@@ -1,0 +1,10 @@
+{
+  "name": "SIRE 2.0 Questionnaire (Testing)",
+  "short_name": "SIRE 2.0",
+  "description": "Offline-capable SIRE 2.0 questionnaire and evidence capture tool.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0b1220",
+  "theme_color": "#0b1220"
+}

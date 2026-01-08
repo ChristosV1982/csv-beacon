@@ -1,0 +1,21 @@
+entrypoint = "index.html"
+modules = ["nodejs-20", "web"]
+
+[nix]
+channel = "stable-25_05"
+packages = ["static-web-server", "unzip"]
+
+# Run command used by the Run button
+run = ["static-web-server", "-p", "3000", "-w", "./static-web-server.toml", "--root", "./"]
+
+# Expose internal 3000 to external 80 (so Preview/browser works reliably)
+[[ports]]
+localPort = 3000
+externalPort = 80
+
+[deployment]
+deploymentTarget = "static"
+publicDir = "."
+
+[agent]
+expertMode = true
