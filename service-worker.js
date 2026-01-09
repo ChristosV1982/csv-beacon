@@ -1,91 +1,45 @@
-/* service-worker.js
-   Bump CACHE_NAME when you want to force clients to refresh cached assets.
-*/
-const CACHE_NAME = "sire-2-questionnaire-2026-v1.1";
+const CACHE_NAME = 'sire-test-v1';
 
-// Keep precache minimal and stable; add icons later once they exist.
-const PRECACHE_URLS = [
-  "./",
-  "./index.html",
-  "./app.js",
-  "./style.css",
-  "./print.js",
-  "./manifest.json",
-  "./sire_questions_all_columns_named.json",
+const urlsToCache = [
+  './',
+  './index.html',
+  './app.js',
+  './style.css',
+  './sire_questions_all_columns_named.json',
+  './print.js',
+  './icon-192.png',
+  './icon-512.png'
 ];
 
-// Install: cache core assets (tolerant to missing files)
-self.addEventListener("install", (event) => {
-  event.waitUntil((async () => {
-    const cache = await caches.open(CACHE_NAME);
-
-    // Cache each asset individually so one missing file doesn't fail the install.
-    await Promise.allSettled(
-      PRECACHE_URLS.map(async (url) => {
-        try {
-          const resp = await fetch(url, { cache: "no-cache" });
-          if (resp && resp.ok) {
-            await cache.put(url, resp.clone());
-          }
-        } catch (_) {
-          // Ignore caching failures; app can still work online.
-        }
-      })
-    );
-
-    self.skipWaiting();
-  })());
+// Install: pre-cache core assets
+self.addEventListener('install', event => {
+  event.waitUntil(
+    caches.open(CACHE_NAME).then(cache => cache.addAll(urlsToCache))
+  );
+  self.skipWaiting();
 });
 
-// Activate: remove old caches and take control
-self.addEventListener("activate", (event) => {
-  event.waitUntil((async () => {
-    const keys = await caches.keys();
-    await Promise.all(
-      keys
-        .filter((k) => k !== CACHE_NAME)
-        .map((k) => caches.delete(k))
-    );
-    await self.clients.claim();
-  })());
+// Activate: remove old caches
+self.addEventListener('activate', event => {
+  event.waitUntil(
+    caches.keys().then(keys =>
+      Promise.all(
+        keys
+          .filter(key => key.startsWith('sire-test-') && key !== CACHE_NAME)
+          .map(key => caches.delete(key))
+      )
+    )
+  );
+  self.clients.claim();
 });
 
-// Fetch strategy:
-// - HTML navigations: network-first, fallback to cached index.html
-// - Other GET: cache-first, fallback to network, then store
-self.addEventListener("fetch", (event) => {
-  if (event.request.method !== "GET") return;
+// Fetch: cache-first for same-origin GET requests
+self.addEventListener('fetch', event => {
+  if (event.request.method !== 'GET') return;
 
-  const req = event.request;
-  const accept = req.headers.get("accept") || "";
-  const isNavigation = req.mode === "navigate" || accept.includes("text/html");
-
-  if (isNavigation) {
-    event.respondWith((async () => {
-      try {
-        const fresh = await fetch(req);
-        const cache = await caches.open(CACHE_NAME);
-        cache.put("./index.html", fresh.clone()).catch(() => {});
-        return fresh;
-      } catch (_) {
-        const cached = await caches.match("./index.html");
-        return cached || new Response("Offline", { status: 503, statusText: "Offline" });
-      }
-    })());
-    return;
-  }
-
-  event.respondWith((async () => {
-    const cached = await caches.match(req);
-    if (cached) return cached;
-
-    try {
-      const fresh = await fetch(req);
-      const cache = await caches.open(CACHE_NAME);
-      cache.put(req, fresh.clone()).catch(() => {});
-      return fresh;
-    } catch (_) {
-      return new Response("Offline", { status: 503, statusText: "Offline" });
-    }
-  })());
+  event.respondWith(
+    caches.match(event.request).then(cached => {
+      return cached || fetch(event.request);
+    })
+  );
 });
