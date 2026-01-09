@@ -134,6 +134,7 @@
     }
 
     .error {
+      white-space: pre-wrap;
       display: none;
       margin-top: 12px;
       padding: 10px 12px;
@@ -144,7 +145,6 @@
       font-weight: 900;
       font-size: 0.95rem;
       line-height: 1.35;
-      white-space: pre-line;
     }
 
     .hint {
@@ -162,7 +162,6 @@
     }
   </style>
 
-  <!-- Supabase JS (CDN) -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 
@@ -176,7 +175,7 @@
 
     <div class="card">
       <label for="username">Username</label>
-      <input id="username" type="text" autocomplete="username" placeholder="e.g. luna" />
+      <input id="username" type="text" autocomplete="username" placeholder="e.g. superuser" />
 
       <label for="password">Password</label>
       <input id="password" type="password" autocomplete="current-password" />
@@ -189,8 +188,9 @@
       <div class="error" id="errBox"></div>
 
       <div class="hint">
-        <b>Important:</b> The user must exist in Supabase Auth as email <span class="mono">username@csvtest.local</span>,
-        and must also have a matching row in <span class="mono">profiles</span>.
+        <b>Important:</b> The user must exist in Supabase Auth as email
+        <span class="mono">username@csvtest.local</span>, and must also have a matching row in
+        <span class="mono">public.profiles</span>.
       </div>
 
       <div class="actions" style="margin-top:14px;">
@@ -205,13 +205,12 @@
     const SUPABASE_URL = "https://bdidrcyufazskpuwmfca.supabase.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJkaWRyY3l1ZmF6c2twdXdtZmNhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc5NDI4ODMsImV4cCI6MjA4MzUxODg4M30.Uqj4WCzoNS9wnlzI-xew6iTFzTUi77dcGeBjUgFjZbQ";
 
-    // Username -> internal email mapping
-    const INTERNAL_EMAIL_DOMAIN = "csvtest.local";
+    const EMAIL_DOMAIN = "csvtest.local";
+    const SESSION_KEY_COMPAT = "q_session_v1"; // keep compatibility with your existing pages for now
 
-    // Compatibility with your existing pages for now
-    const SESSION_KEY_COMPAT = "q_session_v1";
-
-    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
+    });
 
     function setError(msg){
       const el = document.getElementById("errBox");
@@ -225,7 +224,6 @@
     }
 
     function roleToUi(role){
-      // Database enum -> your UI labels
       const map = {
         super_admin: "Super Admin",
         company_admin: "Company Admin",
@@ -243,35 +241,13 @@
     }
 
     function usernameToEmail(usernameOrEmail){
-      const v = String(usernameOrEmail || "").trim().toLowerCase();
+      const v = String(usernameOrEmail || "").trim();
       if (!v) return "";
-      if (v.includes("@")) return v;                     // allow real email if you ever want
-      return `${v}@${INTERNAL_EMAIL_DOMAIN}`;            // username alias email
+      if (v.includes("@")) return v;
+      return `${v}@${EMAIL_DOMAIN}`;
     }
 
-    function normalizeAuthError(error){
-      const msg = String(error?.message || "Unknown error");
-
-      // Supabase often uses a message like "Email not confirmed"
-      if (msg.toLowerCase().includes("not confirmed")) {
-        return [
-          "Login failed: Email not confirmed.",
-          "Your project should have email confirmation OFF (Authentication → Providers → Email).",
-          `Also ensure you recreated the user as ${"username"}@${INTERNAL_EMAIL_DOMAIN}.`
-        ].join("\n");
-      }
-
-      // Wrong password / invalid login
-      if (msg.toLowerCase().includes("invalid login credentials")) {
-        return [
-          "Login failed: Invalid username or password.",
-          `Reminder: internally the username becomes username@${INTERNAL_EMAIL_DOMAIN}.`
-        ].join("\n");
-      }
-
-      return "Login failed: " + msg;
-    }
-
+    // IMPORTANT: no "vessels(name)" join here. We only need the profile row.
     async function fetchMyProfile(userId){
       const { data, error } = await supabaseClient
         .from("profiles")
@@ -298,38 +274,46 @@
 
       const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
       if (error){
-        setError(normalizeAuthError(error));
+        setError("Login failed: " + error.message);
         return;
       }
 
-      const user = data.user;
+      const user = data?.user;
       if (!user){
         setError("Login failed: no user returned.");
         return;
       }
 
-      // Fetch role/vessel from profiles
+      // Ensure session exists
+      const { data: sess } = await supabaseClient.auth.getSession();
+      if (!sess?.session){
+        setError("Login OK but session was not stored. Check browser storage / privacy settings.");
+        return;
+      }
+
+      // Fetch profile
       let profile;
       try{
         profile = await fetchMyProfile(user.id);
       }catch(e){
-        const details = (e && (e.message || e.details || e.hint)) ? (e.message || e.details || e.hint) : JSON.stringify(e);
+        const details = (e && (e.message || e.details || e.hint))
+          ? (e.message || e.details || e.hint)
+          : JSON.stringify(e);
         setError(
           "Login OK but profile fetch failed.\n\n" +
           "Error details:\n" + details + "\n\n" +
-          "Next: check RLS policies and the exact SELECT in fetchMyProfile()."
+          "This is usually an RLS/policy/function issue in Supabase."
         );
         return;
       }
 
       const uiRole = roleToUi(profile.role);
-      const vesselName = profile?.vessels?.name || "";
 
-      // Compatibility for existing pages (until all pages rely solely on Supabase session):
+      // Compatibility payload for existing pages:
       localStorage.setItem(SESSION_KEY_COMPAT, JSON.stringify({
         username: profile.username || username,
         role: uiRole,
-        vessel: vesselName,
+        vessel_id: profile.vessel_id || null,
         created_at: new Date().toISOString()
       }));
 
