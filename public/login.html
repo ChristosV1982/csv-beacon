@@ -18,7 +18,6 @@
       background: radial-gradient(1200px 700px at 20% 10%, #1a4170 0%, #0b1c33 55%, #071426 100%);
       font-family: "Segoe UI", Arial, sans-serif;
     }
-
     .login-shell {
       width: 100%;
       max-width: 560px;
@@ -30,7 +29,6 @@
       backdrop-filter: blur(3px);
       color:#fff;
     }
-
     .title {
       color: #ffffff;
       margin: 0 0 10px 0;
@@ -40,7 +38,6 @@
       text-align: center;
       text-shadow: 0 3px 12px rgba(0,0,0,0.35);
     }
-
     .subtitle {
       margin: 0 0 18px 0;
       color: rgba(255,255,255,0.90);
@@ -49,7 +46,6 @@
       text-align: center;
       font-weight: 800;
     }
-
     .card {
       background: #ffffff;
       border: 1px solid #d5deef;
@@ -58,7 +54,6 @@
       box-shadow: 0 4px 18px rgba(18, 44, 87, 0.16);
       color:#1a4170;
     }
-
     label {
       display: block;
       margin: 12px 0 6px 0;
@@ -66,7 +61,6 @@
       color: #1a4170;
       font-size: 0.95rem;
     }
-
     input {
       width: 100%;
       box-sizing: border-box;
@@ -79,12 +73,10 @@
       background:#fff;
       color:#1a4170;
     }
-
     input:focus {
       border-color: #2e68c7;
       box-shadow: 0 0 0 3px rgba(46, 104, 199, 0.15);
     }
-
     .actions {
       display: flex;
       gap: 10px;
@@ -92,7 +84,6 @@
       align-items: center;
       margin-top: 16px;
     }
-
     .btn-primary {
       border: none;
       border-radius: 10px;
@@ -105,7 +96,18 @@
       box-shadow: 0 2px 10px rgba(0,0,0,0.15);
     }
     .btn-primary:hover { filter: brightness(0.96); }
-
+    .btn-muted {
+      border-radius: 10px;
+      background: #eaf1fb;
+      border: 1px solid #d5deef;
+      color: #1a4170;
+      font-weight: 900;
+      font-size: 1rem;
+      padding: 9px 16px;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-block;
+    }
     .btn-outline {
       border-radius: 10px;
       background: transparent;
@@ -119,22 +121,7 @@
       display: inline-block;
     }
     .btn-outline:hover { background: rgba(41, 94, 176, 0.08); }
-
-    .btn-muted {
-      border-radius: 10px;
-      background: #eaf1fb;
-      border: 1px solid #d5deef;
-      color: #1a4170;
-      font-weight: 900;
-      font-size: 1rem;
-      padding: 9px 16px;
-      cursor: pointer;
-      text-decoration: none;
-      display: inline-block;
-    }
-
     .error {
-      white-space: pre-wrap;
       display: none;
       margin-top: 12px;
       padding: 10px 12px;
@@ -146,7 +133,6 @@
       font-size: 0.95rem;
       line-height: 1.35;
     }
-
     .hint {
       margin-top: 12px;
       color: #35507b;
@@ -154,7 +140,6 @@
       line-height: 1.35;
       font-weight: 800;
     }
-
     .mono {
       font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
       font-size: 0.92rem;
@@ -163,6 +148,7 @@
   </style>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="./auth.js"></script>
 </head>
 
 <body>
@@ -188,29 +174,23 @@
       <div class="error" id="errBox"></div>
 
       <div class="hint">
-        <b>Important:</b> The user must exist in Supabase Auth as email
-        <span class="mono">username@csvtest.local</span>, and must also have a matching row in
+        <b>Important:</b> the user must exist in Supabase Auth as email
+        <span class="mono">username@csvtest.local</span> and must have a matching row in
         <span class="mono">public.profiles</span>.
       </div>
 
       <div class="actions" style="margin-top:14px;">
         <a class="btn-outline" href="./library.html">Read Only</a>
-        <a class="btn-outline" href="./q-dashboard.html">Dashboard</a>
         <a class="btn-outline" href="./index.html">Mode Selection</a>
       </div>
     </div>
   </div>
 
   <script>
-    const SUPABASE_URL = "https://bdidrcyufazskpuwmfca.supabase.co";
-    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJkaWRyY3l1ZmF6c2twdXdtZmNhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc5NDI4ODMsImV4cCI6MjA4MzUxODg4M30.Uqj4WCzoNS9wnlzI-xew6iTFzTUi77dcGeBjUgFjZbQ";
-
-    const EMAIL_DOMAIN = "csvtest.local";
-    const SESSION_KEY_COMPAT = "q_session_v1"; // keep compatibility with your existing pages for now
-
-    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
-    });
+    const supabaseClient = window.supabase.createClient(
+      "https://bdidrcyufazskpuwmfca.supabase.co",
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJkaWRyY3l1ZmF6c2twdXdtZmNhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc5NDI4ODMsImV4cCI6MjA4MzUxODg4M30.Uqj4WCzoNS9wnlzI-xew6iTFzTUi77dcGeBjUgFjZbQ"
+    );
 
     function setError(msg){
       const el = document.getElementById("errBox");
@@ -223,40 +203,29 @@
       el.style.display = "none";
     }
 
-    function roleToUi(role){
-      const map = {
-        super_admin: "Super Admin",
-        company_admin: "Company Admin",
-        company_superintendent: "Company Superintendent",
-        vessel: "Vessel",
-        inspector: "Inspector / Third Party"
-      };
-      return map[role] || role || "";
-    }
-
-    function redirectByRole(uiRole){
-      if (uiRole === "Vessel") return (window.location.href = "./q-vessel.html");
-      if (uiRole === "Inspector / Third Party") return (window.location.href = "./q-inspector.html");
-      return (window.location.href = "./q-dashboard.html");
-    }
-
     function usernameToEmail(usernameOrEmail){
       const v = String(usernameOrEmail || "").trim();
       if (!v) return "";
       if (v.includes("@")) return v;
-      return `${v}@${EMAIL_DOMAIN}`;
+      return `${v}@${AUTH.USERNAME_DOMAIN}`;
     }
 
-    // IMPORTANT: no "vessels(name)" join here. We only need the profile row.
     async function fetchMyProfile(userId){
       const { data, error } = await supabaseClient
         .from("profiles")
-        .select("username, role, vessel_id")
+        .select("id, username, role, vessel_id")
         .eq("id", userId)
         .single();
-
       if (error) throw error;
       return data;
+    }
+
+    function routeByRole(dbRole){
+      const R = AUTH.ROLES;
+      if (dbRole === R.VESSEL) return "./q-vessel.html";
+      if (dbRole === R.INSPECTOR) return "./q-inspector.html";
+      if (dbRole === R.COMPANY_ADMIN || dbRole === R.COMPANY_SUPERINTENDENT || dbRole === R.SUPER_ADMIN) return "./q-dashboard.html";
+      return "./q-dashboard.html";
     }
 
     async function doLogin(){
@@ -278,64 +247,41 @@
         return;
       }
 
-      const user = data?.user;
+      const user = data.user;
       if (!user){
         setError("Login failed: no user returned.");
         return;
       }
 
-      // Ensure session exists
-      const { data: sess } = await supabaseClient.auth.getSession();
-      if (!sess?.session){
-        setError("Login OK but session was not stored. Check browser storage / privacy settings.");
-        return;
-      }
-
-      // Fetch profile
       let profile;
-      try{
+      try {
         profile = await fetchMyProfile(user.id);
-      }catch(e){
-        const details = (e && (e.message || e.details || e.hint))
-          ? (e.message || e.details || e.hint)
-          : JSON.stringify(e);
-        setError(
-          "Login OK but profile fetch failed.\n\n" +
-          "Error details:\n" + details + "\n\n" +
-          "This is usually an RLS/policy/function issue in Supabase."
-        );
+      } catch (e) {
+        setError("Login OK but profile missing or blocked. Ensure a row exists in public.profiles for this user.");
         return;
       }
 
-      const uiRole = roleToUi(profile.role);
+      // If a protected page sent us here, honor it
+      const returnTo = AUTH.safePath(AUTH.qs("returnTo"));
+      if (returnTo) {
+        window.location.href = returnTo;
+        return;
+      }
 
-      // Compatibility payload for existing pages:
-      localStorage.setItem(SESSION_KEY_COMPAT, JSON.stringify({
-        username: profile.username || username,
-        role: uiRole,
-        vessel_id: profile.vessel_id || null,
-        created_at: new Date().toISOString()
-      }));
-
-      redirectByRole(uiRole);
+      window.location.href = routeByRole(profile.role);
     }
 
     async function doLogout(){
       clearError();
       await supabaseClient.auth.signOut();
-      localStorage.removeItem(SESSION_KEY_COMPAT);
+      localStorage.removeItem("q_session_v1");
       setError("Logged out.");
     }
 
     document.getElementById("loginBtn").addEventListener("click", doLogin);
     document.getElementById("logoutBtn").addEventListener("click", doLogout);
-
-    document.getElementById("password").addEventListener("keydown", (e) => {
-      if (e.key === "Enter") doLogin();
-    });
-    document.getElementById("username").addEventListener("keydown", (e) => {
-      if (e.key === "Enter") doLogin();
-    });
+    document.getElementById("password").addEventListener("keydown", (e) => { if (e.key === "Enter") doLogin(); });
+    document.getElementById("username").addEventListener("keydown", (e) => { if (e.key === "Enter") doLogin(); });
   </script>
 </body>
 </html>
