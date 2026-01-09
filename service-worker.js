@@ -1,4 +1,4 @@
-const CACHE_NAME = 'sire-test-v1';
+const CACHE_NAME = "sire2-cache-v7"; // increment this number each time
 
 const urlsToCache = [
   './',
@@ -20,18 +20,14 @@ self.addEventListener('install', event => {
 });
 
 // Activate: remove old caches
-self.addEventListener('activate', event => {
+self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(
-        keys
-          .filter(key => key.startsWith('sire-test-') && key !== CACHE_NAME)
-          .map(key => caches.delete(key))
-      )
+    caches.keys().then((keys) =>
+      Promise.all(keys.map((k) => (k !== CACHE_NAME ? caches.delete(k) : null)))
     )
   );
-  self.clients.claim();
 });
+
 
 // Fetch: cache-first for same-origin GET requests
 self.addEventListener('fetch', event => {
