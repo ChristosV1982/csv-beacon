@@ -144,6 +144,7 @@
       font-weight: 900;
       font-size: 0.95rem;
       line-height: 1.35;
+      white-space: pre-line;
     }
 
     .hint {
@@ -170,7 +171,7 @@
     <div class="title">Questionnaire Mode Login</div>
     <div class="subtitle">
       Users login with <b>Username + Password</b>.<br/>
-      Internally we use: <span class="mono">username@spis.local</span>
+      Internally we use: <span class="mono">username@csvtest.local</span>
     </div>
 
     <div class="card">
@@ -188,7 +189,7 @@
       <div class="error" id="errBox"></div>
 
       <div class="hint">
-        <b>Important:</b> The user must exist in Supabase Auth as email <span class="mono">username@spis.local</span>,
+        <b>Important:</b> The user must exist in Supabase Auth as email <span class="mono">username@csvtest.local</span>,
         and must also have a matching row in <span class="mono">profiles</span>.
       </div>
 
@@ -204,7 +205,11 @@
     const SUPABASE_URL = "https://bdidrcyufazskpuwmfca.supabase.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJkaWRyY3l1ZmF6c2twdXdtZmNhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc5NDI4ODMsImV4cCI6MjA4MzUxODg4M30.Uqj4WCzoNS9wnlzI-xew6iTFzTUi77dcGeBjUgFjZbQ";
 
-    const SESSION_KEY_COMPAT = "q_session_v1"; // keep compatibility with your existing pages for now
+    // Username -> internal email mapping
+    const INTERNAL_EMAIL_DOMAIN = "csvtest.local";
+
+    // Compatibility with your existing pages for now
+    const SESSION_KEY_COMPAT = "q_session_v1";
 
     const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -238,10 +243,33 @@
     }
 
     function usernameToEmail(usernameOrEmail){
-      const v = String(usernameOrEmail || "").trim();
+      const v = String(usernameOrEmail || "").trim().toLowerCase();
       if (!v) return "";
-      if (v.includes("@")) return v;               // allow real email if you ever want
-      return `${v}@spis.local`;                    // username alias email
+      if (v.includes("@")) return v;                     // allow real email if you ever want
+      return `${v}@${INTERNAL_EMAIL_DOMAIN}`;            // username alias email
+    }
+
+    function normalizeAuthError(error){
+      const msg = String(error?.message || "Unknown error");
+
+      // Supabase often uses a message like "Email not confirmed"
+      if (msg.toLowerCase().includes("not confirmed")) {
+        return [
+          "Login failed: Email not confirmed.",
+          "Your project should have email confirmation OFF (Authentication → Providers → Email).",
+          `Also ensure you recreated the user as ${"username"}@${INTERNAL_EMAIL_DOMAIN}.`
+        ].join("\n");
+      }
+
+      // Wrong password / invalid login
+      if (msg.toLowerCase().includes("invalid login credentials")) {
+        return [
+          "Login failed: Invalid username or password.",
+          `Reminder: internally the username becomes username@${INTERNAL_EMAIL_DOMAIN}.`
+        ].join("\n");
+      }
+
+      return "Login failed: " + msg;
     }
 
     async function fetchMyProfile(userId){
@@ -270,11 +298,10 @@
 
       const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
       if (error){
-        setError("Login failed: " + error.message);
+        setError(normalizeAuthError(error));
         return;
       }
 
-      // session exists
       const user = data.user;
       if (!user){
         setError("Login failed: no user returned.");
@@ -286,14 +313,17 @@
       try{
         profile = await fetchMyProfile(user.id);
       }catch(e){
-        setError("Login OK but profile missing or blocked. Ensure a profiles row exists for this user.");
+        setError(
+          "Login OK but profile missing or blocked.\n" +
+          "Ensure a row exists in public.profiles for this user (id must match auth.users.id)."
+        );
         return;
       }
 
       const uiRole = roleToUi(profile.role);
       const vesselName = profile?.vessels?.name || "";
 
-      // Compatibility for existing pages (until we convert them to Supabase):
+      // Compatibility for existing pages (until all pages rely solely on Supabase session):
       localStorage.setItem(SESSION_KEY_COMPAT, JSON.stringify({
         username: profile.username || username,
         role: uiRole,
