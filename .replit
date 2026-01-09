@@ -27,5 +27,6 @@ externalPort = 80
 expertMode = true
 
 [deployment]
-deploymentTarget = "static"
 publicDir = "public"
+deploymentTarget = "static"
+
