@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SIRE 2.0 – Reports</title>
+
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <style>
+    body{
+      min-height:100vh;
+      margin:0;
+      padding:18px 14px;
+      background: radial-gradient(1200px 700px at 20% 10%, #1a4170 0%, #0b1c33 55%, #071426 100%);
+      font-family:"Segoe UI", Arial, sans-serif;
+      color:#fff;
+    }
+    .wrap{ max-width: 1600px; margin: 0 auto; }
+
+    .topbar{
+      display:flex;
+      gap:12px;
+      flex-wrap:wrap;
+      align-items:center;
+      justify-content:space-between;
+      margin-bottom: 12px;
+    }
+    .title{
+      font-weight:950;
+      letter-spacing:0.03em;
+      margin:0;
+      font-size:1.25rem;
+      text-shadow: 0 3px 12px rgba(0,0,0,0.35);
+    }
+    .sub{
+      margin-top:6px;
+      opacity:0.92;
+      font-weight:850;
+      line-height:1.35;
+    }
+    .top-actions{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+
+    .btn{
+      border:none; border-radius:10px;
+      padding:10px 14px;
+      font-weight:900;
+      cursor:pointer;
+      text-decoration:none;
+      display:inline-block;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+      background:#295eb0;
+      color:#fff;
+      white-space: nowrap;
+    }
+    .btn:hover{ filter:brightness(0.96); }
+    .btn-outline{ background:transparent; border:1px solid rgba(255,255,255,0.65); color:#fff; box-shadow:none; }
+    .btn-muted{ background:#eaf1fb; border:1px solid #d5deef; color:#1a4170; box-shadow:none; }
+    .btn:disabled{ opacity:0.55; cursor:not-allowed; filter:none; }
+
+    .panel{
+      background: rgba(12,33,58,0.68);
+      border: 1px solid rgba(213,222,239,0.35);
+      border-radius: 18px;
+      padding: 14px;
+      box-shadow: 0 10px 46px rgba(0,0,0,0.35);
+      backdrop-filter: blur(3px);
+    }
+
+    .card{
+      background:#fff;
+      color:#1a4170;
+      border:1px solid #d5deef;
+      border-radius:16px;
+      padding:14px;
+      box-shadow: 0 4px 18px rgba(18, 44, 87, 0.16);
+    }
+
+    .mono{
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+      font-size: 0.92rem;
+      color:#35507b;
+    }
+
+    .warn{
+      margin-top:10px;
+      padding:10px 12px;
+      border-radius:12px;
+      border:1px solid #f1c7c7;
+      background:#fff2f2;
+      color:#7a1f1f;
+      font-weight: 900;
+      line-height:1.35;
+      display:none;
+    }
+    .ok{
+      margin-top:10px;
+      padding:10px 12px;
+      border-radius:12px;
+      border:1px solid #bce9c9;
+      background:#e9fff0;
+      color:#11612b;
+      font-weight: 900;
+      line-height:1.35;
+      display:none;
+    }
+
+    .toolbar{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      align-items:center;
+      justify-content:space-between;
+      margin: 10px 0 0 0;
+      padding: 10px;
+      border:1px solid #d5deef;
+      border-radius:12px;
+      background:#f7fbff;
+    }
+    .toolbar .left{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+    .toolbar .right{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+
+    label{
+      display:block;
+      margin: 10px 0 6px 0;
+      font-weight: 950;
+      color:#1a4170;
+      font-size: 0.95rem;
+    }
+    select, input{
+      width: 100%;
+      box-sizing:border-box;
+      border-radius:10px;
+      border:1px solid #cbd7ee;
+      padding: 10px 12px;
+      font-size: 1rem;
+      font-family:"Segoe UI", Arial, sans-serif;
+      background:#fff;
+      color:#1a4170;
+      outline:none;
+    }
+    select:focus, input:focus{
+      border-color:#2e68c7;
+      box-shadow: 0 0 0 3px rgba(46, 104, 199, 0.15);
+    }
+
+    .grid{
+      display:grid;
+      grid-template-columns: 420px 1fr;
+      gap:12px;
+      margin-top: 12px;
+      align-items:start;
+    }
+    @media (max-width: 1100px){
+      .grid{ grid-template-columns: 1fr; }
+    }
+
+    .box{
+      border:1px solid #d5deef;
+      border-radius:12px;
+      background:#f7fbff;
+      padding:10px;
+      color:#1a4170;
+    }
+
+    .tiles{
+      display:grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap:10px;
+    }
+    @media (max-width: 1300px){
+      .tiles{ grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 650px){
+      .tiles{ grid-template-columns: 1fr; }
+    }
+
+    .tile{
+      border:1px solid #d5deef;
+      border-radius:14px;
+      padding:12px;
+      background:#fff;
+      box-shadow: 0 4px 18px rgba(18, 44, 87, 0.10);
+    }
+    .tileTitle{ font-weight:950; color:#1a4170; margin-bottom:6px; }
+    .tileNum{ font-size:1.8rem; font-weight:950; color:#1a4170; }
+    .tileSub{ margin-top:6px; font-weight:850; color:#35507b; line-height:1.35; }
+
+    .tableWrap{ overflow:auto; border:1px solid #d5deef; border-radius:12px; margin-top:10px; background:#fff; }
+    table{ width:100%; border-collapse:collapse; min-width: 700px; }
+    th, td{ padding:10px 10px; border-bottom:1px solid #e6eefb; vertical-align:top; }
+    th{
+      text-align:left;
+      background:#f2f7ff;
+      color:#1a4170;
+      font-weight: 950;
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+    td{ color:#223a66; font-weight: 850; }
+    .small{ font-size: 0.92rem; font-weight: 850; color:#35507b; line-height:1.35; }
+
+    .pill{
+      display:inline-block;
+      padding:3px 10px;
+      border-radius:999px;
+      font-weight:900;
+      font-size:0.85rem;
+      border:1px solid #d5deef;
+      background:#eaf1fb;
+      color:#1a4170;
+      white-space: nowrap;
+    }
+    .pill.progress{ background:#fff4df; border-color:#f0d39a; color:#7a4a00; }
+    .pill.pending{ background:#fff0f0; border-color:#f1c7c7; color:#7a1f1f; }
+    .pill.submitted{ background:#e9fff0; border-color:#bce9c9; color:#11612b; }
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <div>
+        <h1 class="title">Reports & Statistics (Supabase)</h1>
+        <div class="sub" id="subLine">Checking session...</div>
+      </div>
+
+      <div class="top-actions">
+        <a class="btn btn-outline" href="./q-dashboard.html">Dashboard</a>
+        <a class="btn btn-outline" href="./q-company.html">Company</a>
+        <a class="btn btn-outline" href="./q-vessel.html">Vessel</a>
+        <a class="btn btn-outline" href="./q-inspector.html">Inspector</a>
+        <a class="btn btn-outline" href="./library.html">Read Only</a>
+        <a class="btn btn-outline" href="./index.html">Mode Selection</a>
+        <a class="btn btn-muted" href="./login.html">Login</a>
+        <button class="btn btn-outline" id="logoutBtn" type="button">Logout</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="card">
+        <div id="warnBox" class="warn"></div>
+        <div id="okBox" class="ok"></div>
+
+        <div class="toolbar">
+          <div class="left">
+            <div class="mono" id="sessionLine">Session: ...</div>
+            <span class="mono" id="roleLine">Role: ...</span>
+            <span class="mono" id="vesselLine">Vessel: ...</span>
+          </div>
+          <div class="right">
+            <button class="btn btn-muted" id="refreshBtn" type="button">Refresh</button>
+          </div>
+        </div>
+
+        <div class="grid">
+          <!-- Filters -->
+          <div>
+            <div class="box">
+              <div class="mono" style="margin-bottom:8px;">
+                Choose questionnaire (within your RLS scope). Statistics are calculated from <span class="mono">public.responses</span>.
+              </div>
+
+              <label for="statusFilter">Status filter (list)</label>
+              <select id="statusFilter">
+                <option value="">All</option>
+                <option value="in_progress">in_progress</option>
+                <option value="pending_office_review">pending_office_review</option>
+                <option value="submitted">submitted</option>
+              </select>
+
+              <label for="qidSelect">Questionnaire</label>
+              <select id="qidSelect">
+                <option value="">(loading...)</option>
+              </select>
+
+              <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:12px;">
+                <button class="btn" id="openBtn" type="button">Open in q-answer</button>
+                <button class="btn btn-muted" id="loadBtn" type="button">Load Stats</button>
+              </div>
+
+              <div class="box" style="margin-top:12px;">
+                <div class="mono" id="qMeta">Selected: -</div>
+              </div>
+            </div>
+
+            <div class="box" style="margin-top:12px;">
+              <div style="font-weight:950;">Global summary (within scope)</div>
+              <div class="tableWrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Status</th>
+                      <th>Count</th>
+                    </tr>
+                  </thead>
+                  <tbody id="globalBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Results -->
+          <div>
+            <div class="tiles">
+              <div class="tile">
+                <div class="tileTitle">Total questions (library)</div>
+                <div class="tileNum" id="kpiTotal">-</div>
+                <div class="tileSub">From sire_questions_all_columns_named.json</div>
+              </div>
+              <div class="tile">
+                <div class="tileTitle">Answered (non-BLANK)</div>
+                <div class="tileNum" id="kpiAnswered">-</div>
+                <div class="tileSub">YES/NO/N/A/NOT SEEN</div>
+              </div>
+              <div class="tile">
+                <div class="tileTitle">Completion</div>
+                <div class="tileNum" id="kpiCompletion">-</div>
+                <div class="tileSub">% answered</div>
+              </div>
+              <div class="tile">
+                <div class="tileTitle">NO answers</div>
+                <div class="tileNum" id="kpiNo">-</div>
+                <div class="tileSub">Risk focus</div>
+              </div>
+              <div class="tile">
+                <div class="tileTitle">BLANK</div>
+                <div class="tileNum" id="kpiBlank">-</div>
+                <div class="tileSub">Not answered</div>
+              </div>
+            </div>
+
+            <div class="box" style="margin-top:12px;">
+              <div style="font-weight:950;">Answer distribution</div>
+              <div class="tableWrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Answer</th>
+                      <th>Count</th>
+                    </tr>
+                  </thead>
+                  <tbody id="distBody"></tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="box" style="margin-top:12px;">
+              <div style="font-weight:950;">Top “NO” questions (by question_key)</div>
+              <div class="small" style="margin-top:6px;">
+                This lists “NO” answers for the selected questionnaire. (Later we will enrich this by joining to the question library text.)
+              </div>
+              <div class="tableWrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th style="width:260px;">Question key</th>
+                      <th>Comment (latest)</th>
+                      <th style="width:220px;">Updated</th>
+                    </tr>
+                  </thead>
+                  <tbody id="noBody"></tbody>
+                </table>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <div class="box" style="margin-top:12px;">
+          <div class="mono">
+            Supabase: https://bdidrcyufazskpuwmfca.supabase.co
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // =====================
+    // Supabase config (your values)
+    // =====================
+    const SUPABASE_URL = "https://bdidrcyufazskpuwmfca.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJkaWRyY3l1ZmF6c2twdXdtZmNhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc5NDI4ODMsImV4cCI6MjA4MzUxODg4M30.Uqj4WCzoNS9wnlzI-xew6iTFzTUi77dcGeBjUgFjZbQ";
+    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    const UI_ROLE_MAP = {
+      super_admin: "Super Admin",
+      company_admin: "Company Admin",
+      company_superintendent: "Company Superintendent",
+      vessel: "Vessel",
+      inspector: "Inspector / Third Party"
+    };
+    function roleToUi(role){ return UI_ROLE_MAP[role] || role || ""; }
+
+    function setSubLine(text){ document.getElementById("subLine").textContent = text; }
+    function showWarn(msg){
+      const w = document.getElementById("warnBox");
+      w.textContent = msg;
+      w.style.display = "block";
+    }
+    function clearWarn(){
+      const w = document.getElementById("warnBox");
+      w.textContent = "";
+      w.style.display = "none";
+    }
+    function showOk(msg){
+      const o = document.getElementById("okBox");
+      o.textContent = msg;
+      o.style.display = "block";
+      setTimeout(() => { o.style.display = "none"; }, 1400);
+    }
+
+    function escapeHtml(str){
+      return String(str ?? "")
+        .replaceAll("&","&amp;")
+        .replaceAll("<","&lt;")
+        .replaceAll(">","&gt;")
+        .replaceAll('"',"&quot;")
+        .replaceAll("'","&#039;");
+    }
+    function fmtTs(ts){
+      if (!ts) return "-";
+      try{ return new Date(ts).toLocaleString(); }catch(e){ return String(ts); }
+    }
+
+    async function getUser(){
+      const { data: { user }, error } = await supabaseClient.auth.getUser();
+      if (error) showWarn("Auth error: " + error.message);
+      return user || null;
+    }
+
+    async function getMyProfile(userId){
+      const { data, error } = await supabaseClient
+        .from("profiles")
+        .select("username, role, vessel_id, vessels(name)")
+        .eq("id", userId)
+        .single();
+      if (error) throw error;
+      return data;
+    }
+
+    async function loadQuestionnaires(status){
+      let q = supabaseClient
+        .from("questionnaires")
+        .select("id, title, status, updated_at, created_at, vessels(name)")
+        .order("updated_at", { ascending: false });
+
+      if (status){
+        q = q.eq("status", status);
+      }
+
+      const { data, error } = await q;
+      if (error) throw error;
+      return data || [];
+    }
+
+    async function loadResponsesForQid(qid){
+      const { data, error } = await supabaseClient
+        .from("responses")
+        .select("question_key, answer, comment, updated_at")
+        .eq("questionnaire_id", qid);
+
+      if (error) throw error;
+      return data || [];
+    }
+
+    async function loadGlobalStatusCounts(){
+      const { data, error } = await supabaseClient
+        .from("questionnaires")
+        .select("status");
+
+      if (error) throw error;
+      const rows = data || [];
+      const map = new Map();
+      rows.forEach(r => {
+        const s = r.status || "unknown";
+        map.set(s, (map.get(s) || 0) + 1);
+      });
+      return map;
+    }
+
+    async function loadQuestionLibraryCount(){
+      const res = await fetch("./sire_questions_all_columns_named.json", { cache: "no-store" });
+      if (!res.ok) throw new Error("Failed to load sire_questions_all_columns_named.json (HTTP " + res.status + ")");
+      const data = await res.json();
+      if (!Array.isArray(data)) throw new Error("Question library JSON is not an array.");
+      return data.length;
+    }
+
+    function renderGlobal(map){
+      const body = document.getElementById("globalBody");
+      const rows = Array.from(map.entries()).sort((a,b) => a[0].localeCompare(b[0]));
+      if (!rows.length){
+        body.innerHTML = `<tr><td colspan="2" class="small">No data.</td></tr>`;
+        return;
+      }
+      body.innerHTML = rows.map(([status,count]) => `
+        <tr>
+          <td><span class="mono">${escapeHtml(status)}</span></td>
+          <td>${count}</td>
+        </tr>
+      `).join("");
+    }
+
+    function renderQSelect(list){
+      const sel = document.getElementById("qidSelect");
+      if (!list.length){
+        sel.innerHTML = `<option value="">(none found)</option>`;
+        return;
+      }
+      sel.innerHTML = `<option value="">-- Select --</option>` + list.map(q => {
+        const vessel = q?.vessels?.name || "";
+        const label = `${vessel ? vessel + " • " : ""}${q.title} • ${q.status}`;
+        return `<option value="${escapeHtml(q.id)}">${escapeHtml(label)}</option>`;
+      }).join("");
+    }
+
+    function setQMeta(q){
+      const el = document.getElementById("qMeta");
+      if (!q){
+        el.textContent = "Selected: -";
+        return;
+      }
+      const vessel = q?.vessels?.name || "";
+      el.textContent = `Selected: ${vessel ? vessel + " • " : ""}${q.title} • ${q.status} • updated ${fmtTs(q.updated_at)}`;
+    }
+
+    function setKpis({ total, answered, completionPct, noCount, blankCount }){
+      document.getElementById("kpiTotal").textContent = total;
+      document.getElementById("kpiAnswered").textContent = answered;
+      document.getElementById("kpiCompletion").textContent = completionPct + "%";
+      document.getElementById("kpiNo").textContent = noCount;
+      document.getElementById("kpiBlank").textContent = blankCount;
+    }
+
+    function renderDistribution(dist){
+      const body = document.getElementById("distBody");
+      const order = ["YES","NO","N/A","NOT SEEN","BLANK"];
+      body.innerHTML = order.map(k => `
+        <tr>
+          <td><span class="mono">${k}</span></td>
+          <td>${dist[k] || 0}</td>
+        </tr>
+      `).join("");
+    }
+
+    function renderNoList(rows){
+      const body = document.getElementById("noBody");
+      if (!rows.length){
+        body.innerHTML = `<tr><td colspan="3" class="small">No “NO” answers.</td></tr>`;
+        return;
+      }
+
+      // sort by updated desc
+      rows.sort((a,b) => new Date(b.updated_at) - new Date(a.updated_at));
+
+      body.innerHTML = rows.map(r => `
+        <tr>
+          <td class="mono">${escapeHtml(r.question_key)}</td>
+          <td class="small">${escapeHtml((r.comment || "").slice(0, 260))}${(r.comment||"").length>260 ? "…" : ""}</td>
+          <td class="small">${escapeHtml(fmtTs(r.updated_at))}</td>
+        </tr>
+      `).join("");
+    }
+
+    async function doLogout(){
+      clearWarn();
+      await supabaseClient.auth.signOut();
+      setSubLine("Logged out.");
+      showWarn("Logged out. Go to login.html to sign in again.");
+    }
+
+    let USER = null;
+    let PROFILE = null;
+    let UI_ROLE = "";
+    let VESSEL_NAME = "";
+    let QLIST = [];
+    let LIB_TOTAL = null;
+
+    async function refreshAll(){
+      clearWarn();
+      setSubLine("Loading report data...");
+
+      const status = document.getElementById("statusFilter").value;
+
+      try{
+        // global summary
+        const g = await loadGlobalStatusCounts();
+        renderGlobal(g);
+
+        // questionnaires list
+        QLIST = await loadQuestionnaires(status);
+        renderQSelect(QLIST);
+
+        // library total
+        if (LIB_TOTAL === null){
+          LIB_TOTAL = await loadQuestionLibraryCount();
+        }
+
+        setSubLine("Ready.");
+        showOk("Refreshed.");
+      }catch(e){
+        showWarn("Refresh failed: " + String(e.message || e));
+        setSubLine("Error loading report data.");
+      }
+    }
+
+    async function loadStats(){
+      clearWarn();
+
+      const qid = document.getElementById("qidSelect").value;
+      if (!qid){
+        showWarn("Please select a questionnaire first.");
+        return;
+      }
+
+      const q = QLIST.find(x => x.id === qid);
+      setQMeta(q);
+
+      try{
+        setSubLine("Loading responses...");
+        const rows = await loadResponsesForQid(qid);
+
+        const dist = { "YES":0, "NO":0, "N/A":0, "NOT SEEN":0, "BLANK":0 };
+        rows.forEach(r => {
+          const a = (r.answer || "BLANK");
+          if (dist[a] === undefined) dist[a] = 0;
+          dist[a] += 1;
+        });
+
+        const answered = (dist["YES"] + dist["NO"] + dist["N/A"] + dist["NOT SEEN"]);
+        const blank = dist["BLANK"] || 0;
+        const total = (LIB_TOTAL ?? (answered + blank));
+        const completionPct = total ? Math.round((answered / total) * 100) : 0;
+
+        setKpis({
+          total,
+          answered,
+          completionPct,
+          noCount: dist["NO"] || 0,
+          blankCount: blank
+        });
+
+        renderDistribution(dist);
+
+        const noRows = rows.filter(r => (r.answer === "NO"));
+        renderNoList(noRows);
+
+        setSubLine("Ready.");
+        showOk("Stats loaded.");
+      }catch(e){
+        showWarn("Stats load failed: " + String(e.message || e));
+        setSubLine("Error loading stats.");
+      }
+    }
+
+    async function init(){
+      clearWarn();
+
+      USER = await getUser();
+      if (!USER){
+        setSubLine("Not logged in.");
+        showWarn("You are not logged in. Please login first (login.html).");
+        return;
+      }
+
+      try{
+        PROFILE = await getMyProfile(USER.id);
+      }catch(e){
+        setSubLine("Logged in, but profile missing or blocked.");
+        showWarn("Profile missing or blocked by RLS. Ensure a row exists in public.profiles for this user.");
+        return;
+      }
+
+      UI_ROLE = roleToUi(PROFILE.role);
+      VESSEL_NAME = PROFILE?.vessels?.name || "";
+      const username = PROFILE.username || USER.email || "(unknown)";
+
+      document.getElementById("sessionLine").textContent = `Session: ${username}`;
+      document.getElementById("roleLine").textContent = `Role: ${UI_ROLE}`;
+      document.getElementById("vesselLine").textContent = `Vessel: ${VESSEL_NAME || "(n/a)"}`;
+
+      document.getElementById("refreshBtn").addEventListener("click", refreshAll);
+      document.getElementById("statusFilter").addEventListener("change", refreshAll);
+      document.getElementById("loadBtn").addEventListener("click", loadStats);
+      document.getElementById("qidSelect").addEventListener("change", () => {
+        const qid = document.getElementById("qidSelect").value;
+        const q = QLIST.find(x => x.id === qid);
+        setQMeta(q || null);
+      });
+
+      document.getElementById("openBtn").addEventListener("click", () => {
+        const qid = document.getElementById("qidSelect").value;
+        if (!qid){
+          showWarn("Select a questionnaire first.");
+          return;
+        }
+        window.location.href = "./q-answer.html?qid=" + encodeURIComponent(qid);
+      });
+
+      document.getElementById("logoutBtn").addEventListener("click", doLogout);
+
+      await refreshAll();
+      setQMeta(null);
+
+      // set blank defaults
+      setKpis({ total:"-", answered:"-", completionPct: "-", noCount:"-", blankCount:"-" });
+      renderDistribution({ "YES":0,"NO":0,"N/A":0,"NOT SEEN":0,"BLANK":0 });
+      renderNoList([]);
+    }
+
+    init();
+  </script>
+</body>
+</html>

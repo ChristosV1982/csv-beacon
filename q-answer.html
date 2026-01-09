@@ -1,0 +1,1252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SIRE 2.0 – Answer Questionnaire</title>
+
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <style>
+    body{
+      min-height:100vh;
+      margin:0;
+      padding:14px 12px;
+      background: radial-gradient(1200px 700px at 20% 10%, #1a4170 0%, #0b1c33 55%, #071426 100%);
+      font-family:"Segoe UI", Arial, sans-serif;
+      color:#fff;
+    }
+    .wrap{ max-width: 1700px; margin: 0 auto; }
+
+    .topbar{
+      display:flex;
+      gap:12px;
+      flex-wrap:wrap;
+      align-items:center;
+      justify-content:space-between;
+      margin-bottom: 10px;
+    }
+    .title{
+      font-weight:950;
+      letter-spacing:0.03em;
+      margin:0;
+      font-size:1.15rem;
+      text-shadow: 0 3px 12px rgba(0,0,0,0.35);
+    }
+    .sub{
+      margin-top:6px;
+      opacity:0.92;
+      font-weight:850;
+      line-height:1.35;
+    }
+    .top-actions{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+
+    .btn{
+      border:none; border-radius:10px;
+      padding:10px 14px;
+      font-weight:900;
+      cursor:pointer;
+      text-decoration:none;
+      display:inline-block;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+      background:#295eb0;
+      color:#fff;
+      white-space: nowrap;
+    }
+    .btn:hover{ filter:brightness(0.96); }
+    .btn-outline{ background:transparent; border:1px solid rgba(255,255,255,0.65); color:#fff; box-shadow:none; }
+    .btn-muted{ background:#eaf1fb; border:1px solid #d5deef; color:#1a4170; box-shadow:none; }
+    .btn-danger{ background:#b03939; color:#fff; }
+    .btn:disabled{ opacity:0.55; cursor:not-allowed; filter:none; }
+
+    .panel{
+      background: rgba(12,33,58,0.68);
+      border: 1px solid rgba(213,222,239,0.35);
+      border-radius: 18px;
+      padding: 12px;
+      box-shadow: 0 10px 46px rgba(0,0,0,0.35);
+      backdrop-filter: blur(3px);
+    }
+
+    .card{
+      background:#fff;
+      color:#1a4170;
+      border:1px solid #d5deef;
+      border-radius:16px;
+      padding:12px;
+      box-shadow: 0 4px 18px rgba(18, 44, 87, 0.16);
+    }
+
+    .mono{
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+      font-size: 0.92rem;
+      color:#35507b;
+    }
+
+    .warn{
+      margin-top:10px;
+      padding:10px 12px;
+      border-radius:12px;
+      border:1px solid #f1c7c7;
+      background:#fff2f2;
+      color:#7a1f1f;
+      font-weight: 900;
+      line-height:1.35;
+      display:none;
+    }
+    .ok{
+      margin-top:10px;
+      padding:10px 12px;
+      border-radius:12px;
+      border:1px solid #bce9c9;
+      background:#e9fff0;
+      color:#11612b;
+      font-weight: 900;
+      line-height:1.35;
+      display:none;
+    }
+
+    .toolbar{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      align-items:center;
+      justify-content:space-between;
+      margin: 10px 0 0 0;
+      padding: 10px;
+      border:1px solid #d5deef;
+      border-radius:12px;
+      background:#f7fbff;
+    }
+    .toolbar .left{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+    .toolbar .right{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+
+    .pill{
+      display:inline-block;
+      padding:3px 10px;
+      border-radius:999px;
+      font-weight:900;
+      font-size:0.85rem;
+      border:1px solid #d5deef;
+      background:#eaf1fb;
+      color:#1a4170;
+      white-space: nowrap;
+    }
+    .pill.progress{ background:#fff4df; border-color:#f0d39a; color:#7a4a00; }
+    .pill.pending{ background:#fff0f0; border-color:#f1c7c7; color:#7a1f1f; }
+    .pill.submitted{ background:#e9fff0; border-color:#bce9c9; color:#11612b; }
+
+    .layout{
+      display:flex;
+      gap:12px;
+      margin-top: 12px;
+      height: calc(100vh - 180px);
+      min-height: 540px;
+    }
+    @media (max-width: 1100px){
+      .layout{ flex-direction:column; height:auto; }
+      .leftPane{ width:auto !important; }
+    }
+
+    .leftPane{
+      width: 420px;
+      min-width: 300px;
+      max-width: 520px;
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+    }
+    .rightPane{
+      flex:1;
+      min-width: 0;
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+    }
+
+    input, select, textarea{
+      border-radius:10px;
+      border:1px solid #cbd7ee;
+      padding: 10px 12px;
+      font-size: 1rem;
+      font-family:"Segoe UI", Arial, sans-serif;
+      background:#fff;
+      color:#1a4170;
+      outline:none;
+      box-sizing:border-box;
+      width:100%;
+    }
+    textarea{ min-height: 90px; resize: vertical; }
+    input:focus, select:focus, textarea:focus{
+      border-color:#2e68c7;
+      box-shadow: 0 0 0 3px rgba(46, 104, 199, 0.15);
+    }
+
+    .list{
+      overflow:auto;
+      border:1px solid #d5deef;
+      border-radius:12px;
+      background:#fff;
+      color:#1a4170;
+      height: 100%;
+    }
+    .item{
+      padding:10px 10px;
+      border-bottom:1px solid #e6eefb;
+      cursor:pointer;
+    }
+    .item:hover{ background:#f2f7ff; }
+    .item.active{ background:#eaf1fb; }
+    .itemTop{
+      display:flex; justify-content:space-between; gap:8px; align-items:flex-start;
+      font-weight: 950;
+    }
+    .itemSub{ margin-top:4px; font-size:0.9rem; font-weight:800; color:#35507b; line-height:1.25; }
+
+    .answerRow{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      align-items:center;
+      margin-top: 10px;
+    }
+    .ansBtn{
+      border:1px solid #cbd7ee;
+      background:#f7fbff;
+      color:#1a4170;
+      font-weight: 950;
+      padding: 8px 10px;
+      border-radius: 10px;
+      cursor:pointer;
+    }
+    .ansBtn.active{
+      background:#295eb0;
+      border-color:#295eb0;
+      color:#fff;
+    }
+    .ansBtn:disabled{ opacity:0.55; cursor:not-allowed; }
+
+    .kv{
+      border:1px solid #d5deef;
+      border-radius:12px;
+      background:#f7fbff;
+      padding:10px;
+      color:#1a4170;
+    }
+    .kvRow{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      align-items:flex-start;
+      margin-bottom:6px;
+    }
+    .k{ font-weight:950; min-width: 160px; }
+    .v{ font-weight:850; color:#35507b; flex:1; min-width: 200px; }
+
+    .muted{ color:#35507b; font-weight: 850; }
+
+    /* Evidence list */
+    .evList{
+      margin-top:10px;
+      border:1px solid #d5deef;
+      border-radius:12px;
+      background:#fff;
+      overflow:auto;
+      max-height: 230px;
+    }
+    .evItem{
+      padding:10px 10px;
+      border-bottom:1px solid #e6eefb;
+      display:flex;
+      gap:10px;
+      align-items:flex-start;
+      justify-content:space-between;
+    }
+    .evLeft{ min-width:0; }
+    .evName{ font-weight:950; color:#1a4170; word-break:break-word; }
+    .evMeta{ margin-top:4px; font-size:0.9rem; font-weight:850; color:#35507b; }
+    .evActions{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+    .linkBtn{
+      border:1px solid #cbd7ee;
+      background:#f7fbff;
+      color:#1a4170;
+      font-weight:900;
+      padding:7px 10px;
+      border-radius:10px;
+      cursor:pointer;
+      text-decoration:none;
+      display:inline-block;
+      white-space:nowrap;
+    }
+    .linkBtn:hover{ background:#eaf1fb; }
+    .linkBtn.danger{ border-color:#f1c7c7; background:#fff2f2; color:#7a1f1f; }
+
+    .smallNote{
+      margin-top:8px;
+      font-size:0.92rem;
+      font-weight:850;
+      color:#35507b;
+      line-height:1.35;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <div>
+        <h1 class="title">Answer Questionnaire (Supabase)</h1>
+        <div class="sub" id="subLine">Checking session...</div>
+      </div>
+
+      <div class="top-actions">
+        <a class="btn btn-outline" href="./q-dashboard.html">Dashboard</a>
+        <a class="btn btn-outline" href="./q-company.html">Company</a>
+        <a class="btn btn-outline" href="./q-vessel.html">Vessel</a>
+        <a class="btn btn-outline" href="./q-inspector.html">Inspector</a>
+        <a class="btn btn-outline" href="./q-report.html">Reports</a>
+        <a class="btn btn-outline" href="./library.html">Read Only</a>
+        <a class="btn btn-outline" href="./index.html">Mode Selection</a>
+        <a class="btn btn-muted" href="./login.html">Login</a>
+        <button class="btn btn-outline" id="logoutBtn" type="button">Logout</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="card">
+        <div id="warnBox" class="warn"></div>
+        <div id="okBox" class="ok"></div>
+
+        <div class="toolbar">
+          <div class="left">
+            <div class="mono" id="sessionLine">Session: ...</div>
+            <span class="mono" id="roleLine">Role: ...</span>
+            <span class="mono" id="vesselLine">Vessel: ...</span>
+            <span class="mono" id="qidLine">QID: ...</span>
+          </div>
+          <div class="right">
+            <span id="statusPill"></span>
+            <button class="btn btn-muted" id="saveBtn" type="button">Save Now</button>
+            <button class="btn btn-outline" id="refreshBtn" type="button">Refresh</button>
+            <button class="btn btn-danger" id="requestSubmitBtn" type="button">Request Submission</button>
+          </div>
+        </div>
+
+        <div class="layout">
+          <!-- Left pane: list -->
+          <div class="leftPane">
+            <input id="searchInput" type="text" placeholder="Search questions (ID/text/chapter)..." />
+            <div class="list" id="qList"></div>
+          </div>
+
+          <!-- Right pane: details + answer -->
+          <div class="rightPane">
+            <div class="kv">
+              <div class="kvRow">
+                <div class="k">Question ID</div>
+                <div class="v mono" id="qId">-</div>
+              </div>
+              <div class="kvRow">
+                <div class="k">Chapter</div>
+                <div class="v" id="qChapter">-</div>
+              </div>
+              <div class="kvRow">
+                <div class="k">Question</div>
+                <div class="v" id="qText">-</div>
+              </div>
+              <div class="kvRow">
+                <div class="k">Expected Evidence</div>
+                <div class="v" id="qEvidence">-</div>
+              </div>
+              <div class="kvRow">
+                <div class="k">Inspector Guidance</div>
+                <div class="v" id="qGuidance">-</div>
+              </div>
+              <div class="kvRow">
+                <div class="k">Suggested Actions</div>
+                <div class="v" id="qActions">-</div>
+              </div>
+              <div class="kvRow" style="margin-bottom:0;">
+                <div class="k">Negative Observations</div>
+                <div class="v" id="qNegative">-</div>
+              </div>
+            </div>
+
+            <div class="kv">
+              <div class="kvRow" style="margin-bottom:0;">
+                <div class="k">Answer</div>
+                <div class="v">
+                  <div class="answerRow">
+                    <button class="ansBtn" data-ans="YES" type="button">YES</button>
+                    <button class="ansBtn" data-ans="NO" type="button">NO</button>
+                    <button class="ansBtn" data-ans="N/A" type="button">N/A</button>
+                    <button class="ansBtn" data-ans="NOT SEEN" type="button">NOT SEEN</button>
+                    <button class="ansBtn" data-ans="BLANK" type="button">CLEAR</button>
+                  </div>
+                  <div class="muted" style="margin-top:8px;">
+                    Auto-save is enabled (debounced). Use “Save Now” for immediate write.
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="kv">
+              <div class="kvRow">
+                <div class="k">Comment / Remark</div>
+                <div class="v">
+                  <textarea id="commentBox" placeholder="Optional comments/remarks..."></textarea>
+                </div>
+              </div>
+            </div>
+
+            <!-- Evidence Uploads -->
+            <div class="kv">
+              <div class="kvRow">
+                <div class="k">Evidence</div>
+                <div class="v">
+                  <div class="smallNote">
+                    Upload PDFs/photos as evidence for the currently selected question. Visibility is controlled by Supabase policies.
+                  </div>
+
+                  <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:10px;">
+                    <input id="evidenceInput" type="file" multiple
+                      accept=".pdf,image/*"
+                      style="max-width:560px;" />
+                    <button class="btn btn-muted" id="uploadEvidenceBtn" type="button">Upload</button>
+                    <button class="btn btn-outline" id="refreshEvidenceBtn" type="button">Refresh Evidence</button>
+                  </div>
+
+                  <div class="mono" id="evidenceState" style="margin-top:10px;">Evidence: idle.</div>
+
+                  <div class="evList" id="evidenceList"></div>
+
+                  <div class="smallNote">
+                    Notes:
+                    <div>• If the bucket is Private, links will be signed (time-limited).</div>
+                    <div>• If your storage policies are too strict, uploads will fail with “permission denied”.</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="kv">
+              <div class="kvRow" style="margin-bottom:0;">
+                <div class="k">Save status</div>
+                <div class="v">
+                  <div class="mono" id="saveState">Idle.</div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <div class="kv" style="margin-top:12px;">
+          <div class="mono">
+            Data sources:
+            <div style="margin-top:6px;">• Questions: <span class="mono">sire_questions_all_columns_named.json</span></div>
+            <div>• Answers: <span class="mono">public.responses</span> (upsert on questionnaire_id + question_key)</div>
+            <div>• Evidence index: <span class="mono">public.evidence_files</span></div>
+            <div>• Files: <span class="mono">Storage bucket evidence</span></div>
+            <div>• Workflow: Vessel “Request Submission” calls RPC <span class="mono">public.request_submission(p_questionnaire_id)</span></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // =====================
+    // Supabase config (your values)
+    // =====================
+    const SUPABASE_URL = "https://bdidrcyufazskpuwmfca.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJkaWRyY3l1ZmF6c2twdXdtZmNhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc5NDI4ODMsImV4cCI6MjA4MzUxODg4M30.Uqj4WCzoNS9wnlzI-xew6iTFzTUi77dcGeBjUgFjZbQ";
+    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // Compatibility key (older pages not yet migrated)
+    const SESSION_KEY_COMPAT = "q_session_v1";
+
+    // Storage bucket name
+    const EVIDENCE_BUCKET = "evidence";
+
+    const UI_ROLE_MAP = {
+      super_admin: "Super Admin",
+      company_admin: "Company Admin",
+      company_superintendent: "Company Superintendent",
+      vessel: "Vessel",
+      inspector: "Inspector / Third Party"
+    };
+    function roleToUi(role){ return UI_ROLE_MAP[role] || role || ""; }
+
+    const ANSWERS = ["YES", "NO", "N/A", "NOT SEEN", "BLANK"];
+
+    function qs(name){ return new URLSearchParams(window.location.search).get(name); }
+
+    function setSubLine(text){ document.getElementById("subLine").textContent = text; }
+    function showWarn(msg){
+      const w = document.getElementById("warnBox");
+      w.textContent = msg;
+      w.style.display = "block";
+    }
+    function clearWarn(){
+      const w = document.getElementById("warnBox");
+      w.textContent = "";
+      w.style.display = "none";
+    }
+    function showOk(msg){
+      const o = document.getElementById("okBox");
+      o.textContent = msg;
+      o.style.display = "block";
+      setTimeout(() => { o.style.display = "none"; }, 1600);
+    }
+
+    function fmtTs(ts){
+      if (!ts) return "-";
+      try{ return new Date(ts).toLocaleString(); }catch(e){ return String(ts); }
+    }
+    function escapeHtml(str){
+      return String(str ?? "")
+        .replaceAll("&","&amp;")
+        .replaceAll("<","&lt;")
+        .replaceAll(">","&gt;")
+        .replaceAll('"',"&quot;")
+        .replaceAll("'","&#039;");
+    }
+    function statusPillHtml(status){
+      const s = String(status || "");
+      const cls = (s === "submitted") ? "submitted" : (s === "pending_office_review" ? "pending" : "progress");
+      const label = (s === "in_progress") ? "In Progress" :
+                    (s === "pending_office_review") ? "Pending Office Review" :
+                    (s === "submitted") ? "Submitted" : s;
+      return `<span class="pill ${cls}">${label}</span>`;
+    }
+
+    // =====================
+    // JSON mapping helpers
+    // =====================
+    function pick(obj, keys){
+      for (const k of keys){
+        if (obj && Object.prototype.hasOwnProperty.call(obj, k) && obj[k] !== null && obj[k] !== undefined && String(obj[k]).trim() !== ""){
+          return obj[k];
+        }
+      }
+      return "";
+    }
+
+    function getQuestionKey(q){
+      const v = pick(q, [
+        "Question ID", "QuestionID", "question_id", "SIRE Question ID", "SIRE_Question_ID",
+        "VIQ Question No", "VIQ Question Number", "Question Number", "Question No", "QID", "id"
+      ]);
+      if (v) return String(v).trim();
+      const ch = pick(q, ["Chapter", "chapter", "Chapters"]);
+      const qt = pick(q, ["Question", "Question Text", "QuestionText", "question"]);
+      return String(ch || "Q") + " :: " + String(qt || "Unknown").slice(0, 40);
+    }
+
+    function getQuestionText(q){
+      return String(pick(q, ["Question", "Question Text", "QuestionText", "question", "Text", "Question (Text)"])).trim();
+    }
+    function getChapter(q){
+      return String(pick(q, ["Chapter", "chapter", "Chapters", "VIQ Chapter", "SIRE Chapter"])).trim();
+    }
+    function getEvidence(q){
+      return String(pick(q, ["Expected Evidence", "Expected evidence", "Evidence", "Expected_Evidence"])).trim();
+    }
+    function getGuidance(q){
+      return String(pick(q, ["Inspector Guidance", "Inspector guidance", "Guidance", "Inspector_Guidance"])).trim();
+    }
+    function getActions(q){
+      return String(pick(q, ["Suggested Actions", "Suggested actions", "Actions", "Suggested_Actions"])).trim();
+    }
+    function getNegative(q){
+      return String(pick(q, ["Negative Observations", "Negative observations", "Negatives", "Negative_Observations"])).trim();
+    }
+
+    // =====================
+    // State
+    // =====================
+    let USER = null;
+    let PROFILE = null;
+    let UI_ROLE = "";
+    let VESSEL_NAME = "";
+    let QID = "";
+    let QUESTIONNAIRE = null;
+
+    let QUESTIONS = [];
+    let FILTERED = [];
+    let RESP_MAP = new Map();
+    let ACTIVE_KEY = "";
+
+    let READ_ONLY = true;
+
+    // auto-save debounce
+    let saveTimer = null;
+    let pendingSave = false;
+
+    // evidence
+    let EVIDENCE_ROWS = [];
+
+    // =====================
+    // Supabase calls
+    // =====================
+    async function getUser(){
+      const { data: { user }, error } = await supabaseClient.auth.getUser();
+      if (error) showWarn("Auth error: " + error.message);
+      return user || null;
+    }
+
+    async function getMyProfile(userId){
+      const { data, error } = await supabaseClient
+        .from("profiles")
+        .select("username, role, vessel_id, vessels(name)")
+        .eq("id", userId)
+        .single();
+      if (error) throw error;
+      return data;
+    }
+
+    async function loadQuestionnaire(qid){
+      const { data, error } = await supabaseClient
+        .from("questionnaires")
+        .select("id, title, status, vessel_id, created_at, updated_at, vessels(name)")
+        .eq("id", qid)
+        .single();
+      if (error) throw error;
+      return data;
+    }
+
+    async function loadResponses(qid){
+      const { data, error } = await supabaseClient
+        .from("responses")
+        .select("question_key, answer, comment, updated_at")
+        .eq("questionnaire_id", qid);
+      if (error) throw error;
+      return data || [];
+    }
+
+    async function upsertResponse(qid, questionKey, answer, comment){
+      const payload = {
+        questionnaire_id: qid,
+        question_key: questionKey,
+        answer: answer || "BLANK",
+        comment: (comment || "").trim(),
+        updated_by: USER?.id || null
+      };
+
+      const { error } = await supabaseClient
+        .from("responses")
+        .upsert(payload, { onConflict: "questionnaire_id,question_key" });
+
+      if (error) throw error;
+    }
+
+    async function requestSubmission(qid){
+      const { error } = await supabaseClient
+        .rpc("request_submission", { p_questionnaire_id: qid });
+      if (error) throw error;
+    }
+
+    async function doLogout(){
+      clearWarn();
+      await supabaseClient.auth.signOut();
+      localStorage.removeItem(SESSION_KEY_COMPAT);
+      setSubLine("Logged out.");
+      showWarn("Logged out. Go to login.html to sign in again.");
+    }
+
+    // Evidence DB
+    async function loadEvidenceRows(qid, questionKey){
+      const { data, error } = await supabaseClient
+        .from("evidence_files")
+        .select("id, questionnaire_id, question_key, file_path, file_name, mime_type, size_bytes, uploaded_by, created_at")
+        .eq("questionnaire_id", qid)
+        .eq("question_key", questionKey)
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      return data || [];
+    }
+
+    async function insertEvidenceRow(row){
+      const { error } = await supabaseClient
+        .from("evidence_files")
+        .insert(row);
+      if (error) throw error;
+    }
+
+    async function deleteEvidenceRow(id){
+      const { data, error } = await supabaseClient
+        .from("evidence_files")
+        .delete()
+        .eq("id", id)
+        .select("id, file_path")
+        .single();
+
+      if (error) throw error;
+      return data;
+    }
+
+    // Storage helpers
+    function safeSlug(s){
+      return String(s || "")
+        .trim()
+        .replaceAll(/[^\w\-\.]+/g, "_")
+        .slice(0, 120);
+    }
+
+    function buildStoragePath(qid, questionKey, file){
+      const keySlug = safeSlug(questionKey);
+      const nameSlug = safeSlug(file?.name || "file");
+      const ts = new Date().toISOString().replaceAll(/[:.]/g, "-");
+      return `${qid}/${keySlug}/${ts}__${nameSlug}`;
+    }
+
+    async function uploadToStorage(path, file){
+      const { error } = await supabaseClient
+        .storage
+        .from(EVIDENCE_BUCKET)
+        .upload(path, file, { upsert: false, contentType: file.type || undefined });
+
+      if (error) throw error;
+    }
+
+    async function removeFromStorage(path){
+      const { error } = await supabaseClient
+        .storage
+        .from(EVIDENCE_BUCKET)
+        .remove([path]);
+
+      if (error) throw error;
+    }
+
+    async function getFileUrl(path){
+      // Prefer signed URL (works for private buckets if Storage policy allows select).
+      const signed = await supabaseClient
+        .storage
+        .from(EVIDENCE_BUCKET)
+        .createSignedUrl(path, 60 * 60); // 1 hour
+      if (!signed.error && signed.data?.signedUrl){
+        return signed.data.signedUrl;
+      }
+
+      // Fallback: public URL (if bucket is public)
+      const pub = supabaseClient.storage.from(EVIDENCE_BUCKET).getPublicUrl(path);
+      return pub?.data?.publicUrl || "";
+    }
+
+    // =====================
+    // Questions JSON
+    // =====================
+    async function loadQuestionLibrary(){
+      const res = await fetch("./sire_questions_all_columns_named.json", { cache: "no-store" });
+      if (!res.ok) throw new Error("Failed to load sire_questions_all_columns_named.json (HTTP " + res.status + ")");
+      const data = await res.json();
+      if (!Array.isArray(data)) throw new Error("Question library JSON is not an array.");
+      return data;
+    }
+
+    // =====================
+    // UI
+    // =====================
+    function setSaveState(text){
+      document.getElementById("saveState").textContent = text;
+    }
+
+    function setEvidenceState(text){
+      document.getElementById("evidenceState").textContent = text;
+    }
+
+    function setReadOnlyUi(isReadOnly){
+      READ_ONLY = !!isReadOnly;
+
+      document.querySelectorAll(".ansBtn").forEach(b => b.disabled = READ_ONLY);
+      document.getElementById("commentBox").disabled = READ_ONLY;
+
+      // evidence upload disabled if read-only
+      document.getElementById("evidenceInput").disabled = READ_ONLY;
+      document.getElementById("uploadEvidenceBtn").disabled = READ_ONLY;
+
+      const btn = document.getElementById("requestSubmitBtn");
+      const isVessel = (UI_ROLE === "Vessel");
+      const inProgress = (QUESTIONNAIRE?.status === "in_progress");
+      btn.disabled = !(isVessel && inProgress && !READ_ONLY);
+    }
+
+    function applyCompatSession(){
+      const username = PROFILE?.username || USER?.email || "";
+      localStorage.setItem(SESSION_KEY_COMPAT, JSON.stringify({
+        username: PROFILE?.username || "",
+        role: UI_ROLE,
+        vessel: VESSEL_NAME || "",
+        created_at: new Date().toISOString()
+      }));
+      document.getElementById("sessionLine").textContent = `Session: ${username}`;
+      document.getElementById("roleLine").textContent = `Role: ${UI_ROLE}`;
+      document.getElementById("vesselLine").textContent = `Vessel: ${VESSEL_NAME || "(n/a)"}`;
+    }
+
+    function renderHeader(){
+      document.getElementById("qidLine").textContent = "QID: " + QID;
+      document.getElementById("statusPill").innerHTML = statusPillHtml(QUESTIONNAIRE?.status);
+      const title = QUESTIONNAIRE?.title ? ` • ${QUESTIONNAIRE.title}` : "";
+      setSubLine(`Questionnaire loaded${title}. Updated: ${fmtTs(QUESTIONNAIRE?.updated_at)}.`);
+    }
+
+    function buildListItems(list){
+      const qList = document.getElementById("qList");
+      if (!list.length){
+        qList.innerHTML = `<div class="item"><div class="itemTop">No questions found.</div></div>`;
+        return;
+      }
+
+      qList.innerHTML = list.map(q => {
+        const key = getQuestionKey(q);
+        const chap = getChapter(q);
+        const txt = getQuestionText(q);
+        const stored = RESP_MAP.get(key);
+        const ans = stored?.answer || "BLANK";
+        const isActive = (key === ACTIVE_KEY);
+
+        const badge = (ans && ans !== "BLANK")
+          ? `<span class="pill ${ans === "NO" ? "pending" : "submitted"}">${escapeHtml(ans)}</span>`
+          : `<span class="pill progress">BLANK</span>`;
+
+        return `
+          <div class="item ${isActive ? "active" : ""}" data-key="${escapeHtml(key)}">
+            <div class="itemTop">
+              <div>${escapeHtml(key)}</div>
+              ${badge}
+            </div>
+            <div class="itemSub">${escapeHtml(chap ? ("Ch. " + chap + " • ") : "")}${escapeHtml(txt.slice(0, 120))}${txt.length>120 ? "…" : ""}</div>
+          </div>
+        `;
+      }).join("");
+
+      qList.querySelectorAll(".item[data-key]").forEach(el => {
+        el.addEventListener("click", async () => {
+          const key = el.getAttribute("data-key");
+          if (!key) return;
+          await setActiveQuestion(key);
+        });
+      });
+    }
+
+    function renderList(){
+      const term = document.getElementById("searchInput").value.trim().toLowerCase();
+      FILTERED = QUESTIONS.filter(q => {
+        if (!term) return true;
+        const key = getQuestionKey(q).toLowerCase();
+        const txt = getQuestionText(q).toLowerCase();
+        const ch = getChapter(q).toLowerCase();
+        return key.includes(term) || txt.includes(term) || ch.includes(term);
+      });
+
+      if (!FILTERED.find(q => getQuestionKey(q) === ACTIVE_KEY)){
+        ACTIVE_KEY = FILTERED[0] ? getQuestionKey(FILTERED[0]) : "";
+      }
+
+      buildListItems(FILTERED);
+      renderActiveDetails();
+    }
+
+    async function setActiveQuestion(key){
+      ACTIVE_KEY = key;
+      buildListItems(FILTERED);
+      renderActiveDetails();
+      await refreshEvidence();
+    }
+
+    function currentQuestionObj(){
+      return QUESTIONS.find(q => getQuestionKey(q) === ACTIVE_KEY) || null;
+    }
+
+    function setAnswerUi(answer){
+      document.querySelectorAll(".ansBtn").forEach(b => {
+        b.classList.toggle("active", b.getAttribute("data-ans") === answer);
+      });
+    }
+
+    function renderActiveDetails(){
+      const q = currentQuestionObj();
+      if (!q){
+        document.getElementById("qId").textContent = "-";
+        document.getElementById("qChapter").textContent = "-";
+        document.getElementById("qText").textContent = "-";
+        document.getElementById("qEvidence").textContent = "-";
+        document.getElementById("qGuidance").textContent = "-";
+        document.getElementById("qActions").textContent = "-";
+        document.getElementById("qNegative").textContent = "-";
+        document.getElementById("commentBox").value = "";
+        setAnswerUi(null);
+        return;
+      }
+
+      const key = getQuestionKey(q);
+      const stored = RESP_MAP.get(key) || { answer: "BLANK", comment: "" };
+
+      document.getElementById("qId").textContent = key;
+      document.getElementById("qChapter").textContent = getChapter(q) || "-";
+      document.getElementById("qText").textContent = getQuestionText(q) || "-";
+      document.getElementById("qEvidence").textContent = getEvidence(q) || "-";
+      document.getElementById("qGuidance").textContent = getGuidance(q) || "-";
+      document.getElementById("qActions").textContent = getActions(q) || "-";
+      document.getElementById("qNegative").textContent = getNegative(q) || "-";
+
+      document.getElementById("commentBox").value = stored.comment || "";
+      setAnswerUi(stored.answer || "BLANK");
+    }
+
+    function getActiveDraft(){
+      const key = ACTIVE_KEY;
+      if (!key) return null;
+
+      const current = RESP_MAP.get(key) || { answer: "BLANK", comment: "" };
+      const answer = (current.answer && ANSWERS.includes(current.answer)) ? current.answer : "BLANK";
+      const comment = document.getElementById("commentBox").value || "";
+      return { key, answer, comment };
+    }
+
+    function scheduleAutoSave(){
+      if (READ_ONLY) return;
+      pendingSave = true;
+
+      if (saveTimer) clearTimeout(saveTimer);
+      saveTimer = setTimeout(async () => {
+        await saveActiveNow(true);
+      }, 700);
+    }
+
+    async function saveActiveNow(isAuto){
+      if (READ_ONLY) return;
+
+      const draft = getActiveDraft();
+      if (!draft) return;
+
+      RESP_MAP.set(draft.key, { answer: draft.answer, comment: draft.comment });
+
+      try{
+        setSaveState((isAuto ? "Auto-saving..." : "Saving...") + " (" + draft.key + ")");
+        await upsertResponse(QID, draft.key, draft.answer, draft.comment);
+        pendingSave = false;
+        setSaveState("Saved: " + draft.key + " at " + new Date().toLocaleTimeString());
+        showOk("Saved.");
+        buildListItems(FILTERED);
+      }catch(e){
+        setSaveState("Save failed: " + String(e.message || e));
+        showWarn("Save failed (RLS or network): " + String(e.message || e));
+      }
+    }
+
+    function bindAnswerButtons(){
+      document.querySelectorAll(".ansBtn").forEach(btn => {
+        btn.addEventListener("click", () => {
+          if (READ_ONLY) return;
+          const val = btn.getAttribute("data-ans");
+          if (!val) return;
+
+          RESP_MAP.set(ACTIVE_KEY, {
+            answer: val,
+            comment: document.getElementById("commentBox").value || ""
+          });
+
+          setAnswerUi(val);
+          buildListItems(FILTERED);
+          scheduleAutoSave();
+        });
+      });
+
+      document.getElementById("commentBox").addEventListener("input", () => {
+        if (READ_ONLY) return;
+        const cur = RESP_MAP.get(ACTIVE_KEY) || { answer: "BLANK", comment: "" };
+        RESP_MAP.set(ACTIVE_KEY, { answer: cur.answer || "BLANK", comment: document.getElementById("commentBox").value || "" });
+        scheduleAutoSave();
+      });
+    }
+
+    // =====================
+    // Evidence UI
+    // =====================
+    function renderEvidenceList(){
+      const box = document.getElementById("evidenceList");
+      if (!ACTIVE_KEY){
+        box.innerHTML = `<div class="evItem"><div class="evLeft"><div class="evName">No question selected.</div></div></div>`;
+        return;
+      }
+      if (!EVIDENCE_ROWS.length){
+        box.innerHTML = `<div class="evItem"><div class="evLeft"><div class="evName">No evidence uploaded for this question.</div></div></div>`;
+        return;
+      }
+
+      box.innerHTML = EVIDENCE_ROWS.map(r => {
+        const canDelete = !READ_ONLY; // UI-level; DB enforces real permission
+        return `
+          <div class="evItem" data-evid="${escapeHtml(r.id)}">
+            <div class="evLeft">
+              <div class="evName">${escapeHtml(r.file_name)}</div>
+              <div class="evMeta">
+                <span class="mono">${escapeHtml(r.mime_type || "unknown")}</span>
+                • <span class="mono">${escapeHtml(String(r.size_bytes || 0))} bytes</span>
+                • <span class="mono">${escapeHtml(fmtTs(r.created_at))}</span>
+              </div>
+              <div class="evMeta mono" style="opacity:0.85;">${escapeHtml(r.file_path)}</div>
+            </div>
+            <div class="evActions">
+              <a class="linkBtn" href="#" data-open="${escapeHtml(r.id)}">Open</a>
+              ${canDelete ? `<button class="linkBtn danger" type="button" data-del="${escapeHtml(r.id)}">Delete</button>` : ``}
+            </div>
+          </div>
+        `;
+      }).join("");
+
+      box.querySelectorAll("a[data-open]").forEach(a => {
+        a.addEventListener("click", async (e) => {
+          e.preventDefault();
+          const id = a.getAttribute("data-open");
+          const row = EVIDENCE_ROWS.find(x => x.id === id);
+          if (!row) return;
+
+          try{
+            setEvidenceState("Opening link...");
+            const url = await getFileUrl(row.file_path);
+            if (!url){
+              showWarn("Cannot generate file URL. Check Storage bucket/public setting and Storage policies.");
+              setEvidenceState("Open failed.");
+              return;
+            }
+            window.open(url, "_blank", "noopener,noreferrer");
+            setEvidenceState("Ready.");
+          }catch(err){
+            showWarn("Open failed: " + String(err.message || err));
+            setEvidenceState("Open failed.");
+          }
+        });
+      });
+
+      box.querySelectorAll("button[data-del]").forEach(b => {
+        b.addEventListener("click", async () => {
+          if (READ_ONLY) return;
+          const id = b.getAttribute("data-del");
+          const row = EVIDENCE_ROWS.find(x => x.id === id);
+          if (!row) return;
+
+          if (!confirm("Delete this evidence file? This will remove both the database index row and the storage object.")) return;
+
+          try{
+            setEvidenceState("Deleting...");
+            // Remove storage first (so if DB delete is allowed but storage isn't, you see it)
+            await removeFromStorage(row.file_path);
+            await deleteEvidenceRow(row.id);
+            showOk("Evidence deleted.");
+            await refreshEvidence();
+          }catch(err){
+            showWarn("Delete failed: " + String(err.message || err));
+            setEvidenceState("Delete failed.");
+          }
+        });
+      });
+    }
+
+    async function refreshEvidence(){
+      if (!QID || !ACTIVE_KEY){
+        EVIDENCE_ROWS = [];
+        renderEvidenceList();
+        return;
+      }
+      try{
+        setEvidenceState("Loading evidence list...");
+        EVIDENCE_ROWS = await loadEvidenceRows(QID, ACTIVE_KEY);
+        renderEvidenceList();
+        setEvidenceState("Evidence: ready.");
+      }catch(e){
+        EVIDENCE_ROWS = [];
+        renderEvidenceList();
+        setEvidenceState("Evidence: failed.");
+        showWarn("Evidence load failed (RLS/policy): " + String(e.message || e));
+      }
+    }
+
+    async function uploadEvidence(){
+      clearWarn();
+      if (READ_ONLY){
+        showWarn("Read-only mode. Evidence upload is disabled.");
+        return;
+      }
+      if (!QID || !ACTIVE_KEY){
+        showWarn("No active question selected.");
+        return;
+      }
+
+      const input = document.getElementById("evidenceInput");
+      const files = Array.from(input.files || []);
+      if (!files.length){
+        showWarn("Please select one or more files (PDF/image).");
+        return;
+      }
+
+      try{
+        setEvidenceState("Uploading " + files.length + " file(s)...");
+        for (const f of files){
+          const path = buildStoragePath(QID, ACTIVE_KEY, f);
+
+          // 1) upload to storage
+          await uploadToStorage(path, f);
+
+          // 2) insert metadata row
+          await insertEvidenceRow({
+            questionnaire_id: QID,
+            question_key: ACTIVE_KEY,
+            file_path: path,
+            file_name: f.name,
+            mime_type: f.type || null,
+            size_bytes: f.size || null,
+            uploaded_by: USER.id
+          });
+        }
+
+        input.value = "";
+        showOk("Evidence uploaded.");
+        await refreshEvidence();
+      }catch(e){
+        showWarn("Upload failed (Storage policy or DB RLS): " + String(e.message || e));
+        setEvidenceState("Upload failed.");
+      }
+    }
+
+    // =====================
+    // Init / Refresh
+    // =====================
+    async function refreshAll(){
+      clearWarn();
+      setSaveState("Refreshing...");
+
+      try{
+        QUESTIONNAIRE = await loadQuestionnaire(QID);
+      }catch(e){
+        showWarn("Cannot load questionnaire (not found or no permission): " + String(e.message || e));
+        setSubLine("Questionnaire load failed.");
+        return;
+      }
+
+      renderHeader();
+
+      // UI read-only rules (DB/RLS is the real enforcement):
+      // - Inspector always read-only
+      // - Vessel editable only when in_progress
+      let ro = false;
+      if (UI_ROLE === "Inspector / Third Party") ro = true;
+      if (UI_ROLE === "Vessel" && QUESTIONNAIRE.status !== "in_progress") ro = true;
+      if (!UI_ROLE) ro = true;
+
+      setReadOnlyUi(ro);
+
+      RESP_MAP.clear();
+      try{
+        const rows = await loadResponses(QID);
+        rows.forEach(r => {
+          RESP_MAP.set(String(r.question_key), {
+            answer: r.answer || "BLANK",
+            comment: r.comment || ""
+          });
+        });
+      }catch(e){
+        showWarn("Cannot load responses: " + String(e.message || e));
+      }
+
+      if (!QUESTIONS.length){
+        QUESTIONS = await loadQuestionLibrary();
+      }
+
+      if (!ACTIVE_KEY && QUESTIONS[0]){
+        ACTIVE_KEY = getQuestionKey(QUESTIONS[0]);
+      }
+
+      renderList();
+      await refreshEvidence();
+
+      setSaveState("Idle.");
+    }
+
+    async function init(){
+      clearWarn();
+
+      QID = qs("qid") || "";
+      if (!QID){
+        showWarn("Missing qid in URL. Open as: q-answer.html?qid=<uuid>");
+        setSubLine("Missing qid.");
+        return;
+      }
+
+      USER = await getUser();
+      if (!USER){
+        showWarn("You are not logged in. Go to login.html and sign in.");
+        setSubLine("Not logged in.");
+        document.getElementById("qidLine").textContent = "QID: " + QID;
+        return;
+      }
+
+      try{
+        PROFILE = await getMyProfile(USER.id);
+      }catch(e){
+        showWarn("Profile missing or blocked by RLS. Ensure a row exists in public.profiles for this user.");
+        setSubLine("Profile error.");
+        return;
+      }
+
+      UI_ROLE = roleToUi(PROFILE.role);
+      VESSEL_NAME = PROFILE?.vessels?.name || "";
+
+      applyCompatSession();
+      document.getElementById("qidLine").textContent = "QID: " + QID;
+
+      bindAnswerButtons();
+
+      document.getElementById("searchInput").addEventListener("input", () => renderList());
+      document.getElementById("saveBtn").addEventListener("click", async () => saveActiveNow(false));
+      document.getElementById("refreshBtn").addEventListener("click", refreshAll);
+      document.getElementById("logoutBtn").addEventListener("click", doLogout);
+
+      document.getElementById("uploadEvidenceBtn").addEventListener("click", uploadEvidence);
+      document.getElementById("refreshEvidenceBtn").addEventListener("click", refreshEvidence);
+
+      document.getElementById("requestSubmitBtn").addEventListener("click", async () => {
+        clearWarn();
+        if (READ_ONLY){
+          showWarn("Read-only mode. Submission request is not available.");
+          return;
+        }
+        if (UI_ROLE !== "Vessel"){
+          showWarn("Only Vessel role can request submission (Option B).");
+          return;
+        }
+        if (QUESTIONNAIRE?.status !== "in_progress"){
+          showWarn("Request submission is only allowed when status is in_progress.");
+          return;
+        }
+        if (!confirm("Request submission to office review? Status will become: pending_office_review.")) return;
+
+        if (pendingSave){
+          await saveActiveNow(false);
+        }
+
+        try{
+          setSaveState("Requesting submission...");
+          await requestSubmission(QID);
+          showOk("Submission requested.");
+          await refreshAll();
+        }catch(e){
+          setSaveState("Request submission failed: " + String(e.message || e));
+          showWarn("Request submission failed (RLS / status): " + String(e.message || e));
+        }
+      });
+
+      setSubLine("Loading questionnaire, library, responses, and evidence...");
+      await refreshAll();
+    }
+
+    init();
+  </script>
+</body>
+</html>

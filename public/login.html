@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SIRE 2.0 – Login (Username + Password)</title>
+
+  <link rel="stylesheet" href="style.css" />
+
+  <style>
+    body {
+      min-height: 100vh;
+      margin: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 28px 16px;
+      background: radial-gradient(1200px 700px at 20% 10%, #1a4170 0%, #0b1c33 55%, #071426 100%);
+      font-family: "Segoe UI", Arial, sans-serif;
+    }
+
+    .login-shell {
+      width: 100%;
+      max-width: 560px;
+      background: rgba(12,33,58,0.68);
+      border: 1px solid rgba(213,222,239,0.35);
+      border-radius: 20px;
+      padding: 28px 22px 22px 22px;
+      box-shadow: 0 10px 46px rgba(0,0,0,0.45);
+      backdrop-filter: blur(3px);
+      color:#fff;
+    }
+
+    .title {
+      color: #ffffff;
+      margin: 0 0 10px 0;
+      font-size: 1.55rem;
+      font-weight: 900;
+      letter-spacing: 0.03em;
+      text-align: center;
+      text-shadow: 0 3px 12px rgba(0,0,0,0.35);
+    }
+
+    .subtitle {
+      margin: 0 0 18px 0;
+      color: rgba(255,255,255,0.90);
+      font-size: 1rem;
+      line-height: 1.45;
+      text-align: center;
+      font-weight: 800;
+    }
+
+    .card {
+      background: #ffffff;
+      border: 1px solid #d5deef;
+      border-radius: 16px;
+      padding: 18px 18px;
+      box-shadow: 0 4px 18px rgba(18, 44, 87, 0.16);
+      color:#1a4170;
+    }
+
+    label {
+      display: block;
+      margin: 12px 0 6px 0;
+      font-weight: 900;
+      color: #1a4170;
+      font-size: 0.95rem;
+    }
+
+    input {
+      width: 100%;
+      box-sizing: border-box;
+      font-size: 1rem;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid #cbd7ee;
+      outline: none;
+      font-family: "Segoe UI", Arial, sans-serif;
+      background:#fff;
+      color:#1a4170;
+    }
+
+    input:focus {
+      border-color: #2e68c7;
+      box-shadow: 0 0 0 3px rgba(46, 104, 199, 0.15);
+    }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+      margin-top: 16px;
+    }
+
+    .btn-primary {
+      border: none;
+      border-radius: 10px;
+      background: #295eb0;
+      color: #ffffff;
+      font-weight: 900;
+      font-size: 1rem;
+      padding: 10px 16px;
+      cursor: pointer;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+    }
+    .btn-primary:hover { filter: brightness(0.96); }
+
+    .btn-outline {
+      border-radius: 10px;
+      background: transparent;
+      border: 1px solid #295eb0;
+      color: #295eb0;
+      font-weight: 900;
+      font-size: 1rem;
+      padding: 9px 16px;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-block;
+    }
+    .btn-outline:hover { background: rgba(41, 94, 176, 0.08); }
+
+    .btn-muted {
+      border-radius: 10px;
+      background: #eaf1fb;
+      border: 1px solid #d5deef;
+      color: #1a4170;
+      font-weight: 900;
+      font-size: 1rem;
+      padding: 9px 16px;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-block;
+    }
+
+    .error {
+      display: none;
+      margin-top: 12px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid #f1c7c7;
+      background: #fff2f2;
+      color: #7a1f1f;
+      font-weight: 900;
+      font-size: 0.95rem;
+      line-height: 1.35;
+    }
+
+    .hint {
+      margin-top: 12px;
+      color: #35507b;
+      font-size: 0.92rem;
+      line-height: 1.35;
+      font-weight: 800;
+    }
+
+    .mono {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+      font-size: 0.92rem;
+      color:#35507b;
+    }
+  </style>
+
+  <!-- Supabase JS (CDN) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+
+<body>
+  <div class="login-shell">
+    <div class="title">Questionnaire Mode Login</div>
+    <div class="subtitle">
+      Users login with <b>Username + Password</b>.<br/>
+      Internally we use: <span class="mono">username@spis.local</span>
+    </div>
+
+    <div class="card">
+      <label for="username">Username</label>
+      <input id="username" type="text" autocomplete="username" placeholder="e.g. luna" />
+
+      <label for="password">Password</label>
+      <input id="password" type="password" autocomplete="current-password" />
+
+      <div class="actions">
+        <button class="btn-primary" id="loginBtn" type="button">Login</button>
+        <button class="btn-muted" id="logoutBtn" type="button">Logout</button>
+      </div>
+
+      <div class="error" id="errBox"></div>
+
+      <div class="hint">
+        <b>Important:</b> The user must exist in Supabase Auth as email <span class="mono">username@spis.local</span>,
+        and must also have a matching row in <span class="mono">profiles</span>.
+      </div>
+
+      <div class="actions" style="margin-top:14px;">
+        <a class="btn-outline" href="./library.html">Read Only</a>
+        <a class="btn-outline" href="./q-dashboard.html">Dashboard</a>
+        <a class="btn-outline" href="./index.html">Mode Selection</a>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const SUPABASE_URL = "https://bdidrcyufazskpuwmfca.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJkaWRyY3l1ZmF6c2twdXdtZmNhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc5NDI4ODMsImV4cCI6MjA4MzUxODg4M30.Uqj4WCzoNS9wnlzI-xew6iTFzTUi77dcGeBjUgFjZbQ";
+
+    const SESSION_KEY_COMPAT = "q_session_v1"; // keep compatibility with your existing pages for now
+
+    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    function setError(msg){
+      const el = document.getElementById("errBox");
+      el.textContent = msg;
+      el.style.display = "block";
+    }
+    function clearError(){
+      const el = document.getElementById("errBox");
+      el.textContent = "";
+      el.style.display = "none";
+    }
+
+    function roleToUi(role){
+      // Database enum -> your UI labels
+      const map = {
+        super_admin: "Super Admin",
+        company_admin: "Company Admin",
+        company_superintendent: "Company Superintendent",
+        vessel: "Vessel",
+        inspector: "Inspector / Third Party"
+      };
+      return map[role] || role || "";
+    }
+
+    function redirectByRole(uiRole){
+      if (uiRole === "Vessel") return (window.location.href = "./q-vessel.html");
+      if (uiRole === "Inspector / Third Party") return (window.location.href = "./q-inspector.html");
+      return (window.location.href = "./q-dashboard.html");
+    }
+
+    function usernameToEmail(usernameOrEmail){
+      const v = String(usernameOrEmail || "").trim();
+      if (!v) return "";
+      if (v.includes("@")) return v;               // allow real email if you ever want
+      return `${v}@spis.local`;                    // username alias email
+    }
+
+    async function fetchMyProfile(userId){
+      const { data, error } = await supabaseClient
+        .from("profiles")
+        .select("username, role, vessel_id, vessels(name)")
+        .eq("id", userId)
+        .single();
+
+      if (error) throw error;
+      return data;
+    }
+
+    async function doLogin(){
+      clearError();
+
+      const username = document.getElementById("username").value.trim();
+      const password = document.getElementById("password").value;
+
+      if (!username || !password){
+        setError("Please enter username and password.");
+        return;
+      }
+
+      const email = usernameToEmail(username);
+
+      const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+      if (error){
+        setError("Login failed: " + error.message);
+        return;
+      }
+
+      // session exists
+      const user = data.user;
+      if (!user){
+        setError("Login failed: no user returned.");
+        return;
+      }
+
+      // Fetch role/vessel from profiles
+      let profile;
+      try{
+        profile = await fetchMyProfile(user.id);
+      }catch(e){
+        setError("Login OK but profile missing or blocked. Ensure a profiles row exists for this user.");
+        return;
+      }
+
+      const uiRole = roleToUi(profile.role);
+      const vesselName = profile?.vessels?.name || "";
+
+      // Compatibility for existing pages (until we convert them to Supabase):
+      localStorage.setItem(SESSION_KEY_COMPAT, JSON.stringify({
+        username: profile.username || username,
+        role: uiRole,
+        vessel: vesselName,
+        created_at: new Date().toISOString()
+      }));
+
+      redirectByRole(uiRole);
+    }
+
+    async function doLogout(){
+      clearError();
+      await supabaseClient.auth.signOut();
+      localStorage.removeItem(SESSION_KEY_COMPAT);
+      setError("Logged out.");
+    }
+
+    document.getElementById("loginBtn").addEventListener("click", doLogin);
+    document.getElementById("logoutBtn").addEventListener("click", doLogout);
+
+    document.getElementById("password").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") doLogin();
+    });
+    document.getElementById("username").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") doLogin();
+    });
+  </script>
+</body>
+</html>

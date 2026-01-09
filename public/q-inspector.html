@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SIRE 2.0 – Inspector (Read Only)</title>
+
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <style>
+    body{
+      min-height:100vh;
+      margin:0;
+      padding:18px 14px;
+      background: radial-gradient(1200px 700px at 20% 10%, #1a4170 0%, #0b1c33 55%, #071426 100%);
+      font-family:"Segoe UI", Arial, sans-serif;
+      color:#fff;
+    }
+    .wrap{ max-width: 1550px; margin: 0 auto; }
+
+    .topbar{
+      display:flex;
+      gap:12px;
+      flex-wrap:wrap;
+      align-items:center;
+      justify-content:space-between;
+      margin-bottom: 12px;
+    }
+    .title{
+      font-weight:900;
+      letter-spacing:0.03em;
+      margin:0;
+      font-size:1.25rem;
+      text-shadow: 0 3px 12px rgba(0,0,0,0.35);
+    }
+    .sub{
+      margin-top:6px;
+      opacity:0.92;
+      font-weight:800;
+      line-height:1.35;
+    }
+    .top-actions{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+
+    .btn{
+      border:none; border-radius:10px;
+      padding:10px 14px;
+      font-weight:900;
+      cursor:pointer;
+      text-decoration:none;
+      display:inline-block;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+      background:#295eb0;
+      color:#fff;
+      white-space: nowrap;
+    }
+    .btn:hover{ filter:brightness(0.96); }
+    .btn-outline{ background:transparent; border:1px solid rgba(255,255,255,0.65); color:#fff; box-shadow:none; }
+    .btn-muted{ background:#eaf1fb; border:1px solid #d5deef; color:#1a4170; box-shadow:none; }
+    .btn:disabled{ opacity:0.55; cursor:not-allowed; filter:none; }
+
+    .panel{
+      background: rgba(12,33,58,0.68);
+      border: 1px solid rgba(213,222,239,0.35);
+      border-radius: 18px;
+      padding: 14px;
+      box-shadow: 0 10px 46px rgba(0,0,0,0.35);
+      backdrop-filter: blur(3px);
+    }
+
+    .card{
+      background:#fff;
+      color:#1a4170;
+      border:1px solid #d5deef;
+      border-radius:16px;
+      padding:14px;
+      box-shadow: 0 4px 18px rgba(18, 44, 87, 0.16);
+    }
+
+    .mono{
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+      font-size: 0.92rem;
+      color:#35507b;
+    }
+
+    .note{
+      margin-top:10px;
+      background:#f7fbff;
+      border:1px solid #d5deef;
+      border-radius:12px;
+      padding:10px;
+      color:#35507b;
+      font-weight: 750;
+      line-height:1.35;
+    }
+
+    .warn{
+      margin-top:10px;
+      padding:10px 12px;
+      border-radius:12px;
+      border:1px solid #f1c7c7;
+      background:#fff2f2;
+      color:#7a1f1f;
+      font-weight: 900;
+      line-height:1.35;
+      display:none;
+    }
+
+    .toolbar{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      align-items:center;
+      justify-content:space-between;
+      margin: 10px 0 0 0;
+      padding: 10px;
+      border:1px solid #d5deef;
+      border-radius:12px;
+      background:#f7fbff;
+    }
+    .toolbar .left{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+    .toolbar .right{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+
+    input{
+      border-radius:10px;
+      border:1px solid #cbd7ee;
+      padding: 10px 12px;
+      font-size: 1rem;
+      font-family:"Segoe UI", Arial, sans-serif;
+      background:#fff;
+      color:#1a4170;
+      outline:none;
+      min-width: 280px;
+      box-sizing:border-box;
+    }
+    input:focus{
+      border-color:#2e68c7;
+      box-shadow: 0 0 0 3px rgba(46, 104, 199, 0.15);
+    }
+
+    .tableWrap{ overflow:auto; border:1px solid #d5deef; border-radius:12px; margin-top:10px; }
+    table{ width:100%; border-collapse:collapse; min-width: 880px; }
+    th, td{ padding:10px 10px; border-bottom:1px solid #e6eefb; vertical-align:top; }
+    th{
+      text-align:left;
+      background:#f2f7ff;
+      color:#1a4170;
+      font-weight: 950;
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+    td{ color:#223a66; font-weight: 800; }
+    .small{ font-size: 0.92rem; font-weight: 800; color:#35507b; line-height:1.35; }
+
+    .pill{
+      display:inline-block;
+      padding:3px 10px;
+      border-radius:999px;
+      font-weight:900;
+      font-size:0.85rem;
+      border:1px solid #d5deef;
+      background:#eaf1fb;
+      color:#1a4170;
+      white-space: nowrap;
+    }
+    .pill.progress{ background:#fff4df; border-color:#f0d39a; color:#7a4a00; }
+    .pill.pending{ background:#fff0f0; border-color:#f1c7c7; color:#7a1f1f; }
+    .pill.submitted{ background:#e9fff0; border-color:#bce9c9; color:#11612b; }
+
+    .metaGrid{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap:10px;
+      margin-top:10px;
+    }
+    @media (max-width: 900px){
+      .metaGrid{ grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <div>
+        <h1 class="title">Inspector / Third Party (Read Only)</h1>
+        <div class="sub" id="subLine">Checking session...</div>
+      </div>
+
+      <div class="top-actions">
+        <a class="btn btn-outline" href="./q-dashboard.html">Dashboard</a>
+        <a class="btn btn-outline" href="./q-company.html">Company</a>
+        <a class="btn btn-outline" href="./q-vessel.html">Vessel</a>
+        <a class="btn btn-outline" href="./q-report.html">Reports</a>
+        <a class="btn btn-outline" href="./library.html">Read Only Library</a>
+        <a class="btn btn-outline" href="./index.html">Mode Selection</a>
+        <a class="btn btn-muted" href="./login.html">Login</a>
+        <button class="btn btn-outline" id="logoutBtn" type="button">Logout</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="card">
+        <div id="warnBox" class="warn"></div>
+
+        <div class="toolbar">
+          <div class="left">
+            <div class="mono" id="sessionLine">Session: ...</div>
+            <span class="mono" id="roleLine">Role: ...</span>
+            <span class="mono" id="scopeLine">Scope: ...</span>
+          </div>
+          <div class="right">
+            <input id="searchInput" type="text" placeholder="Search title / vessel / status..." />
+            <button class="btn btn-muted" id="refreshBtn" type="button">Refresh</button>
+          </div>
+        </div>
+
+        <div class="note">
+          Read-only access. Open any questionnaire to view answers and evidence placeholders in <span class="mono">q-answer.html</span>.
+          Visibility is controlled by Supabase RLS policies.
+        </div>
+
+        <div class="tableWrap">
+          <table>
+            <thead>
+              <tr>
+                <th style="width:140px;">Status</th>
+                <th style="width:260px;">Vessel</th>
+                <th>Title</th>
+                <th style="width:220px;">Updated</th>
+                <th style="width:240px;">Action</th>
+              </tr>
+            </thead>
+            <tbody id="tableBody"></tbody>
+          </table>
+        </div>
+
+        <div class="metaGrid">
+          <div class="note">
+            Supabase project:
+            <div class="mono" style="margin-top:6px;">https://bdidrcyufazskpuwmfca.supabase.co</div>
+          </div>
+          <div class="note">
+            Inspector mode note:
+            <div class="mono" style="margin-top:6px;">
+              q-answer enforces read-only UI for Inspector role, even if RLS allows select.
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // =====================
+    // Supabase config (your values)
+    // =====================
+    const SUPABASE_URL = "https://bdidrcyufazskpuwmfca.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJkaWRyY3l1ZmF6c2twdXdtZmNhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc5NDI4ODMsImV4cCI6MjA4MzUxODg4M30.Uqj4WCzoNS9wnlzI-xew6iTFzTUi77dcGeBjUgFjZbQ";
+    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // Compatibility key (older pages)
+    const SESSION_KEY_COMPAT = "q_session_v1";
+
+    const UI_ROLE_MAP = {
+      super_admin: "Super Admin",
+      company_admin: "Company Admin",
+      company_superintendent: "Company Superintendent",
+      vessel: "Vessel",
+      inspector: "Inspector / Third Party"
+    };
+    function roleToUi(role){ return UI_ROLE_MAP[role] || role || ""; }
+
+    function setSubLine(text){ document.getElementById("subLine").textContent = text; }
+    function showWarn(msg){
+      const w = document.getElementById("warnBox");
+      w.textContent = msg;
+      w.style.display = "block";
+    }
+    function clearWarn(){
+      const w = document.getElementById("warnBox");
+      w.textContent = "";
+      w.style.display = "none";
+    }
+
+    function fmtTs(ts){
+      if (!ts) return "-";
+      try{ return new Date(ts).toLocaleString(); }catch(e){ return String(ts); }
+    }
+
+    function escapeHtml(str){
+      return String(str ?? "")
+        .replaceAll("&","&amp;")
+        .replaceAll("<","&lt;")
+        .replaceAll(">","&gt;")
+        .replaceAll('"',"&quot;")
+        .replaceAll("'","&#039;");
+    }
+
+    function statusPill(status){
+      const s = String(status || "");
+      const cls = (s === "submitted") ? "submitted" : (s === "pending_office_review" ? "pending" : "progress");
+      const label = (s === "in_progress") ? "In Progress" :
+                    (s === "pending_office_review") ? "Pending Office Review" :
+                    (s === "submitted") ? "Submitted" : s;
+      return `<span class="pill ${cls}">${label}</span>`;
+    }
+
+    async function getUser(){
+      const { data: { user }, error } = await supabaseClient.auth.getUser();
+      if (error) showWarn("Auth error: " + error.message);
+      return user || null;
+    }
+
+    async function getMyProfile(userId){
+      const { data, error } = await supabaseClient
+        .from("profiles")
+        .select("username, role, vessel_id, vessels(name)")
+        .eq("id", userId)
+        .single();
+      if (error) throw error;
+      return data;
+    }
+
+    async function loadQuestionnairesScope(){
+      // RLS controls what this user can see
+      const { data, error } = await supabaseClient
+        .from("questionnaires")
+        .select("id, title, status, created_at, updated_at, vessel_id, vessels(name)")
+        .order("updated_at", { ascending: false });
+
+      if (error) throw error;
+      return data || [];
+    }
+
+    let ALL_Q = [];
+
+    function renderTable(){
+      const term = document.getElementById("searchInput").value.trim().toLowerCase();
+      const body = document.getElementById("tableBody");
+
+      const rows = ALL_Q.filter(q => {
+        if (!term) return true;
+        const vessel = q?.vessels?.name || "";
+        const s = String(q.status || "");
+        const t = String(q.title || "");
+        return vessel.toLowerCase().includes(term) || t.toLowerCase().includes(term) || s.toLowerCase().includes(term);
+      });
+
+      if (!rows.length){
+        body.innerHTML = `<tr><td colspan="5" class="small">No questionnaires found for your scope.</td></tr>`;
+        return;
+      }
+
+      body.innerHTML = rows.map(q => {
+        const vessel = q?.vessels?.name || "";
+        return `
+          <tr>
+            <td>${statusPill(q.status)}</td>
+            <td>${escapeHtml(vessel)}</td>
+            <td>
+              <div style="font-weight:950;">${escapeHtml(q.title)}</div>
+              <div class="small mono">ID: ${escapeHtml(q.id)}</div>
+            </td>
+            <td class="small">
+              <div>Updated: ${escapeHtml(fmtTs(q.updated_at))}</div>
+              <div>Created: ${escapeHtml(fmtTs(q.created_at))}</div>
+            </td>
+            <td>
+              <a class="btn btn-muted" href="./q-answer.html?qid=${encodeURIComponent(q.id)}">Open (Read)</a>
+            </td>
+          </tr>
+        `;
+      }).join("");
+    }
+
+    async function refreshAll(){
+      clearWarn();
+      setSubLine("Loading questionnaires...");
+      try{
+        ALL_Q = await loadQuestionnairesScope();
+        renderTable();
+        setSubLine("Ready.");
+      }catch(e){
+        showWarn("Load failed: " + String(e.message || e));
+        setSubLine("Error loading data.");
+      }
+    }
+
+    async function doLogout(){
+      clearWarn();
+      await supabaseClient.auth.signOut();
+      localStorage.removeItem(SESSION_KEY_COMPAT);
+      setSubLine("Logged out.");
+      showWarn("Logged out. Go to login.html to sign in again.");
+    }
+
+    async function init(){
+      clearWarn();
+
+      const user = await getUser();
+      if (!user){
+        setSubLine("Not logged in.");
+        showWarn("You are not logged in. Please login first (login.html).");
+        return;
+      }
+
+      let profile;
+      try{
+        profile = await getMyProfile(user.id);
+      }catch(e){
+        setSubLine("Logged in, but profile missing or blocked.");
+        showWarn("Profile missing or blocked by RLS. Ensure a row exists in public.profiles for this user.");
+        return;
+      }
+
+      const uiRole = roleToUi(profile.role);
+      const username = profile.username || user.email || "(unknown)";
+
+      document.getElementById("sessionLine").textContent = `Session: ${username}`;
+      document.getElementById("roleLine").textContent = `Role: ${uiRole}`;
+
+      // Show scope in a user-friendly way
+      const vesselName = profile?.vessels?.name || "";
+      const scopeText = (uiRole === "Vessel")
+        ? ("Vessel scope: " + (vesselName || "(not assigned)"))
+        : (uiRole === "Inspector / Third Party" ? "Inspector scope: All visible questionnaires (RLS)" : "Company scope: All questionnaires (RLS)");
+      document.getElementById("scopeLine").textContent = `Scope: ${scopeText}`;
+
+      // Compatibility session (until all pages are migrated)
+      localStorage.setItem(SESSION_KEY_COMPAT, JSON.stringify({
+        username: profile.username || "",
+        role: uiRole,
+        vessel: vesselName,
+        created_at: new Date().toISOString()
+      }));
+
+      if (uiRole !== "Inspector / Third Party"){
+        showWarn("You are logged in but not an Inspector role. This page is intended for Inspector/Third Party. RLS controls what you can see.");
+      }
+
+      document.getElementById("refreshBtn").addEventListener("click", refreshAll);
+      document.getElementById("logoutBtn").addEventListener("click", doLogout);
+      document.getElementById("searchInput").addEventListener("input", renderTable);
+
+      await refreshAll();
+    }
+
+    init();
+  </script>
+</body>
+</html>

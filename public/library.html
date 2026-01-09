@@ -1,0 +1,224 @@
+<!-- This is the doctype declaration for HTML5, telling the browser this is an HTML5 document -->
+<!DOCTYPE html>
+<!-- The root <html> tag, specifying the document language as English -->
+<html lang="en">
+  <head>
+    <!-- Set character encoding to UTF-8 for wide compatibility -->
+    <meta charset="UTF-8">
+    <!-- Set the page title (displayed in browser tab) -->
+    <title>SIRE 2.0 Questionnaire (Admin Mode)</title>
+    <!-- Link to PWA manifest for offline/app support -->
+    <link rel="manifest" href="manifest.json">
+    <!-- Link to external stylesheet for most styling rules -->
+    <link rel="stylesheet" href="style.css">
+    <!-- Additional print-specific and dropdown menu styles for print preview and dropdowns -->
+    <style>
+      @media print {
+        body, html { background: #fff !important; }
+        #admin-bar, #filters, #main-content > #questions-list, #version-bar, #question-counter {
+          display: none !important;
+        }
+        #printView, #printSingleView { margin: 0 !important; }
+        .print-break { page-break-before: always !important; }
+        .only-print { display: block !important; }
+        .no-print { display: none !important; }
+        @page { size: A4; margin: 5mm; }
+      }
+      .only-print { display: none; }
+      .print-btn-group { display: inline-flex; gap: 10px; align-items: center; }
+      .print-dropdown {
+        display: inline-block;
+        position: relative;
+        margin-right: 8px;
+      }
+      .print-dropdown-btn {
+        font-size:0.96em;
+        margin-top:3px;
+        margin-right:3px;
+        cursor: pointer;
+        padding: 5px 10px;
+      }
+      .print-dropdown-menu {
+        display: none;
+        position: absolute;
+        right: 0;
+        top: 29px;
+        background: #fff;
+        border: 1px solid #c0d7f4;
+        border-radius: 6px;
+        min-width: 160px;
+        z-index: 10;
+        box-shadow: 0 6px 16px rgba(34,94,164,0.13);
+      }
+      .print-dropdown.open .print-dropdown-menu { display: block; }
+      .print-dropdown-menu button {
+        display: block;
+        width: 100%;
+        border: none;
+        background: none;
+        text-align: left;
+        padding: 10px 14px;
+        cursor: pointer;
+        font-size: 1em;
+      }
+      .print-dropdown-menu button:hover {
+        background: #f1f8ff;
+      }
+      @media (max-width: 700px) {
+        .print-btn-group { flex-direction: column; align-items: stretch; }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Mode Selector Screen -->
+    <div id="modeSelectorScreen">
+      <div style="background:rgba(12,33,58,0.60); border-radius:20px; padding:46px 34px 36px 34px; box-shadow:0 6px 32px #111a;">
+        <h1 style="color:#fff; margin-bottom:32px; font-size:2.5em; font-weight:700; letter-spacing:0.07em; text-align:center; text-shadow:0 3px 12px #052;">SIRE 2.0 Inspection Application & Guidance</h1>
+        <label for="modeSelect" style="color:#fff; font-size:1.2em; margin-bottom:14px; display:block;">Please select mode:</label>
+        <select id="modeSelect" style="font-size:1.15em; padding:10px 16px; border-radius:8px; margin-bottom:30px; width:260px; background:#f5f8fd;">
+          <option value="" disabled selected>-- Select Mode --</option>
+          <option value="study">Read-Only (Study)</option>
+          <option value="preinspection">Pre-Inspection (Officers)</option>
+          <option value="superintendent">Superintendent Inspection</option>
+          <option value="manager">Manager Review</option>
+          <option value="admin">Admin / Editor</option>
+          <option value="superuser">Super-User</option>
+          <option value="postinspection">Post-Inspection</option>
+          <option value="spare">Spare/Reserved</option>
+        </select>
+        <br>
+        <button onclick="confirmMode()" style="font-size:1.13em; font-weight:600; padding:10px 38px; border-radius:9px; background:#295eb0; color:#fff; box-shadow:0 2px 9px #2226; cursor:pointer; border:none;">Continue</button>
+      </div>
+    </div>
+
+    <!-- Login Panel (all modes except Study) -->
+    <div id="loginPanel" style="display:none; position:fixed; z-index:9999; top:0; left:0; width:100vw; height:100vh; background:rgba(20,37,59,0.82); align-items:center; justify-content:center;">
+      <div style="background:#fff; padding:32px 32px 28px 32px; border-radius:14px; box-shadow:0 4px 28px #2229; margin:auto; width:350px; text-align:center;">
+        <h2 style="margin-bottom:24px;">Login Required</h2>
+        <div style="margin-bottom:14px;">
+          <label for="loginUsername" style="font-weight:500;">Username:</label><br>
+          <input type="text" id="loginUsername" style="font-size:1.15em; width:240px; padding:8px; border-radius:5px; margin-bottom:8px;" autocomplete="username">
+        </div>
+        <div style="margin-bottom:16px;">
+          <label for="loginPassword" style="font-weight:500;">Password:</label><br>
+          <input type="password" id="loginPassword" style="font-size:1.15em; width:240px; padding:8px; border-radius:5px;" autocomplete="current-password">
+        </div>
+        <div id="loginError" style="color:red; margin-bottom:10px;"></div>
+        <button id="loginBtn" style="font-size:1.15em; padding:8px 24px; border-radius:7px; background:#295eb0; color:#fff; border:none; cursor:pointer;">Login</button>
+      </div>
+    </div>
+
+    <!-- God Mode User Management Panel (Super-User only) -->
+      <div id="userManagementPanel" style="display:none; position:absolute; top:60px; right:20px; z-index:1001;">
+      <h3 style="margin-bottom:18px;">User Management (God Mode)</h3>
+      <div id="userList"></div>
+      <div style="margin-top:18px;">
+        <input type="text" id="newUsername" placeholder="Username" style="padding:6px; border-radius:5px; width:130px;">
+        <input type="password" id="newPassword" placeholder="Password" style="padding:6px; border-radius:5px; width:130px;">
+        <button onclick="addUser()" style="padding:6px 14px; border-radius:5px; background:#295eb0; color:#fff; border:none;">Add User</button>
+      </div>
+    </div>
+
+   <!-- Admin Bar: top area with admin actions, print/export/import controls -->
+  <div id="adminBarControls" style="background: #1a4170; padding: 10px 18px; display: flex; align-items: center; gap: 12px;">
+    <button id="printAnsweredBtn">Print Only Answered</button>
+    <button id="exportAnswersBtn">Export Answers</button>
+    <button id="importAnswersBtn">Import Answers</button>
+    <input type="file" id="importAnswersInput" accept=".json" style="display:none;" />
+    <button id="showUserManagementBtn" class="admin-btn">Manage Users</button>
+    <button id="downloadJsonBtn">Download JSON</button>
+    <span id="adminModeLabel" style="color: #fff; font-weight: bold;">Admin Mode:</span>
+    <button id="toggleAdminBtn">Enable Editing</button>
+    <button id="printAllBtn" class="print-dropdown-btn" style="margin-left:18px; font-size:1em; padding: 7px 20px;">
+      🖨️ Print All (Filtered)
+    </button>
+
+  </div>
+
+  <!-- App version bar, always visible just below admin bar -->
+  <div id="version-bar" style="display: flex; align-items: center; justify-content: space-between;">
+    <span>SIRE2.0-WebApp v1.0.1 (2025-07-21)</span>
+    <div id="search-box-area" style="display:flex; align-items:center; gap:6px;">
+      <input type="text" class="search-nav-input" id="mainSearchInput" placeholder="Search..." style="min-width:180px;">
+      <button id="prevResultBtn" type="button" class="search-nav-btn">⟨</button>
+      <button id="nextResultBtn" type="button" class="search-nav-btn">⟩</button>
+      <span id="resultIndicator"></span>
+      <button id="modeSwitchBtn" style="margin-left:24px; font-size:1em; padding:7px 18px; border-radius:8px; background:#295eb0; color:#fff; border:none; cursor:pointer;">
+        Change Mode
+      </button>
+    </div>
+  </div>
+
+  <!-- Counter for visible (filtered) questions, updated live -->
+  <div id="question-counter"></div> <!-- Moved here, just after version-bar -->
+
+      <!-- Main app container for all content below the navigation -->
+      <div id="container">
+
+        <!-- Filter bar: contains checkboxes and dynamic filters -->
+        <div id="filters" style="display: flex; gap: 16px; flex-wrap: wrap;">
+          <!-- Response Type -->
+          <div class="filter-dropdown-group" style="position:relative;">
+            <label onclick="toggleFilterDropdown('responseType')" id="responseTypeLabel" style="font-weight:600; color:#b2d5ff; font-size:1.03em; cursor:pointer;">Response Type ▼</label>
+            <div id="responseTypeDropdown" class="filter-dropdown-box" style="display:none; position:absolute; background:#e98b3a; padding:10px 18px; border-radius:7px; z-index:99;">
+              <div id="responseTypeChecks"></div>
+            </div>
+          </div>
+          <!-- Vessel Type -->
+          <div class="filter-dropdown-group" style="position:relative;">
+            <label onclick="toggleFilterDropdown('vesselType')" id="vesselTypeLabel" style="font-weight:600; color:#b2d5ff; font-size:1.03em; cursor:pointer;">Vessel Type ▼</label>
+            <div id="vesselTypeDropdown" class="filter-dropdown-box" style="display:none; position:absolute; background:#e98b3a; padding:10px 18px; border-radius:7px; z-index:99;">
+              <div id="vesselTypeChecks"></div>
+            </div>
+          </div>
+          <!-- Question Type -->
+          <div class="filter-dropdown-group" style="position:relative;">
+            <label onclick="toggleFilterDropdown('qtype')" id="qtypeLabel" style="font-weight:600; color:#b2d5ff; font-size:1.03em; cursor:pointer;">Question Type ▼</label>
+            <div id="qtypeDropdown" class="filter-dropdown-box" style="display:none; position:absolute; background:#e98b3a; padding:10px 18px; border-radius:7px; z-index:99;">
+              <div id="qtypeChecks"></div>
+            </div>
+          </div>
+          <!-- Company Rank Allocation -->
+          <div class="filter-dropdown-group" style="position:relative;">
+            <label onclick="toggleFilterDropdown('spis')" id="spisLabel" style="font-weight:600; color:#b2d5ff; font-size:1.03em; cursor:pointer;">Rank Allocation ▼</label>
+            <div id="spisDropdown" class="filter-dropdown-box" style="display:none; position:absolute; background:#e98b3a; padding:10px 18px; border-radius:7px; z-index:99;">
+              <div id="spisChecks"></div>
+            </div>
+          </div>
+          <!-- Chapters -->
+          <div class="filter-dropdown-group" style="position:relative;">
+            <label onclick="toggleFilterDropdown('chapter')" id="chapterLabel" style="font-weight:600; color:#b2d5ff; font-size:1.03em; cursor:pointer;">Chapters ▼</label>
+            <div id="chapterDropdown" class="filter-dropdown-box" style="display:none; position:absolute; background:#e98b3a; padding:10px 18px; border-radius:7px; z-index:99;">
+              <div id="chapterChecks"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- FLEX PANEL: list + details -->
+        <div style="display: flex; height: calc(100vh - 130px);">
+          <div id="questions-list" style="width: 370px; min-width: 270px; max-width: 520px; overflow-y: auto; border-right: 1px solid #c6d6e4; background: #fff7f7;"></div>
+          <div id="details-panel" style="flex: 1; min-width: 0; padding: 28px 36px; background: #f8fbff;"></div>
+        </div>
+
+      </div>
+
+  <!-- Include JavaScript at the end of body for best loading performance.
+       app.js handles all data loading, rendering, filtering, admin editing, etc.
+       print.js handles all logic for printing answers and single questions. -->
+  <script src="app.js"></script>
+  <script src="print.js"></script>
+</body>
+</html>
+<script>
+  // Direct mode switch buttons (Read Only -> Questionnaire Login)
+  (function () {
+    const btn = document.getElementById("modeSwitchBtn");
+    if (!btn) return;
+
+    btn.textContent = "Go to Questionnaire (Login)";
+    btn.title = "Switch to Questionnaire mode (login required)";
+    btn.onclick = function () {
+      window.location.href = "./login.html";
+    };
+  })();
+</script>
