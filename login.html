@@ -275,7 +275,7 @@
     async function fetchMyProfile(userId){
       const { data, error } = await supabaseClient
         .from("profiles")
-        .select("username, role, vessel_id, vessels(name)")
+        .select("username, role, vessel_id")
         .eq("id", userId)
         .single();
 
@@ -313,9 +313,11 @@
       try{
         profile = await fetchMyProfile(user.id);
       }catch(e){
+        const details = (e && (e.message || e.details || e.hint)) ? (e.message || e.details || e.hint) : JSON.stringify(e);
         setError(
-          "Login OK but profile missing or blocked.\n" +
-          "Ensure a row exists in public.profiles for this user (id must match auth.users.id)."
+          "Login OK but profile fetch failed.\n\n" +
+          "Error details:\n" + details + "\n\n" +
+          "Next: check RLS policies and the exact SELECT in fetchMyProfile()."
         );
         return;
       }
