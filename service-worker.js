@@ -1,4 +1,16 @@
-const CACHE_NAME = "sire2-cache-v7"; // increment this number each time
+const CACHE_NAME = "sire2-cache-v1.0.0"; // bump on every release
+
+self.addEventListener("install", (event) => {
+  self.skipWaiting();
+});
+
+self.addEventListener("activate", (event) => {
+  event.waitUntil(
+    caches.keys().then((keys) =>
+      Promise.all(keys.map((k) => (k !== CACHE_NAME ? caches.delete(k) : null)))
+    ).then(() => self.clients.claim())
+  );
+});
 
 const urlsToCache = [
   './',
