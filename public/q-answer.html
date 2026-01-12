@@ -2,47 +2,339 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Answer Questionnaire</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Questionnaire Answers</title>
   <link rel="stylesheet" href="style.css" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="./auth.js"></script>
+
   <style>
-    body { margin:0; font-family:"Segoe UI", Arial, sans-serif; background:#f5f7fb; }
-    .topbar { background:#1a4170; color:#fff; padding:12px 16px; display:flex; justify-content:space-between; align-items:center; }
-    .wrap { padding:18px; }
-    .btn { background:#295eb0; color:#fff; border:none; border-radius:10px; padding:10px 14px; font-weight:900; cursor:pointer; }
-    .btn2 { background:#eaf1fb; color:#1a4170; border:1px solid #d5deef; border-radius:10px; padding:10px 14px; font-weight:900; cursor:pointer; }
-    .card { background:#fff; border:1px solid #d5deef; border-radius:14px; padding:14px; margin-top:12px; }
+    body{
+      margin:0; min-height:100vh;
+      font-family:"Segoe UI", Arial, sans-serif;
+      background: radial-gradient(1200px 700px at 20% 10%, #1a4170 0%, #0b1c33 55%, #071426 100%);
+      color:#fff;
+      padding:24px 16px; box-sizing:border-box;
+    }
+    .shell{max-width:1100px;margin:0 auto;}
+    .topbar{
+      display:flex; gap:12px; align-items:center; justify-content:space-between;
+      background: rgba(12,33,58,0.68);
+      border: 1px solid rgba(213,222,239,0.35);
+      border-radius: 16px;
+      padding:14px 16px;
+      box-shadow: 0 10px 46px rgba(0,0,0,0.35);
+      backdrop-filter: blur(3px);
+      margin-bottom:14px;
+    }
+    .title{font-size:1.15rem;font-weight:900;}
+    .muted{opacity:.9;font-weight:700;}
+    .btn-outline{
+      border-radius:10px;background:transparent;
+      border:1px solid #d5deef;color:#fff;
+      font-weight:900;font-size:1rem;
+      padding:9px 14px;cursor:pointer;
+      text-decoration:none;display:inline-block;
+    }
+    .btn-outline:hover{background:rgba(255,255,255,0.08);}
+    .card{
+      background:#ffffff;color:#1a4170;
+      border:1px solid #d5deef;border-radius:16px;
+      padding:14px 14px;
+      box-shadow:0 4px 18px rgba(18,44,87,0.16);
+      margin-bottom:14px;
+    }
+    .qhead{display:flex;gap:10px;align-items:flex-start;justify-content:space-between;}
+    .qno{font-weight:900;font-size:1.05rem;}
+    .qmeta{font-weight:800;color:#35507b;}
+    .qtext{margin-top:10px;line-height:1.4;font-weight:800;}
+    details{margin-top:10px;}
+    summary{cursor:pointer;font-weight:900;}
+    .block{margin-top:10px;}
+    .label{font-weight:900;margin-bottom:6px;}
+    .pre{white-space:pre-wrap;line-height:1.4;}
+    .pgno{
+      margin-top:12px;
+      border:1px solid #e6edf9;
+      border-radius:12px;
+      padding:12px;
+      background:#f8fbff;
+    }
+    .pgno-title{font-weight:900;margin-bottom:6px;}
+    .choices{display:flex;gap:12px;flex-wrap:wrap;margin-top:8px;}
+    .choices label{font-weight:900;}
+    textarea{
+      width:100%; box-sizing:border-box;
+      margin-top:8px;
+      border-radius:10px;
+      border:1px solid #cbd7ee;
+      padding:10px 12px;
+      font-family:"Segoe UI", Arial, sans-serif;
+      font-size:0.98rem;
+      min-height:74px;
+      resize:vertical;
+    }
+    .saveRow{display:flex;gap:10px;align-items:center;margin-top:10px;flex-wrap:wrap;}
+    .btn{
+      border:none;border-radius:10px;
+      background:#295eb0;color:#fff;
+      font-weight:900;font-size:1rem;
+      padding:9px 14px;cursor:pointer;
+      box-shadow:0 2px 10px rgba(0,0,0,0.15);
+    }
+    .btn:hover{filter:brightness(.97);}
+    .status{font-weight:900;}
+    .err{
+      background:#fff2f2;color:#7a1f1f;
+      border:1px solid #f1c7c7;
+      padding:10px 12px;border-radius:10px;
+      font-weight:900;line-height:1.35;
+      margin-top:12px;
+      display:none;
+    }
   </style>
 </head>
-<body>
-  <div class="topbar">
-    <div><b>Answering</b></div>
-    <div style="display:flex; gap:10px; align-items:center;">
-      <div id="userBadge" style="font-weight:800; opacity:0.95;"></div>
-      <button class="btn2" onclick="location.href='./q-vessel.html'">Vessel Page</button>
-      <button class="btn2" onclick="location.href='./q-dashboard.html'">Dashboard</button>
-      <button class="btn" id="logoutBtn">Logout</button>
-    </div>
-  </div>
 
-  <div class="wrap">
-    <div class="card">
-      <h3 style="margin:0 0 8px 0;">Protected Page</h3>
-      <div>Only Vessel and Company roles can answer. Inspector cannot access.</div>
+<body>
+  <div class="shell">
+    <div class="topbar">
+      <div>
+        <div class="title" id="pageTitle">Questionnaire</div>
+        <div class="muted" id="pageSub">Loading…</div>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <a class="btn-outline" href="./q-dashboard.html">Dashboard</a>
+        <a class="btn-outline" href="./library.html">Read Only</a>
+        <a class="btn-outline" href="./index.html">Mode Selection</a>
+      </div>
     </div>
+
+    <div class="err" id="errBox"></div>
+    <div id="content"></div>
   </div>
 
   <script>
-    (async () => {
-      const R = AUTH.ROLES;
-      const me = await AUTH.requireAuth([R.SUPER_ADMIN, R.COMPANY_ADMIN, R.COMPANY_SUPERINTENDENT, R.VESSEL]);
-      if (!me) return;
+    const SUPABASE_URL = "https://bdidrcyufazskpuwmfca.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJkaWRyY3l1ZmF6c2twdXdtZmNhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc5NDI4ODMsImV4cCI6MjA4MzUxODg4M30.Uqj4WCzoNS9wnlzI-xew6iTFzTUi77dcGeBjUgFjZbQ";
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-      AUTH.fillUserBadge(me, "userBadge");
-      document.getElementById("logoutBtn").addEventListener("click", AUTH.logoutAndGoLogin);
-    })();
+    function qs(name){ return new URLSearchParams(location.search).get(name); }
+
+    function setError(msg){
+      const e=document.getElementById("errBox");
+      e.textContent=msg;
+      e.style.display="block";
+    }
+    function clearError(){
+      const e=document.getElementById("errBox");
+      e.textContent="";
+      e.style.display="none";
+    }
+
+    async function requireLogin(){
+      const { data, error } = await supabase.auth.getSession();
+      if (error) throw error;
+      if (!data.session) window.location.href = "./login.html";
+      return data.session;
+    }
+
+    function esc(s){
+      return String(s||"")
+        .replaceAll("&","&amp;").replaceAll("<","&lt;")
+        .replaceAll(">","&gt;").replaceAll('"',"&quot;")
+        .replaceAll("'","&#039;");
+    }
+
+    function renderQuestionCard(q, pgnoRows){
+      const qno = q["No."] || "";
+      const section = q["Section Name"] || "";
+      const shortText = q["Short Text"] || "";
+      const risk = q["Risk Level"] ?? "";
+      const qtype = q["Question Type"] || "";
+      const qtext = q["Question"] || "";
+
+      const guidance = q["Inspection Guidance"] || "";
+      const actions = q["Suggested Inspector Actions"] || "";
+      const evidence = q["Expected Evidence"] || "";
+
+      const wrapper = document.createElement("div");
+      wrapper.className="card";
+
+      wrapper.innerHTML = `
+        <div class="qhead">
+          <div>
+            <div class="qno">${esc(qno)} — ${esc(shortText)}</div>
+            <div class="qmeta">${esc(section)} | Risk: ${esc(String(risk))} | Type: ${esc(qtype)}</div>
+          </div>
+        </div>
+
+        <div class="qtext">${esc(qtext)}</div>
+
+        <details>
+          <summary>Read-Only Details (same content as library)</summary>
+
+          <div class="block">
+            <div class="label">Inspection Guidance</div>
+            <div class="pre">${esc(guidance)}</div>
+          </div>
+
+          <div class="block">
+            <div class="label">Suggested Inspector Actions</div>
+            <div class="pre">${esc(actions)}</div>
+          </div>
+
+          <div class="block">
+            <div class="label">Expected Evidence</div>
+            <div class="pre">${esc(evidence)}</div>
+          </div>
+        </details>
+
+        <div class="block">
+          <div class="label">Potential Grounds for Negative Observations (Answer each PGNO)</div>
+          <div id="pgno-${cssId(qno)}"></div>
+        </div>
+      `;
+
+      const pgnoBox = wrapper.querySelector(`#pgno-${cssId(qno)}`);
+
+      pgnoRows.sort((a,b)=> (a.pgno_index||0)-(b.pgno_index||0)).forEach(row=>{
+        const el = document.createElement("div");
+        el.className="pgno";
+        el.innerHTML = `
+          <div class="pgno-title">PGNO ${esc(String(row.pgno_index))}</div>
+          <div class="pre">${esc(row.pgno_text)}</div>
+
+          <div class="choices">
+            ${choiceRadio(qno,row.pgno_index,'Y',row.response)}
+            ${choiceRadio(qno,row.pgno_index,'N',row.response)}
+            ${choiceRadio(qno,row.pgno_index,'NA',row.response)}
+            ${choiceRadio(qno,row.pgno_index,'NS',row.response)}
+          </div>
+
+          <textarea placeholder="Remarks for this PGNO…" id="${taId(qno,row.pgno_index)}">${esc(row.remarks||"")}</textarea>
+
+          <div class="saveRow">
+            <button class="btn" type="button" id="${saveId(qno,row.pgno_index)}">Save</button>
+            <span class="status" id="${statusId(qno,row.pgno_index)}"></span>
+          </div>
+        `;
+        pgnoBox.appendChild(el);
+      });
+
+      // Hook save buttons
+      pgnoRows.forEach(row=>{
+        const btn = wrapper.querySelector(`#${saveId(qno,row.pgno_index)}`);
+        btn.addEventListener("click", async ()=>{
+          await savePgno(row.questionnaire_id, qno, row.pgno_index);
+        });
+      });
+
+      return wrapper;
+    }
+
+    function cssId(qno){ return qno.replaceAll(".","_").replaceAll(" ","_"); }
+    function radioName(qno, idx){ return `resp_${cssId(qno)}_${idx}`; }
+    function taId(qno, idx){ return `rm_${cssId(qno)}_${idx}`; }
+    function saveId(qno, idx){ return `sv_${cssId(qno)}_${idx}`; }
+    function statusId(qno, idx){ return `st_${cssId(qno)}_${idx}`; }
+
+    function choiceRadio(qno, idx, val, current){
+      const checked = (String(current||"") === val) ? "checked" : "";
+      const label = (val === "NA") ? "N/A" : (val === "NS" ? "N/S" : val);
+      return `
+        <label>
+          <input type="radio" name="${radioName(qno,idx)}" value="${val}" ${checked}/>
+          ${label}
+        </label>
+      `;
+    }
+
+    async function savePgno(qid, qno, idx){
+      clearError();
+      const st = document.getElementById(statusId(qno,idx));
+      st.textContent = "Saving…";
+
+      const radios = document.getElementsByName(radioName(qno,idx));
+      let val = null;
+      radios.forEach(r=>{ if (r.checked) val = r.value; });
+
+      const remarks = document.getElementById(taId(qno,idx)).value;
+
+      const { error } = await supabase
+        .from("answers_pgno")
+        .update({ response: val, remarks })
+        .eq("questionnaire_id", qid)
+        .eq("question_no", qno)
+        .eq("pgno_index", idx);
+
+      if (error){
+        st.textContent = "";
+        setError("Save failed: " + error.message);
+        return;
+      }
+      st.textContent = "Saved.";
+      setTimeout(()=> st.textContent="", 1200);
+    }
+
+    async function loadData(){
+      const session = await requireLogin();
+
+      const qid = qs("qid") || localStorage.getItem("active_qid");
+      if (!qid) throw new Error("No questionnaire id found. Open from Dashboard or Builder.");
+
+      // Title
+      const { data: qh, error: qhErr } = await supabase
+        .from("questionnaires")
+        .select("id,title,status,created_at")
+        .eq("id", qid)
+        .single();
+
+      if (qhErr) throw qhErr;
+
+      document.getElementById("pageTitle").textContent = qh.title || "Questionnaire";
+      document.getElementById("pageSub").textContent =
+        `Questionnaire ID: ${qh.id} | Status: ${qh.status}`;
+
+      // Questions (JSON snapshot)
+      const { data: qq, error: qqErr } = await supabase
+        .from("questionnaire_questions")
+        .select("questionnaire_id, seq, question_no, question_json")
+        .eq("questionnaire_id", qid)
+        .order("seq", { ascending: true });
+
+      if (qqErr) throw qqErr;
+
+      // PGNO rows
+      const { data: ap, error: apErr } = await supabase
+        .from("answers_pgno")
+        .select("questionnaire_id, question_no, pgno_index, pgno_text, response, remarks")
+        .eq("questionnaire_id", qid)
+        .order("question_no", { ascending: true })
+        .order("pgno_index", { ascending: true });
+
+      if (apErr) throw apErr;
+
+      // Group PGNO by question_no
+      const map = {};
+      (ap||[]).forEach(r=>{
+        map[r.question_no] = map[r.question_no] || [];
+        map[r.question_no].push(r);
+      });
+
+      const content = document.getElementById("content");
+      content.innerHTML = "";
+
+      (qq||[]).forEach(row=>{
+        const q = row.question_json;
+        const pgnoRows = map[row.question_no] || [];
+        // attach qid so save knows it
+        pgnoRows.forEach(r=> r.questionnaire_id = qid);
+
+        const card = renderQuestionCard(q, pgnoRows);
+        content.appendChild(card);
+      });
+    }
+
+    loadData().catch(e=> setError(e.message));
   </script>
 </body>
 </html>

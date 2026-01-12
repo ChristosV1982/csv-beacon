@@ -1,0 +1,52 @@
+vessel_name,call_sign,imo_number,hull_number,position,role,username,email,password
+OLYMPIC LEOPARD,SVCE7,9470040,S 42,Master,vessel,olympic_leopard_master,olympic_leopard_master@csvtest.local,SVCE7
+OLYMPIC LEOPARD,SVCE7,9470040,S 42,Chief Officer,vessel,olympic_leopard_chiefofficer,olympic_leopard_chiefofficer@csvtest.local,SVCE7
+OLYMPIC LEOPARD,SVCE7,9470040,S 42,Chief Engineer,vessel,olympic_leopard_chiefengineer,olympic_leopard_chiefengineer@csvtest.local,SVCE7
+OLYMPIC LION,V7HT4,9445459,S 41,Master,vessel,olympic_lion_master,olympic_lion_master@csvtest.local,V7HT4
+OLYMPIC LION,V7HT4,9445459,S 41,Chief Officer,vessel,olympic_lion_chiefofficer,olympic_lion_chiefofficer@csvtest.local,V7HT4
+OLYMPIC LION,V7HT4,9445459,S 41,Chief Engineer,vessel,olympic_lion_chiefengineer,olympic_lion_chiefengineer@csvtest.local,V7HT4
+OLYMPIC LUCK,SVCA7,9424211,S 32,Master,vessel,olympic_luck_master,olympic_luck_master@csvtest.local,SVCA7
+OLYMPIC LUCK,SVCA7,9424211,S 32,Chief Officer,vessel,olympic_luck_chiefofficer,olympic_luck_chiefofficer@csvtest.local,SVCA7
+OLYMPIC LUCK,SVCA7,9424211,S 32,Chief Engineer,vessel,olympic_luck_chiefengineer,olympic_luck_chiefengineer@csvtest.local,SVCA7
+OLYMPIC TRUST,V7HA2,9437177,S 43,Master,vessel,olympic_trust_master,olympic_trust_master@csvtest.local,V7HA2
+OLYMPIC TRUST,V7HA2,9437177,S 43,Chief Officer,vessel,olympic_trust_chiefofficer,olympic_trust_chiefofficer@csvtest.local,V7HA2
+OLYMPIC TRUST,V7HA2,9437177,S 43,Chief Engineer,vessel,olympic_trust_chiefengineer,olympic_trust_chiefengineer@csvtest.local,V7HA2
+OLYMPIC TROPHY,SVCH8,9445461,S 45,Master,vessel,olympic_trophy_master,olympic_trophy_master@csvtest.local,SVCH8
+OLYMPIC TROPHY,SVCH8,9445461,S 45,Chief Officer,vessel,olympic_trophy_chiefofficer,olympic_trophy_chiefofficer@csvtest.local,SVCH8
+OLYMPIC TROPHY,SVCH8,9445461,S 45,Chief Engineer,vessel,olympic_trophy_chiefengineer,olympic_trophy_chiefengineer@csvtest.local,SVCH8
+OLYMPIC TARGET,SVCI2,9468853,S 46,Master,vessel,olympic_target_master,olympic_target_master@csvtest.local,SVCI2
+OLYMPIC TARGET,SVCI2,9468853,S 46,Chief Officer,vessel,olympic_target_chiefofficer,olympic_target_chiefofficer@csvtest.local,SVCI2
+OLYMPIC TARGET,SVCI2,9468853,S 46,Chief Engineer,vessel,olympic_target_chiefengineer,olympic_target_chiefengineer@csvtest.local,SVCI2
+OLYMPIC LUNA,V7A4145,9731157,S 48,Master,vessel,olympic_luna_master,olympic_luna_master@csvtest.local,V7A4145
+OLYMPIC LUNA,V7A4145,9731157,S 48,Chief Officer,vessel,olympic_luna_chiefofficer,olympic_luna_chiefofficer@csvtest.local,V7A4145
+OLYMPIC LUNA,V7A4145,9731157,S 48,Chief Engineer,vessel,olympic_luna_chiefengineer,olympic_luna_chiefengineer@csvtest.local,V7A4145
+OLYMPIC LADY,V7A2687,9731169,S 49,Master,vessel,olympic_lady_master,olympic_lady_master@csvtest.local,V7A2687
+OLYMPIC LADY,V7A2687,9731169,S 49,Chief Officer,vessel,olympic_lady_chiefofficer,olympic_lady_chiefofficer@csvtest.local,V7A2687
+OLYMPIC LADY,V7A2687,9731169,S 49,Chief Engineer,vessel,olympic_lady_chiefengineer,olympic_lady_chiefengineer@csvtest.local,V7A2687
+OLYMPIC LIGHT,SVBZ7,9424273,S 36,Master,vessel,olympic_light_master,olympic_light_master@csvtest.local,SVBZ7
+OLYMPIC LIGHT,SVBZ7,9424273,S 36,Chief Officer,vessel,olympic_light_chiefofficer,olympic_light_chiefofficer@csvtest.local,SVBZ7
+OLYMPIC LIGHT,SVBZ7,9424273,S 36,Chief Engineer,vessel,olympic_light_chiefengineer,olympic_light_chiefengineer@csvtest.local,SVBZ7
+OLYMPIC FRIENDSHIP,V7SP5,9745251,S 50,Master,vessel,olympic_friendship_master,olympic_friendship_master@csvtest.local,V7SP5
+OLYMPIC FRIENDSHIP,V7SP5,9745251,S 50,Chief Officer,vessel,olympic_friendship_chiefofficer,olympic_friendship_chiefofficer@csvtest.local,V7SP5
+OLYMPIC FRIENDSHIP,V7SP5,9745251,S 50,Chief Engineer,vessel,olympic_friendship_chiefengineer,olympic_friendship_chiefengineer@csvtest.local,V7SP5
+OLYMPIC FIGHTER,V7QK3,9745263,S 51,Master,vessel,olympic_fighter_master,olympic_fighter_master@csvtest.local,V7QK3
+OLYMPIC FIGHTER,V7QK3,9745263,S 51,Chief Officer,vessel,olympic_fighter_chiefofficer,olympic_fighter_chiefofficer@csvtest.local,V7QK3
+OLYMPIC FIGHTER,V7QK3,9745263,S 51,Chief Engineer,vessel,olympic_fighter_chiefengineer,olympic_fighter_chiefengineer@csvtest.local,V7QK3
+OLYMPIC FUTURE,SYQH,9271353,S 19,Master,vessel,olympic_future_master,olympic_future_master@csvtest.local,SYQH
+OLYMPIC FUTURE,SYQH,9271353,S 19,Chief Officer,vessel,olympic_future_chiefofficer,olympic_future_chiefofficer@csvtest.local,SYQH
+OLYMPIC FUTURE,SYQH,9271353,S 19,Chief Engineer,vessel,olympic_future_chiefengineer,olympic_future_chiefengineer@csvtest.local,SYQH
+OLYMPIC FLAG,SWDF,9271341,S 20,Master,vessel,olympic_flag_master,olympic_flag_master@csvtest.local,SWDF
+OLYMPIC FLAG,SWDF,9271341,S 20,Chief Officer,vessel,olympic_flag_chiefofficer,olympic_flag_chiefofficer@csvtest.local,SWDF
+OLYMPIC FLAG,SWDF,9271341,S 20,Chief Engineer,vessel,olympic_flag_chiefengineer,olympic_flag_chiefengineer@csvtest.local,SWDF
+OLYMPIC LAUREL,V7A2037,9831804,S 52,Master,vessel,olympic_laurel_master,olympic_laurel_master@csvtest.local,V7A2037
+OLYMPIC LAUREL,V7A2037,9831804,S 52,Chief Officer,vessel,olympic_laurel_chiefofficer,olympic_laurel_chiefofficer@csvtest.local,V7A2037
+OLYMPIC LAUREL,V7A2037,9831804,S 52,Chief Engineer,vessel,olympic_laurel_chiefengineer,olympic_laurel_chiefengineer@csvtest.local,V7A2037
+OLYMPIC LYRA,V7A2038,9831816,S 53,Master,vessel,olympic_lyra_master,olympic_lyra_master@csvtest.local,V7A2038
+OLYMPIC LYRA,V7A2038,9831816,S 53,Chief Officer,vessel,olympic_lyra_chiefofficer,olympic_lyra_chiefofficer@csvtest.local,V7A2038
+OLYMPIC LYRA,V7A2038,9831816,S 53,Chief Engineer,vessel,olympic_lyra_chiefengineer,olympic_lyra_chiefengineer@csvtest.local,V7A2038
+OLYMPIC LIFE,V7A2092,9844277,S 54,Master,vessel,olympic_life_master,olympic_life_master@csvtest.local,V7A2092
+OLYMPIC LIFE,V7A2092,9844277,S 54,Chief Officer,vessel,olympic_life_chiefofficer,olympic_life_chiefofficer@csvtest.local,V7A2092
+OLYMPIC LIFE,V7A2092,9844277,S 54,Chief Engineer,vessel,olympic_life_chiefengineer,olympic_life_chiefengineer@csvtest.local,V7A2092
+OLYMPIC OLYMPIC,XXX999,,S82,Master,vessel,olympic_olympic_master,olympic_olympic_master@csvtest.local,XXX999
+OLYMPIC OLYMPIC,XXX999,,S82,Chief Officer,vessel,olympic_olympic_chiefofficer,olympic_olympic_chiefofficer@csvtest.local,XXX999
+OLYMPIC OLYMPIC,XXX999,,S82,Chief Engineer,vessel,olympic_olympic_chiefengineer,olympic_olympic_chiefengineer@csvtest.local,XXX999
