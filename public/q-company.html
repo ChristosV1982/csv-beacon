@@ -110,7 +110,7 @@
 
     .grid{
       display:grid;
-      grid-template-columns: 560px 1fr;
+      grid-template-columns: 520px 1fr;
       gap:12px;
       margin-top: 12px;
       align-items:start;
@@ -190,80 +190,115 @@
     .toolbar .left{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
     .toolbar .right{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
 
-    .divider{ margin:14px 0; border-top:1px solid #d5deef; }
+    .divider{
+      margin:14px 0;
+      border-top:1px solid #d5deef;
+    }
 
-    /* Read-Only style: checkbox dropdown filters */
+    /* === Read-Only style filter dropdowns (fixed layout) === */
     .filterBar{
       display:flex;
-      gap:12px;
       flex-wrap:wrap;
-      align-items:center;
+      gap:10px;
       margin-top:10px;
+      align-items:center;
     }
+
     .filterGroup{
       position:relative;
-      display:inline-block;
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
     }
-    .filterLabel{
-      display:inline-block;
-      padding:8px 10px;
-      border-radius:10px;
+
+    .filterBtn{
       border:1px solid #cbd7ee;
-      background:#fff;
+      background:#ffffff;
       color:#1a4170;
-      font-weight:950;
+      font-weight:900;
+      border-radius:10px;
+      padding:8px 10px;
       cursor:pointer;
-      user-select:none;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.06);
       white-space:nowrap;
     }
-    .filterBox{
+    .filterBtn:hover{ filter:brightness(0.98); }
+
+    .filterMenu{
       display:none;
       position:absolute;
       top:44px;
       left:0;
-      z-index:50;
-      min-width: 280px;
-      max-width: 380px;
-      max-height: 320px;
-      overflow:auto;
+      width:320px;
       background:#fff;
+      color:#1a4170;
       border:1px solid #cbd7ee;
       border-radius:12px;
+      box-shadow: 0 12px 36px rgba(0,0,0,0.18);
+      z-index: 50;
       padding:10px;
-      box-shadow: 0 10px 24px rgba(0,0,0,0.18);
     }
-    .filterBox.open{ display:block; }
-    .filterTopActions{
+    .filterMenu.rightAlign{ left:auto; right:0; }
+
+    .filterMenu.open{ display:block; }
+
+    .filterMenuHeader{
       display:flex;
       gap:8px;
-      flex-wrap:wrap;
+      justify-content:space-between;
+      align-items:center;
       margin-bottom:8px;
     }
     .miniBtn{
       border:1px solid #cbd7ee;
-      background:#f2f7ff;
+      background:#f7fbff;
       color:#1a4170;
-      padding:6px 10px;
-      border-radius:10px;
       font-weight:900;
+      border-radius:10px;
+      padding:6px 10px;
       cursor:pointer;
-      font-size:0.9rem;
+      white-space:nowrap;
     }
     .miniBtn:hover{ filter:brightness(0.98); }
-    .checkRow{
-      display:flex;
-      align-items:flex-start;
-      gap:8px;
-      padding:6px 2px;
-      border-bottom:1px solid #eef4ff;
+
+    .filterList{
+      max-height:240px;
+      overflow:auto;
+      border:1px solid #d5deef;
+      border-radius:10px;
+      padding:8px;
+      background:#fdfefe;
     }
-    .checkRow:last-child{ border-bottom:none; }
-    .checkRow input{ margin-top:3px; }
-    .checkRow span{
-      color:#223a66;
+    .chk{
+      display:flex;
+      gap:10px;
+      align-items:flex-start;
+      padding:6px 6px;
+      border-radius:8px;
+    }
+    .chk:hover{ background:#f3f8ff; }
+    .chk input{ width:auto; margin-top:2px; }
+    .chk span{ font-weight:850; color:#223a66; line-height:1.25; }
+
+    .radioRow{
+      display:flex;
+      gap:10px;
+      align-items:center;
+      padding:6px 6px;
+      border-radius:8px;
+    }
+    .radioRow:hover{ background:#f3f8ff; }
+    .radioRow input{ width:auto; }
+
+    .tiny{
+      font-size:0.86rem;
+      color:#35507b;
       font-weight:800;
       line-height:1.25;
-      word-break:break-word;
+    }
+
+    @media (max-width: 520px){
+      .filterMenu{ width: 88vw; }
     }
   </style>
 </head>
@@ -304,16 +339,14 @@
         </div>
 
         <div class="grid">
-          <!-- LEFT -->
+          <!-- LEFT: Create + Filters + Templates -->
           <div>
             <div class="note">
               <b>Create Questionnaire (Option A: no empty questionnaires)</b>
               <div class="mono" style="margin-top:6px;">
                 Creates: <span class="mono">public.questionnaires</span> + compiles selected questions into <span class="mono">public.questionnaire_questions</span>
               </div>
-              <div class="mono" style="margin-top:6px;">
-                Library locked to: <span class="mono">sire_questions_all_columns_named.json</span>
-              </div>
+              <div class="mono" style="margin-top:6px;" id="libLockLine">Library locked to: ...</div>
             </div>
 
             <label for="vesselSelect">Vessel</label>
@@ -334,58 +367,43 @@
 
             <div class="filterBar">
               <div class="filterGroup">
-                <div class="filterLabel" data-toggle="f_chapter">Chapters ▼</div>
-                <div class="filterBox" id="box_f_chapter"></div>
+                <button class="filterBtn" id="btnChapters" type="button">Chapters ▼</button>
+                <div class="filterMenu" id="menuChapters"></div>
               </div>
 
               <div class="filterGroup">
-                <div class="filterLabel" data-toggle="f_section">Sections ▼</div>
-                <div class="filterBox" id="box_f_section"></div>
+                <button class="filterBtn" id="btnSections" type="button">Sections ▼</button>
+                <div class="filterMenu" id="menuSections"></div>
               </div>
 
               <div class="filterGroup">
-                <div class="filterLabel" data-toggle="f_qtype">Question Type ▼</div>
-                <div class="filterBox" id="box_f_qtype"></div>
+                <button class="filterBtn" id="btnQType" type="button">Question Type ▼</button>
+                <div class="filterMenu" id="menuQType"></div>
               </div>
 
               <div class="filterGroup">
-                <div class="filterLabel" data-toggle="f_vessel">Vessel Type ▼</div>
-                <div class="filterBox" id="box_f_vessel"></div>
+                <button class="filterBtn" id="btnVesselType" type="button">Vessel Type ▼</button>
+                <div class="filterMenu rightAlign" id="menuVesselType"></div>
               </div>
 
               <div class="filterGroup">
-                <div class="filterLabel" data-toggle="f_rank">Rank Allocation ▼</div>
-                <div class="filterBox" id="box_f_rank"></div>
+                <button class="filterBtn" id="btnRank" type="button">Rank Allocation ▼</button>
+                <div class="filterMenu" id="menuRank"></div>
               </div>
 
               <div class="filterGroup">
-                <div class="filterLabel" data-toggle="f_roviq">ROVIQ List ▼</div>
-                <div class="filterBox" id="box_f_roviq"></div>
+                <button class="filterBtn" id="btnRoviq" type="button">ROVIQ List ▼</button>
+                <div class="filterMenu rightAlign" id="menuRoviq"></div>
               </div>
 
               <div class="filterGroup">
-                <div class="filterLabel" data-toggle="f_human">Human Response ▼</div>
-                <div class="filterBox" id="box_f_human"></div>
+                <button class="filterBtn" id="btnResponse" type="button">Response ▼</button>
+                <div class="filterMenu" id="menuResponse"></div>
               </div>
 
               <div class="filterGroup">
-                <div class="filterLabel" data-toggle="f_hardware">Hardware Response ▼</div>
-                <div class="filterBox" id="box_f_hardware"></div>
-              </div>
-
-              <div class="filterGroup">
-                <div class="filterLabel" data-toggle="f_process">Process Response ▼</div>
-                <div class="filterBox" id="box_f_process"></div>
-              </div>
-
-              <div class="filterGroup">
-                <div class="filterLabel" data-toggle="f_photo">Photo Response ▼</div>
-                <div class="filterBox" id="box_f_photo"></div>
-              </div>
-
-              <div class="filterGroup">
-                <div class="filterLabel" data-toggle="f_risk">Risk Level ▼</div>
-                <div class="filterBox" id="box_f_risk"></div>
+                <button class="filterBtn" id="btnRisk" type="button">Risk Level ▼</button>
+                <div class="filterMenu rightAlign" id="menuRisk"></div>
               </div>
             </div>
 
@@ -404,13 +422,12 @@
             <div class="note">
               <b>Standard Questionnaires (Templates)</b>
               <div class="mono" style="margin-top:6px;">
-                Create templates (Super Admin), then Compile (replace template questions) using your selected set.
-                Then create a vessel questionnaire from that template (RPC).
+                Create templates (superuser), compile questions into them, then create vessel questionnaires from templates.
               </div>
             </div>
 
             <label for="tplName">Template Name</label>
-            <input id="tplName" type="text" placeholder="e.g. Standard – Master (Oil)" />
+            <input id="tplName" type="text" placeholder="e.g. Standard – Master (Full)" />
 
             <label for="tplDesc">Description</label>
             <input id="tplDesc" type="text" placeholder="Optional" />
@@ -422,7 +439,7 @@
             <div class="note" style="margin-top:12px;">
               <b>Templates</b>
               <div class="mono" style="margin-top:6px;">
-                Compile replaces template questions. Create Questionnaire calls RPC create_questionnaire_from_template().
+                Compile replaces template questions with your current selected set. Create Questionnaire calls RPC.
               </div>
             </div>
 
@@ -442,7 +459,7 @@
             </div>
           </div>
 
-          <!-- RIGHT -->
+          <!-- RIGHT: Questionnaires list -->
           <div>
             <div class="note">
               <b>Questionnaires</b>

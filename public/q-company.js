@@ -5,8 +5,8 @@ const SUPABASE_URL = "https://bdidrcyufazskpuwmfca.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJkaWRyY3l1ZmF6c2twdXdtZmNhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc5NDI4ODMsImV4cCI6MjA4MzUxODg4M30.Uqj4WCzoNS9wnlzI-xew6iTFzTUi77dcGeBjUgFjZbQ";
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// Lock to EXACT file
-const LIBRARY_JSON_PATH = "./sire_questions_all_columns_named.json";
+// Lock to EXACT JSON used by your Read-Only library
+const LIBRARY_JSON_FILENAME = "./sire_questions_all_columns_named.json";
 
 const SESSION_KEY_COMPAT = "q_session_v1";
 
@@ -94,7 +94,7 @@ async function getMyProfile(userId){
 }
 
 // ----------------------
-// Data loading (DB)
+// Data loading
 // ----------------------
 async function loadVessels(){
   const { data, error } = await supabaseClient
@@ -153,11 +153,12 @@ async function loadTemplateCounts(){
 }
 
 // ----------------------
-// Library parsing (your JSON structure)
+// Library field mapping (your JSON keys)
 // ----------------------
 let LIB = [];
 let FILTERED = [];
-let SELECTED_SET = new Set(); // question_no strings ("No." like "5.8.1")
+let SELECTED_SET = new Set(); // qno strings
+let QNO_MAP = new Map();      // qno -> full question object (for question_json inserts)
 
 function pick(obj, keys){
   for (const k of keys){
@@ -166,191 +167,238 @@ function pick(obj, keys){
   return "";
 }
 
-function norm(v){ return String(v ?? "").trim(); }
-function splitCSV(v){
-  const s = norm(v);
-  if (!s) return [];
-  return s.split(",").map(x => x.trim()).filter(Boolean);
-}
-
-// Primary question number in your JSON is "No."
 function getQno(q){
-  return norm(pick(q, ["No.", "No", "question_no", "questionNo", "id", "qid"]));
+  return String(pick(q, ["No.","No","question_no","questionNo","id","qid","QuestionNo","Question ID","QuestionID"])).trim();
+}
+function getChapter(q){ return String(pick(q, ["Chap","chapter","Chapter"])).trim(); }
+function getSection(q){ return String(pick(q, ["Sect","section","Section"])).trim(); }
+function getQType(q){ return String(pick(q, ["Question Type","question_type","questionType","qtype"])).trim(); }
+function getVesselType(q){ return String(pick(q, ["Vessel Type","vessel_type","vesselType"])).trim(); }
+function getRisk(q){ return String(pick(q, ["Risk Level","risk_level","riskLevel"])).trim(); }
+function getRoviq(q){ return String(pick(q, ["ROVIQ List","ROVIQ","roviq","roviq_list_contains","ROVIQ List contains"])).trim(); }
+function getRank(q){ return String(pick(q, ["Company Rank Allocation","SPIS Rank Allocation","Rank Allocation"])).trim(); }
+
+function getHumanResp(q){ return String(pick(q, ["Human Response Type","human_response_type","Human Response"])).trim(); }
+function getProcessResp(q){ return String(pick(q, ["Process Response Type","process_response_type","Process Response"])).trim(); }
+function getHardwareResp(q){ return String(pick(q, ["Hardware Response Type","hardware_response_type","Hardware Response"])).trim(); }
+function getPhotoResp(q){
+  const v = pick(q, ["Photo Response","photo_response","Photo"]);
+  return String(v ?? "").trim();
 }
 
-// Numeric chapter/section in your JSON: Chap, Sect
-function getChapter(q){ return norm(pick(q, ["Chap", "chapter", "Chapter"])); }
-function getSection(q){ return norm(pick(q, ["Sect", "section", "Section"])); }
+function hasMeaningful(val){
+  const s = String(val ?? "").trim();
+  if (!s) return false;
+  if (s.toLowerCase() === "none") return false;
+  return true;
+}
 
-function getQuestionType(q){ return norm(pick(q, ["Question Type", "question_type", "qtype"])); }
-function getVesselTypesRaw(q){ return norm(pick(q, ["Vessel Type", "vessel_type"])); } // "Chemical, LNG, LPG, Oil"
-function getVesselTypes(q){ return splitCSV(getVesselTypesRaw(q)); }
+/**
+ * Combined response category:
+ * - Human: Human Response Type is not empty/None
+ * - Process: Process Response Type is not empty/None
+ * - Hardware: Hardware Response Type is not empty/None
+ * - Photo: Photo Response is Y/Yes/True
+ */
+function matchesResponseCategory(q, cat){
+  if (!cat) return true; // no filter
+  if (cat === "Human") return hasMeaningful(getHumanResp(q));
+  if (cat === "Process") return hasMeaningful(getProcessResp(q));
+  if (cat === "Hardware") return hasMeaningful(getHardwareResp(q));
+  if (cat === "Photo"){
+    const p = String(getPhotoResp(q)).toLowerCase();
+    return (p === "y" || p === "yes" || p === "true" || p === "1");
+  }
+  return true;
+}
 
-function getRankAllocationRaw(q){ return norm(pick(q, ["Company Rank Allocation", "SPIS Rank Allocation", "Company Rank Allocation "])); }
-function getRankAllocationTokens(q){ return splitCSV(getRankAllocationRaw(q)); }
-
-function getRoviqRaw(q){ return norm(pick(q, ["ROVIQ List", "ROVIQ List contains", "roviq_list_contains"])); }
-function getRoviqTokens(q){ return splitCSV(getRoviqRaw(q)); }
-
-// Response types - exactly as requested:
-function getHumanResponse(q){ return norm(pick(q, ["Human Response Type", "Human Response", "human_response_type"])); }
-function getHardwareResponse(q){ return norm(pick(q, ["Hardware Response Type", "Hardware Response", "hardware_response_type"])); }
-function getProcessResponse(q){ return norm(pick(q, ["Process Response Type", "Process Response", "process_response_type"])); }
-function getPhotoResponse(q){ return norm(pick(q, ["Photo Response", "photo_response"])); } // typically "Y"/"N"
-
-// Risk
-function getRisk(q){ return norm(pick(q, ["Risk Level", "risk_level", "Risk"])); }
-
-// Search blob
 function getTextBlob(q){
-  const a = norm(pick(q, ["Question", "question", "question_text"]));
-  const b = norm(pick(q, ["Expected Evidence", "expected_evidence"]));
-  const c = norm(pick(q, ["Inspection Guidance", "Inspector Guidance", "inspector_guidance"]));
-  const d = norm(pick(q, ["Suggested Inspector Actions", "Suggested Actions", "suggested_actions"]));
-  return `${a} ${b} ${c} ${d}`.toLowerCase();
+  const a = pick(q, ["Question","question","question_text","questionText"]);
+  const b = pick(q, ["Expected Evidence","expected_evidence","expectedEvidence"]);
+  const c = pick(q, ["Inspection Guidance","Inspector Guidance","inspector_guidance","inspectorGuidance"]);
+  return `${a} ${b} ${c}`.toLowerCase();
 }
 
 function uniqSorted(arr){
-  return [...new Set(arr.filter(Boolean).map(x => String(x).trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b, undefined, {numeric:true}));
+  return [...new Set(arr
+    .filter(x => x != null && String(x).trim() !== "")
+    .flatMap(x => String(x).split(",").map(s => s.trim()).filter(Boolean))
+  )].sort((a,b) => a.localeCompare(b, undefined, { numeric:true, sensitivity:"base" }));
 }
 
 // ----------------------
-// Read-Only style checkbox dropdown filters (multi-select)
+// Read-Only style multi-select dropdown filters
 // ----------------------
-const FILTERS = {
-  f_chapter: new Set(),
-  f_section: new Set(),
-  f_qtype: new Set(),
-  f_vessel: new Set(),
-  f_rank: new Set(),
-  f_roviq: new Set(),
-  f_human: new Set(),
-  f_hardware: new Set(),
-  f_process: new Set(),
-  f_photo: new Set(),
-  f_risk: new Set()
+const filters = {
+  chapters: { label: "Chapters", values: [], selected: new Set() },
+  sections: { label: "Sections", values: [], selected: new Set() },
+  qtype:    { label: "Question Type", values: [], selected: new Set() },
+  vtype:    { label: "Vessel Type", values: [], selected: new Set() },
+  rank:     { label: "Rank Allocation", values: [], selected: new Set() },
+  roviq:    { label: "ROVIQ List", values: [], selected: new Set() },
+  risk:     { label: "Risk Level", values: [], selected: new Set() },
+
+  // Combined response filter (single-choice)
+  responseCat: { label: "Response", value: "" } // "" means no filter
 };
 
-function setHasAny(set){ return set && set.size > 0; }
-
-function matchesSet(value, set){
-  if (!setHasAny(set)) return true;
-  return set.has(String(value));
-}
-
-// For token fields (vessel type, roviq, rank allocation)
-function matchesTokenSet(tokens, set){
-  if (!setHasAny(set)) return true;
-  for (const t of (tokens || [])){
-    if (set.has(String(t))) return true;
-  }
+function isSelectedOrAll(selSet, allValues){
+  // If nothing selected -> treat as ALL (same behaviour as Read-Only default)
+  if (!selSet || selSet.size === 0) return true;
+  // If all selected -> also effectively ALL
+  if (selSet.size === allValues.length) return true;
   return false;
 }
 
-function buildFilterBox(filterKey, values){
-  const box = el(`box_${filterKey}`);
-  const set = FILTERS[filterKey];
+function selectedCountLabel(selSet, allValues){
+  if (isSelectedOrAll(selSet, allValues)) return "";
+  return ` (${selSet.size})`;
+}
 
-  const items = values.map(v => String(v));
+function closeAllMenus(){
+  [
+    "menuChapters","menuSections","menuQType","menuVesselType",
+    "menuRank","menuRoviq","menuResponse","menuRisk"
+  ].forEach(id => {
+    const m = el(id);
+    if (m) m.classList.remove("open");
+  });
+}
 
-  box.innerHTML = `
-    <div class="filterTopActions">
-      <button class="miniBtn" type="button" data-act="all" data-key="${filterKey}">All</button>
-      <button class="miniBtn" type="button" data-act="none" data-key="${filterKey}">None</button>
+function toggleMenu(menuId){
+  const m = el(menuId);
+  if (!m) return;
+  const isOpen = m.classList.contains("open");
+  closeAllMenus();
+  if (!isOpen) m.classList.add("open");
+}
+
+function buildMultiMenu({ menuEl, key, allValues }){
+  const f = filters[key];
+
+  const header = `
+    <div class="filterMenuHeader">
+      <div class="tiny"><b>${escapeHtml(f.label)}</b></div>
+      <div style="display:flex; gap:8px;">
+        <button class="miniBtn" type="button" data-all="1">All</button>
+        <button class="miniBtn" type="button" data-none="1">None</button>
+      </div>
     </div>
-    ${items.length ? items.map(v => `
-      <label class="checkRow">
-        <input type="checkbox" data-key="${filterKey}" value="${escapeHtml(v)}" ${set.has(v) ? "checked" : ""} />
-        <span>${escapeHtml(v)}</span>
-      </label>
-    `).join("") : `<div class="small">No values.</div>`}
   `;
 
-  // events: all/none
-  box.querySelectorAll("button[data-act]").forEach(btn => {
-    btn.addEventListener("click", () => {
-      const act = btn.getAttribute("data-act");
-      if (act === "all"){
-        set.clear();
-        for (const v of items) set.add(v);
-      } else {
-        set.clear();
-      }
-      // re-render to update checkbox states
-      buildAllFilterBoxes();
+  const list = `
+    <div class="filterList">
+      ${allValues.map(v => {
+        const checked = (f.selected.size === 0 || f.selected.has(v)) ? "checked" : "";
+        return `
+          <label class="chk">
+            <input type="checkbox" data-val="${escapeHtml(v)}" ${checked}/>
+            <span>${escapeHtml(v)}</span>
+          </label>
+        `;
+      }).join("")}
+    </div>
+  `;
+
+  menuEl.innerHTML = header + list;
+
+  // All / None
+  menuEl.querySelector('button[data-all="1"]').addEventListener("click", () => {
+    f.selected = new Set(allValues);
+    renderFilterButtonLabels();
+    applyFilters();
+  });
+  menuEl.querySelector('button[data-none="1"]').addEventListener("click", () => {
+    f.selected = new Set(); // empty => treat as ALL? We want NONE as none selected? In Read-Only "None" means select none (filter becomes no matches).
+    // To preserve "None" meaning: set to a special marker by selecting an impossible value.
+    // Instead: we keep empty but store a separate flag:
+    f.selected = new Set(["__NONE__"]);
+    renderFilterButtonLabels();
+    applyFilters();
+  });
+
+  // checkboxes
+  menuEl.querySelectorAll('input[type="checkbox"][data-val]').forEach(chk => {
+    chk.addEventListener("change", () => {
+      const v = chk.getAttribute("data-val");
+      if (!v) return;
+
+      // if previously in NONE marker, clear it
+      if (f.selected.has("__NONE__")) f.selected.delete("__NONE__");
+
+      if (chk.checked) f.selected.add(v);
+      else f.selected.delete(v);
+
+      renderFilterButtonLabels();
       applyFilters();
-      renderSelectedSummary();
     });
   });
+}
 
-  // events: checkboxes
-  box.querySelectorAll('input[type="checkbox"]').forEach(cb => {
-    cb.addEventListener("change", () => {
-      const v = cb.value;
-      if (cb.checked) set.add(v);
-      else set.delete(v);
+function buildResponseMenu(menuEl){
+  const label = filters.responseCat.label;
+  const current = filters.responseCat.value || "";
+
+  menuEl.innerHTML = `
+    <div class="filterMenuHeader">
+      <div class="tiny"><b>${escapeHtml(label)}</b></div>
+      <div style="display:flex; gap:8px;">
+        <button class="miniBtn" type="button" data-clear="1">Clear</button>
+      </div>
+    </div>
+
+    <div class="filterList" style="max-height:220px;">
+      ${[
+        { v:"",        t:"(Any)" },
+        { v:"Human",   t:"Human" },
+        { v:"Hardware",t:"Hardware" },
+        { v:"Process", t:"Process" },
+        { v:"Photo",   t:"Photo" }
+      ].map(opt => `
+        <label class="radioRow">
+          <input type="radio" name="respCat" value="${escapeHtml(opt.v)}" ${opt.v===current ? "checked" : ""}/>
+          <span style="font-weight:900; color:#223a66;">${escapeHtml(opt.t)}</span>
+        </label>
+      `).join("")}
+    </div>
+  `;
+
+  menuEl.querySelector('button[data-clear="1"]').addEventListener("click", () => {
+    filters.responseCat.value = "";
+    buildResponseMenu(menuEl);
+    renderFilterButtonLabels();
+    applyFilters();
+  });
+
+  menuEl.querySelectorAll('input[type="radio"][name="respCat"]').forEach(r => {
+    r.addEventListener("change", () => {
+      filters.responseCat.value = r.value || "";
+      renderFilterButtonLabels();
       applyFilters();
-      renderSelectedSummary();
     });
   });
 }
 
-function buildAllFilterBoxes(){
-  // compute available values from LIB (not FILTERED) like read-only
-  const chapters = uniqSorted(LIB.map(getChapter));
-  const sections = uniqSorted(LIB.map(getSection));
-  const qtypes = uniqSorted(LIB.map(getQuestionType));
+function renderFilterButtonLabels(){
+  el("btnChapters").textContent = `${filters.chapters.label} ▼${selectedCountLabel(filters.chapters.selected, filters.chapters.values)}`;
+  el("btnSections").textContent = `${filters.sections.label} ▼${selectedCountLabel(filters.sections.selected, filters.sections.values)}`;
+  el("btnQType").textContent = `${filters.qtype.label} ▼${selectedCountLabel(filters.qtype.selected, filters.qtype.values)}`;
+  el("btnVesselType").textContent = `${filters.vtype.label} ▼${selectedCountLabel(filters.vtype.selected, filters.vtype.values)}`;
+  el("btnRank").textContent = `${filters.rank.label} ▼${selectedCountLabel(filters.rank.selected, filters.rank.values)}`;
+  el("btnRoviq").textContent = `${filters.roviq.label} ▼${selectedCountLabel(filters.roviq.selected, filters.roviq.values)}`;
+  el("btnRisk").textContent = `${filters.risk.label} ▼${selectedCountLabel(filters.risk.selected, filters.risk.values)}`;
 
-  // vessel types / rank / roviq are tokenized across rows
-  const vesselTypes = uniqSorted(LIB.flatMap(getVesselTypes));
-  const ranks = uniqSorted(LIB.flatMap(getRankAllocationTokens));
-  const roviq = uniqSorted(LIB.flatMap(getRoviqTokens));
-
-  const human = uniqSorted(LIB.map(getHumanResponse));
-  const hardware = uniqSorted(LIB.map(getHardwareResponse));
-  const process = uniqSorted(LIB.map(getProcessResponse));
-  const photo = uniqSorted(LIB.map(getPhotoResponse));
-  const risk = uniqSorted(LIB.map(getRisk));
-
-  buildFilterBox("f_chapter", chapters);
-  buildFilterBox("f_section", sections);
-  buildFilterBox("f_qtype", qtypes);
-  buildFilterBox("f_vessel", vesselTypes);
-  buildFilterBox("f_rank", ranks);
-  buildFilterBox("f_roviq", roviq);
-
-  buildFilterBox("f_human", human);
-  buildFilterBox("f_hardware", hardware);
-  buildFilterBox("f_process", process);
-  buildFilterBox("f_photo", photo);
-  buildFilterBox("f_risk", risk);
+  const resp = filters.responseCat.value ? ` (${filters.responseCat.value})` : "";
+  el("btnResponse").textContent = `${filters.responseCat.label} ▼${resp}`;
 }
 
-function closeAllFilterBoxes(){
-  document.querySelectorAll(".filterBox").forEach(b => b.classList.remove("open"));
+function valuePassesMultiFilter(selSet, allValues, value){
+  if (!selSet || selSet.size === 0) return true; // treated as ALL
+  if (selSet.has("__NONE__")) return false;
+  if (selSet.size === allValues.length) return true;
+  return selSet.has(value);
 }
 
-function wireFilterDropdownToggles(){
-  document.querySelectorAll(".filterLabel[data-toggle]").forEach(lbl => {
-    lbl.addEventListener("click", (e) => {
-      const key = lbl.getAttribute("data-toggle");
-      const box = el(`box_${key}`);
-      if (!box) return;
-
-      const isOpen = box.classList.contains("open");
-      closeAllFilterBoxes();
-      if (!isOpen) box.classList.add("open");
-      e.stopPropagation();
-    });
-  });
-
-  // close when clicking outside
-  document.addEventListener("click", () => closeAllFilterBoxes());
-}
-
-// ----------------------
-// Filters application
-// ----------------------
 function applyFilters(){
   const s = el("fltSearch").value.trim().toLowerCase();
 
@@ -358,23 +406,62 @@ function applyFilters(){
     const qno = getQno(q);
     if (!qno) return false;
 
-    if (!matchesSet(getChapter(q), FILTERS.f_chapter)) return false;
-    if (!matchesSet(getSection(q), FILTERS.f_section)) return false;
-    if (!matchesSet(getQuestionType(q), FILTERS.f_qtype)) return false;
+    const ch = getChapter(q);
+    const sec = getSection(q);
+    const qt = getQType(q);
 
-    if (!matchesTokenSet(getVesselTypes(q), FILTERS.f_vessel)) return false;
-    if (!matchesTokenSet(getRankAllocationTokens(q), FILTERS.f_rank)) return false;
-    if (!matchesTokenSet(getRoviqTokens(q), FILTERS.f_roviq)) return false;
+    // vessel type can be CSV string in your JSON => treat as contains
+    const vtRaw = getVesselType(q);
+    const vtList = vtRaw ? vtRaw.split(",").map(x => x.trim()).filter(Boolean) : [];
 
-    if (!matchesSet(getHumanResponse(q), FILTERS.f_human)) return false;
-    if (!matchesSet(getHardwareResponse(q), FILTERS.f_hardware)) return false;
-    if (!matchesSet(getProcessResponse(q), FILTERS.f_process)) return false;
-    if (!matchesSet(getPhotoResponse(q), FILTERS.f_photo)) return false;
+    const rk = getRisk(q);
+    const rv = getRoviq(q);
+    const ra = getRank(q);
 
-    if (!matchesSet(getRisk(q), FILTERS.f_risk)) return false;
+    if (!valuePassesMultiFilter(filters.chapters.selected, filters.chapters.values, ch)) return false;
+    if (!valuePassesMultiFilter(filters.sections.selected, filters.sections.values, sec)) return false;
+    if (!valuePassesMultiFilter(filters.qtype.selected, filters.qtype.values, qt)) return false;
 
+    // Vessel type: pass if ANY vessel type option matches the question's list
+    if (filters.vtype.selected && filters.vtype.selected.size > 0 && !filters.vtype.selected.has("__NONE__")){
+      const all = (filters.vtype.selected.size === filters.vtype.values.length);
+      if (!all){
+        const ok = vtList.some(v => filters.vtype.selected.has(v));
+        if (!ok) return false;
+      }
+    } else if (filters.vtype.selected && filters.vtype.selected.has("__NONE__")){
+      return false;
+    }
+
+    // Rank + ROVIQ are text fields; we filter by "contains" for practicality
+    if (filters.rank.selected && filters.rank.selected.size > 0 && !filters.rank.selected.has("__NONE__")){
+      const all = (filters.rank.selected.size === filters.rank.values.length);
+      if (!all){
+        const ok = Array.from(filters.rank.selected).some(v => (ra || "").toLowerCase().includes(v.toLowerCase()));
+        if (!ok) return false;
+      }
+    } else if (filters.rank.selected && filters.rank.selected.has("__NONE__")){
+      return false;
+    }
+
+    if (filters.roviq.selected && filters.roviq.selected.size > 0 && !filters.roviq.selected.has("__NONE__")){
+      const all = (filters.roviq.selected.size === filters.roviq.values.length);
+      if (!all){
+        const ok = Array.from(filters.roviq.selected).some(v => (rv || "").toLowerCase().includes(v.toLowerCase()));
+        if (!ok) return false;
+      }
+    } else if (filters.roviq.selected && filters.roviq.selected.has("__NONE__")){
+      return false;
+    }
+
+    if (!valuePassesMultiFilter(filters.risk.selected, filters.risk.values, rk)) return false;
+
+    // Combined response category
+    if (!matchesResponseCategory(q, filters.responseCat.value)) return false;
+
+    // Search
     if (s){
-      const blob = `${qno} ${getChapter(q)} ${getSection(q)} ${getQuestionType(q)} ${getVesselTypesRaw(q)} ${getRankAllocationRaw(q)} ${getRoviqRaw(q)} ${getHumanResponse(q)} ${getHardwareResponse(q)} ${getProcessResponse(q)} ${getPhotoResponse(q)} ${getRisk(q)} ${getTextBlob(q)}`.toLowerCase();
+      const blob = `${qno} ${ch} ${sec} ${qt} ${vtRaw} ${rk} ${rv} ${ra} ${getTextBlob(q)}`;
       if (!blob.includes(s)) return false;
     }
 
@@ -480,7 +567,7 @@ function renderQuestionnairesTable(){
     btn.addEventListener("click", async () => {
       const qid = btn.getAttribute("data-id");
       if (!qid) return;
-      if (!confirm("DELETE questionnaire permanently?\n\nThis will cascade-delete child rows if constraints are set.\nProceed?")) return;
+      if (!confirm("DELETE questionnaire permanently?\n\nThis will cascade-delete child rows if your FK constraints are set.\nProceed?")) return;
       await deleteQuestionnaire(qid);
     });
   });
@@ -600,11 +687,11 @@ async function compileTemplateQuestions(templateId){
   clearWarn();
 
   if (SELECTED_SET.size < 1){
-    showWarn("No questions selected. Adjust filters, then click Select All Filtered (or build selection), then compile.");
+    showWarn("No questions selected. Select questions first, then compile.");
     return;
   }
 
-  // wipe old rows
+  // Wipe old rows
   {
     const { error } = await supabaseClient
       .from("questionnaire_template_questions")
@@ -617,6 +704,7 @@ async function compileTemplateQuestions(templateId){
     }
   }
 
+  // Insert new rows with sort_order
   const selected = Array.from(SELECTED_SET);
   const payload = selected.map((qno, idx) => ({
     template_id: templateId,
@@ -643,11 +731,11 @@ async function createQuestionnaireFromTemplateFlow(templateId){
   const title = el("titleInput").value.trim();
 
   if (!vesselId){
-    showWarn("Select a vessel first (Vessel dropdown).");
+    showWarn("Select a vessel first (left panel Vessel).");
     return;
   }
   if (!title){
-    showWarn("Enter a title first.");
+    showWarn("Enter a title first (left panel Title).");
     return;
   }
 
@@ -664,18 +752,16 @@ async function createQuestionnaireFromTemplateFlow(templateId){
   }
 
   const qid = data;
-
   await refreshAll();
 
-  if (!qid){
-    showWarn("Template RPC returned no questionnaire id. Check the function return type and RLS.");
-    return;
+  if (qid){
+    window.location.href = "./q-answer.html?qid=" + encodeURIComponent(qid);
   }
-  window.location.href = "./q-answer.html?qid=" + encodeURIComponent(qid);
 }
 
 // ----------------------
-// Create questionnaire by compile (Option A)
+// Create questionnaire by compiling (Option A: no empty questionnaires)
+// FIXED: inserts question_json (NOT NULL column) + sort_order
 // ----------------------
 async function createQuestionnaireByCompile(userId){
   clearWarn();
@@ -695,8 +781,12 @@ async function createQuestionnaireByCompile(userId){
     showWarn("No questions selected. Adjust filters, then click Select All Filtered.");
     return;
   }
+  if (!QNO_MAP || QNO_MAP.size === 0){
+    showWarn("Library not loaded. Cannot compile questionnaire.");
+    return;
+  }
 
-  // 1) create questionnaire
+  // 1) Create questionnaire
   const payload = { title, vessel_id: vesselId, status: "in_progress", created_by: userId };
 
   const { data: q, error: qErr } = await supabaseClient
@@ -710,15 +800,26 @@ async function createQuestionnaireByCompile(userId){
     return;
   }
 
-  const qid = q?.id;
-  if (!qid){
-    showWarn("Questionnaire was created but no id was returned. This is typically a SELECT/RLS return issue.");
-    return;
-  }
+  const qid = q.id;
 
-  // 2) compile questions
+  // 2) Insert questionnaire_questions with question_json (NOT NULL)
   const selected = Array.from(SELECTED_SET);
-  const rows = selected.map(qno => ({ questionnaire_id: qid, question_no: qno }));
+  const rows = [];
+
+  for (let idx = 0; idx < selected.length; idx++){
+    const qno = selected[idx];
+    const obj = QNO_MAP.get(qno);
+    if (!obj){
+      showWarn(`Selected question not found in library JSON: ${qno}\n\nFix: ensure the library JSON is the same one used in Read-Only and includes this question number.`);
+      return;
+    }
+    rows.push({
+      questionnaire_id: qid,
+      question_no: qno,
+      sort_order: idx,
+      question_json: obj
+    });
+  }
 
   const { error: qqErr } = await supabaseClient
     .from("questionnaire_questions")
@@ -760,6 +861,9 @@ async function refreshAll(){
 async function init(){
   clearWarn();
 
+  // lock line
+  if (el("libLockLine")) el("libLockLine").textContent = `Library locked to: ${LIBRARY_JSON_FILENAME}`;
+
   const user = await getUserOrWarn();
   if (!user) return;
 
@@ -787,36 +891,76 @@ async function init(){
 
   setSubLine("Connected. Loading library, vessels, questionnaires, templates...");
 
-  // wire dropdown toggles now
-  wireFilterDropdownToggles();
+  // close menus on outside click / Esc
+  document.addEventListener("click", (e) => {
+    const insideMenu = e.target.closest(".filterMenu");
+    const insideBtn = e.target.closest(".filterBtn");
+    if (!insideMenu && !insideBtn) closeAllMenus();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") closeAllMenus();
+  });
 
-  // load library
+  // Load library JSON (locked)
   try{
-    LIB = await loadLockedLibraryJson(LIBRARY_JSON_PATH);
+    LIB = await loadLockedLibraryJson(LIBRARY_JSON_FILENAME);
+
+    // Build QNO map
+    QNO_MAP = new Map();
+    for (const q of LIB){
+      const qno = getQno(q);
+      if (qno) QNO_MAP.set(qno, q);
+    }
+
   }catch(e){
     showWarn(
-      "Question library load failed.\n\n" +
-      `Tried: ${LIBRARY_JSON_PATH}\n\n` +
-      `Error: ${String(e.message || e)}`
+      `Question library load failed: ${String(e.message || e)}\n\n` +
+      `Fix: ensure ${LIBRARY_JSON_FILENAME} exists in /public and is accessible.`
     );
     setSubLine("Error loading library JSON.");
-    LIB = [];
   }
 
-  // build filters
+  // Build filters (Read-Only style)
   if (LIB.length){
-    buildAllFilterBoxes();
+    filters.chapters.values = uniqSorted(LIB.map(getChapter));
+    filters.sections.values = uniqSorted(LIB.map(getSection));
+    filters.qtype.values    = uniqSorted(LIB.map(getQType));
+
+    // vessel type is CSV list -> collect unique tokens
+    filters.vtype.values    = uniqSorted(LIB.map(getVesselType));
+
+    // rank allocation / roviq list -> tokenize CSVs where present
+    filters.rank.values     = uniqSorted(LIB.map(getRank));
+    filters.roviq.values    = uniqSorted(LIB.map(getRoviq));
+
+    filters.risk.values     = uniqSorted(LIB.map(getRisk)).sort((a,b) => Number(a)-Number(b));
+
+    // default = ALL selected (Read-Only behaviour)
+    filters.chapters.selected = new Set(filters.chapters.values);
+    filters.sections.selected = new Set(filters.sections.values);
+    filters.qtype.selected    = new Set(filters.qtype.values);
+    filters.vtype.selected    = new Set(filters.vtype.values);
+    filters.rank.selected     = new Set(filters.rank.values);
+    filters.roviq.selected    = new Set(filters.roviq.values);
+    filters.risk.selected     = new Set(filters.risk.values);
+
+    // Build menus
+    buildMultiMenu({ menuEl: el("menuChapters"), key:"chapters", allValues: filters.chapters.values });
+    buildMultiMenu({ menuEl: el("menuSections"), key:"sections", allValues: filters.sections.values });
+    buildMultiMenu({ menuEl: el("menuQType"), key:"qtype", allValues: filters.qtype.values });
+    buildMultiMenu({ menuEl: el("menuVesselType"), key:"vtype", allValues: filters.vtype.values });
+    buildMultiMenu({ menuEl: el("menuRank"), key:"rank", allValues: filters.rank.values });
+    buildMultiMenu({ menuEl: el("menuRoviq"), key:"roviq", allValues: filters.roviq.values });
+    buildMultiMenu({ menuEl: el("menuRisk"), key:"risk", allValues: filters.risk.values });
+
+    buildResponseMenu(el("menuResponse"));
+    renderFilterButtonLabels();
+
     applyFilters();
     renderSelectedSummary();
-
-    // bind search
-    el("fltSearch").addEventListener("input", () => {
-      applyFilters();
-      renderSelectedSummary();
-    });
   }
 
-  // load db
+  // Load DB data
   try{
     await refreshAll();
     setSubLine("Ready.");
@@ -825,24 +969,35 @@ async function init(){
     setSubLine("Error loading data.");
   }
 
-  // bind buttons
+  // Bind actions
   el("refreshBtn").addEventListener("click", refreshAll);
   el("searchInput").addEventListener("input", renderQuestionnairesTable);
 
   el("createBtn").addEventListener("click", () => createQuestionnaireByCompile(user.id));
   el("clearBtn").addEventListener("click", () => { el("titleInput").value = ""; });
 
+  el("fltSearch").addEventListener("input", () => { applyFilters(); });
+
   el("btnSelectAllFiltered").addEventListener("click", () => {
     applyFilters();
     selectAllFiltered();
   });
-
   el("btnClearSelected").addEventListener("click", clearSelected);
 
-  // templates
+  // Filter button toggles
+  el("btnChapters").addEventListener("click", () => toggleMenu("menuChapters"));
+  el("btnSections").addEventListener("click", () => toggleMenu("menuSections"));
+  el("btnQType").addEventListener("click", () => toggleMenu("menuQType"));
+  el("btnVesselType").addEventListener("click", () => toggleMenu("menuVesselType"));
+  el("btnRank").addEventListener("click", () => toggleMenu("menuRank"));
+  el("btnRoviq").addEventListener("click", () => toggleMenu("menuRoviq"));
+  el("btnResponse").addEventListener("click", () => toggleMenu("menuResponse"));
+  el("btnRisk").addEventListener("click", () => toggleMenu("menuRisk"));
+
+  // Templates
   el("btnCreateTemplate").addEventListener("click", createTemplate);
 
-  // logout
+  // Logout
   el("logoutBtn").addEventListener("click", async () => {
     clearWarn();
     await supabaseClient.auth.signOut();
