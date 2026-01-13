@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SIRE 2.0 – Post-Inspection Observations</title>
+
+  <link rel="stylesheet" href="./style.css" />
+
+  <style>
+    body{
+      margin:0; min-height:100vh;
+      font-family:"Segoe UI", Arial, sans-serif;
+      background: radial-gradient(1200px 700px at 20% 10%, #1a4170 0%, #0b1c33 55%, #071426 100%);
+      color:#fff;
+      padding:18px 14px;
+      box-sizing:border-box;
+    }
+    .wrap{ max-width: 1650px; margin: 0 auto; }
+
+    .topbar{
+      display:flex;
+      gap:12px;
+      flex-wrap:wrap;
+      align-items:center;
+      justify-content:space-between;
+      margin-bottom: 12px;
+
+      background: rgba(12,33,58,0.68);
+      border: 1px solid rgba(213,222,239,0.35);
+      border-radius: 16px;
+      padding:12px 14px;
+      box-shadow: 0 10px 46px rgba(0,0,0,0.35);
+      backdrop-filter: blur(3px);
+    }
+    .title{
+      margin:0;
+      font-weight:900;
+      letter-spacing:0.03em;
+      font-size:1.15rem;
+      text-shadow: 0 3px 12px rgba(0,0,0,0.35);
+    }
+    .sub{
+      margin-top:4px;
+      opacity:0.92;
+      font-weight:800;
+      line-height:1.35;
+      font-size:0.95rem;
+    }
+    .actions{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+
+    .btn{
+      border:none; border-radius:10px;
+      padding:10px 14px;
+      font-weight:900;
+      cursor:pointer;
+      text-decoration:none;
+      display:inline-block;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+      background:#295eb0;
+      color:#fff;
+      white-space: nowrap;
+    }
+    .btn:hover{ filter:brightness(0.96); }
+    .btn-outline{ background:transparent; border:1px solid rgba(255,255,255,0.65); color:#fff; box-shadow:none; }
+    .btn-muted{ background:#eaf1fb; border:1px solid #d5deef; color:#1a4170; box-shadow:none; }
+    .btn-danger{ background:#b03939; color:#fff; }
+    .btn:disabled{ opacity:0.55; cursor:not-allowed; filter:none; }
+
+    .panel{
+      background: rgba(12,33,58,0.68);
+      border: 1px solid rgba(213,222,239,0.35);
+      border-radius: 18px;
+      padding: 14px;
+      box-shadow: 0 10px 46px rgba(0,0,0,0.35);
+      backdrop-filter: blur(3px);
+      margin-bottom:12px;
+    }
+
+    .grid{
+      display:grid;
+      grid-template-columns: 520px 1fr;
+      gap:12px;
+      align-items:start;
+    }
+    @media (max-width: 1200px){
+      .grid{ grid-template-columns: 1fr; }
+    }
+
+    .card{
+      background:#fff;
+      color:#1a4170;
+      border:1px solid #d5deef;
+      border-radius:16px;
+      padding:14px;
+      box-shadow: 0 4px 18px rgba(18, 44, 87, 0.16);
+    }
+
+    .row{ display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; }
+    .field{ min-width: 220px; flex: 1; }
+    label{
+      display:block;
+      margin: 10px 0 6px 0;
+      font-weight: 900;
+      color:#1a4170;
+      font-size: 0.95rem;
+    }
+    input, select{
+      width: 100%;
+      box-sizing:border-box;
+      border-radius:10px;
+      border:1px solid #cbd7ee;
+      padding: 10px 12px;
+      font-size: 1rem;
+      font-family:"Segoe UI", Arial, sans-serif;
+      background:#fff;
+      color:#1a4170;
+      outline:none;
+    }
+    input:focus, select:focus{
+      border-color:#2e68c7;
+      box-shadow: 0 0 0 3px rgba(46, 104, 199, 0.15);
+    }
+
+    .minor{
+      font-weight:800;
+      color:#35507b;
+      opacity:0.95;
+      line-height:1.35;
+      margin-top:8px;
+    }
+
+    .list{
+      margin-top:10px;
+      max-height: calc(100vh - 360px);
+      overflow:auto;
+      padding-right:6px;
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+    }
+    .item{
+      border:1px solid #d5deef;
+      border-radius:14px;
+      padding:10px;
+      background:#f8fbff;
+      cursor:pointer;
+    }
+    .item:hover{ background:#eef5ff; }
+    .item.active{ outline:2px solid rgba(41, 94, 176, 0.65); }
+    .itemTop{ display:flex; gap:10px; align-items:flex-start; justify-content:space-between; }
+    .qno{ font-weight:950; }
+    .qst{ font-weight:800; color:#35507b; margin-top:5px; line-height:1.25; }
+    .badge{
+      display:inline-block;
+      padding:3px 10px;
+      border-radius:999px;
+      font-weight:950;
+      font-size:0.82rem;
+      border:1px solid #d5deef;
+      background:#eaf1fb;
+      color:#1a4170;
+      white-space:nowrap;
+    }
+    .badge.obs{
+      background:#e9fff0;
+      border-color:#bce9c9;
+      color:#11612b;
+    }
+
+    .detailTitle{
+      margin:0;
+      font-size:1.1rem;
+      font-weight:950;
+    }
+    .meta{
+      margin-top:6px;
+      color:#35507b;
+      font-weight:850;
+      line-height:1.35;
+    }
+    .qtext{
+      margin-top:10px;
+      padding:10px;
+      border-radius:12px;
+      border:1px solid #d5deef;
+      background:#f7fbff;
+      font-weight:850;
+      color:#223a66;
+      line-height:1.4;
+      white-space:pre-wrap;
+    }
+
+    .toggleRow{
+      display:flex;
+      gap:10px;
+      align-items:center;
+      margin-top:12px;
+      flex-wrap:wrap;
+    }
+    .toggleRow label{
+      margin:0;
+      display:flex;
+      gap:10px;
+      align-items:center;
+      font-weight:950;
+      color:#1a4170;
+    }
+    .toggleRow input[type="checkbox"]{ width:auto; }
+
+    .pgnoBox{
+      margin-top:12px;
+      border:1px solid #d5deef;
+      border-radius:12px;
+      padding:12px;
+      background:#f8fbff;
+    }
+    .pgnoTitle{
+      font-weight:950;
+      margin:0 0 8px 0;
+    }
+    .pgnoList{
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+      margin-top:8px;
+    }
+    .pgnoRow{
+      display:flex;
+      gap:10px;
+      align-items:flex-start;
+      padding:8px;
+      border-radius:12px;
+      border:1px solid #e6eefb;
+      background:#fff;
+    }
+    .pgnoRow input{ width:auto; margin-top:3px; }
+    .pgnoIdx{
+      font-weight:950;
+      color:#1a4170;
+      min-width:48px;
+    }
+    .pgnoTxt{
+      font-weight:850;
+      color:#223a66;
+      line-height:1.35;
+      white-space:pre-wrap;
+      flex:1;
+    }
+
+    textarea{
+      width:100%;
+      box-sizing:border-box;
+      margin-top:10px;
+      border-radius:10px;
+      border:1px solid #cbd7ee;
+      padding:10px 12px;
+      font-family:"Segoe UI", Arial, sans-serif;
+      font-size:0.98rem;
+      min-height:110px;
+      resize:vertical;
+      color:#1a4170;
+      background:#fff;
+    }
+
+    .statusLine{
+      margin-top:10px;
+      font-weight:950;
+      color: rgba(255,255,255,0.92);
+      display:flex;
+      gap:10px;
+      align-items:center;
+      flex-wrap:wrap;
+    }
+    .statusPill{
+      display:inline-block;
+      padding:3px 10px;
+      border-radius:999px;
+      font-weight:950;
+      font-size:0.85rem;
+      border:1px solid rgba(255,255,255,0.35);
+      background: rgba(255,255,255,0.10);
+      color:#fff;
+    }
+
+    dialog{
+      border:none;
+      border-radius:16px;
+      width: min(900px, 92vw);
+      padding:0;
+      background:#0b1c33;
+      color:#fff;
+      box-shadow: 0 14px 60px rgba(0,0,0,0.55);
+    }
+    .dlgHead{
+      padding:12px 14px;
+      border-bottom:1px solid rgba(255,255,255,0.16);
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:10px;
+      flex-wrap:wrap;
+    }
+    .dlgBody{ padding:12px 14px; }
+    .dlgTitle{ margin:0; font-weight:950; }
+    .statGrid{
+      display:grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap:10px;
+      margin-top:10px;
+    }
+    @media (max-width: 900px){
+      .statGrid{ grid-template-columns: 1fr; }
+    }
+    .stat{
+      border:1px solid rgba(255,255,255,0.18);
+      border-radius:14px;
+      padding:10px;
+      background: rgba(255,255,255,0.06);
+    }
+    .statN{ font-size:1.4rem; font-weight:950; }
+    .statL{ margin-top:6px; opacity:0.92; font-weight:850; line-height:1.35; white-space:pre-wrap; }
+    .mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <div>
+        <div class="title">Post-Inspection Observations (Company)</div>
+        <div class="sub">Record vetting inspection report observations against the locked SIRE question library, with PGNO tick selection.</div>
+      </div>
+      <div class="actions">
+        <div id="userBadge" style="font-weight:900; opacity:0.95;"></div>
+        <a class="btn btn-outline" href="./q-dashboard.html">Dashboard</a>
+        <a class="btn btn-outline" href="./library.html">Read Only</a>
+        <a class="btn btn-outline" href="./index.html">Mode Selection</a>
+        <button class="btn" id="logoutBtn">Logout</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="card">
+        <div class="row">
+          <div class="field">
+            <label for="reportSelect">Existing Post-Inspection Reports</label>
+            <select id="reportSelect"></select>
+          </div>
+          <div class="field">
+            <label for="vesselSelect">Vessel</label>
+            <select id="vesselSelect"></select>
+          </div>
+          <div class="field">
+            <label for="inspectionDate">Inspection Date</label>
+            <input id="inspectionDate" type="date" />
+          </div>
+          <div class="field">
+            <label for="reportRef">Report Reference (optional)</label>
+            <input id="reportRef" type="text" placeholder="e.g. SIRE 2.0 Report No / Vetting Ref" />
+          </div>
+          <div class="field" style="min-width:320px; flex:2;">
+            <label for="reportTitle">Title (optional)</label>
+            <input id="reportTitle" type="text" placeholder="e.g. OCIMF SIRE 2.0 – Discharge Call – Terminal XYZ" />
+          </div>
+        </div>
+
+        <div class="row" style="margin-top:10px;">
+          <button class="btn btn-muted" id="newReportBtn">New Report</button>
+          <button class="btn" id="saveHeaderBtn">Save Report Header</button>
+          <button class="btn btn-danger" id="deleteReportBtn">Delete Report</button>
+          <button class="btn btn-muted" id="exportBtn">Export Report JSON</button>
+          <button class="btn btn-muted" id="importBtn">Import Report JSON</button>
+          <input id="importFile" type="file" accept="application/json" style="display:none;" />
+          <button class="btn btn-muted" id="statsBtn">View Statistics</button>
+
+          <div class="statusLine" style="margin-left:auto;">
+            <span class="statusPill" id="activeReportPill">No active report</span>
+            <span class="statusPill" id="saveStatus">Not saved</span>
+          </div>
+        </div>
+
+        <div class="minor">
+          Notes:
+          <ul style="margin:8px 0 0 18px; padding:0;">
+            <li>Only <b>Super Admin</b> and <b>Company Admin</b> can access this module.</li>
+            <li>For each question with an observation, tick the applicable PGNO(s). Full PGNO answering is not required.</li>
+            <li>Data is currently stored in <b>this browser</b> (local storage). Export JSON for backup/sharing.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="panel">
+        <div class="card">
+          <div class="row">
+            <div class="field">
+              <label for="searchInput">Search (No / Short Text / Question / Section)</label>
+              <input id="searchInput" type="text" placeholder="e.g. 8.99.2 / mooring / permits..." />
+            </div>
+            <div class="field">
+              <label for="chapterFilter">Chapter</label>
+              <select id="chapterFilter"></select>
+            </div>
+            <div class="field" style="min-width:170px; flex:0.7;">
+              <label>&nbsp;</label>
+              <label style="margin:0; display:flex; gap:10px; align-items:center; font-weight:950; color:#1a4170;">
+                <input id="onlyObsFilter" type="checkbox" />
+                Only Observed
+              </label>
+            </div>
+          </div>
+
+          <div class="list" id="questionList" aria-label="Question list"></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="card" id="detailPane">
+          <div style="font-weight:950; color:#35507b;">
+            Select a question from the list to record post-inspection observations and tick PGNO(s).
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <dialog id="statsDialog">
+      <div class="dlgHead">
+        <h3 class="dlgTitle">Post-Inspection Statistics</h3>
+        <div style="display:flex; gap:10px; flex-wrap:wrap;">
+          <button class="btn btn-muted" id="exportCsvBtn">Export Observations CSV</button>
+          <button class="btn" id="closeStatsBtn">Close</button>
+        </div>
+      </div>
+      <div class="dlgBody">
+        <div class="statGrid">
+          <div class="stat">
+            <div class="statN" id="statTotalQ">0</div>
+            <div class="statL">Total questions in library</div>
+          </div>
+          <div class="stat">
+            <div class="statN" id="statObservedQ">0</div>
+            <div class="statL">Questions marked with observations</div>
+          </div>
+          <div class="stat">
+            <div class="statN" id="statPct">0%</div>
+            <div class="statL">Observed / Total</div>
+          </div>
+        </div>
+
+        <div class="stat" style="margin-top:10px;">
+          <div class="statL" style="font-weight:950;">Observed by Chapter</div>
+          <div class="statL mono" id="statByChapter">-</div>
+        </div>
+
+        <div class="stat" style="margin-top:10px;">
+          <div class="statL" style="font-weight:950;">Observed Question Nos.</div>
+          <div class="statL mono" id="statObsList">-</div>
+        </div>
+      </div>
+    </dialog>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="./auth.js"></script>
+  <script type="module" src="./post_inspection.js"></script>
+</body>
+</html>
