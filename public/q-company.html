@@ -10,19 +10,49 @@
 
   <style>
     body{
-      min-height:100vh; margin:0; padding:18px 14px;
+      min-height:100vh;
+      margin:0;
+      padding:18px 14px;
       background: radial-gradient(1200px 700px at 20% 10%, #1a4170 0%, #0b1c33 55%, #071426 100%);
-      font-family:"Segoe UI", Arial, sans-serif; color:#fff;
+      font-family:"Segoe UI", Arial, sans-serif;
+      color:#fff;
     }
     .wrap{ max-width: 1600px; margin: 0 auto; }
-    .topbar{ display:flex; gap:12px; flex-wrap:wrap; align-items:center; justify-content:space-between; margin-bottom: 12px; }
-    .title{ font-weight:900; letter-spacing:0.03em; margin:0; font-size:1.25rem; text-shadow: 0 3px 12px rgba(0,0,0,0.35); }
-    .sub{ margin-top:6px; opacity:0.92; font-weight:800; line-height:1.35; }
+
+    .topbar{
+      display:flex;
+      gap:12px;
+      flex-wrap:wrap;
+      align-items:center;
+      justify-content:space-between;
+      margin-bottom: 12px;
+    }
+    .title{
+      font-weight:900;
+      letter-spacing:0.03em;
+      margin:0;
+      font-size:1.25rem;
+      text-shadow: 0 3px 12px rgba(0,0,0,0.35);
+    }
+    .sub{
+      margin-top:6px;
+      opacity:0.92;
+      font-weight:800;
+      line-height:1.35;
+    }
     .top-actions{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+
     .btn{
-      border:none; border-radius:10px; padding:10px 14px; font-weight:900; cursor:pointer;
-      text-decoration:none; display:inline-block; box-shadow: 0 2px 10px rgba(0,0,0,0.15);
-      background:#295eb0; color:#fff; white-space: nowrap;
+      border:none; border-radius:10px;
+      padding:10px 14px;
+      font-weight:900;
+      cursor:pointer;
+      text-decoration:none;
+      display:inline-block;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+      background:#295eb0;
+      color:#fff;
+      white-space: nowrap;
     }
     .btn:hover{ filter:brightness(0.96); }
     .btn-outline{ background:transparent; border:1px solid rgba(255,255,255,0.65); color:#fff; box-shadow:none; }
@@ -38,6 +68,7 @@
       box-shadow: 0 10px 46px rgba(0,0,0,0.35);
       backdrop-filter: blur(3px);
     }
+
     .card{
       background:#fff;
       color:#1a4170;
@@ -46,11 +77,13 @@
       padding:14px;
       box-shadow: 0 4px 18px rgba(18, 44, 87, 0.16);
     }
+
     .mono{
       font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
       font-size: 0.92rem;
       color:#35507b;
     }
+
     .note{
       margin-top:10px;
       background:#f7fbff;
@@ -61,6 +94,7 @@
       font-weight: 750;
       line-height:1.35;
     }
+
     .warn{
       margin-top:10px;
       padding:10px 12px;
@@ -71,6 +105,7 @@
       font-weight: 900;
       line-height:1.35;
       display:none;
+      white-space: pre-wrap;
     }
 
     .grid{
@@ -80,7 +115,9 @@
       margin-top: 12px;
       align-items:start;
     }
-    @media (max-width: 1100px){ .grid{ grid-template-columns: 1fr; } }
+    @media (max-width: 1200px){
+      .grid{ grid-template-columns: 1fr; }
+    }
 
     label{
       display:block;
@@ -107,6 +144,7 @@
     }
 
     .rowActions{ display:flex; gap:10px; flex-wrap:wrap; margin-top: 12px; }
+
     .tableWrap{ overflow:auto; border:1px solid #d5deef; border-radius:12px; }
     table{ width:100%; border-collapse:collapse; min-width: 980px; }
     th, td{ padding:10px 10px; border-bottom:1px solid #e6eefb; vertical-align:top; }
@@ -152,11 +190,18 @@
     .toolbar .left{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
     .toolbar .right{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
 
-    .compile{ margin-top:12px; border:1px dashed #cbd7ee; border-radius:12px; padding:10px; background:#fbfdff; }
-    .filters{ display:grid; grid-template-columns: 1fr 1fr; gap:10px; }
-    @media (max-width: 650px){ .filters{ grid-template-columns: 1fr; } }
-    .kpi{ display:flex; gap:10px; flex-wrap:wrap; margin-top:10px; }
-    .kpi .pill{ background:#f2f7ff; }
+    .filtersGrid{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap:10px;
+      margin-top:10px;
+    }
+    .filtersGrid .full{ grid-column: 1 / -1; }
+
+    .divider{
+      margin:14px 0;
+      border-top:1px solid #d5deef;
+    }
   </style>
 </head>
 
@@ -196,11 +241,12 @@
         </div>
 
         <div class="grid">
+          <!-- LEFT: Create + Filters + Templates -->
           <div>
             <div class="note">
-              <b>Create Questionnaire</b>
+              <b>Create Questionnaire (Option A: no empty questionnaires)</b>
               <div class="mono" style="margin-top:6px;">
-                Creates: public.questionnaires + public.questionnaire_questions (compiled from your local JSON library)
+                Creates: <span class="mono">public.questionnaires</span> + compiles selected questions into <span class="mono">public.questionnaire_questions</span>
               </div>
             </div>
 
@@ -210,72 +256,114 @@
             <label for="titleInput">Title</label>
             <input id="titleInput" type="text" placeholder="e.g. SIRE 2.0 Pre-Inspection – Jan 2026" />
 
-            <div class="compile">
-              <div style="font-weight:950;">Compile Questionnaire (select questions)</div>
-              <div class="small" style="margin-top:6px;">
-                Use filters to select which questions will be mapped into <span class="mono">questionnaire_questions</span>.
+            <div class="note" style="margin-top:12px;">
+              <b>Compile Questionnaire (select questions)</b><br/>
+              Filters below behave like Read-Only. Use <b>Select All Filtered</b> to add questions to the compile set.
+              <div class="mono" style="margin-top:6px;" id="fltCount">0 questions currently selected by filters</div>
+              <div class="mono" style="margin-top:6px;" id="selectedCount">0 questions selected for compile</div>
+            </div>
+
+            <div class="filtersGrid">
+              <div class="full">
+                <label for="fltSearch">Search</label>
+                <input id="fltSearch" type="text" placeholder="Search question no / text / chapter..." />
               </div>
 
-              <div class="filters" style="margin-top:10px;">
-                <div>
-                  <label for="f_term">Search</label>
-                  <input id="f_term" type="text" placeholder="Search question no / text / section..." />
-                </div>
-                <div>
-                  <label for="f_chapter">Chapter</label>
-                  <select id="f_chapter"></select>
-                </div>
-                <div>
-                  <label for="f_section">Section</label>
-                  <select id="f_section"></select>
-                </div>
-                <div>
-                  <label for="f_type">Question Type</label>
-                  <select id="f_type"></select>
-                </div>
-                <div>
-                  <label for="f_risk">Risk Level</label>
-                  <select id="f_risk"></select>
-                </div>
-                <div>
-                  <label for="f_roviq">ROVIQ List contains</label>
-                  <select id="f_roviq"></select>
-                </div>
-                <div>
-                  <label for="f_vesselType">Vessel Type contains</label>
-                  <select id="f_vesselType"></select>
-                </div>
-                <div>
-                  <label for="f_companyRank">Company Rank Allocation</label>
-                  <select id="f_companyRank"></select>
-                </div>
+              <div>
+                <label for="fltChapter">Chapter</label>
+                <select id="fltChapter"></select>
               </div>
 
-              <div class="kpi">
-                <span class="pill" id="libSourcePill">Library: (loading...)</span>
-                <span class="pill" id="selectedCountPill">Selected: 0</span>
+              <div>
+                <label for="fltSection">Section</label>
+                <select id="fltSection"></select>
               </div>
 
-              <div class="rowActions">
-                <button class="btn btn-muted" id="previewBtn" type="button">Preview Selected</button>
-                <button class="btn" id="createBtn" type="button">Create + Open</button>
+              <div>
+                <label for="fltQType">Question Type</label>
+                <select id="fltQType"></select>
               </div>
 
-              <div class="small" style="margin-top:10px;">
-                Notes:
-                <ul style="margin:6px 0 0 18px; padding:0;">
-                  <li>Selection is stored in <span class="mono">public.questionnaire_questions</span>.</li>
-                  <li>Open/answer via <span class="mono">q-answer.html?qid=&lt;uuid&gt;</span>.</li>
-                </ul>
+              <div>
+                <label for="fltVesselType">Vessel Type</label>
+                <select id="fltVesselType"></select>
+              </div>
+
+              <div>
+                <label for="fltResponseType">Response Type</label>
+                <select id="fltResponseType"></select>
+              </div>
+
+              <div>
+                <label for="fltRisk">Risk Level</label>
+                <select id="fltRisk"></select>
+              </div>
+
+              <div>
+                <label for="fltRoviq">ROVIQ List contains</label>
+                <select id="fltRoviq"></select>
               </div>
             </div>
+
+            <div class="rowActions">
+              <button class="btn btn-muted" id="btnSelectAllFiltered" type="button">Select All Filtered</button>
+              <button class="btn btn-muted" id="btnClearSelected" type="button">Clear Selected</button>
+            </div>
+
+            <div class="rowActions" style="margin-top:10px;">
+              <button class="btn" id="createBtn" type="button">Create + Open</button>
+              <button class="btn btn-muted" id="clearBtn" type="button">Clear Title</button>
+            </div>
+
+            <div class="divider"></div>
+
+            <div class="note">
+              <b>Standard Questionnaires (Templates)</b>
+              <div class="mono" style="margin-top:6px;">
+                Create templates (superuser), compile questions into them, then create vessel questionnaires from templates.
+              </div>
+            </div>
+
+            <label for="tplName">Template Name</label>
+            <input id="tplName" type="text" placeholder="e.g. Standard – Master (Full)" />
+
+            <label for="tplDesc">Description</label>
+            <input id="tplDesc" type="text" placeholder="Optional" />
+
+            <div class="rowActions">
+              <button class="btn" id="btnCreateTemplate" type="button">Create Template</button>
+            </div>
+
+            <div class="note" style="margin-top:12px;">
+              <b>Templates</b>
+              <div class="mono" style="margin-top:6px;">
+                Actions: Compile replaces template questions with your current selected set. Create Questionnaire calls RPC.
+              </div>
+            </div>
+
+            <div class="tableWrap" style="margin-top:10px; min-width:0;">
+              <table style="min-width:720px;">
+                <thead>
+                  <tr>
+                    <th style="width:240px;">Template</th>
+                    <th>Description</th>
+                    <th style="width:110px;">Questions</th>
+                    <th style="width:180px;">Updated</th>
+                    <th style="width:340px;">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="tplBody"></tbody>
+              </table>
+            </div>
+
           </div>
 
+          <!-- RIGHT: Questionnaires list -->
           <div>
             <div class="note">
               <b>Questionnaires</b>
               <div class="mono" style="margin-top:6px;">
-                Loaded from Supabase. Open to answer: q-answer.html?qid=&lt;uuid&gt;
+                Loaded from Supabase. Open to answer: <span class="mono">q-answer.html?qid=&lt;uuid&gt;</span>
               </div>
             </div>
 
@@ -287,384 +375,28 @@
                     <th style="width:260px;">Vessel</th>
                     <th>Title</th>
                     <th style="width:220px;">Updated</th>
-                    <th style="width:420px;">Actions</th>
+                    <th style="width:520px;">Actions</th>
+                    <th style="width:260px;">Notes</th>
                   </tr>
                 </thead>
                 <tbody id="tableBody"></tbody>
               </table>
             </div>
+
+            <div class="note" style="margin-top:12px;">
+              Supabase connection:
+              <div class="mono" style="margin-top:6px;">
+                Project: https://bdidrcyufazskpuwmfca.supabase.co
+              </div>
+            </div>
           </div>
         </div>
 
-        <div class="note" style="margin-top:12px;">
-          Supabase connection:
-          <div class="mono" style="margin-top:6px;">
-            Project: https://bdidrcyufazskpuwmfca.supabase.co
-          </div>
-        </div>
       </div>
     </div>
   </div>
 
-  <script type="module">
-    import { loadQuestionLibrary, buildFilterOptions, applyFilters, compareDotted } from "./questionlib.js";
-
-    const SUPABASE_URL = "https://bdidrcyufazskpuwmfca.supabase.co";
-    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJkaWRyY3l1ZmF6c2twdXdtZmNhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc5NDI4ODMsImV4cCI6MjA4MzUxODg4M30.Uqj4WCzoNS9wnlzI-xew6iTFzTUi77dcGeBjUgFjZbQ";
-    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-    const UI_ROLE_MAP = {
-      super_admin: "Super Admin",
-      company_admin: "Company Admin",
-      company_superintendent: "Company Superintendent",
-      vessel: "Vessel",
-      inspector: "Inspector / Third Party"
-    };
-
-    const SESSION_KEY_COMPAT = "q_session_v1";
-
-    function roleToUi(role){ return UI_ROLE_MAP[role] || role || ""; }
-    function setSubLine(text){ document.getElementById("subLine").textContent = text; }
-    function showWarn(msg){
-      const w = document.getElementById("warnBox");
-      w.textContent = msg;
-      w.style.display = "block";
-    }
-    function clearWarn(){
-      const w = document.getElementById("warnBox");
-      w.textContent = "";
-      w.style.display = "none";
-    }
-    function escapeHtml(str){
-      return String(str ?? "")
-        .replaceAll("&","&amp;")
-        .replaceAll("<","&lt;")
-        .replaceAll(">","&gt;")
-        .replaceAll('"',"&quot;")
-        .replaceAll("'","&#039;");
-    }
-
-    function statusPill(status){
-      const s = String(status || "");
-      const cls = (s === "submitted") ? "submitted" : (s === "pending_office_review" ? "pending" : "progress");
-      const label = (s === "in_progress") ? "In Progress" :
-                    (s === "pending_office_review") ? "Pending Office Review" :
-                    (s === "submitted") ? "Submitted" : s;
-      return `<span class="pill ${cls}">${label}</span>`;
-    }
-
-    function fmtTs(ts){
-      if (!ts) return "-";
-      try{ return new Date(ts).toLocaleString(); }catch(e){ return String(ts); }
-    }
-
-    async function getUserOrRedirect(){
-      const { data: { user }, error } = await supabaseClient.auth.getUser();
-      if (error) showWarn("Auth error: " + error.message);
-      if (!user){
-        showWarn("You are not logged in. Please login first.");
-        setSubLine("Not logged in.");
-        return null;
-      }
-      return user;
-    }
-
-    async function getMyProfile(userId){
-      const { data, error } = await supabaseClient
-        .from("profiles")
-        .select("username, role, vessel_id")
-        .eq("id", userId)
-        .single();
-      if (error) throw error;
-      return data;
-    }
-
-    async function loadVessels(){
-      const { data, error } = await supabaseClient
-        .from("vessels")
-        .select("id, name")
-        .eq("is_active", true)
-        .order("name", { ascending: true });
-      if (error) throw error;
-      return data || [];
-    }
-
-    async function loadQuestionnaires(){
-      const { data, error } = await supabaseClient
-        .from("questionnaires")
-        .select("id, title, status, created_at, updated_at, vessel_id")
-        .order("updated_at", { ascending: false });
-      if (error) throw error;
-
-      const rows = data || [];
-      const vesselIds = [...new Set(rows.map(r => r.vessel_id).filter(Boolean))];
-
-      if (!vesselIds.length) return rows.map(r => ({ ...r, vessel_name: "" }));
-
-      const { data: vessels, error: vErr } = await supabaseClient
-        .from("vessels")
-        .select("id, name")
-        .in("id", vesselIds);
-
-      if (vErr) return rows.map(r => ({ ...r, vessel_name: "" }));
-
-      const map = new Map((vessels || []).map(v => [v.id, v.name]));
-      return rows.map(r => ({ ...r, vessel_name: map.get(r.vessel_id) || "" }));
-    }
-
-    async function updateStatus(qid, newStatus){
-      clearWarn();
-      const { error } = await supabaseClient
-        .from("questionnaires")
-        .update({ status: newStatus })
-        .eq("id", qid);
-      if (error){
-        showWarn("Status update failed: " + error.message);
-        return;
-      }
-      await refreshAll();
-    }
-
-    function renderVesselSelect(vessels){
-      const sel = document.getElementById("vesselSelect");
-      if (!vessels.length){
-        sel.innerHTML = `<option value="">(No vessels found)</option>`;
-        return;
-      }
-      sel.innerHTML = vessels.map(v => `<option value="${escapeHtml(v.id)}">${escapeHtml(v.name)}</option>`).join("");
-    }
-
-    // ---- Question library & filters ----
-    let LIB = [];
-    let FILTERED = [];
-    let FILTER_OPTS = null;
-
-    function fillSelect(id, options, placeholder){
-      const el = document.getElementById(id);
-      const opts = [`<option value="">${escapeHtml(placeholder)}</option>`].concat(
-        (options || []).map(x => `<option value="${escapeHtml(x)}">${escapeHtml(x)}</option>`)
-      );
-      el.innerHTML = opts.join("");
-    }
-
-    function currentFilters(){
-      return {
-        term: document.getElementById("f_term").value,
-        chapter: document.getElementById("f_chapter").value,
-        section: document.getElementById("f_section").value,
-        type: document.getElementById("f_type").value,
-        risk: document.getElementById("f_risk").value,
-        roviq: document.getElementById("f_roviq").value,
-        vesselType: document.getElementById("f_vesselType").value,
-        companyRank: document.getElementById("f_companyRank").value,
-      };
-    }
-
-    function recomputeSelection(){
-      FILTERED = applyFilters(LIB, currentFilters())
-        .slice()
-        .sort((a,b)=>compareDotted(a.question_no, b.question_no));
-      document.getElementById("selectedCountPill").textContent = `Selected: ${FILTERED.length}`;
-    }
-
-    async function previewSelected(){
-      recomputeSelection();
-      const lines = FILTERED.slice(0, 40)
-        .map(q => `${q.question_no} — ${(q["Short Text"] ?? "").toString().slice(0,80)}`)
-        .join("\n");
-      alert(
-        `Selected questions: ${FILTERED.length}\n\n` +
-        (lines || "(none)") +
-        (FILTERED.length > 40 ? "\n\n... (showing first 40)" : "")
-      );
-    }
-
-    async function createQuestionnaireWithQuestions(userId){
-      clearWarn();
-      recomputeSelection();
-
-      const vesselId = document.getElementById("vesselSelect").value;
-      const title = document.getElementById("titleInput").value.trim();
-
-      if (!vesselId){ showWarn("Please select a vessel."); return; }
-      if (!title){ showWarn("Please enter a title."); return; }
-      if (!FILTERED.length){ showWarn("No questions selected. Adjust filters first."); return; }
-
-      const payload = { title, vessel_id: vesselId, status: "in_progress", created_by: userId };
-      const { data: q, error: qErr } = await supabaseClient
-        .from("questionnaires")
-        .insert(payload)
-        .select("id")
-        .single();
-      if (qErr){ showWarn("Create questionnaire failed: " + qErr.message); return; }
-
-      const rows = FILTERED.map((qq, idx) => ({
-        questionnaire_id: q.id,
-        question_no: qq.question_no,
-        sort_order: idx + 1
-      }));
-
-      const { error: mapErr } = await supabaseClient
-        .from("questionnaire_questions")
-        .insert(rows);
-
-      if (mapErr){
-        showWarn(
-          "Created questionnaire, but inserting questions failed: " + mapErr.message +
-          " (Run sire2_schema_patch.sql to ensure questionnaire_questions.sort_order exists.)"
-        );
-        return;
-      }
-
-      document.getElementById("titleInput").value = "";
-      await refreshAll();
-
-      window.location.href = "./q-answer.html?qid=" + encodeURIComponent(q.id);
-    }
-
-    let ALL_Q = [];
-
-    function renderTable(){
-      const term = document.getElementById("searchInput").value.trim().toLowerCase();
-      const body = document.getElementById("tableBody");
-
-      const rows = ALL_Q.filter(q => {
-        if (!term) return true;
-        const vessel = q?.vessel_name || "";
-        const s = String(q.status || "");
-        const t = String(q.title || "");
-        return vessel.toLowerCase().includes(term) || t.toLowerCase().includes(term) || s.toLowerCase().includes(term);
-      });
-
-      if (!rows.length){
-        body.innerHTML = `<tr><td colspan="5" class="small">No questionnaires found.</td></tr>`;
-        return;
-      }
-
-      body.innerHTML = rows.map(q => {
-        const vessel = q?.vessel_name || "";
-        return `
-          <tr>
-            <td>${statusPill(q.status)}</td>
-            <td>${escapeHtml(vessel)}</td>
-            <td>
-              <div style="font-weight:950;">${escapeHtml(q.title)}</div>
-              <div class="small mono">ID: ${escapeHtml(q.id)}</div>
-            </td>
-            <td class="small">
-              <div>Updated: ${escapeHtml(fmtTs(q.updated_at))}</div>
-              <div>Created: ${escapeHtml(fmtTs(q.created_at))}</div>
-            </td>
-            <td>
-              <div style="display:flex; gap:8px; flex-wrap:wrap;">
-                <a class="btn btn-muted" href="./q-answer.html?qid=${encodeURIComponent(q.id)}">Open</a>
-                <button class="btn btn-outline" type="button" data-act="in_progress" data-id="${escapeHtml(q.id)}">Set In Progress</button>
-                <button class="btn btn-outline" type="button" data-act="pending_office_review" data-id="${escapeHtml(q.id)}">Set Pending</button>
-                <button class="btn btn-outline" type="button" data-act="submitted" data-id="${escapeHtml(q.id)}">Set Submitted</button>
-              </div>
-            </td>
-          </tr>
-        `;
-      }).join("");
-
-      body.querySelectorAll("button[data-act]").forEach(btn => {
-        btn.addEventListener("click", async () => {
-          const qid = btn.getAttribute("data-id");
-          const st = btn.getAttribute("data-act");
-          if (!qid || !st) return;
-          if (!confirm("Change status to: " + st + " ?")) return;
-          await updateStatus(qid, st);
-        });
-      });
-    }
-
-    async function refreshAll(){
-      const vessels = await loadVessels();
-      renderVesselSelect(vessels);
-
-      ALL_Q = await loadQuestionnaires();
-      renderTable();
-    }
-
-    async function doLogout(){
-      clearWarn();
-      await supabaseClient.auth.signOut();
-      localStorage.removeItem(SESSION_KEY_COMPAT);
-      setSubLine("Logged out.");
-      showWarn("Logged out. Go to login.html to sign in again.");
-    }
-
-    async function init(){
-      clearWarn();
-
-      const user = await getUserOrRedirect();
-      if (!user) return;
-
-      let profile;
-      try{
-        profile = await getMyProfile(user.id);
-      }catch(e){
-        setSubLine("Logged in, but profile missing or blocked.");
-        showWarn("Profile missing or blocked by RLS. Ensure a row exists in public.profiles for this user.");
-        return;
-      }
-
-      const uiRole = roleToUi(profile.role);
-      const username = profile.username || user.email || "(unknown)";
-
-      document.getElementById("sessionLine").textContent = `Session: ${username}`;
-      document.getElementById("roleLine").textContent = `Role: ${uiRole}`;
-
-      localStorage.setItem(SESSION_KEY_COMPAT, JSON.stringify({
-        username: profile.username || "",
-        role: uiRole,
-        vessel: "",
-        created_at: new Date().toISOString()
-      }));
-
-      setSubLine("Connected. Loading vessels, questionnaires, and question library...");
-
-      // Load question library
-      try{
-        const r = await loadQuestionLibrary();
-        LIB = r.questions;
-        document.getElementById("libSourcePill").textContent = "Library: " + r.url;
-
-        FILTER_OPTS = buildFilterOptions(LIB);
-        fillSelect("f_chapter", FILTER_OPTS.chapters, "All chapters");
-        fillSelect("f_section", FILTER_OPTS.sections, "All sections");
-        fillSelect("f_type", FILTER_OPTS.types, "All types");
-        fillSelect("f_risk", FILTER_OPTS.riskLevels, "All risk levels");
-        fillSelect("f_roviq", FILTER_OPTS.roviq, "All ROVIQ");
-        fillSelect("f_vesselType", FILTER_OPTS.vesselTypes, "All vessel types");
-        fillSelect("f_companyRank", FILTER_OPTS.companyRanks, "All company ranks");
-
-        ["f_term","f_chapter","f_section","f_type","f_risk","f_roviq","f_vesselType","f_companyRank"].forEach(id => {
-          document.getElementById(id).addEventListener("input", recomputeSelection);
-          document.getElementById(id).addEventListener("change", recomputeSelection);
-        });
-
-        recomputeSelection();
-      }catch(e){
-        showWarn("Question library load failed: " + String(e.message || e));
-      }
-
-      try{
-        await refreshAll();
-        setSubLine("Ready.");
-      }catch(e){
-        showWarn("Load failed: " + String(e.message || e));
-        setSubLine("Error loading data.");
-      }
-
-      document.getElementById("previewBtn").addEventListener("click", previewSelected);
-      document.getElementById("createBtn").addEventListener("click", () => createQuestionnaireWithQuestions(user.id));
-      document.getElementById("refreshBtn").addEventListener("click", refreshAll);
-      document.getElementById("logoutBtn").addEventListener("click", doLogout);
-      document.getElementById("searchInput").addEventListener("input", renderTable);
-    }
-
-    init();
-  </script>
+  <!-- Logic -->
+  <script type="module" src="./q-company.js"></script>
 </body>
 </html>
