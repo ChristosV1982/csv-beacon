@@ -57,11 +57,17 @@
         <button class="btn2" onclick="location.href='./q-report.html'">Open</button>
       </div>
 
-      <!-- NEW: Post Inspection (restricted) -->
+      <!-- Admin-only cards -->
       <div class="card" id="postInspectionCard" style="display:none;">
         <h3 style="margin:0 0 8px 0;">Post-Inspection</h3>
-        <div class="muted">Record vetting inspection report observations and tick PGNO(s).</div><br/>
+        <div class="muted">Record vetting report observations and tick PGNO(s).</div><br/>
         <button class="btn2" onclick="location.href='./post_inspection.html'">Open</button>
+      </div>
+
+      <div class="card" id="postInspectionStatsCard" style="display:none;">
+        <h3 style="margin:0 0 8px 0;">Post-Inspection Stats</h3>
+        <div class="muted">Fleet / vessel statistics and exports (admin-only).</div><br/>
+        <button class="btn2" onclick="location.href='./post_inspection_stats.html'">Open</button>
       </div>
     </div>
   </div>
@@ -74,11 +80,12 @@
       AUTH.fillUserBadge(me, "userBadge");
       document.getElementById("logoutBtn").addEventListener("click", AUTH.logoutAndGoLogin);
 
-      // Show Post-Inspection only to Super Admin + Company Admin
       const role = me.profile?.role || "";
       const R = AUTH.ROLES;
+
       if (role === R.SUPER_ADMIN || role === R.COMPANY_ADMIN) {
         document.getElementById("postInspectionCard").style.display = "block";
+        document.getElementById("postInspectionStatsCard").style.display = "block";
       }
     })();
   </script>

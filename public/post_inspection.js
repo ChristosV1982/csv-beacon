@@ -1,12 +1,21 @@
 // public/post_inspection.js
-// Supabase-backed Post-Inspection module (no localStorage)
-// Tables:
-//   post_inspection_reports
-//   post_inspection_observations
+// Supabase-backed Post-Inspection module with:
+// - observation_type support
+// - completeness tools (missing PGNO filter + finalize check)
+// - batched autosave (chunked upserts/deletes)
 
 import { loadLockedLibraryJson } from "./question_library_loader.js";
 
 const LOCKED_LIBRARY_JSON = "./sire_questions_all_columns_named.json";
+
+const OBS_TYPES = [
+  { value: "negative_observation", label: "Negative observation" },
+  { value: "observation_comment", label: "Observation / comment" },
+  { value: "note_improvement", label: "Note / improvement" },
+  { value: "best_practice", label: "Best practice" },
+  { value: "office_finding", label: "Office finding" },
+  { value: "other", label: "Other" },
+];
 
 function el(id) { return document.getElementById(id); }
 
@@ -31,14 +40,25 @@ const state = {
   chapters: [],
 
   reports: [],
-  activeReport: null,          // header row
-  observations: {},            // map: question_no -> row (has_observation, pgno_selected, remarks, updated_at)
+  activeReport: null,          // report header row
+  observations: {},            // map: question_no -> observation row
+
   selectedQno: null,
 
-  saveTimer: null,
+  // batching
+  flushTimer: null,
+  pendingUpserts: new Map(),   // question_no -> payload
+  pendingDeletes: new Set(),   // question_no
 };
 
-// ---------- Library helpers ----------
+function setSaveStatus(text) {
+  el("saveStatus").textContent = text || "Not saved";
+}
+
+function setActivePill(text) {
+  el("activeReportPill").textContent = text || "No active report";
+}
+
 function pick(obj, keys) {
   for (const k of keys) {
     if (obj && obj[k] != null && obj[k] !== "") return obj[k];
@@ -79,49 +99,7 @@ function getPgnoBullets(q) {
 
   const lines = pgTxt.split("\n").map((s) => s.trim()).filter(Boolean);
   const usable = lines.filter((s) => s.length > 6);
-  return usable.slice(0, 60);
-}
-
-// ---------- UI ----------
-function setSaveStatus(text) {
-  el("saveStatus").textContent = text || "Not saved";
-}
-function setActivePill(text) {
-  el("activeReportPill").textContent = text || "No active report";
-}
-
-function renderVesselsSelect() {
-  const sel = el("vesselSelect");
-  sel.innerHTML = "";
-
-  const opt0 = document.createElement("option");
-  opt0.value = "";
-  opt0.textContent = "— Select vessel —";
-  sel.appendChild(opt0);
-
-  for (const v of state.vessels) {
-    const o = document.createElement("option");
-    o.value = v.id;
-    o.textContent = v.name;
-    sel.appendChild(o);
-  }
-}
-
-function renderChapterFilter() {
-  const sel = el("chapterFilter");
-  sel.innerHTML = "";
-
-  const o0 = document.createElement("option");
-  o0.value = "";
-  o0.textContent = "All chapters";
-  sel.appendChild(o0);
-
-  for (const ch of state.chapters) {
-    const o = document.createElement("option");
-    o.value = ch;
-    o.textContent = `Chapter ${ch}`;
-    sel.appendChild(o);
-  }
+  return usable.slice(0, 80);
 }
 
 function reportLabel(r) {
@@ -131,126 +109,25 @@ function reportLabel(r) {
   return `${v} | ${d}${ref}`;
 }
 
-function renderReportSelect() {
-  const sel = el("reportSelect");
-  sel.innerHTML = "";
-
-  const opt0 = document.createElement("option");
-  opt0.value = "";
-  opt0.textContent = "— Select report —";
-  sel.appendChild(opt0);
-
-  for (const r of state.reports) {
-    const o = document.createElement("option");
-    o.value = r.id;
-    o.textContent = reportLabel(r);
-    sel.appendChild(o);
-  }
-
-  sel.value = state.activeReport?.id || "";
+function isMissingPgno(row) {
+  if (!row || !row.has_observation) return false;
+  const arr = Array.isArray(row.pgno_selected) ? row.pgno_selected : [];
+  return arr.length === 0;
 }
 
-function currentReportHasObs(qno) {
-  const row = state.observations?.[qno];
-  return !!(row && row.has_observation);
+function getObservedQnos() {
+  const obs = state.observations || {};
+  return Object.keys(obs).filter(qno => obs[qno]?.has_observation);
 }
 
-function renderQuestionList() {
-  const list = el("questionList");
-  list.innerHTML = "";
-
-  const term = String(el("searchInput").value || "").trim().toLowerCase();
-  const chap = String(el("chapterFilter").value || "").trim();
-  const onlyObs = !!el("onlyObsFilter").checked;
-
-  const rows = [];
-
-  for (const item of state.lib) {
-    const qno = getQno(item);
-    if (!qno) continue;
-
-    if (chap && String(getChap(item)) !== chap) continue;
-
-    const hasObs = currentReportHasObs(qno);
-    if (onlyObs && !hasObs) continue;
-
-    if (term) {
-      const hay = [qno, getShort(item), getSection(item), getQText(item), getChap(item)]
-        .join(" ")
-        .toLowerCase();
-      if (!hay.includes(term)) continue;
-    }
-
-    rows.push({ qno, item, hasObs });
-  }
-
-  rows.sort((a, b) => String(a.qno).localeCompare(String(b.qno)));
-
-  for (const r of rows) {
-    const div = document.createElement("div");
-    div.className = "item" + (state.selectedQno === r.qno ? " active" : "");
-
-    const badge = r.hasObs
-      ? `<span class="badge obs">Observed</span>`
-      : `<span class="badge">No Obs</span>`;
-
-    div.innerHTML = `
-      <div class="itemTop">
-        <div>
-          <div class="qno">${esc(r.qno)} — ${esc(getShort(r.item))}</div>
-          <div class="qst">${esc(getSection(r.item))}</div>
-        </div>
-        <div>${badge}</div>
-      </div>
-    `;
-
-    div.addEventListener("click", async () => {
-      state.selectedQno = r.qno;
-      renderQuestionList();
-      renderDetailPane(r.qno);
-    });
-
-    list.appendChild(div);
-  }
-
-  if (!rows.length) {
-    const empty = document.createElement("div");
-    empty.style.padding = "10px";
-    empty.style.border = "1px dashed #d5deef";
-    empty.style.borderRadius = "12px";
-    empty.style.background = "#f8fbff";
-    empty.style.color = "#35507b";
-    empty.style.fontWeight = "900";
-    empty.textContent = "No questions match current filters.";
-    list.appendChild(empty);
-  }
+function getMissingPgnoQnos() {
+  const obs = state.observations || {};
+  return Object.keys(obs).filter(qno => isMissingPgno(obs[qno]));
 }
 
-function ensureActiveReportOrWarn() {
-  if (!state.activeReport) {
-    alert("No active post-inspection report. Please select an existing report or create a new one, then Save Report Header.");
-    return false;
-  }
-  return true;
-}
-
-function loadReportIntoHeader(r) {
-  el("vesselSelect").value = r.vessel_id || "";
-  el("inspectionDate").value = r.inspection_date || "";
-  el("reportRef").value = r.report_ref || "";
-  el("reportTitle").value = r.title || "";
-  setActivePill("Active: " + reportLabel(r));
-}
-
-function clearDetailPane() {
-  el("detailPane").innerHTML = `
-    <div style="font-weight:950; color:#35507b;">
-      Select a question from the list to record post-inspection observations and tick PGNO(s).
-    </div>
-  `;
-}
-
-// ---------- Supabase data access ----------
+// -------------------------
+// Supabase access
+// -------------------------
 async function loadVessels() {
   const { data, error } = await state.supabase
     .from("vessels")
@@ -262,7 +139,6 @@ async function loadVessels() {
 }
 
 async function loadReportsFromDb() {
-  // Avoid joins to reduce RLS surprises; map vessel names in a second query.
   const { data, error } = await state.supabase
     .from("post_inspection_reports")
     .select("id, vessel_id, inspection_date, report_ref, title, created_at, updated_at")
@@ -289,14 +165,16 @@ async function loadReportsFromDb() {
 async function loadObservationsForReport(reportId) {
   const { data, error } = await state.supabase
     .from("post_inspection_observations")
-    .select("report_id, question_no, has_observation, pgno_selected, remarks, updated_at")
+    .select("report_id, question_no, has_observation, observation_type, pgno_selected, remarks, updated_at")
     .eq("report_id", reportId);
 
   if (error) throw error;
 
   const map = {};
   for (const row of data || []) {
-    map[row.question_no] = row;
+    // Normalize pgno_selected to array
+    const pg = Array.isArray(row.pgno_selected) ? row.pgno_selected : [];
+    map[row.question_no] = { ...row, pgno_selected: pg };
   }
   return map;
 }
@@ -332,36 +210,268 @@ async function deleteReport(reportId) {
   if (error) throw error;
 }
 
-async function upsertObservation({ report_id, question_no, has_observation, pgno_selected, remarks }) {
-  const payload = {
-    report_id,
-    question_no,
-    has_observation: !!has_observation,
-    pgno_selected: Array.isArray(pgno_selected) ? pgno_selected : [],
-    remarks: remarks ?? null,
-  };
-
-  const { data, error } = await state.supabase
-    .from("post_inspection_observations")
-    .upsert(payload, { onConflict: "report_id,question_no" })
-    .select("report_id, question_no, has_observation, pgno_selected, remarks, updated_at")
-    .single();
-
-  if (error) throw error;
-  return data;
+// -------------------------
+// Batched save queue
+// -------------------------
+function hasPending() {
+  return state.pendingUpserts.size > 0 || state.pendingDeletes.size > 0;
 }
 
-async function deleteObservation(report_id, question_no) {
-  const { error } = await state.supabase
-    .from("post_inspection_observations")
-    .delete()
-    .eq("report_id", report_id)
-    .eq("question_no", question_no);
+function scheduleFlush(delayMs = 850) {
+  if (!state.activeReport) return;
 
-  if (error) throw error;
+  clearTimeout(state.flushTimer);
+  setSaveStatus(hasPending() ? "Pending changes…" : "Saved");
+
+  state.flushTimer = setTimeout(async () => {
+    try {
+      await flushPending();
+    } catch (e) {
+      console.error(e);
+      setSaveStatus("Error");
+    }
+  }, delayMs);
 }
 
-// ---------- Detail pane (record obs + PGNO ticks) ----------
+function queueUpsert(question_no, payload) {
+  if (!state.activeReport) return;
+
+  state.pendingDeletes.delete(question_no);
+  state.pendingUpserts.set(question_no, payload);
+  setSaveStatus("Pending changes…");
+  scheduleFlush();
+}
+
+function queueDelete(question_no) {
+  if (!state.activeReport) return;
+
+  state.pendingUpserts.delete(question_no);
+  state.pendingDeletes.add(question_no);
+  setSaveStatus("Pending changes…");
+  scheduleFlush();
+}
+
+async function flushPending() {
+  if (!state.activeReport) return;
+  if (!hasPending()) return;
+
+  const report_id = state.activeReport.id;
+  const deletes = Array.from(state.pendingDeletes);
+  const upserts = Array.from(state.pendingUpserts.values());
+
+  setSaveStatus("Saving…");
+
+  // Deletes first
+  if (deletes.length) {
+    const chunkSize = 200;
+    for (let i = 0; i < deletes.length; i += chunkSize) {
+      const chunk = deletes.slice(i, i + chunkSize);
+      const { error } = await state.supabase
+        .from("post_inspection_observations")
+        .delete()
+        .eq("report_id", report_id)
+        .in("question_no", chunk);
+
+      if (error) throw error;
+    }
+
+    for (const qno of deletes) {
+      delete state.observations[qno];
+      state.pendingDeletes.delete(qno);
+    }
+  }
+
+  // Upserts next (chunked)
+  if (upserts.length) {
+    const chunkSize = 200;
+    for (let i = 0; i < upserts.length; i += chunkSize) {
+      const chunk = upserts.slice(i, i + chunkSize);
+
+      const { data, error } = await state.supabase
+        .from("post_inspection_observations")
+        .upsert(chunk, { onConflict: "report_id,question_no" })
+        .select("report_id, question_no, has_observation, observation_type, pgno_selected, remarks, updated_at");
+
+      if (error) throw error;
+
+      for (const row of data || []) {
+        const pg = Array.isArray(row.pgno_selected) ? row.pgno_selected : [];
+        state.observations[row.question_no] = { ...row, pgno_selected: pg };
+        state.pendingUpserts.delete(row.question_no);
+      }
+    }
+  }
+
+  renderQuestionList();
+
+  // If still pending (edge), schedule again; else mark saved
+  if (hasPending()) {
+    setSaveStatus("Pending changes…");
+    scheduleFlush(650);
+  } else {
+    setSaveStatus("Saved");
+  }
+}
+
+// -------------------------
+// UI rendering
+// -------------------------
+function renderVesselsSelect() {
+  const sel = el("vesselSelect");
+  sel.innerHTML = "";
+
+  const opt0 = document.createElement("option");
+  opt0.value = "";
+  opt0.textContent = "— Select vessel —";
+  sel.appendChild(opt0);
+
+  for (const v of state.vessels) {
+    const o = document.createElement("option");
+    o.value = v.id;
+    o.textContent = v.name;
+    sel.appendChild(o);
+  }
+}
+
+function renderChapterFilter() {
+  const sel = el("chapterFilter");
+  sel.innerHTML = "";
+
+  const o0 = document.createElement("option");
+  o0.value = "";
+  o0.textContent = "All chapters";
+  sel.appendChild(o0);
+
+  for (const ch of state.chapters) {
+    const o = document.createElement("option");
+    o.value = ch;
+    o.textContent = `Chapter ${ch}`;
+    sel.appendChild(o);
+  }
+}
+
+function renderReportSelect() {
+  const sel = el("reportSelect");
+  sel.innerHTML = "";
+
+  const opt0 = document.createElement("option");
+  opt0.value = "";
+  opt0.textContent = "— Select report —";
+  sel.appendChild(opt0);
+
+  for (const r of state.reports) {
+    const o = document.createElement("option");
+    o.value = r.id;
+    o.textContent = reportLabel(r);
+    sel.appendChild(o);
+  }
+
+  sel.value = state.activeReport?.id || "";
+}
+
+function loadReportIntoHeader(r) {
+  el("vesselSelect").value = r.vessel_id || "";
+  el("inspectionDate").value = r.inspection_date || "";
+  el("reportRef").value = r.report_ref || "";
+  el("reportTitle").value = r.title || "";
+  setActivePill("Active: " + reportLabel(r));
+}
+
+function clearDetailPane() {
+  el("detailPane").innerHTML = `
+    <div style="font-weight:950; color:#35507b;">
+      Select a question from the list to record post-inspection observations and tick PGNO(s).
+    </div>
+  `;
+}
+
+function ensureActiveReportOrWarn() {
+  if (!state.activeReport) {
+    alert("No active post-inspection report. Please select an existing report or create a new one, then Save Report Header.");
+    return false;
+  }
+  return true;
+}
+
+function renderQuestionList() {
+  const list = el("questionList");
+  list.innerHTML = "";
+
+  const term = String(el("searchInput").value || "").trim().toLowerCase();
+  const chap = String(el("chapterFilter").value || "").trim();
+  const onlyObs = !!el("onlyObsFilter").checked;
+  const onlyMissing = !!el("missingPgnoFilter").checked;
+
+  const rows = [];
+
+  for (const item of state.lib) {
+    const qno = getQno(item);
+    if (!qno) continue;
+
+    if (chap && String(getChap(item)) !== chap) continue;
+
+    const row = state.observations[qno] || null;
+    const hasObs = !!(row && row.has_observation);
+    const missing = isMissingPgno(row);
+
+    if (onlyObs && !hasObs) continue;
+    if (onlyMissing && !missing) continue;
+
+    if (term) {
+      const hay = [qno, getShort(item), getSection(item), getQText(item), getChap(item)]
+        .join(" ")
+        .toLowerCase();
+      if (!hay.includes(term)) continue;
+    }
+
+    rows.push({ qno, item, hasObs, missing });
+  }
+
+  rows.sort((a, b) => String(a.qno).localeCompare(String(b.qno)));
+
+  for (const r of rows) {
+    const div = document.createElement("div");
+    div.className = "item" + (state.selectedQno === r.qno ? " active" : "");
+
+    let badgeHtml = `<span class="badge">No Obs</span>`;
+    if (r.hasObs && r.missing) badgeHtml = `<span class="badge warn">Missing PGNO</span>`;
+    else if (r.hasObs) badgeHtml = `<span class="badge obs">Observed</span>`;
+
+    div.innerHTML = `
+      <div class="itemTop">
+        <div>
+          <div class="qno">${esc(r.qno)} — ${esc(getShort(r.item))}</div>
+          <div class="qst">${esc(getSection(r.item))}</div>
+        </div>
+        <div>${badgeHtml}</div>
+      </div>
+    `;
+
+    div.addEventListener("click", () => {
+      state.selectedQno = r.qno;
+      renderQuestionList();
+      renderDetailPane(r.qno);
+    });
+
+    list.appendChild(div);
+  }
+
+  if (!rows.length) {
+    const empty = document.createElement("div");
+    empty.style.padding = "10px";
+    empty.style.border = "1px dashed #d5deef";
+    empty.style.borderRadius = "12px";
+    empty.style.background = "#f8fbff";
+    empty.style.color = "#35507b";
+    empty.style.fontWeight = "900";
+    empty.textContent = "No questions match current filters.";
+    list.appendChild(empty);
+  }
+}
+
+// -------------------------
+// Detail pane (obs + PGNO + type)
+// -------------------------
 function renderDetailPane(qno) {
   const pane = el("detailPane");
   const q = state.libByNo.get(qno);
@@ -378,13 +488,19 @@ function renderDetailPane(qno) {
   const shortText = getShort(q);
   const qText = getQText(q);
 
-  const row = state.observations[qno] || null;
-  const hasObs = !!(row && row.has_observation);
+  const existing = state.observations[qno] || null;
+  const hasObs = !!(existing && existing.has_observation);
 
   const pgnoBullets = getPgnoBullets(q);
   const selected = new Set(
-    (row?.pgno_selected || []).map(x => Number(x.idx)).filter(n => Number.isFinite(n))
+    (existing?.pgno_selected || []).map(x => Number(x.idx)).filter(n => Number.isFinite(n))
   );
+
+  const typeValue = existing?.observation_type || "negative_observation";
+
+  const typeOptions = OBS_TYPES.map(o =>
+    `<option value="${esc(o.value)}" ${o.value === typeValue ? "selected" : ""}>${esc(o.label)}</option>`
+  ).join("");
 
   pane.innerHTML = `
     <h3 class="detailTitle">${esc(qno)} — ${esc(shortText)}</h3>
@@ -401,7 +517,15 @@ function renderDetailPane(qno) {
       </label>
 
       <button class="btn btn-muted" id="clearBtn" ${hasObs ? "" : "disabled"}>Clear observation</button>
+      <div id="missingHint" style="font-weight:900; color:#8a4b00; display:${hasObs && isMissingPgno(existing) ? "block" : "none"};">
+        Missing PGNO tick (Finalize check will flag this)
+      </div>
     </div>
+
+    <label for="obsType" style="margin-top:12px;">Observation type</label>
+    <select id="obsType" ${hasObs ? "" : "disabled"}>
+      ${typeOptions}
+    </select>
 
     <div class="pgnoBox">
       <div class="pgnoTitle">PGNO Tick Selection (only for observed questions)</div>
@@ -417,6 +541,7 @@ function renderDetailPane(qno) {
 
     <div style="margin-top:12px; display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
       <button class="btn" id="saveBtn">Save This Question</button>
+      <button class="btn btn-muted" id="saveNowBtn">Save now (flush)</button>
       <div style="font-weight:900; color:#35507b;" id="qSaveMsg"></div>
     </div>
   `;
@@ -426,9 +551,12 @@ function renderDetailPane(qno) {
   const clearBtn = pane.querySelector("#clearBtn");
   const remarks = pane.querySelector("#obsRemarks");
   const saveBtn = pane.querySelector("#saveBtn");
+  const saveNowBtn = pane.querySelector("#saveNowBtn");
   const msg = pane.querySelector("#qSaveMsg");
+  const obsType = pane.querySelector("#obsType");
+  const missingHint = pane.querySelector("#missingHint");
 
-  if (row?.remarks) remarks.value = row.remarks;
+  if (existing?.remarks) remarks.value = existing.remarks;
 
   // Populate PGNO list
   if (!pgnoBullets.length) {
@@ -452,6 +580,15 @@ function renderDetailPane(qno) {
     });
   }
 
+  function setControlsEnabled(on) {
+    obsType.disabled = !on;
+    remarks.disabled = !on;
+    clearBtn.disabled = !on;
+    pgList.querySelectorAll(".pgChk").forEach((c) => (c.disabled = !on));
+  }
+
+  setControlsEnabled(hasObs);
+
   function getSelectedPgno() {
     const selectedPg = [];
     if (!pgnoBullets.length) return selectedPg;
@@ -466,68 +603,66 @@ function renderDetailPane(qno) {
     return selectedPg;
   }
 
-  async function doSave(immediateMessage = true) {
+  function upsertLocalAndQueue() {
     if (!ensureActiveReportOrWarn()) return;
 
     const observed = !!toggle.checked;
 
     if (!observed) {
-      // If not observed -> delete row if exists
+      // delete from db if exists
       if (state.observations[qno]) {
-        setSaveStatus("Saving…");
-        await deleteObservation(state.activeReport.id, qno);
-        delete state.observations[qno];
+        queueDelete(qno);
+        missingHint.style.display = "none";
         renderQuestionList();
-        setSaveStatus("Saved");
       }
-      if (immediateMessage) msg.textContent = "Saved (no observation).";
       return;
     }
 
     const pg = getSelectedPgno();
     const rem = String(remarks.value || "");
+    const ot = String(obsType.value || "negative_observation");
 
-    setSaveStatus("Saving…");
-    const saved = await upsertObservation({
+    // optimistic local update
+    state.observations[qno] = {
       report_id: state.activeReport.id,
       question_no: qno,
       has_observation: true,
+      observation_type: ot,
+      pgno_selected: pg,
+      remarks: rem,
+      updated_at: nowIso(),
+    };
+
+    // queue db upsert
+    queueUpsert(qno, {
+      report_id: state.activeReport.id,
+      question_no: qno,
+      has_observation: true,
+      observation_type: ot,
       pgno_selected: pg,
       remarks: rem,
     });
 
-    state.observations[qno] = saved;
+    missingHint.style.display = (pg.length === 0) ? "block" : "none";
     renderQuestionList();
-    setSaveStatus("Saved");
-
-    if (immediateMessage) {
-      msg.textContent = pg.length
-        ? "Saved."
-        : "Saved. (No PGNO ticked — allowed, but consider ticking the applicable PGNO.)";
-    }
   }
-
-  function setControlsEnabled(on) {
-    remarks.disabled = !on;
-    clearBtn.disabled = !on;
-    pgList.querySelectorAll(".pgChk").forEach((c) => (c.disabled = !on));
-  }
-
-  setControlsEnabled(hasObs);
 
   toggle.addEventListener("change", () => {
     if (!ensureActiveReportOrWarn()) {
       toggle.checked = false;
       return;
     }
-
     const on = !!toggle.checked;
     setControlsEnabled(on);
 
     if (!on) {
-      msg.textContent = "Observation toggled off. Click Save to remove from database, or Clear to remove immediately.";
+      msg.textContent = "Observation toggled off. Save will remove it from the database.";
+      upsertLocalAndQueue();
     } else {
       msg.textContent = "";
+      // default new observation type if none existed
+      if (!existing) obsType.value = "negative_observation";
+      upsertLocalAndQueue();
     }
   });
 
@@ -537,67 +672,91 @@ function renderDetailPane(qno) {
     const ok = confirm("Clear this observation (remove from database)?");
     if (!ok) return;
 
-    setSaveStatus("Saving…");
-    await deleteObservation(state.activeReport.id, qno);
-    delete state.observations[qno];
-
+    // clear UI
     toggle.checked = false;
     remarks.value = "";
+    obsType.value = "negative_observation";
     setControlsEnabled(false);
+    missingHint.style.display = "none";
 
+    // queue delete
+    queueDelete(qno);
+
+    msg.textContent = "Observation cleared (pending save).";
     renderQuestionList();
-    setSaveStatus("Saved");
-    msg.textContent = "Observation cleared.";
   });
 
-  saveBtn.addEventListener("click", async () => {
+  saveBtn.addEventListener("click", () => {
+    upsertLocalAndQueue();
+
+    const observed = !!toggle.checked;
+    if (!observed) {
+      msg.textContent = "Saved (no observation).";
+      return;
+    }
+
+    const pg = getSelectedPgno();
+    msg.textContent = pg.length ? "Saved (pending flush)." : "Saved (pending flush). Missing PGNO tick.";
+  });
+
+  saveNowBtn.addEventListener("click", async () => {
+    upsertLocalAndQueue();
     try {
-      await doSave(true);
+      await flushPending();
+      msg.textContent = "Saved to database.";
     } catch (e) {
       console.error(e);
-      alert("Save failed: " + (e?.message || String(e)));
+      alert("Save now failed: " + (e?.message || String(e)));
       setSaveStatus("Error");
     }
   });
 
-  // Debounced autosave on remarks + PGNO ticks (only when observation ON)
-  function debounceAutosave() {
-    clearTimeout(state.saveTimer);
-    state.saveTimer = setTimeout(async () => {
-      try {
-        if (!toggle.checked) return;
-        await doSave(false);
-      } catch (e) {
-        console.error(e);
-        setSaveStatus("Error");
-      }
-    }, 650);
-  }
-
+  // Autosave (batched): remarks, pgno ticks, obs type
   remarks.addEventListener("input", () => {
     if (!toggle.checked) return;
-    debounceAutosave();
+    upsertLocalAndQueue();
+  });
+
+  obsType.addEventListener("change", () => {
+    if (!toggle.checked) return;
+    upsertLocalAndQueue();
   });
 
   pgList.querySelectorAll(".pgChk").forEach((chk) => {
     chk.addEventListener("change", () => {
       if (!toggle.checked) return;
-      debounceAutosave();
+      upsertLocalAndQueue();
     });
   });
 }
 
-// ---------- Report actions ----------
+// -------------------------
+// Report actions
+// -------------------------
+function headerInputs() {
+  const vessel_id = String(el("vesselSelect").value || "").trim();
+  const inspection_date = String(el("inspectionDate").value || "").trim();
+  const report_ref = String(el("reportRef").value || "").trim();
+  const title = String(el("reportTitle").value || "").trim();
+  return { vessel_id, inspection_date, report_ref, title };
+}
+
 async function setActiveReportById(id) {
+  // ensure pending changes are flushed before changing report
+  if (state.activeReport && hasPending()) {
+    try { await flushPending(); } catch { /* keep going; user sees Error */ }
+  }
+
   if (!id) {
     state.activeReport = null;
     state.observations = {};
     state.selectedQno = null;
+
     renderReportSelect();
     setActivePill("No active report");
-    setSaveStatus("Not saved");
     clearDetailPane();
     renderQuestionList();
+    setSaveStatus("Not saved");
     return;
   }
 
@@ -625,15 +784,6 @@ async function setActiveReportById(id) {
   renderQuestionList();
 }
 
-function headerInputs() {
-  const vessel_id = String(el("vesselSelect").value || "").trim();
-  const inspection_date = String(el("inspectionDate").value || "").trim();
-  const report_ref = String(el("reportRef").value || "").trim();
-  const title = String(el("reportTitle").value || "").trim();
-
-  return { vessel_id, inspection_date, report_ref, title };
-}
-
 async function handleNewReport() {
   const { vessel_id, inspection_date, report_ref, title } = headerInputs();
 
@@ -645,15 +795,10 @@ async function handleNewReport() {
   try {
     const created = await createReportHeader({ vessel_id, inspection_date, report_ref, title });
 
-    // Enrich vessel_name locally
-    const vessel_name = state.vessels.find(v => v.id === vessel_id)?.name || "";
-    const enriched = { ...created, vessel_name };
-
     // refresh list from DB (source of truth)
     state.reports = await loadReportsFromDb();
 
-    // Set active
-    await setActiveReportById(enriched.id);
+    await setActiveReportById(created.id);
     setSaveStatus("Saved");
   } catch (e) {
     console.error(e);
@@ -672,7 +817,6 @@ async function handleSaveHeader() {
 
   try {
     if (!state.activeReport) {
-      // create
       const created = await createReportHeader({ vessel_id, inspection_date, report_ref, title });
       state.reports = await loadReportsFromDb();
       await setActiveReportById(created.id);
@@ -680,9 +824,7 @@ async function handleSaveHeader() {
       return;
     }
 
-    // update
     const updated = await updateReportHeader(state.activeReport.id, { vessel_id, inspection_date, report_ref, title });
-
     state.reports = await loadReportsFromDb();
     await setActiveReportById(updated.id);
     setSaveStatus("Saved");
@@ -695,6 +837,13 @@ async function handleSaveHeader() {
 
 async function handleDeleteReport() {
   if (!state.activeReport) return;
+
+  if (hasPending()) {
+    const okPending = confirm("There are pending changes. Flush them before deleting this report?");
+    if (okPending) {
+      try { await flushPending(); } catch { /* ignore */ }
+    }
+  }
 
   const ok = confirm(`Delete this report?\n\n${reportLabel(state.activeReport)}\n\nAll observations will be deleted (cascade).`);
   if (!ok) return;
@@ -713,13 +862,22 @@ async function handleDeleteReport() {
   }
 }
 
+// -------------------------
+// Export / Import / Stats
+// -------------------------
 async function exportActiveReportJson() {
   if (!state.activeReport) {
     alert("No active report to export.");
     return;
   }
 
-  // Export header + current obs map (exact DB content)
+  if (hasPending()) {
+    const ok = confirm("There are pending changes. Flush to database before export?");
+    if (ok) {
+      try { await flushPending(); } catch { /* continue */ }
+    }
+  }
+
   const payload = {
     report: state.activeReport,
     observations: Object.values(state.observations || {}),
@@ -763,7 +921,7 @@ async function importReportJsonFromFile(file) {
 
     setSaveStatus("Importing…");
 
-    // Create a NEW report record (do not reuse old ID)
+    // Create a NEW report record
     const created = await createReportHeader({ vessel_id, inspection_date, report_ref, title });
 
     // Insert observations in batches
@@ -774,11 +932,11 @@ async function importReportJsonFromFile(file) {
         report_id: created.id,
         question_no: String(r.question_no),
         has_observation: true,
+        observation_type: String(r.observation_type || "negative_observation"),
         pgno_selected: Array.isArray(r.pgno_selected) ? r.pgno_selected : [],
         remarks: r.remarks ?? null,
       }));
 
-    // Batch upsert
     const batchSize = 500;
     for (let i = 0; i < payload.length; i += batchSize) {
       const chunk = payload.slice(i, i + batchSize);
@@ -788,7 +946,6 @@ async function importReportJsonFromFile(file) {
       if (error) throw error;
     }
 
-    // Refresh
     state.reports = await loadReportsFromDb();
     await setActiveReportById(created.id);
 
@@ -801,12 +958,6 @@ async function importReportJsonFromFile(file) {
   }
 }
 
-// ---------- Statistics + CSV ----------
-function getObservedQnos() {
-  const obs = state.observations || {};
-  return Object.keys(obs).filter(qno => obs[qno]?.has_observation);
-}
-
 function renderStatsDialog() {
   if (!state.activeReport) {
     alert("No active report. Please select or create a report first.");
@@ -815,26 +966,44 @@ function renderStatsDialog() {
 
   const total = state.lib.length;
   const observed = getObservedQnos().sort((a, b) => String(a).localeCompare(String(b)));
+  const missing = getMissingPgnoQnos().sort((a, b) => String(a).localeCompare(String(b)));
+
   const obsCount = observed.length;
+  const missCount = missing.length;
   const pct = total ? Math.round((obsCount / total) * 1000) / 10 : 0;
 
   el("statTotalQ").textContent = String(total);
   el("statObservedQ").textContent = String(obsCount);
+  el("statMissingPgno").textContent = String(missCount);
   el("statPct").textContent = String(pct) + "%";
 
-  // By chapter counts
-  const by = new Map();
+  // by chapter
+  const byChap = new Map();
   for (const qno of observed) {
     const q = state.libByNo.get(qno);
     const ch = q ? String(getChap(q) || "—") : "—";
-    by.set(ch, (by.get(ch) || 0) + 1);
+    byChap.set(ch, (byChap.get(ch) || 0) + 1);
   }
-  const byLines = [...by.entries()]
+  const byChapLines = [...byChap.entries()]
     .sort((a, b) => b[1] - a[1])
     .map(([ch, n]) => `Chapter ${ch}: ${n}`);
+  el("statByChapter").textContent = byChapLines.length ? byChapLines.join("\n") : "-";
 
-  el("statByChapter").textContent = byLines.length ? byLines.join("\n") : "-";
+  // by type
+  const byType = new Map();
+  for (const qno of observed) {
+    const r = state.observations[qno];
+    const t = String(r?.observation_type || "negative_observation");
+    byType.set(t, (byType.get(t) || 0) + 1);
+  }
+  const labelMap = new Map(OBS_TYPES.map(o => [o.value, o.label]));
+  const byTypeLines = [...byType.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .map(([t, n]) => `${labelMap.get(t) || t}: ${n}`);
+  el("statByType").textContent = byTypeLines.length ? byTypeLines.join("\n") : "-";
+
   el("statObsList").textContent = observed.length ? observed.join(", ") : "-";
+  el("statMissingList").textContent = missing.length ? missing.join(", ") : "-";
 
   el("statsDialog").showModal();
 }
@@ -856,10 +1025,14 @@ function exportObservationsCsv() {
     "chapter",
     "section_name",
     "short_text",
+    "observation_type",
     "pgno_selected",
+    "pgno_count",
     "remarks",
   ];
   lines.push(header.join(","));
+
+  const labelMap = new Map(OBS_TYPES.map(o => [o.value, o.label]));
 
   for (const qno of observed) {
     const q = state.libByNo.get(qno);
@@ -869,6 +1042,8 @@ function exportObservationsCsv() {
       ? entry.pgno_selected.map((x) => `PGNO ${x.idx}`).join("; ")
       : "";
 
+    const pgCount = Array.isArray(entry?.pgno_selected) ? entry.pgno_selected.length : 0;
+
     const row = [
       state.activeReport.vessel_name || "",
       state.activeReport.inspection_date || "",
@@ -877,7 +1052,9 @@ function exportObservationsCsv() {
       q ? getChap(q) : "",
       q ? getSection(q) : "",
       q ? getShort(q) : "",
+      labelMap.get(entry?.observation_type) || (entry?.observation_type || ""),
       pg,
+      String(pgCount),
       entry?.remarks || "",
     ].map((v) => `"${String(v).replaceAll('"', '""')}"`);
 
@@ -898,9 +1075,24 @@ function exportObservationsCsv() {
   URL.revokeObjectURL(a.href);
 }
 
-// ---------- Init ----------
+function finalizeCheck() {
+  if (!state.activeReport) {
+    alert("No active report.");
+    return;
+  }
+  const missing = getMissingPgnoQnos().sort((a, b) => String(a).localeCompare(String(b)));
+  if (!missing.length) {
+    alert("Finalize check: OK.\n\nNo observed questions are missing PGNO ticks.");
+    return;
+  }
+  // Open stats dialog and show missing list
+  renderStatsDialog();
+}
+
+// -------------------------
+// Init
+// -------------------------
 async function init() {
-  // Auth guard: admin-only
   const R = window.AUTH?.ROLES;
   state.me = await window.AUTH.requireAuth([R.SUPER_ADMIN, R.COMPANY_ADMIN]);
   if (!state.me) return;
@@ -908,7 +1100,6 @@ async function init() {
   window.AUTH.fillUserBadge(state.me, "userBadge");
   el("logoutBtn").addEventListener("click", window.AUTH.logoutAndGoLogin);
 
-  // Reuse client created by auth.js (preferred)
   state.supabase = window.__supabaseClient;
   if (!state.supabase) {
     throw new Error("Supabase client missing. Ensure supabase-js CDN and auth.js are loaded before post_inspection.js.");
@@ -950,7 +1141,7 @@ async function init() {
     el("inspectionDate").value = `${yyyy}-${mm}-${dd}`;
   }
 
-  // Wire events
+  // Events
   el("reportSelect").addEventListener("change", async () => {
     const id = el("reportSelect").value || null;
     await setActiveReportById(id);
@@ -970,24 +1161,34 @@ async function init() {
   });
 
   el("statsBtn").addEventListener("click", renderStatsDialog);
+  el("finalizeBtn").addEventListener("click", finalizeCheck);
+
   el("closeStatsBtn").addEventListener("click", () => el("statsDialog").close());
   el("exportCsvBtn").addEventListener("click", exportObservationsCsv);
 
   el("searchInput").addEventListener("input", renderQuestionList);
   el("chapterFilter").addEventListener("change", renderQuestionList);
   el("onlyObsFilter").addEventListener("change", renderQuestionList);
+  el("missingPgnoFilter").addEventListener("change", renderQuestionList);
 
-  // If reports exist, auto-load first; otherwise show empty
+  // Auto-load first report if exists
   if (state.reports.length) {
     await setActiveReportById(state.reports[0].id);
   } else {
     await setActiveReportById(null);
-    // preselect first vessel for convenience
     if (state.vessels.length) el("vesselSelect").value = state.vessels[0].id;
   }
 
   renderQuestionList();
   setSaveStatus(state.activeReport ? "Loaded" : "Not saved");
+
+  // Warn on pending changes (no async flush on unload)
+  window.addEventListener("beforeunload", (e) => {
+    if (hasPending()) {
+      e.preventDefault();
+      e.returnValue = "";
+    }
+  });
 }
 
 (async () => {
