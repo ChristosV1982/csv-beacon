@@ -1,15 +1,12 @@
 // public/q-company.js
 import { loadLockedLibraryJson } from "./question_library_loader.js";
 
-// =====================
-// Supabase config
-// =====================
 const SUPABASE_URL = "https://bdidrcyufazskpuwmfca.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJkaWRyY3l1ZmF6c2twdXdtZmNhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc5NDI4ODMsImV4cCI6MjA4MzUxODg4M30.Uqj4WCzoNS9wnlzI-xew6iTFzTUi77dcGeBjUgFjZbQ";
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// IMPORTANT: lock to the EXACT JSON you confirmed
-const LOCKED_LIBRARY_JSON = "./sire_questions_all_columns_named.json";
+// Lock to EXACT file
+const LIBRARY_JSON_PATH = "./sire_questions_all_columns_named.json";
 
 const SESSION_KEY_COMPAT = "q_session_v1";
 
@@ -21,53 +18,52 @@ const UI_ROLE_MAP = {
   inspector: "Inspector / Third Party"
 };
 
-function roleToUi(role) { return UI_ROLE_MAP[role] || role || ""; }
-function el(id) { return document.getElementById(id); }
+function roleToUi(role){ return UI_ROLE_MAP[role] || role || ""; }
+function el(id){ return document.getElementById(id); }
 
-function setSubLine(text) { el("subLine").textContent = text; }
+function setSubLine(text){ el("subLine").textContent = text; }
 
-function showWarn(msg) {
+function showWarn(msg){
   const w = el("warnBox");
   w.textContent = msg;
   w.style.display = "block";
 }
-
-function clearWarn() {
+function clearWarn(){
   const w = el("warnBox");
   w.textContent = "";
   w.style.display = "none";
 }
 
-function escapeHtml(str) {
+function escapeHtml(str){
   return String(str ?? "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
+    .replaceAll("&","&amp;")
+    .replaceAll("<","&lt;")
+    .replaceAll(">","&gt;")
+    .replaceAll('"',"&quot;")
+    .replaceAll("'","&#039;");
 }
 
-function fmtTs(ts) {
+function fmtTs(ts){
   if (!ts) return "-";
-  try { return new Date(ts).toLocaleString(); } catch { return String(ts); }
+  try{ return new Date(ts).toLocaleString(); } catch { return String(ts); }
 }
 
-function statusPill(status) {
+function statusPill(status){
   const s = String(status || "");
   const cls = (s === "submitted") ? "submitted" : (s === "pending_office_review" ? "pending" : "progress");
   const label = (s === "in_progress") ? "In Progress" :
-    (s === "pending_office_review") ? "Pending Office Review" :
-      (s === "submitted") ? "Submitted" : s;
+                (s === "pending_office_review") ? "Pending Office Review" :
+                (s === "submitted") ? "Submitted" : s;
   return `<span class="pill ${cls}">${label}</span>`;
 }
 
 // ----------------------
 // Auth + profile
 // ----------------------
-async function getUserOrWarn() {
+async function getUserOrWarn(){
   const { data: { user }, error } = await supabaseClient.auth.getUser();
   if (error) showWarn("Auth error: " + error.message);
-  if (!user) {
+  if (!user){
     showWarn("You are not logged in. Please login first.");
     setSubLine("Not logged in.");
     return null;
@@ -75,7 +71,7 @@ async function getUserOrWarn() {
   return user;
 }
 
-async function getMyProfile(userId) {
+async function getMyProfile(userId){
   const { data, error } = await supabaseClient
     .from("profiles")
     .select("username, role, vessel_id")
@@ -85,7 +81,7 @@ async function getMyProfile(userId) {
   if (error) throw error;
 
   let vesselName = "";
-  if (data?.vessel_id) {
+  if (data?.vessel_id){
     const { data: v, error: vErr } = await supabaseClient
       .from("vessels")
       .select("name")
@@ -98,9 +94,9 @@ async function getMyProfile(userId) {
 }
 
 // ----------------------
-// Data loading
+// Data loading (DB)
 // ----------------------
-async function loadVessels() {
+async function loadVessels(){
   const { data, error } = await supabaseClient
     .from("vessels")
     .select("id, name, is_active")
@@ -110,7 +106,7 @@ async function loadVessels() {
   return data || [];
 }
 
-async function loadQuestionnaires() {
+async function loadQuestionnaires(){
   const { data, error } = await supabaseClient
     .from("questionnaires")
     .select("id, title, status, created_at, updated_at, vessel_id")
@@ -134,7 +130,7 @@ async function loadQuestionnaires() {
 }
 
 // Templates
-async function loadTemplates() {
+async function loadTemplates(){
   const { data, error } = await supabaseClient
     .from("questionnaire_templates")
     .select("id, name, description, is_active, created_at, updated_at")
@@ -143,140 +139,242 @@ async function loadTemplates() {
   return data || [];
 }
 
-async function loadTemplateCounts() {
+async function loadTemplateCounts(){
   const { data, error } = await supabaseClient
     .from("questionnaire_template_questions")
     .select("template_id, question_no");
   if (error) throw error;
 
   const map = new Map();
-  for (const row of (data || [])) {
+  for (const row of (data || [])){
     map.set(row.template_id, (map.get(row.template_id) || 0) + 1);
   }
   return map;
 }
 
 // ----------------------
-// Library parsing (MATCHES sire_questions_all_columns_named.json)
+// Library parsing (your JSON structure)
 // ----------------------
 let LIB = [];
 let FILTERED = [];
-let SELECTED_SET = new Set(); // question_no strings
+let SELECTED_SET = new Set(); // question_no strings ("No." like "5.8.1")
 
-function pick(obj, keys) {
-  for (const k of keys) {
+function pick(obj, keys){
+  for (const k of keys){
     if (obj && obj[k] != null && obj[k] !== "") return obj[k];
   }
   return "";
 }
 
-function getQno(q) {
-  // Your JSON uses "No." like "5.8.1"
-  return String(pick(q, ["No.", "No", "question_no", "questionNo", "id", "qid", "QuestionNo", "Question ID", "QuestionID"])).trim();
+function norm(v){ return String(v ?? "").trim(); }
+function splitCSV(v){
+  const s = norm(v);
+  if (!s) return [];
+  return s.split(",").map(x => x.trim()).filter(Boolean);
 }
 
-function getChapter(q) {
-  // Your JSON uses "Chap"
-  return String(pick(q, ["Chap", "chapter", "Chapter"])).trim();
+// Primary question number in your JSON is "No."
+function getQno(q){
+  return norm(pick(q, ["No.", "No", "question_no", "questionNo", "id", "qid"]));
 }
 
-function getSection(q) {
-  // Your JSON uses "Sect"
-  return String(pick(q, ["Sect", "section", "Section"])).trim();
+// Numeric chapter/section in your JSON: Chap, Sect
+function getChapter(q){ return norm(pick(q, ["Chap", "chapter", "Chapter"])); }
+function getSection(q){ return norm(pick(q, ["Sect", "section", "Section"])); }
+
+function getQuestionType(q){ return norm(pick(q, ["Question Type", "question_type", "qtype"])); }
+function getVesselTypesRaw(q){ return norm(pick(q, ["Vessel Type", "vessel_type"])); } // "Chemical, LNG, LPG, Oil"
+function getVesselTypes(q){ return splitCSV(getVesselTypesRaw(q)); }
+
+function getRankAllocationRaw(q){ return norm(pick(q, ["Company Rank Allocation", "SPIS Rank Allocation", "Company Rank Allocation "])); }
+function getRankAllocationTokens(q){ return splitCSV(getRankAllocationRaw(q)); }
+
+function getRoviqRaw(q){ return norm(pick(q, ["ROVIQ List", "ROVIQ List contains", "roviq_list_contains"])); }
+function getRoviqTokens(q){ return splitCSV(getRoviqRaw(q)); }
+
+// Response types - exactly as requested:
+function getHumanResponse(q){ return norm(pick(q, ["Human Response Type", "Human Response", "human_response_type"])); }
+function getHardwareResponse(q){ return norm(pick(q, ["Hardware Response Type", "Hardware Response", "hardware_response_type"])); }
+function getProcessResponse(q){ return norm(pick(q, ["Process Response Type", "Process Response", "process_response_type"])); }
+function getPhotoResponse(q){ return norm(pick(q, ["Photo Response", "photo_response"])); } // typically "Y"/"N"
+
+// Risk
+function getRisk(q){ return norm(pick(q, ["Risk Level", "risk_level", "Risk"])); }
+
+// Search blob
+function getTextBlob(q){
+  const a = norm(pick(q, ["Question", "question", "question_text"]));
+  const b = norm(pick(q, ["Expected Evidence", "expected_evidence"]));
+  const c = norm(pick(q, ["Inspection Guidance", "Inspector Guidance", "inspector_guidance"]));
+  const d = norm(pick(q, ["Suggested Inspector Actions", "Suggested Actions", "suggested_actions"]));
+  return `${a} ${b} ${c} ${d}`.toLowerCase();
 }
 
-function getQType(q) {
-  // Your JSON uses "Question Type"
-  return String(pick(q, ["Question Type", "question_type", "questionType", "qtype"])).trim();
-}
-
-function getVesselType(q) {
-  // Your JSON uses "Vessel Type"
-  return String(pick(q, ["Vessel Type", "vessel_type", "vesselType"])).trim();
-}
-
-function getResponseType(q) {
-  // Normalize 3 columns into 1 filterable string
-  const hw = String(pick(q, ["Hardware Response Type"])).trim();
-  const hu = String(pick(q, ["Human Response Type"])).trim();
-  const pr = String(pick(q, ["Process Response Type"])).trim();
-  return [hw, hu, pr].filter(Boolean).join(" | ");
-}
-
-function getRisk(q) {
-  // Your JSON uses "Risk Level"
-  return String(pick(q, ["Risk Level", "risk_level", "riskLevel"])).trim();
-}
-
-function getRoviq(q) {
-  // Your JSON uses "ROVIQ List"
-  const val = pick(q, ["ROVIQ List", "ROVIQ List contains", "roviq", "roviq_list_contains", "ROVIQ"]);
-  if (val === true) return "Yes";
-  if (val === false) return "No";
-  return String(val || "").trim();
-}
-
-function getTextBlob(q) {
-  const a = pick(q, ["Question", "question", "question_text", "questionText"]);
-  const b = pick(q, ["Expected Evidence", "expected_evidence", "expectedEvidence"]);
-  const c = pick(q, ["Inspection Guidance", "inspector_guidance", "Inspector Guidance", "inspectorGuidance"]);
-  const d = pick(q, ["Suggested Inspector Actions", "Suggested Actions", "suggested_actions"]);
-  const e = pick(q, ["Potential Grounds for Negative Observations", "Negative Observations", "negative_observations"]);
-  const f = pick(q, ["Section Name", "Short Text"]);
-  return `${a} ${b} ${c} ${d} ${e} ${f}`.toLowerCase();
-}
-
-function uniqSorted(arr) {
-  return [...new Set(arr
-    .filter(x => x != null && String(x).trim() !== "")
-    .map(x => String(x).trim()))].sort();
-}
-
-function fillSelect(selectEl, values, placeholder) {
-  selectEl.innerHTML =
-    `<option value="">${escapeHtml(placeholder)}</option>` +
-    values.map(v => `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join("");
+function uniqSorted(arr){
+  return [...new Set(arr.filter(Boolean).map(x => String(x).trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b, undefined, {numeric:true}));
 }
 
 // ----------------------
-// Filters UI
+// Read-Only style checkbox dropdown filters (multi-select)
 // ----------------------
-function applyFilters() {
+const FILTERS = {
+  f_chapter: new Set(),
+  f_section: new Set(),
+  f_qtype: new Set(),
+  f_vessel: new Set(),
+  f_rank: new Set(),
+  f_roviq: new Set(),
+  f_human: new Set(),
+  f_hardware: new Set(),
+  f_process: new Set(),
+  f_photo: new Set(),
+  f_risk: new Set()
+};
+
+function setHasAny(set){ return set && set.size > 0; }
+
+function matchesSet(value, set){
+  if (!setHasAny(set)) return true;
+  return set.has(String(value));
+}
+
+// For token fields (vessel type, roviq, rank allocation)
+function matchesTokenSet(tokens, set){
+  if (!setHasAny(set)) return true;
+  for (const t of (tokens || [])){
+    if (set.has(String(t))) return true;
+  }
+  return false;
+}
+
+function buildFilterBox(filterKey, values){
+  const box = el(`box_${filterKey}`);
+  const set = FILTERS[filterKey];
+
+  const items = values.map(v => String(v));
+
+  box.innerHTML = `
+    <div class="filterTopActions">
+      <button class="miniBtn" type="button" data-act="all" data-key="${filterKey}">All</button>
+      <button class="miniBtn" type="button" data-act="none" data-key="${filterKey}">None</button>
+    </div>
+    ${items.length ? items.map(v => `
+      <label class="checkRow">
+        <input type="checkbox" data-key="${filterKey}" value="${escapeHtml(v)}" ${set.has(v) ? "checked" : ""} />
+        <span>${escapeHtml(v)}</span>
+      </label>
+    `).join("") : `<div class="small">No values.</div>`}
+  `;
+
+  // events: all/none
+  box.querySelectorAll("button[data-act]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const act = btn.getAttribute("data-act");
+      if (act === "all"){
+        set.clear();
+        for (const v of items) set.add(v);
+      } else {
+        set.clear();
+      }
+      // re-render to update checkbox states
+      buildAllFilterBoxes();
+      applyFilters();
+      renderSelectedSummary();
+    });
+  });
+
+  // events: checkboxes
+  box.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+    cb.addEventListener("change", () => {
+      const v = cb.value;
+      if (cb.checked) set.add(v);
+      else set.delete(v);
+      applyFilters();
+      renderSelectedSummary();
+    });
+  });
+}
+
+function buildAllFilterBoxes(){
+  // compute available values from LIB (not FILTERED) like read-only
+  const chapters = uniqSorted(LIB.map(getChapter));
+  const sections = uniqSorted(LIB.map(getSection));
+  const qtypes = uniqSorted(LIB.map(getQuestionType));
+
+  // vessel types / rank / roviq are tokenized across rows
+  const vesselTypes = uniqSorted(LIB.flatMap(getVesselTypes));
+  const ranks = uniqSorted(LIB.flatMap(getRankAllocationTokens));
+  const roviq = uniqSorted(LIB.flatMap(getRoviqTokens));
+
+  const human = uniqSorted(LIB.map(getHumanResponse));
+  const hardware = uniqSorted(LIB.map(getHardwareResponse));
+  const process = uniqSorted(LIB.map(getProcessResponse));
+  const photo = uniqSorted(LIB.map(getPhotoResponse));
+  const risk = uniqSorted(LIB.map(getRisk));
+
+  buildFilterBox("f_chapter", chapters);
+  buildFilterBox("f_section", sections);
+  buildFilterBox("f_qtype", qtypes);
+  buildFilterBox("f_vessel", vesselTypes);
+  buildFilterBox("f_rank", ranks);
+  buildFilterBox("f_roviq", roviq);
+
+  buildFilterBox("f_human", human);
+  buildFilterBox("f_hardware", hardware);
+  buildFilterBox("f_process", process);
+  buildFilterBox("f_photo", photo);
+  buildFilterBox("f_risk", risk);
+}
+
+function closeAllFilterBoxes(){
+  document.querySelectorAll(".filterBox").forEach(b => b.classList.remove("open"));
+}
+
+function wireFilterDropdownToggles(){
+  document.querySelectorAll(".filterLabel[data-toggle]").forEach(lbl => {
+    lbl.addEventListener("click", (e) => {
+      const key = lbl.getAttribute("data-toggle");
+      const box = el(`box_${key}`);
+      if (!box) return;
+
+      const isOpen = box.classList.contains("open");
+      closeAllFilterBoxes();
+      if (!isOpen) box.classList.add("open");
+      e.stopPropagation();
+    });
+  });
+
+  // close when clicking outside
+  document.addEventListener("click", () => closeAllFilterBoxes());
+}
+
+// ----------------------
+// Filters application
+// ----------------------
+function applyFilters(){
   const s = el("fltSearch").value.trim().toLowerCase();
-  const ch = el("fltChapter").value;
-  const sec = el("fltSection").value;
-  const qt = el("fltQType").value;
-  const vt = el("fltVesselType").value;
-  const rt = el("fltResponseType").value;
-  const rk = el("fltRisk").value;
-  const rv = el("fltRoviq").value;
 
   FILTERED = LIB.filter(q => {
     const qno = getQno(q);
     if (!qno) return false;
 
-    if (ch && getChapter(q) !== ch) return false;
-    if (sec && getSection(q) !== sec) return false;
-    if (qt && getQType(q) !== qt) return false;
+    if (!matchesSet(getChapter(q), FILTERS.f_chapter)) return false;
+    if (!matchesSet(getSection(q), FILTERS.f_section)) return false;
+    if (!matchesSet(getQuestionType(q), FILTERS.f_qtype)) return false;
 
-    // Vessel Type in your JSON is comma-separated list, so "contains" match is better.
-    if (vt) {
-      const vstr = getVesselType(q);
-      const parts = vstr.split(",").map(x => x.trim()).filter(Boolean);
-      if (!parts.includes(vt)) return false;
-    }
+    if (!matchesTokenSet(getVesselTypes(q), FILTERS.f_vessel)) return false;
+    if (!matchesTokenSet(getRankAllocationTokens(q), FILTERS.f_rank)) return false;
+    if (!matchesTokenSet(getRoviqTokens(q), FILTERS.f_roviq)) return false;
 
-    if (rt && getResponseType(q) !== rt) return false;
-    if (rk && getRisk(q) !== rk) return false;
+    if (!matchesSet(getHumanResponse(q), FILTERS.f_human)) return false;
+    if (!matchesSet(getHardwareResponse(q), FILTERS.f_hardware)) return false;
+    if (!matchesSet(getProcessResponse(q), FILTERS.f_process)) return false;
+    if (!matchesSet(getPhotoResponse(q), FILTERS.f_photo)) return false;
 
-    // ROVIQ is a comma-separated list, so "contains" match is better.
-    if (rv) {
-      const rstr = getRoviq(q);
-      if (!String(rstr).includes(rv)) return false;
-    }
+    if (!matchesSet(getRisk(q), FILTERS.f_risk)) return false;
 
-    if (s) {
-      const blob = `${qno} ${getChapter(q)} ${getSection(q)} ${getQType(q)} ${getVesselType(q)} ${getResponseType(q)} ${getRisk(q)} ${getRoviq(q)} ${getTextBlob(q)}`.toLowerCase();
+    if (s){
+      const blob = `${qno} ${getChapter(q)} ${getSection(q)} ${getQuestionType(q)} ${getVesselTypesRaw(q)} ${getRankAllocationRaw(q)} ${getRoviqRaw(q)} ${getHumanResponse(q)} ${getHardwareResponse(q)} ${getProcessResponse(q)} ${getPhotoResponse(q)} ${getRisk(q)} ${getTextBlob(q)}`.toLowerCase();
       if (!blob.includes(s)) return false;
     }
 
@@ -286,19 +384,19 @@ function applyFilters() {
   el("fltCount").textContent = `${FILTERED.length} questions currently selected by filters`;
 }
 
-function renderSelectedSummary() {
+function renderSelectedSummary(){
   el("selectedCount").textContent = `${SELECTED_SET.size} questions selected for compile`;
 }
 
-function selectAllFiltered() {
-  for (const q of FILTERED) {
+function selectAllFiltered(){
+  for (const q of FILTERED){
     const qno = getQno(q);
     if (qno) SELECTED_SET.add(qno);
   }
   renderSelectedSummary();
 }
 
-function clearSelected() {
+function clearSelected(){
   SELECTED_SET = new Set();
   renderSelectedSummary();
 }
@@ -310,16 +408,16 @@ let ALL_Q = [];
 let VESSELS = [];
 let PROFILE = null;
 
-function renderVesselSelect() {
+function renderVesselSelect(){
   const sel = el("vesselSelect");
-  if (!VESSELS.length) {
+  if (!VESSELS.length){
     sel.innerHTML = `<option value="">(No vessels found)</option>`;
     return;
   }
   sel.innerHTML = VESSELS.map(v => `<option value="${escapeHtml(v.id)}">${escapeHtml(v.name)}</option>`).join("");
 }
 
-function renderQuestionnairesTable() {
+function renderQuestionnairesTable(){
   const term = el("searchInput").value.trim().toLowerCase();
   const body = el("tableBody");
 
@@ -331,7 +429,7 @@ function renderQuestionnairesTable() {
     return vessel.toLowerCase().includes(term) || t.toLowerCase().includes(term) || s.toLowerCase().includes(term);
   });
 
-  if (!rows.length) {
+  if (!rows.length){
     body.innerHTML = `<tr><td colspan="6" class="small">No questionnaires found.</td></tr>`;
     return;
   }
@@ -382,34 +480,34 @@ function renderQuestionnairesTable() {
     btn.addEventListener("click", async () => {
       const qid = btn.getAttribute("data-id");
       if (!qid) return;
-      if (!confirm("DELETE questionnaire permanently?\n\nThis will cascade-delete child rows (answers/evidence/etc) if constraints are set.\nProceed?")) return;
+      if (!confirm("DELETE questionnaire permanently?\n\nThis will cascade-delete child rows if constraints are set.\nProceed?")) return;
       await deleteQuestionnaire(qid);
     });
   });
 }
 
-async function updateStatus(qid, newStatus) {
+async function updateStatus(qid, newStatus){
   clearWarn();
   const { error } = await supabaseClient
     .from("questionnaires")
     .update({ status: newStatus })
     .eq("id", qid);
 
-  if (error) {
+  if (error){
     showWarn("Status update failed: " + error.message);
     return;
   }
   await refreshAll();
 }
 
-async function deleteQuestionnaire(qid) {
+async function deleteQuestionnaire(qid){
   clearWarn();
   const { error } = await supabaseClient
     .from("questionnaires")
     .delete()
     .eq("id", qid);
 
-  if (error) {
+  if (error){
     showWarn("Delete failed: " + error.message);
     return;
   }
@@ -422,11 +520,11 @@ async function deleteQuestionnaire(qid) {
 let TEMPLATES = [];
 let TEMPLATE_COUNTS = new Map();
 
-function renderTemplates() {
+function renderTemplates(){
   const body = el("tplBody");
   const isSuper = (PROFILE?.role === "super_admin");
 
-  if (!TEMPLATES.length) {
+  if (!TEMPLATES.length){
     body.innerHTML = `<tr><td colspan="5" class="small">No templates found.</td></tr>`;
     return;
   }
@@ -467,12 +565,12 @@ function renderTemplates() {
   });
 }
 
-async function createTemplate() {
+async function createTemplate(){
   clearWarn();
   const name = el("tplName").value.trim();
   const desc = el("tplDesc").value.trim();
 
-  if (!name) {
+  if (!name){
     showWarn("Template name is required.");
     return;
   }
@@ -483,7 +581,7 @@ async function createTemplate() {
     .select("id")
     .single();
 
-  if (error) {
+  if (error){
     showWarn("Create template failed: " + error.message);
     return;
   }
@@ -491,35 +589,34 @@ async function createTemplate() {
   el("tplName").value = "";
   el("tplDesc").value = "";
 
-  if (confirm("Template created. Compile it now using the currently SELECTED questions?")) {
+  if (confirm("Template created. Compile it now using the currently SELECTED questions?")){
     await compileTemplateQuestions(data.id);
   } else {
     await refreshTemplates();
   }
 }
 
-async function compileTemplateQuestions(templateId) {
+async function compileTemplateQuestions(templateId){
   clearWarn();
 
-  if (SELECTED_SET.size < 1) {
-    showWarn("No questions selected. Select questions first, then compile.");
+  if (SELECTED_SET.size < 1){
+    showWarn("No questions selected. Adjust filters, then click Select All Filtered (or build selection), then compile.");
     return;
   }
 
-  // Wipe old rows
+  // wipe old rows
   {
     const { error } = await supabaseClient
       .from("questionnaire_template_questions")
       .delete()
       .eq("template_id", templateId);
 
-    if (error) {
+    if (error){
       showWarn("Failed clearing template questions: " + error.message);
       return;
     }
   }
 
-  // Insert new rows with sort_order based on insertion order
   const selected = Array.from(SELECTED_SET);
   const payload = selected.map((qno, idx) => ({
     template_id: templateId,
@@ -531,7 +628,7 @@ async function compileTemplateQuestions(templateId) {
     .from("questionnaire_template_questions")
     .insert(payload);
 
-  if (error) {
+  if (error){
     showWarn("Compile failed: " + error.message);
     return;
   }
@@ -539,18 +636,18 @@ async function compileTemplateQuestions(templateId) {
   await refreshTemplates();
 }
 
-async function createQuestionnaireFromTemplateFlow(templateId) {
+async function createQuestionnaireFromTemplateFlow(templateId){
   clearWarn();
 
   const vesselId = el("vesselSelect").value;
   const title = el("titleInput").value.trim();
 
-  if (!vesselId) {
-    showWarn("Select a vessel first (left panel Vessel).");
+  if (!vesselId){
+    showWarn("Select a vessel first (Vessel dropdown).");
     return;
   }
-  if (!title) {
-    showWarn("Enter a title first (left panel Title).");
+  if (!title){
+    showWarn("Enter a title first.");
     return;
   }
 
@@ -561,42 +658,45 @@ async function createQuestionnaireFromTemplateFlow(templateId) {
       p_title: title
     });
 
-  if (error) {
+  if (error){
     showWarn("Create from template failed: " + error.message);
     return;
   }
 
   const qid = data;
+
   await refreshAll();
 
-  if (qid) {
-    window.location.href = "./q-answer.html?qid=" + encodeURIComponent(qid);
+  if (!qid){
+    showWarn("Template RPC returned no questionnaire id. Check the function return type and RLS.");
+    return;
   }
+  window.location.href = "./q-answer.html?qid=" + encodeURIComponent(qid);
 }
 
 // ----------------------
 // Create questionnaire by compile (Option A)
 // ----------------------
-async function createQuestionnaireByCompile(userId) {
+async function createQuestionnaireByCompile(userId){
   clearWarn();
 
   const vesselId = el("vesselSelect").value;
   const title = el("titleInput").value.trim();
 
-  if (!vesselId) {
+  if (!vesselId){
     showWarn("Please select a vessel.");
     return;
   }
-  if (!title) {
+  if (!title){
     showWarn("Please enter a title.");
     return;
   }
-  if (SELECTED_SET.size < 1) {
+  if (SELECTED_SET.size < 1){
     showWarn("No questions selected. Adjust filters, then click Select All Filtered.");
     return;
   }
 
-  // 1) Create questionnaire
+  // 1) create questionnaire
   const payload = { title, vessel_id: vesselId, status: "in_progress", created_by: userId };
 
   const { data: q, error: qErr } = await supabaseClient
@@ -605,14 +705,18 @@ async function createQuestionnaireByCompile(userId) {
     .select("id")
     .single();
 
-  if (qErr) {
+  if (qErr){
     showWarn("Create questionnaire failed: " + qErr.message);
     return;
   }
 
-  const qid = q.id;
+  const qid = q?.id;
+  if (!qid){
+    showWarn("Questionnaire was created but no id was returned. This is typically a SELECT/RLS return issue.");
+    return;
+  }
 
-  // 2) Map selected questions into questionnaire_questions
+  // 2) compile questions
   const selected = Array.from(SELECTED_SET);
   const rows = selected.map(qno => ({ questionnaire_id: qid, question_no: qno }));
 
@@ -620,7 +724,7 @@ async function createQuestionnaireByCompile(userId) {
     .from("questionnaire_questions")
     .insert(rows);
 
-  if (qqErr) {
+  if (qqErr){
     showWarn("Created questionnaire, but failed to compile questions: " + qqErr.message);
     return;
   }
@@ -634,13 +738,13 @@ async function createQuestionnaireByCompile(userId) {
 // ----------------------
 // Refresh
 // ----------------------
-async function refreshTemplates() {
+async function refreshTemplates(){
   TEMPLATES = await loadTemplates();
   TEMPLATE_COUNTS = await loadTemplateCounts();
   renderTemplates();
 }
 
-async function refreshAll() {
+async function refreshAll(){
   VESSELS = await loadVessels();
   renderVesselSelect();
 
@@ -653,15 +757,15 @@ async function refreshAll() {
 // ----------------------
 // Init
 // ----------------------
-async function init() {
+async function init(){
   clearWarn();
 
   const user = await getUserOrWarn();
   if (!user) return;
 
-  try {
+  try{
     PROFILE = await getMyProfile(user.id);
-  } catch (e) {
+  }catch(e){
     setSubLine("Logged in, but profile missing or blocked.");
     showWarn("Profile missing or blocked by RLS. Ensure a row exists in public.profiles for this user.");
     return;
@@ -681,80 +785,52 @@ async function init() {
     created_at: new Date().toISOString()
   }));
 
-  setSubLine("Connected. Loading question library, vessels, questionnaires, templates...");
+  setSubLine("Connected. Loading library, vessels, questionnaires, templates...");
 
-  // Load library JSON (locked)
-  try {
-    LIB = await loadLockedLibraryJson(LOCKED_LIBRARY_JSON);
-  } catch (e) {
+  // wire dropdown toggles now
+  wireFilterDropdownToggles();
+
+  // load library
+  try{
+    LIB = await loadLockedLibraryJson(LIBRARY_JSON_PATH);
+  }catch(e){
     showWarn(
-      `Question library load failed.\n\n` +
-      `Expected to load: ${LOCKED_LIBRARY_JSON}\n` +
-      `Error: ${String(e.message || e)}\n\n` +
-      `Fix: ensure the file exists in /public and the filename matches exactly.`
+      "Question library load failed.\n\n" +
+      `Tried: ${LIBRARY_JSON_PATH}\n\n` +
+      `Error: ${String(e.message || e)}`
     );
     setSubLine("Error loading library JSON.");
     LIB = [];
   }
 
-  // Build filter dropdowns
-  if (LIB.length) {
-    const chapters = uniqSorted(LIB.map(getChapter));
-    const sections = uniqSorted(LIB.map(getSection));
-    const qtypes = uniqSorted(LIB.map(getQType));
-
-    // Vessel Type is often multi-valued "Chemical, LNG, LPG, Oil" -> split into distinct options
-    const vesselTypes = uniqSorted(
-      LIB.flatMap(q => String(getVesselType(q) || "").split(",").map(x => x.trim()).filter(Boolean))
-    );
-
-    const responseTypes = uniqSorted(LIB.map(getResponseType));
-    const risks = uniqSorted(LIB.map(getRisk));
-
-    // ROVIQ list is multi-valued -> split to distinct options
-    const roviqValues = uniqSorted(
-      LIB.flatMap(q => String(getRoviq(q) || "").split(",").map(x => x.trim()).filter(Boolean))
-    );
-
-    fillSelect(el("fltChapter"), chapters, "Chapter");
-    fillSelect(el("fltSection"), sections, "Section");
-    fillSelect(el("fltQType"), qtypes, "Question Type");
-    fillSelect(el("fltVesselType"), vesselTypes, "Vessel Type");
-    fillSelect(el("fltResponseType"), responseTypes, "Response Type");
-    fillSelect(el("fltRisk"), risks, "Risk Level");
-    fillSelect(el("fltRoviq"), roviqValues, "ROVIQ List contains");
-
+  // build filters
+  if (LIB.length){
+    buildAllFilterBoxes();
     applyFilters();
     renderSelectedSummary();
-  } else {
-    // Keep selects usable even if LIB fails
-    ["fltChapter", "fltSection", "fltQType", "fltVesselType", "fltResponseType", "fltRisk", "fltRoviq"].forEach(id => {
-      const s = el(id);
-      if (s) s.innerHTML = `<option value="">(library not loaded)</option>`;
+
+    // bind search
+    el("fltSearch").addEventListener("input", () => {
+      applyFilters();
+      renderSelectedSummary();
     });
   }
 
-  // Load DB data
-  try {
+  // load db
+  try{
     await refreshAll();
     setSubLine("Ready.");
-  } catch (e) {
+  }catch(e){
     showWarn("Load failed: " + String(e.message || e));
     setSubLine("Error loading data.");
   }
 
-  // Bind buttons
+  // bind buttons
   el("refreshBtn").addEventListener("click", refreshAll);
   el("searchInput").addEventListener("input", renderQuestionnairesTable);
 
   el("createBtn").addEventListener("click", () => createQuestionnaireByCompile(user.id));
   el("clearBtn").addEventListener("click", () => { el("titleInput").value = ""; });
-
-  // Filters
-  ["fltSearch", "fltChapter", "fltSection", "fltQType", "fltVesselType", "fltResponseType", "fltRisk", "fltRoviq"].forEach(id => {
-    el(id).addEventListener("input", () => { applyFilters(); });
-    el(id).addEventListener("change", () => { applyFilters(); });
-  });
 
   el("btnSelectAllFiltered").addEventListener("click", () => {
     applyFilters();
@@ -763,10 +839,10 @@ async function init() {
 
   el("btnClearSelected").addEventListener("click", clearSelected);
 
-  // Templates
+  // templates
   el("btnCreateTemplate").addEventListener("click", createTemplate);
 
-  // Logout
+  // logout
   el("logoutBtn").addEventListener("click", async () => {
     clearWarn();
     await supabaseClient.auth.signOut();

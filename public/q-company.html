@@ -110,7 +110,7 @@
 
     .grid{
       display:grid;
-      grid-template-columns: 520px 1fr;
+      grid-template-columns: 560px 1fr;
       gap:12px;
       margin-top: 12px;
       align-items:start;
@@ -190,17 +190,80 @@
     .toolbar .left{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
     .toolbar .right{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
 
-    .filtersGrid{
-      display:grid;
-      grid-template-columns: 1fr 1fr;
-      gap:10px;
+    .divider{ margin:14px 0; border-top:1px solid #d5deef; }
+
+    /* Read-Only style: checkbox dropdown filters */
+    .filterBar{
+      display:flex;
+      gap:12px;
+      flex-wrap:wrap;
+      align-items:center;
       margin-top:10px;
     }
-    .filtersGrid .full{ grid-column: 1 / -1; }
-
-    .divider{
-      margin:14px 0;
-      border-top:1px solid #d5deef;
+    .filterGroup{
+      position:relative;
+      display:inline-block;
+    }
+    .filterLabel{
+      display:inline-block;
+      padding:8px 10px;
+      border-radius:10px;
+      border:1px solid #cbd7ee;
+      background:#fff;
+      color:#1a4170;
+      font-weight:950;
+      cursor:pointer;
+      user-select:none;
+      white-space:nowrap;
+    }
+    .filterBox{
+      display:none;
+      position:absolute;
+      top:44px;
+      left:0;
+      z-index:50;
+      min-width: 280px;
+      max-width: 380px;
+      max-height: 320px;
+      overflow:auto;
+      background:#fff;
+      border:1px solid #cbd7ee;
+      border-radius:12px;
+      padding:10px;
+      box-shadow: 0 10px 24px rgba(0,0,0,0.18);
+    }
+    .filterBox.open{ display:block; }
+    .filterTopActions{
+      display:flex;
+      gap:8px;
+      flex-wrap:wrap;
+      margin-bottom:8px;
+    }
+    .miniBtn{
+      border:1px solid #cbd7ee;
+      background:#f2f7ff;
+      color:#1a4170;
+      padding:6px 10px;
+      border-radius:10px;
+      font-weight:900;
+      cursor:pointer;
+      font-size:0.9rem;
+    }
+    .miniBtn:hover{ filter:brightness(0.98); }
+    .checkRow{
+      display:flex;
+      align-items:flex-start;
+      gap:8px;
+      padding:6px 2px;
+      border-bottom:1px solid #eef4ff;
+    }
+    .checkRow:last-child{ border-bottom:none; }
+    .checkRow input{ margin-top:3px; }
+    .checkRow span{
+      color:#223a66;
+      font-weight:800;
+      line-height:1.25;
+      word-break:break-word;
     }
   </style>
 </head>
@@ -241,12 +304,15 @@
         </div>
 
         <div class="grid">
-          <!-- LEFT: Create + Filters + Templates -->
+          <!-- LEFT -->
           <div>
             <div class="note">
               <b>Create Questionnaire (Option A: no empty questionnaires)</b>
               <div class="mono" style="margin-top:6px;">
                 Creates: <span class="mono">public.questionnaires</span> + compiles selected questions into <span class="mono">public.questionnaire_questions</span>
+              </div>
+              <div class="mono" style="margin-top:6px;">
+                Library locked to: <span class="mono">sire_questions_all_columns_named.json</span>
               </div>
             </div>
 
@@ -258,50 +324,68 @@
 
             <div class="note" style="margin-top:12px;">
               <b>Compile Questionnaire (select questions)</b><br/>
-              Filters below behave like Read-Only. Use <b>Select All Filtered</b> to add questions to the compile set.
+              Filters behave like Read-Only (multi-select tick boxes).
               <div class="mono" style="margin-top:6px;" id="fltCount">0 questions currently selected by filters</div>
               <div class="mono" style="margin-top:6px;" id="selectedCount">0 questions selected for compile</div>
             </div>
 
-            <div class="filtersGrid">
-              <div class="full">
-                <label for="fltSearch">Search</label>
-                <input id="fltSearch" type="text" placeholder="Search question no / text / chapter..." />
+            <label for="fltSearch">Search</label>
+            <input id="fltSearch" type="text" placeholder="Search question no / text / chapter..." />
+
+            <div class="filterBar">
+              <div class="filterGroup">
+                <div class="filterLabel" data-toggle="f_chapter">Chapters ▼</div>
+                <div class="filterBox" id="box_f_chapter"></div>
               </div>
 
-              <div>
-                <label for="fltChapter">Chapter</label>
-                <select id="fltChapter"></select>
+              <div class="filterGroup">
+                <div class="filterLabel" data-toggle="f_section">Sections ▼</div>
+                <div class="filterBox" id="box_f_section"></div>
               </div>
 
-              <div>
-                <label for="fltSection">Section</label>
-                <select id="fltSection"></select>
+              <div class="filterGroup">
+                <div class="filterLabel" data-toggle="f_qtype">Question Type ▼</div>
+                <div class="filterBox" id="box_f_qtype"></div>
               </div>
 
-              <div>
-                <label for="fltQType">Question Type</label>
-                <select id="fltQType"></select>
+              <div class="filterGroup">
+                <div class="filterLabel" data-toggle="f_vessel">Vessel Type ▼</div>
+                <div class="filterBox" id="box_f_vessel"></div>
               </div>
 
-              <div>
-                <label for="fltVesselType">Vessel Type</label>
-                <select id="fltVesselType"></select>
+              <div class="filterGroup">
+                <div class="filterLabel" data-toggle="f_rank">Rank Allocation ▼</div>
+                <div class="filterBox" id="box_f_rank"></div>
               </div>
 
-              <div>
-                <label for="fltResponseType">Response Type</label>
-                <select id="fltResponseType"></select>
+              <div class="filterGroup">
+                <div class="filterLabel" data-toggle="f_roviq">ROVIQ List ▼</div>
+                <div class="filterBox" id="box_f_roviq"></div>
               </div>
 
-              <div>
-                <label for="fltRisk">Risk Level</label>
-                <select id="fltRisk"></select>
+              <div class="filterGroup">
+                <div class="filterLabel" data-toggle="f_human">Human Response ▼</div>
+                <div class="filterBox" id="box_f_human"></div>
               </div>
 
-              <div>
-                <label for="fltRoviq">ROVIQ List contains</label>
-                <select id="fltRoviq"></select>
+              <div class="filterGroup">
+                <div class="filterLabel" data-toggle="f_hardware">Hardware Response ▼</div>
+                <div class="filterBox" id="box_f_hardware"></div>
+              </div>
+
+              <div class="filterGroup">
+                <div class="filterLabel" data-toggle="f_process">Process Response ▼</div>
+                <div class="filterBox" id="box_f_process"></div>
+              </div>
+
+              <div class="filterGroup">
+                <div class="filterLabel" data-toggle="f_photo">Photo Response ▼</div>
+                <div class="filterBox" id="box_f_photo"></div>
+              </div>
+
+              <div class="filterGroup">
+                <div class="filterLabel" data-toggle="f_risk">Risk Level ▼</div>
+                <div class="filterBox" id="box_f_risk"></div>
               </div>
             </div>
 
@@ -320,12 +404,13 @@
             <div class="note">
               <b>Standard Questionnaires (Templates)</b>
               <div class="mono" style="margin-top:6px;">
-                Create templates (superuser), compile questions into them, then create vessel questionnaires from templates.
+                Create templates (Super Admin), then Compile (replace template questions) using your selected set.
+                Then create a vessel questionnaire from that template (RPC).
               </div>
             </div>
 
             <label for="tplName">Template Name</label>
-            <input id="tplName" type="text" placeholder="e.g. Standard – Master (Full)" />
+            <input id="tplName" type="text" placeholder="e.g. Standard – Master (Oil)" />
 
             <label for="tplDesc">Description</label>
             <input id="tplDesc" type="text" placeholder="Optional" />
@@ -337,7 +422,7 @@
             <div class="note" style="margin-top:12px;">
               <b>Templates</b>
               <div class="mono" style="margin-top:6px;">
-                Actions: Compile replaces template questions with your current selected set. Create Questionnaire calls RPC.
+                Compile replaces template questions. Create Questionnaire calls RPC create_questionnaire_from_template().
               </div>
             </div>
 
@@ -355,10 +440,9 @@
                 <tbody id="tplBody"></tbody>
               </table>
             </div>
-
           </div>
 
-          <!-- RIGHT: Questionnaires list -->
+          <!-- RIGHT -->
           <div>
             <div class="note">
               <b>Questionnaires</b>
@@ -396,7 +480,6 @@
     </div>
   </div>
 
-  <!-- Logic -->
   <script type="module" src="./q-company.js"></script>
 </body>
 </html>
