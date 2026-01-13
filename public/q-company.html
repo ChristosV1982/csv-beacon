@@ -20,26 +20,12 @@
     .wrap{ max-width: 1600px; margin: 0 auto; }
 
     .topbar{
-      display:flex;
-      gap:12px;
-      flex-wrap:wrap;
-      align-items:center;
-      justify-content:space-between;
+      display:flex; gap:12px; flex-wrap:wrap;
+      align-items:center; justify-content:space-between;
       margin-bottom: 12px;
     }
-    .title{
-      font-weight:900;
-      letter-spacing:0.03em;
-      margin:0;
-      font-size:1.25rem;
-      text-shadow: 0 3px 12px rgba(0,0,0,0.35);
-    }
-    .sub{
-      margin-top:6px;
-      opacity:0.92;
-      font-weight:800;
-      line-height:1.35;
-    }
+    .title{ font-weight:900; letter-spacing:0.03em; margin:0; font-size:1.25rem; text-shadow: 0 3px 12px rgba(0,0,0,0.35); }
+    .sub{ margin-top:6px; opacity:0.92; font-weight:800; line-height:1.35; }
     .top-actions{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
 
     .btn{
@@ -68,7 +54,6 @@
       box-shadow: 0 10px 46px rgba(0,0,0,0.35);
       backdrop-filter: blur(3px);
     }
-
     .card{
       background:#fff;
       color:#1a4170;
@@ -77,13 +62,11 @@
       padding:14px;
       box-shadow: 0 4px 18px rgba(18, 44, 87, 0.16);
     }
-
     .mono{
       font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
       font-size: 0.92rem;
       color:#35507b;
     }
-
     .note{
       margin-top:10px;
       background:#f7fbff;
@@ -94,7 +77,6 @@
       font-weight: 750;
       line-height:1.35;
     }
-
     .warn{
       margin-top:10px;
       padding:10px 12px;
@@ -119,13 +101,7 @@
       .grid{ grid-template-columns: 1fr; }
     }
 
-    label{
-      display:block;
-      margin: 12px 0 6px 0;
-      font-weight: 900;
-      color:#1a4170;
-      font-size: 0.95rem;
-    }
+    label{ display:block; margin: 12px 0 6px 0; font-weight: 900; color:#1a4170; font-size: 0.95rem; }
     input, select{
       width: 100%;
       box-sizing:border-box;
@@ -144,7 +120,6 @@
     }
 
     .rowActions{ display:flex; gap:10px; flex-wrap:wrap; margin-top: 12px; }
-
     .tableWrap{ overflow:auto; border:1px solid #d5deef; border-radius:12px; }
     table{ width:100%; border-collapse:collapse; min-width: 980px; }
     th, td{ padding:10px 10px; border-bottom:1px solid #e6eefb; vertical-align:top; }
@@ -190,116 +165,69 @@
     .toolbar .left{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
     .toolbar .right{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
 
-    .divider{
-      margin:14px 0;
-      border-top:1px solid #d5deef;
-    }
-
-    /* === Read-Only style filter dropdowns (fixed layout) === */
-    .filterBar{
-      display:flex;
-      flex-wrap:wrap;
-      gap:10px;
-      margin-top:10px;
-      align-items:center;
-    }
-
-    .filterGroup{
-      position:relative;
-      display:inline-flex;
-      align-items:center;
-      gap:8px;
-    }
-
-    .filterBtn{
+    /* Read-only style dropdown filters */
+    .fltWrap{ position:relative; display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
+    .fltBtn{
+      background:#fff;
       border:1px solid #cbd7ee;
-      background:#ffffff;
       color:#1a4170;
-      font-weight:900;
       border-radius:10px;
-      padding:8px 10px;
+      padding:9px 12px;
+      font-weight:900;
       cursor:pointer;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+      box-shadow: 0 2px 10px rgba(18,44,87,0.08);
       white-space:nowrap;
     }
-    .filterBtn:hover{ filter:brightness(0.98); }
-
-    .filterMenu{
+    .fltMenu{
       display:none;
       position:absolute;
       top:44px;
       left:0;
-      width:320px;
+      width: 320px;
+      max-width: calc(100vw - 60px);
       background:#fff;
-      color:#1a4170;
-      border:1px solid #cbd7ee;
+      border:1px solid #d5deef;
       border-radius:12px;
-      box-shadow: 0 12px 36px rgba(0,0,0,0.18);
-      z-index: 50;
-      padding:10px;
+      box-shadow: 0 10px 26px rgba(18,44,87,0.18);
+      z-index: 1000;
+      overflow:hidden;
     }
-    .filterMenu.rightAlign{ left:auto; right:0; }
-
-    .filterMenu.open{ display:block; }
-
-    .filterMenuHeader{
+    .fltMenuHead{
       display:flex;
+      justify-content:flex-end;
       gap:8px;
-      justify-content:space-between;
-      align-items:center;
-      margin-bottom:8px;
-    }
-    .miniBtn{
-      border:1px solid #cbd7ee;
+      padding:10px;
+      border-bottom:1px solid #e6eefb;
       background:#f7fbff;
-      color:#1a4170;
-      font-weight:900;
+    }
+    .fltMiniBtn{
+      border:1px solid #cbd7ee;
+      background:#fff;
       border-radius:10px;
       padding:6px 10px;
+      font-weight:900;
       cursor:pointer;
-      white-space:nowrap;
+      color:#1a4170;
     }
-    .miniBtn:hover{ filter:brightness(0.98); }
-
-    .filterList{
-      max-height:240px;
+    .fltMenuList{
+      max-height: 260px;
       overflow:auto;
-      border:1px solid #d5deef;
-      border-radius:10px;
-      padding:8px;
-      background:#fdfefe;
+      padding:8px 10px 12px 10px;
     }
-    .chk{
+    .fltRow{
       display:flex;
       gap:10px;
       align-items:flex-start;
-      padding:6px 6px;
-      border-radius:8px;
+      padding:8px 6px;
+      border-radius:10px;
+      cursor:pointer;
+      user-select:none;
+      color:#1a4170;
+      font-weight:850;
     }
-    .chk:hover{ background:#f3f8ff; }
-    .chk input{ width:auto; margin-top:2px; }
-    .chk span{ font-weight:850; color:#223a66; line-height:1.25; }
-
-    .radioRow{
-      display:flex;
-      gap:10px;
-      align-items:center;
-      padding:6px 6px;
-      border-radius:8px;
-    }
-    .radioRow:hover{ background:#f3f8ff; }
-    .radioRow input{ width:auto; }
-
-    .tiny{
-      font-size:0.86rem;
-      color:#35507b;
-      font-weight:800;
-      line-height:1.25;
-    }
-
-    @media (max-width: 520px){
-      .filterMenu{ width: 88vw; }
-    }
+    .fltRow:hover{ background:#f2f7ff; }
+    .fltRow input{ margin-top:2px; width:auto; }
+    .divider{ margin:14px 0; border-top:1px solid #d5deef; }
   </style>
 </head>
 
@@ -331,6 +259,7 @@
           <div class="left">
             <div class="mono" id="sessionLine">Session: ...</div>
             <span class="mono" id="roleLine">Role: ...</span>
+            <span class="mono" id="libLine"></span>
           </div>
           <div class="right">
             <input id="searchInput" type="text" placeholder="Search title / vessel / status..." style="min-width:260px;" />
@@ -339,14 +268,13 @@
         </div>
 
         <div class="grid">
-          <!-- LEFT: Create + Filters + Templates -->
+          <!-- LEFT -->
           <div>
             <div class="note">
               <b>Create Questionnaire (Option A: no empty questionnaires)</b>
               <div class="mono" style="margin-top:6px;">
-                Creates: <span class="mono">public.questionnaires</span> + compiles selected questions into <span class="mono">public.questionnaire_questions</span>
+                Creates: <span class="mono">public.questionnaires</span> + compiles into <span class="mono">public.questionnaire_questions</span> (with <span class="mono">question_json</span>)
               </div>
-              <div class="mono" style="margin-top:6px;" id="libLockLine">Library locked to: ...</div>
             </div>
 
             <label for="vesselSelect">Vessel</label>
@@ -365,46 +293,30 @@
             <label for="fltSearch">Search</label>
             <input id="fltSearch" type="text" placeholder="Search question no / text / chapter..." />
 
-            <div class="filterBar">
-              <div class="filterGroup">
-                <button class="filterBtn" id="btnChapters" type="button">Chapters ▼</button>
-                <div class="filterMenu" id="menuChapters"></div>
-              </div>
+            <div class="fltWrap" style="margin-top:10px;">
+              <button class="fltBtn" id="btnChapters" type="button">Chapters ▼</button>
+              <div class="fltMenu" id="menuChapters"></div>
 
-              <div class="filterGroup">
-                <button class="filterBtn" id="btnSections" type="button">Sections ▼</button>
-                <div class="filterMenu" id="menuSections"></div>
-              </div>
+              <button class="fltBtn" id="btnSections" type="button">Sections ▼</button>
+              <div class="fltMenu" id="menuSections"></div>
 
-              <div class="filterGroup">
-                <button class="filterBtn" id="btnQType" type="button">Question Type ▼</button>
-                <div class="filterMenu" id="menuQType"></div>
-              </div>
+              <button class="fltBtn" id="btnQType" type="button">Question Type ▼</button>
+              <div class="fltMenu" id="menuQType"></div>
 
-              <div class="filterGroup">
-                <button class="filterBtn" id="btnVesselType" type="button">Vessel Type ▼</button>
-                <div class="filterMenu rightAlign" id="menuVesselType"></div>
-              </div>
+              <button class="fltBtn" id="btnVesselType" type="button">Vessel Type ▼</button>
+              <div class="fltMenu" id="menuVesselType"></div>
 
-              <div class="filterGroup">
-                <button class="filterBtn" id="btnRank" type="button">Rank Allocation ▼</button>
-                <div class="filterMenu" id="menuRank"></div>
-              </div>
+              <button class="fltBtn" id="btnRank" type="button">Rank Allocation ▼</button>
+              <div class="fltMenu" id="menuRank"></div>
 
-              <div class="filterGroup">
-                <button class="filterBtn" id="btnRoviq" type="button">ROVIQ List ▼</button>
-                <div class="filterMenu rightAlign" id="menuRoviq"></div>
-              </div>
+              <button class="fltBtn" id="btnRoviq" type="button">ROVIQ List ▼</button>
+              <div class="fltMenu" id="menuRoviq"></div>
 
-              <div class="filterGroup">
-                <button class="filterBtn" id="btnResponse" type="button">Response ▼</button>
-                <div class="filterMenu" id="menuResponse"></div>
-              </div>
+              <button class="fltBtn" id="btnResponse" type="button">Response ▼</button>
+              <div class="fltMenu" id="menuResponse"></div>
 
-              <div class="filterGroup">
-                <button class="filterBtn" id="btnRisk" type="button">Risk Level ▼</button>
-                <div class="filterMenu rightAlign" id="menuRisk"></div>
-              </div>
+              <button class="fltBtn" id="btnRisk" type="button">Risk Level ▼</button>
+              <div class="fltMenu" id="menuRisk"></div>
             </div>
 
             <div class="rowActions">
@@ -439,7 +351,7 @@
             <div class="note" style="margin-top:12px;">
               <b>Templates</b>
               <div class="mono" style="margin-top:6px;">
-                Compile replaces template questions with your current selected set. Create Questionnaire calls RPC.
+                Compile replaces template questions with your current selected set.
               </div>
             </div>
 
@@ -459,12 +371,12 @@
             </div>
           </div>
 
-          <!-- RIGHT: Questionnaires list -->
+          <!-- RIGHT -->
           <div>
             <div class="note">
               <b>Questionnaires</b>
               <div class="mono" style="margin-top:6px;">
-                Loaded from Supabase. Open to answer: <span class="mono">q-answer.html?qid=&lt;uuid&gt;</span>
+                Open to answer: <span class="mono">q-answer.html?qid=&lt;uuid&gt;</span>
               </div>
             </div>
 
