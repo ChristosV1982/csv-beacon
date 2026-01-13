@@ -1,33 +1,12 @@
 // public/post_inspection.js
+// Supabase-backed Post-Inspection module (no localStorage)
+// Tables:
+//   post_inspection_reports
+//   post_inspection_observations
+
 import { loadLockedLibraryJson } from "./question_library_loader.js";
 
-const SUPABASE_URL = "https://bdidrcyufazskpuwmfca.supabase.co";
-const SUPABASE_ANON_KEY =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJkaWRyY3l1ZmF6c2twdXdtZmNhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc5NDI4ODMsImV4cCI6MjA4MzUxODg4M30.Uqj4WCzoNS9wnlzI-xew6iTFzTUi77dcGeBjUgFjZbQ";
-
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-  auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
-});
-
-// Must stay locked to the same library source
 const LOCKED_LIBRARY_JSON = "./sire_questions_all_columns_named.json";
-
-// Local storage (cautious first step: no DB schema changes yet)
-const STORAGE_KEY_REPORTS = "post_inspection_reports_v1";
-const STORAGE_KEY_ACTIVE = "post_inspection_active_report_id_v1";
-
-const state = {
-  me: null,
-  vessels: [],
-  lib: [],
-  libByNo: new Map(),
-  chapters: [],
-  reports: [],
-  activeReportId: null,
-  activeReport: null,
-  selectedQno: null,
-  saveTimer: null,
-};
 
 function el(id) { return document.getElementById(id); }
 
@@ -42,11 +21,24 @@ function esc(s) {
 
 function nowIso() { return new Date().toISOString(); }
 
-function uid() {
-  if (window.crypto && typeof window.crypto.randomUUID === "function") return window.crypto.randomUUID();
-  return "pi_" + Math.random().toString(16).slice(2) + "_" + Date.now().toString(16);
-}
+const state = {
+  me: null,
+  supabase: null,
 
+  vessels: [],
+  lib: [],
+  libByNo: new Map(),
+  chapters: [],
+
+  reports: [],
+  activeReport: null,          // header row
+  observations: {},            // map: question_no -> row (has_observation, pgno_selected, remarks, updated_at)
+  selectedQno: null,
+
+  saveTimer: null,
+};
+
+// ---------- Library helpers ----------
 function pick(obj, keys) {
   for (const k of keys) {
     if (obj && obj[k] != null && obj[k] !== "") return obj[k];
@@ -70,8 +62,7 @@ function getQText(q) {
   return String(pick(q, ["Question", "question"])).trim();
 }
 function getRisk(q) {
-  const v = pick(q, ["Risk Level", "risk", "Risk"]);
-  return String(v ?? "").trim();
+  return String(pick(q, ["Risk Level", "risk", "Risk"])).trim();
 }
 function getType(q) {
   return String(pick(q, ["Question Type", "question_type", "Type"])).trim();
@@ -88,95 +79,15 @@ function getPgnoBullets(q) {
 
   const lines = pgTxt.split("\n").map((s) => s.trim()).filter(Boolean);
   const usable = lines.filter((s) => s.length > 6);
-  return usable.slice(0, 50);
+  return usable.slice(0, 60);
 }
 
-// -------------------------
-// LocalStorage persistence
-// -------------------------
-function loadReports() {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY_REPORTS);
-    const arr = raw ? JSON.parse(raw) : [];
-    return Array.isArray(arr) ? arr : [];
-  } catch {
-    return [];
-  }
-}
-
-function saveReports(reports) {
-  localStorage.setItem(STORAGE_KEY_REPORTS, JSON.stringify(reports));
-}
-
-function setActiveReportId(id) {
-  state.activeReportId = id || null;
-  if (id) localStorage.setItem(STORAGE_KEY_ACTIVE, id);
-  else localStorage.removeItem(STORAGE_KEY_ACTIVE);
-}
-
-function loadActiveReportId() {
-  const id = localStorage.getItem(STORAGE_KEY_ACTIVE);
-  return id || null;
-}
-
-function upsertReport(report) {
-  const idx = state.reports.findIndex((r) => r.id === report.id);
-  if (idx >= 0) state.reports[idx] = report;
-  else state.reports.unshift(report);
-
-  // Sort by updated_at desc
-  state.reports.sort((a, b) => String(b.updated_at || "").localeCompare(String(a.updated_at || "")));
-
-  saveReports(state.reports);
-  renderReportSelect();
-}
-
-// -------------------------
-// Supabase data (vessels)
-// -------------------------
-async function loadVessels() {
-  const { data, error } = await supabase
-    .from("vessels")
-    .select("id, name, is_active")
-    .eq("is_active", true)
-    .order("name", { ascending: true });
-
-  if (error) throw error;
-  return data || [];
-}
-
-// -------------------------
-// UI rendering
-// -------------------------
+// ---------- UI ----------
 function setSaveStatus(text) {
   el("saveStatus").textContent = text || "Not saved";
 }
-
 function setActivePill(text) {
   el("activeReportPill").textContent = text || "No active report";
-}
-
-function renderReportSelect() {
-  const sel = el("reportSelect");
-  sel.innerHTML = "";
-
-  const opt0 = document.createElement("option");
-  opt0.value = "";
-  opt0.textContent = "— Select report —";
-  sel.appendChild(opt0);
-
-  for (const r of state.reports) {
-    const o = document.createElement("option");
-    o.value = r.id;
-
-    const vName = r.vessel_name || "Unknown vessel";
-    const dt = r.inspection_date || "No date";
-    const ref = r.report_ref ? ` | ${r.report_ref}` : "";
-    o.textContent = `${vName} | ${dt}${ref}`;
-    sel.appendChild(o);
-  }
-
-  sel.value = state.activeReportId || "";
 }
 
 function renderVesselsSelect() {
@@ -213,17 +124,42 @@ function renderChapterFilter() {
   }
 }
 
+function reportLabel(r) {
+  const v = r.vessel_name || "Unknown vessel";
+  const d = r.inspection_date || "No date";
+  const ref = r.report_ref ? ` | ${r.report_ref}` : "";
+  return `${v} | ${d}${ref}`;
+}
+
+function renderReportSelect() {
+  const sel = el("reportSelect");
+  sel.innerHTML = "";
+
+  const opt0 = document.createElement("option");
+  opt0.value = "";
+  opt0.textContent = "— Select report —";
+  sel.appendChild(opt0);
+
+  for (const r of state.reports) {
+    const o = document.createElement("option");
+    o.value = r.id;
+    o.textContent = reportLabel(r);
+    sel.appendChild(o);
+  }
+
+  sel.value = state.activeReport?.id || "";
+}
+
 function currentReportHasObs(qno) {
-  if (!state.activeReport) return false;
-  const obs = state.activeReport.observations?.[qno];
-  return !!(obs && obs.has_observation);
+  const row = state.observations?.[qno];
+  return !!(row && row.has_observation);
 }
 
 function renderQuestionList() {
   const list = el("questionList");
   list.innerHTML = "";
 
-  const q = String(el("searchInput").value || "").trim().toLowerCase();
+  const term = String(el("searchInput").value || "").trim().toLowerCase();
   const chap = String(el("chapterFilter").value || "").trim();
   const onlyObs = !!el("onlyObsFilter").checked;
 
@@ -238,22 +174,16 @@ function renderQuestionList() {
     const hasObs = currentReportHasObs(qno);
     if (onlyObs && !hasObs) continue;
 
-    if (q) {
-      const hay = [
-        qno,
-        getShort(item),
-        getSection(item),
-        getQText(item),
-        getChap(item),
-      ].join(" ").toLowerCase();
-
-      if (!hay.includes(q)) continue;
+    if (term) {
+      const hay = [qno, getShort(item), getSection(item), getQText(item), getChap(item)]
+        .join(" ")
+        .toLowerCase();
+      if (!hay.includes(term)) continue;
     }
 
     rows.push({ qno, item, hasObs });
   }
 
-  // keep stable sort by question no (string)
   rows.sort((a, b) => String(a.qno).localeCompare(String(b.qno)));
 
   for (const r of rows) {
@@ -274,7 +204,7 @@ function renderQuestionList() {
       </div>
     `;
 
-    div.addEventListener("click", () => {
+    div.addEventListener("click", async () => {
       state.selectedQno = r.qno;
       renderQuestionList();
       renderDetailPane(r.qno);
@@ -298,35 +228,140 @@ function renderQuestionList() {
 
 function ensureActiveReportOrWarn() {
   if (!state.activeReport) {
-    alert("No active report. Please select an existing report or create a new one, then Save Report Header.");
+    alert("No active post-inspection report. Please select an existing report or create a new one, then Save Report Header.");
     return false;
   }
   return true;
 }
 
-function scheduleSaveActiveReport() {
-  if (!state.activeReport) return;
-
-  clearTimeout(state.saveTimer);
-  state.saveTimer = setTimeout(() => {
-    state.activeReport.updated_at = nowIso();
-    upsertReport(state.activeReport);
-    setSaveStatus("Saved");
-  }, 350);
+function loadReportIntoHeader(r) {
+  el("vesselSelect").value = r.vessel_id || "";
+  el("inspectionDate").value = r.inspection_date || "";
+  el("reportRef").value = r.report_ref || "";
+  el("reportTitle").value = r.title || "";
+  setActivePill("Active: " + reportLabel(r));
 }
 
-function setObservationEntry(qno, entry) {
-  if (!state.activeReport) return;
-  if (!state.activeReport.observations) state.activeReport.observations = {};
-  if (!entry) delete state.activeReport.observations[qno];
-  else state.activeReport.observations[qno] = entry;
+function clearDetailPane() {
+  el("detailPane").innerHTML = `
+    <div style="font-weight:950; color:#35507b;">
+      Select a question from the list to record post-inspection observations and tick PGNO(s).
+    </div>
+  `;
 }
 
-function getObservationEntry(qno) {
-  if (!state.activeReport) return null;
-  return state.activeReport.observations?.[qno] || null;
+// ---------- Supabase data access ----------
+async function loadVessels() {
+  const { data, error } = await state.supabase
+    .from("vessels")
+    .select("id, name, is_active")
+    .eq("is_active", true)
+    .order("name", { ascending: true });
+  if (error) throw error;
+  return data || [];
 }
 
+async function loadReportsFromDb() {
+  // Avoid joins to reduce RLS surprises; map vessel names in a second query.
+  const { data, error } = await state.supabase
+    .from("post_inspection_reports")
+    .select("id, vessel_id, inspection_date, report_ref, title, created_at, updated_at")
+    .order("updated_at", { ascending: false });
+
+  if (error) throw error;
+
+  const rows = data || [];
+  const vesselIds = [...new Set(rows.map(r => r.vessel_id).filter(Boolean))];
+
+  if (!vesselIds.length) return rows.map(r => ({ ...r, vessel_name: "" }));
+
+  const { data: vessels, error: vErr } = await state.supabase
+    .from("vessels")
+    .select("id, name")
+    .in("id", vesselIds);
+
+  const map = new Map((vessels || []).map(v => [v.id, v.name]));
+  if (vErr) return rows.map(r => ({ ...r, vessel_name: "" }));
+
+  return rows.map(r => ({ ...r, vessel_name: map.get(r.vessel_id) || "" }));
+}
+
+async function loadObservationsForReport(reportId) {
+  const { data, error } = await state.supabase
+    .from("post_inspection_observations")
+    .select("report_id, question_no, has_observation, pgno_selected, remarks, updated_at")
+    .eq("report_id", reportId);
+
+  if (error) throw error;
+
+  const map = {};
+  for (const row of data || []) {
+    map[row.question_no] = row;
+  }
+  return map;
+}
+
+async function createReportHeader({ vessel_id, inspection_date, report_ref, title }) {
+  const { data, error } = await state.supabase
+    .from("post_inspection_reports")
+    .insert([{ vessel_id, inspection_date, report_ref, title }])
+    .select("id, vessel_id, inspection_date, report_ref, title, created_at, updated_at")
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+async function updateReportHeader(reportId, { vessel_id, inspection_date, report_ref, title }) {
+  const { data, error } = await state.supabase
+    .from("post_inspection_reports")
+    .update({ vessel_id, inspection_date, report_ref, title })
+    .eq("id", reportId)
+    .select("id, vessel_id, inspection_date, report_ref, title, created_at, updated_at")
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+async function deleteReport(reportId) {
+  const { error } = await state.supabase
+    .from("post_inspection_reports")
+    .delete()
+    .eq("id", reportId);
+  if (error) throw error;
+}
+
+async function upsertObservation({ report_id, question_no, has_observation, pgno_selected, remarks }) {
+  const payload = {
+    report_id,
+    question_no,
+    has_observation: !!has_observation,
+    pgno_selected: Array.isArray(pgno_selected) ? pgno_selected : [],
+    remarks: remarks ?? null,
+  };
+
+  const { data, error } = await state.supabase
+    .from("post_inspection_observations")
+    .upsert(payload, { onConflict: "report_id,question_no" })
+    .select("report_id, question_no, has_observation, pgno_selected, remarks, updated_at")
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+async function deleteObservation(report_id, question_no) {
+  const { error } = await state.supabase
+    .from("post_inspection_observations")
+    .delete()
+    .eq("report_id", report_id)
+    .eq("question_no", question_no);
+
+  if (error) throw error;
+}
+
+// ---------- Detail pane (record obs + PGNO ticks) ----------
 function renderDetailPane(qno) {
   const pane = el("detailPane");
   const q = state.libByNo.get(qno);
@@ -343,11 +378,13 @@ function renderDetailPane(qno) {
   const shortText = getShort(q);
   const qText = getQText(q);
 
-  const entry = getObservationEntry(qno);
-  const hasObs = !!(entry && entry.has_observation);
+  const row = state.observations[qno] || null;
+  const hasObs = !!(row && row.has_observation);
 
   const pgnoBullets = getPgnoBullets(q);
-  const selected = new Set((entry?.pgno_selected || []).map((x) => Number(x.idx)));
+  const selected = new Set(
+    (row?.pgno_selected || []).map(x => Number(x.idx)).filter(n => Number.isFinite(n))
+  );
 
   pane.innerHTML = `
     <h3 class="detailTitle">${esc(qno)} — ${esc(shortText)}</h3>
@@ -369,7 +406,7 @@ function renderDetailPane(qno) {
     <div class="pgnoBox">
       <div class="pgnoTitle">PGNO Tick Selection (only for observed questions)</div>
       <div style="font-weight:850; color:#35507b; line-height:1.35;">
-        Tick the specific PGNO(s) where the observation was raised. No Y/N/NA/NS answering required.
+        Tick the specific PGNO(s) where the observation was raised. Full PGNO answering is not required.
       </div>
 
       <div class="pgnoList" id="pgnoList"></div>
@@ -385,7 +422,15 @@ function renderDetailPane(qno) {
   `;
 
   const pgList = pane.querySelector("#pgnoList");
+  const toggle = pane.querySelector("#obsToggle");
+  const clearBtn = pane.querySelector("#clearBtn");
+  const remarks = pane.querySelector("#obsRemarks");
+  const saveBtn = pane.querySelector("#saveBtn");
+  const msg = pane.querySelector("#qSaveMsg");
 
+  if (row?.remarks) remarks.value = row.remarks;
+
+  // Populate PGNO list
   if (!pgnoBullets.length) {
     const noPg = document.createElement("div");
     noPg.style.fontWeight = "900";
@@ -396,24 +441,79 @@ function renderDetailPane(qno) {
   } else {
     pgnoBullets.forEach((txt, i) => {
       const idx = i + 1;
-      const row = document.createElement("div");
-      row.className = "pgnoRow";
-      row.innerHTML = `
+      const rowDiv = document.createElement("div");
+      rowDiv.className = "pgnoRow";
+      rowDiv.innerHTML = `
         <input type="checkbox" class="pgChk" data-idx="${idx}" ${selected.has(idx) ? "checked" : ""} ${hasObs ? "" : "disabled"} />
         <div class="pgnoIdx">PGNO ${idx}</div>
         <div class="pgnoTxt">${esc(txt)}</div>
       `;
-      pgList.appendChild(row);
+      pgList.appendChild(rowDiv);
     });
   }
 
-  const toggle = pane.querySelector("#obsToggle");
-  const clearBtn = pane.querySelector("#clearBtn");
-  const remarks = pane.querySelector("#obsRemarks");
-  const saveBtn = pane.querySelector("#saveBtn");
-  const msg = pane.querySelector("#qSaveMsg");
+  function getSelectedPgno() {
+    const selectedPg = [];
+    if (!pgnoBullets.length) return selectedPg;
 
-  if (entry?.remarks) remarks.value = entry.remarks;
+    pgList.querySelectorAll(".pgChk").forEach((c) => {
+      if (c.checked) {
+        const idx = Number(c.getAttribute("data-idx"));
+        const txt = pgnoBullets[idx - 1] || "";
+        selectedPg.push({ idx, text: String(txt || "").trim() });
+      }
+    });
+    return selectedPg;
+  }
+
+  async function doSave(immediateMessage = true) {
+    if (!ensureActiveReportOrWarn()) return;
+
+    const observed = !!toggle.checked;
+
+    if (!observed) {
+      // If not observed -> delete row if exists
+      if (state.observations[qno]) {
+        setSaveStatus("Saving…");
+        await deleteObservation(state.activeReport.id, qno);
+        delete state.observations[qno];
+        renderQuestionList();
+        setSaveStatus("Saved");
+      }
+      if (immediateMessage) msg.textContent = "Saved (no observation).";
+      return;
+    }
+
+    const pg = getSelectedPgno();
+    const rem = String(remarks.value || "");
+
+    setSaveStatus("Saving…");
+    const saved = await upsertObservation({
+      report_id: state.activeReport.id,
+      question_no: qno,
+      has_observation: true,
+      pgno_selected: pg,
+      remarks: rem,
+    });
+
+    state.observations[qno] = saved;
+    renderQuestionList();
+    setSaveStatus("Saved");
+
+    if (immediateMessage) {
+      msg.textContent = pg.length
+        ? "Saved."
+        : "Saved. (No PGNO ticked — allowed, but consider ticking the applicable PGNO.)";
+    }
+  }
+
+  function setControlsEnabled(on) {
+    remarks.disabled = !on;
+    clearBtn.disabled = !on;
+    pgList.querySelectorAll(".pgChk").forEach((c) => (c.disabled = !on));
+  }
+
+  setControlsEnabled(hasObs);
 
   toggle.addEventListener("change", () => {
     if (!ensureActiveReportOrWarn()) {
@@ -422,256 +522,212 @@ function renderDetailPane(qno) {
     }
 
     const on = !!toggle.checked;
+    setControlsEnabled(on);
 
     if (!on) {
-      // Disable controls (but do not delete until user confirms by Clear, or Save)
-      clearBtn.disabled = true;
-      remarks.disabled = true;
-      pgList.querySelectorAll(".pgChk").forEach((c) => (c.disabled = true));
-      msg.textContent = "Observation toggled off. Click 'Clear observation' to remove, or Save to store as not observed.";
-      return;
+      msg.textContent = "Observation toggled off. Click Save to remove from database, or Clear to remove immediately.";
+    } else {
+      msg.textContent = "";
     }
-
-    clearBtn.disabled = false;
-    remarks.disabled = false;
-    pgList.querySelectorAll(".pgChk").forEach((c) => (c.disabled = false));
-    msg.textContent = "";
   });
 
-  clearBtn.addEventListener("click", () => {
+  clearBtn.addEventListener("click", async () => {
     if (!ensureActiveReportOrWarn()) return;
 
-    // Clear fully
+    const ok = confirm("Clear this observation (remove from database)?");
+    if (!ok) return;
+
+    setSaveStatus("Saving…");
+    await deleteObservation(state.activeReport.id, qno);
+    delete state.observations[qno];
+
     toggle.checked = false;
     remarks.value = "";
-    remarks.disabled = true;
-    pgList.querySelectorAll(".pgChk").forEach((c) => {
-      c.checked = false;
-      c.disabled = true;
-    });
-    clearBtn.disabled = true;
+    setControlsEnabled(false);
 
-    setObservationEntry(qno, null);
-    scheduleSaveActiveReport();
     renderQuestionList();
+    setSaveStatus("Saved");
     msg.textContent = "Observation cleared.";
   });
 
-  saveBtn.addEventListener("click", () => {
-    if (!ensureActiveReportOrWarn()) return;
-
-    const observed = !!toggle.checked;
-
-    if (!observed) {
-      // Store as not observed by removing entry (keeps dataset small)
-      setObservationEntry(qno, null);
-      scheduleSaveActiveReport();
-      renderQuestionList();
-      msg.textContent = "Saved (no observation).";
-      return;
-    }
-
-    const selectedPg = [];
-    pgList.querySelectorAll(".pgChk").forEach((c) => {
-      if (c.checked) {
-        const idx = Number(c.getAttribute("data-idx"));
-        const txt = pgnoBullets[idx - 1] || "";
-        selectedPg.push({ idx, text: String(txt || "").trim() });
-      }
-    });
-
-    const newEntry = {
-      has_observation: true,
-      pgno_selected: selectedPg,
-      remarks: String(remarks.value || ""),
-      updated_at: nowIso(),
-    };
-
-    setObservationEntry(qno, newEntry);
-    scheduleSaveActiveReport();
-    renderQuestionList();
-
-    if (!selectedPg.length) {
-      msg.textContent = "Saved. (No PGNO ticked — allowed, but consider ticking the applicable PGNO.)";
-    } else {
-      msg.textContent = "Saved.";
+  saveBtn.addEventListener("click", async () => {
+    try {
+      await doSave(true);
+    } catch (e) {
+      console.error(e);
+      alert("Save failed: " + (e?.message || String(e)));
+      setSaveStatus("Error");
     }
   });
 
-  // Gentle autosave on input changes (only if observation is ON)
+  // Debounced autosave on remarks + PGNO ticks (only when observation ON)
+  function debounceAutosave() {
+    clearTimeout(state.saveTimer);
+    state.saveTimer = setTimeout(async () => {
+      try {
+        if (!toggle.checked) return;
+        await doSave(false);
+      } catch (e) {
+        console.error(e);
+        setSaveStatus("Error");
+      }
+    }, 650);
+  }
+
   remarks.addEventListener("input", () => {
     if (!toggle.checked) return;
-    if (!ensureActiveReportOrWarn()) return;
-
-    const cur = getObservationEntry(qno) || { has_observation: true, pgno_selected: [], remarks: "", updated_at: nowIso() };
-    cur.has_observation = true;
-    cur.remarks = String(remarks.value || "");
-    cur.updated_at = nowIso();
-    setObservationEntry(qno, cur);
-    scheduleSaveActiveReport();
+    debounceAutosave();
   });
 
   pgList.querySelectorAll(".pgChk").forEach((chk) => {
     chk.addEventListener("change", () => {
       if (!toggle.checked) return;
-      if (!ensureActiveReportOrWarn()) return;
-
-      const bullets = pgnoBullets;
-      const selectedPg = [];
-      pgList.querySelectorAll(".pgChk").forEach((c) => {
-        if (c.checked) {
-          const idx = Number(c.getAttribute("data-idx"));
-          const txt = bullets[idx - 1] || "";
-          selectedPg.push({ idx, text: String(txt || "").trim() });
-        }
-      });
-
-      const cur = getObservationEntry(qno) || { has_observation: true, pgno_selected: [], remarks: "", updated_at: nowIso() };
-      cur.has_observation = true;
-      cur.pgno_selected = selectedPg;
-      cur.updated_at = nowIso();
-      setObservationEntry(qno, cur);
-      scheduleSaveActiveReport();
-      renderQuestionList();
+      debounceAutosave();
     });
   });
 }
 
-// -------------------------
-// Report actions
-// -------------------------
-function reportLabel(r) {
-  const vName = r.vessel_name || "Unknown vessel";
-  const dt = r.inspection_date || "No date";
-  const ref = r.report_ref ? ` | ${r.report_ref}` : "";
-  return `${vName} | ${dt}${ref}`;
-}
-
-function loadReportIntoHeader(r) {
-  el("vesselSelect").value = r.vessel_id || "";
-  el("inspectionDate").value = r.inspection_date || "";
-  el("reportRef").value = r.report_ref || "";
-  el("reportTitle").value = r.title || "";
-  setActivePill("Active: " + reportLabel(r));
-}
-
-function setActiveReportById(id) {
-  const r = state.reports.find((x) => x.id === id) || null;
-  state.activeReport = r;
-  setActiveReportId(r ? r.id : null);
-
-  if (r) {
-    loadReportIntoHeader(r);
-    setSaveStatus("Loaded");
-  } else {
+// ---------- Report actions ----------
+async function setActiveReportById(id) {
+  if (!id) {
+    state.activeReport = null;
+    state.observations = {};
+    state.selectedQno = null;
+    renderReportSelect();
     setActivePill("No active report");
     setSaveStatus("Not saved");
-  }
-
-  // Reset selection
-  state.selectedQno = null;
-  el("detailPane").innerHTML = `
-    <div style="font-weight:950; color:#35507b;">
-      Select a question from the list to record post-inspection observations and tick PGNO(s).
-    </div>
-  `;
-  renderQuestionList();
-}
-
-function createNewReportFromHeader() {
-  const vessel_id = String(el("vesselSelect").value || "").trim();
-  const vessel_name = (state.vessels.find((v) => v.id === vessel_id)?.name) || "";
-  const inspection_date = String(el("inspectionDate").value || "").trim();
-  const report_ref = String(el("reportRef").value || "").trim();
-  const title = String(el("reportTitle").value || "").trim();
-
-  if (!vessel_id) {
-    alert("Please select a vessel first.");
-    return null;
-  }
-  if (!inspection_date) {
-    alert("Please set an inspection date.");
-    return null;
-  }
-
-  const r = {
-    id: uid(),
-    vessel_id,
-    vessel_name,
-    inspection_date,
-    report_ref,
-    title,
-    created_at: nowIso(),
-    updated_at: nowIso(),
-    observations: {},
-  };
-
-  return r;
-}
-
-function saveHeaderToActiveReport() {
-  // If no active report -> create one
-  if (!state.activeReport) {
-    const r = createNewReportFromHeader();
-    if (!r) return;
-    state.activeReport = r;
-    setActiveReportId(r.id);
-    upsertReport(r);
-    loadReportIntoHeader(r);
-    setSaveStatus("Saved");
+    clearDetailPane();
     renderQuestionList();
     return;
   }
 
-  // Update existing
+  const r = state.reports.find(x => x.id === id) || null;
+  if (!r) return;
+
+  state.activeReport = r;
+  state.selectedQno = null;
+
+  loadReportIntoHeader(r);
+  setSaveStatus("Loading…");
+
+  try {
+    state.observations = await loadObservationsForReport(r.id);
+    setSaveStatus("Loaded");
+  } catch (e) {
+    console.error(e);
+    alert("Failed to load observations: " + (e?.message || String(e)));
+    state.observations = {};
+    setSaveStatus("Error");
+  }
+
+  renderReportSelect();
+  clearDetailPane();
+  renderQuestionList();
+}
+
+function headerInputs() {
   const vessel_id = String(el("vesselSelect").value || "").trim();
-  const vessel_name = (state.vessels.find((v) => v.id === vessel_id)?.name) || "";
   const inspection_date = String(el("inspectionDate").value || "").trim();
   const report_ref = String(el("reportRef").value || "").trim();
   const title = String(el("reportTitle").value || "").trim();
 
-  if (!vessel_id) {
-    alert("Please select a vessel first.");
-    return;
-  }
-  if (!inspection_date) {
-    alert("Please set an inspection date.");
-    return;
-  }
-
-  state.activeReport.vessel_id = vessel_id;
-  state.activeReport.vessel_name = vessel_name;
-  state.activeReport.inspection_date = inspection_date;
-  state.activeReport.report_ref = report_ref;
-  state.activeReport.title = title;
-  state.activeReport.updated_at = nowIso();
-
-  upsertReport(state.activeReport);
-  loadReportIntoHeader(state.activeReport);
-  setSaveStatus("Saved");
+  return { vessel_id, inspection_date, report_ref, title };
 }
 
-function deleteActiveReport() {
+async function handleNewReport() {
+  const { vessel_id, inspection_date, report_ref, title } = headerInputs();
+
+  if (!vessel_id) { alert("Please select a vessel first."); return; }
+  if (!inspection_date) { alert("Please set an inspection date."); return; }
+
+  setSaveStatus("Saving…");
+
+  try {
+    const created = await createReportHeader({ vessel_id, inspection_date, report_ref, title });
+
+    // Enrich vessel_name locally
+    const vessel_name = state.vessels.find(v => v.id === vessel_id)?.name || "";
+    const enriched = { ...created, vessel_name };
+
+    // refresh list from DB (source of truth)
+    state.reports = await loadReportsFromDb();
+
+    // Set active
+    await setActiveReportById(enriched.id);
+    setSaveStatus("Saved");
+  } catch (e) {
+    console.error(e);
+    alert("Create report failed: " + (e?.message || String(e)));
+    setSaveStatus("Error");
+  }
+}
+
+async function handleSaveHeader() {
+  const { vessel_id, inspection_date, report_ref, title } = headerInputs();
+
+  if (!vessel_id) { alert("Please select a vessel first."); return; }
+  if (!inspection_date) { alert("Please set an inspection date."); return; }
+
+  setSaveStatus("Saving…");
+
+  try {
+    if (!state.activeReport) {
+      // create
+      const created = await createReportHeader({ vessel_id, inspection_date, report_ref, title });
+      state.reports = await loadReportsFromDb();
+      await setActiveReportById(created.id);
+      setSaveStatus("Saved");
+      return;
+    }
+
+    // update
+    const updated = await updateReportHeader(state.activeReport.id, { vessel_id, inspection_date, report_ref, title });
+
+    state.reports = await loadReportsFromDb();
+    await setActiveReportById(updated.id);
+    setSaveStatus("Saved");
+  } catch (e) {
+    console.error(e);
+    alert("Save header failed: " + (e?.message || String(e)));
+    setSaveStatus("Error");
+  }
+}
+
+async function handleDeleteReport() {
   if (!state.activeReport) return;
 
-  const ok = confirm(`Delete this report?\n\n${reportLabel(state.activeReport)}\n\nThis cannot be undone (unless you exported JSON).`);
+  const ok = confirm(`Delete this report?\n\n${reportLabel(state.activeReport)}\n\nAll observations will be deleted (cascade).`);
   if (!ok) return;
 
-  state.reports = state.reports.filter((r) => r.id !== state.activeReport.id);
-  saveReports(state.reports);
+  setSaveStatus("Deleting…");
 
-  setActiveReportById(null);
-  renderReportSelect();
-  setSaveStatus("Deleted");
+  try {
+    await deleteReport(state.activeReport.id);
+    state.reports = await loadReportsFromDb();
+    await setActiveReportById(state.reports[0]?.id || null);
+    setSaveStatus("Deleted");
+  } catch (e) {
+    console.error(e);
+    alert("Delete failed: " + (e?.message || String(e)));
+    setSaveStatus("Error");
+  }
 }
 
-function exportActiveReportJson() {
+async function exportActiveReportJson() {
   if (!state.activeReport) {
     alert("No active report to export.");
     return;
   }
 
-  const blob = new Blob([JSON.stringify(state.activeReport, null, 2)], { type: "application/json" });
+  // Export header + current obs map (exact DB content)
+  const payload = {
+    report: state.activeReport,
+    observations: Object.values(state.observations || {}),
+    exported_at: nowIso(),
+    module: "post_inspection",
+  };
+
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
   const a = document.createElement("a");
 
   const safeV = String(state.activeReport.vessel_name || "vessel").replace(/[^a-z0-9]+/gi, "_");
@@ -685,41 +741,70 @@ function exportActiveReportJson() {
   URL.revokeObjectURL(a.href);
 }
 
-function importReportJsonFromFile(file) {
-  const reader = new FileReader();
-  reader.onload = () => {
-    try {
-      const obj = JSON.parse(String(reader.result || "{}"));
+async function importReportJsonFromFile(file) {
+  const text = await file.text();
 
-      // Minimal validation
-      if (!obj || typeof obj !== "object") throw new Error("Invalid JSON.");
-      if (!obj.id) obj.id = uid();
-      if (!obj.vessel_id || !obj.inspection_date) throw new Error("Missing vessel_id or inspection_date.");
-      if (!obj.created_at) obj.created_at = nowIso();
-      obj.updated_at = nowIso();
-      if (!obj.observations || typeof obj.observations !== "object") obj.observations = {};
+  try {
+    const obj = JSON.parse(text);
 
-      // Enrich vessel_name from current vessels list
-      obj.vessel_name = (state.vessels.find((v) => v.id === obj.vessel_id)?.name) || obj.vessel_name || "";
+    if (!obj || typeof obj !== "object") throw new Error("Invalid JSON.");
+    if (!obj.report || !obj.observations) throw new Error("JSON must contain { report, observations }.");
 
-      upsertReport(obj);
-      setActiveReportById(obj.id);
+    const rep = obj.report;
+    const obs = obj.observations;
 
-      alert("Report imported and loaded successfully.");
-    } catch (e) {
-      alert("Import failed: " + (e?.message || String(e)));
+    const vessel_id = String(rep.vessel_id || "").trim();
+    const inspection_date = String(rep.inspection_date || "").trim();
+    const report_ref = String(rep.report_ref || "").trim();
+    const title = String(rep.title || "").trim();
+
+    if (!vessel_id) throw new Error("Import: report.vessel_id missing.");
+    if (!inspection_date) throw new Error("Import: report.inspection_date missing.");
+
+    setSaveStatus("Importing…");
+
+    // Create a NEW report record (do not reuse old ID)
+    const created = await createReportHeader({ vessel_id, inspection_date, report_ref, title });
+
+    // Insert observations in batches
+    const rows = Array.isArray(obs) ? obs : [];
+    const payload = rows
+      .filter(r => r && r.question_no)
+      .map(r => ({
+        report_id: created.id,
+        question_no: String(r.question_no),
+        has_observation: true,
+        pgno_selected: Array.isArray(r.pgno_selected) ? r.pgno_selected : [],
+        remarks: r.remarks ?? null,
+      }));
+
+    // Batch upsert
+    const batchSize = 500;
+    for (let i = 0; i < payload.length; i += batchSize) {
+      const chunk = payload.slice(i, i + batchSize);
+      const { error } = await state.supabase
+        .from("post_inspection_observations")
+        .upsert(chunk, { onConflict: "report_id,question_no" });
+      if (error) throw error;
     }
-  };
-  reader.readAsText(file);
+
+    // Refresh
+    state.reports = await loadReportsFromDb();
+    await setActiveReportById(created.id);
+
+    setSaveStatus("Imported");
+    alert("Import completed successfully.");
+  } catch (e) {
+    console.error(e);
+    alert("Import failed: " + (e?.message || String(e)));
+    setSaveStatus("Error");
+  }
 }
 
-// -------------------------
-// Statistics + CSV export
-// -------------------------
+// ---------- Statistics + CSV ----------
 function getObservedQnos() {
-  if (!state.activeReport) return [];
-  const obs = state.activeReport.observations || {};
-  return Object.keys(obs).filter((qno) => obs[qno]?.has_observation);
+  const obs = state.observations || {};
+  return Object.keys(obs).filter(qno => obs[qno]?.has_observation);
 }
 
 function renderStatsDialog() {
@@ -737,7 +822,7 @@ function renderStatsDialog() {
   el("statObservedQ").textContent = String(obsCount);
   el("statPct").textContent = String(pct) + "%";
 
-  // by chapter
+  // By chapter counts
   const by = new Map();
   for (const qno of observed) {
     const q = state.libByNo.get(qno);
@@ -778,7 +863,7 @@ function exportObservationsCsv() {
 
   for (const qno of observed) {
     const q = state.libByNo.get(qno);
-    const entry = state.activeReport.observations[qno];
+    const entry = state.observations[qno];
 
     const pg = Array.isArray(entry?.pgno_selected)
       ? entry.pgno_selected.map((x) => `PGNO ${x.idx}`).join("; ")
@@ -813,11 +898,9 @@ function exportObservationsCsv() {
   URL.revokeObjectURL(a.href);
 }
 
-// -------------------------
-// Init
-// -------------------------
+// ---------- Init ----------
 async function init() {
-  // Role guard (exactly as you requested)
+  // Auth guard: admin-only
   const R = window.AUTH?.ROLES;
   state.me = await window.AUTH.requireAuth([R.SUPER_ADMIN, R.COMPANY_ADMIN]);
   if (!state.me) return;
@@ -825,13 +908,19 @@ async function init() {
   window.AUTH.fillUserBadge(state.me, "userBadge");
   el("logoutBtn").addEventListener("click", window.AUTH.logoutAndGoLogin);
 
+  // Reuse client created by auth.js (preferred)
+  state.supabase = window.__supabaseClient;
+  if (!state.supabase) {
+    throw new Error("Supabase client missing. Ensure supabase-js CDN and auth.js are loaded before post_inspection.js.");
+  }
+
   setSaveStatus("Loading…");
 
-  // Load vessels
+  // Vessels
   state.vessels = await loadVessels();
   renderVesselsSelect();
 
-  // Load locked library
+  // Library (locked)
   state.lib = await loadLockedLibraryJson(LOCKED_LIBRARY_JSON);
   state.libByNo = new Map();
   for (const q of state.lib) {
@@ -848,57 +937,35 @@ async function init() {
   state.chapters = [...chSet].sort((a, b) => String(a).localeCompare(String(b)));
   renderChapterFilter();
 
-  // Load stored reports
-  state.reports = loadReports();
+  // Reports from DB
+  state.reports = await loadReportsFromDb();
   renderReportSelect();
 
-  // Restore last active report if still exists
-  const last = loadActiveReportId();
-  const exists = last && state.reports.some((r) => r.id === last);
-  if (exists) {
-    setActiveReportById(last);
-  } else if (state.reports.length) {
-    setActiveReportById(state.reports[0].id);
-  } else {
-    setActiveReportById(null);
-
-    // Preselect vessel + date for convenience
-    if (state.vessels.length) el("vesselSelect").value = state.vessels[0].id;
-    const today = new Date();
-    const yyyy = today.getFullYear();
-    const mm = String(today.getMonth() + 1).padStart(2, "0");
-    const dd = String(today.getDate()).padStart(2, "0");
+  // Default date
+  if (!el("inspectionDate").value) {
+    const d = new Date();
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
     el("inspectionDate").value = `${yyyy}-${mm}-${dd}`;
   }
 
-  // Event wiring
-  el("reportSelect").addEventListener("change", () => {
+  // Wire events
+  el("reportSelect").addEventListener("change", async () => {
     const id = el("reportSelect").value || null;
-    setActiveReportById(id);
+    await setActiveReportById(id);
   });
 
-  el("newReportBtn").addEventListener("click", () => {
-    const r = createNewReportFromHeader();
-    if (!r) return;
-
-    state.activeReport = r;
-    setActiveReportId(r.id);
-    upsertReport(r);
-    renderReportSelect();
-    setActiveReportById(r.id);
-
-    setSaveStatus("Created");
-  });
-
-  el("saveHeaderBtn").addEventListener("click", saveHeaderToActiveReport);
-  el("deleteReportBtn").addEventListener("click", deleteActiveReport);
+  el("newReportBtn").addEventListener("click", handleNewReport);
+  el("saveHeaderBtn").addEventListener("click", handleSaveHeader);
+  el("deleteReportBtn").addEventListener("click", handleDeleteReport);
 
   el("exportBtn").addEventListener("click", exportActiveReportJson);
 
   el("importBtn").addEventListener("click", () => el("importFile").click());
-  el("importFile").addEventListener("change", (e) => {
+  el("importFile").addEventListener("change", async (e) => {
     const f = e.target.files && e.target.files[0];
-    if (f) importReportJsonFromFile(f);
+    if (f) await importReportJsonFromFile(f);
     e.target.value = "";
   });
 
@@ -906,9 +973,18 @@ async function init() {
   el("closeStatsBtn").addEventListener("click", () => el("statsDialog").close());
   el("exportCsvBtn").addEventListener("click", exportObservationsCsv);
 
-  el("searchInput").addEventListener("input", () => renderQuestionList());
-  el("chapterFilter").addEventListener("change", () => renderQuestionList());
-  el("onlyObsFilter").addEventListener("change", () => renderQuestionList());
+  el("searchInput").addEventListener("input", renderQuestionList);
+  el("chapterFilter").addEventListener("change", renderQuestionList);
+  el("onlyObsFilter").addEventListener("change", renderQuestionList);
+
+  // If reports exist, auto-load first; otherwise show empty
+  if (state.reports.length) {
+    await setActiveReportById(state.reports[0].id);
+  } else {
+    await setActiveReportById(null);
+    // preselect first vessel for convenience
+    if (state.vessels.length) el("vesselSelect").value = state.vessels[0].id;
+  }
 
   renderQuestionList();
   setSaveStatus(state.activeReport ? "Loaded" : "Not saved");
