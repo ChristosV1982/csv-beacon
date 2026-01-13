@@ -90,6 +90,17 @@
       font-weight:900;line-height:1.35;
       margin-top:12px;
       display:none;
+      white-space:pre-wrap;
+    }
+    .note{
+      background:#f7fbff;
+      border:1px solid #d5deef;
+      border-radius:12px;
+      padding:10px 12px;
+      color:#35507b;
+      font-weight:800;
+      line-height:1.35;
+      margin-bottom:12px;
     }
   </style>
 </head>
@@ -112,10 +123,15 @@
     <div id="content"></div>
   </div>
 
-  <script>
+  <script type="module">
+    import { loadLockedLibraryJson } from "./question_library_loader.js";
+
     const SUPABASE_URL = "https://bdidrcyufazskpuwmfca.supabase.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJkaWRyY3l1ZmF6c2twdXdtZmNhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc5NDI4ODMsImV4cCI6MjA4MzUxODg4M30.Uqj4WCzoNS9wnlzI-xew6iTFzTUi77dcGeBjUgFjZbQ";
     const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // Must match the same locked JSON used in q-company.js
+    const LOCKED_LIBRARY_JSON = "./sire_questions_all_columns_named.json";
 
     function qs(name){ return new URLSearchParams(location.search).get(name); }
 
@@ -144,17 +160,34 @@
         .replaceAll("'","&#039;");
     }
 
-    function renderQuestionCard(q, pgnoRows){
-      const qno = q["No."] || "";
-      const section = q["Section Name"] || "";
-      const shortText = q["Short Text"] || "";
-      const risk = q["Risk Level"] ?? "";
-      const qtype = q["Question Type"] || "";
-      const qtext = q["Question"] || "";
+    function cssId(qno){ return String(qno||"").replaceAll(".","_").replaceAll(" ","_"); }
+    function radioName(qno, idx){ return `resp_${cssId(qno)}_${idx}`; }
+    function taId(qno, idx){ return `rm_${cssId(qno)}_${idx}`; }
+    function saveId(qno, idx){ return `sv_${cssId(qno)}_${idx}`; }
+    function statusId(qno, idx){ return `st_${cssId(qno)}_${idx}`; }
 
-      const guidance = q["Inspection Guidance"] || "";
-      const actions = q["Suggested Inspector Actions"] || "";
-      const evidence = q["Expected Evidence"] || "";
+    function choiceRadio(qno, idx, val, current){
+      const checked = (String(current||"") === val) ? "checked" : "";
+      const label = (val === "NA") ? "N/A" : (val === "NS" ? "N/S" : val);
+      return `
+        <label>
+          <input type="radio" name="${radioName(qno,idx)}" value="${val}" ${checked}/>
+          ${label}
+        </label>
+      `;
+    }
+
+    function renderQuestionCard(q, pgnoRows){
+      const qno = q?.["No."] || q?.["No"] || "";
+      const section = q?.["Section Name"] || "";
+      const shortText = q?.["Short Text"] || "";
+      const risk = q?.["Risk Level"] ?? "";
+      const qtype = q?.["Question Type"] || "";
+      const qtext = q?.["Question"] || "";
+
+      const guidance = q?.["Inspection Guidance"] || "";
+      const actions = q?.["Suggested Inspector Actions"] || "";
+      const evidence = q?.["Expected Evidence"] || "";
 
       const wrapper = document.createElement("div");
       wrapper.className="card";
@@ -196,12 +229,13 @@
 
       const pgnoBox = wrapper.querySelector(`#pgno-${cssId(qno)}`);
 
+      // Ensure stable order
       pgnoRows.sort((a,b)=> (a.pgno_index||0)-(b.pgno_index||0)).forEach(row=>{
         const el = document.createElement("div");
         el.className="pgno";
         el.innerHTML = `
           <div class="pgno-title">PGNO ${esc(String(row.pgno_index))}</div>
-          <div class="pre">${esc(row.pgno_text)}</div>
+          <div class="pre">${esc(row.pgno_text || "")}</div>
 
           <div class="choices">
             ${choiceRadio(qno,row.pgno_index,'Y',row.response)}
@@ -224,62 +258,98 @@
       pgnoRows.forEach(row=>{
         const btn = wrapper.querySelector(`#${saveId(qno,row.pgno_index)}`);
         btn.addEventListener("click", async ()=>{
-          await savePgno(row.questionnaire_id, qno, row.pgno_index);
+          await savePgno(row.questionnaire_id, qno, row.pgno_index, row.pgno_text || "");
         });
       });
 
       return wrapper;
     }
 
-    function cssId(qno){ return qno.replaceAll(".","_").replaceAll(" ","_"); }
-    function radioName(qno, idx){ return `resp_${cssId(qno)}_${idx}`; }
-    function taId(qno, idx){ return `rm_${cssId(qno)}_${idx}`; }
-    function saveId(qno, idx){ return `sv_${cssId(qno)}_${idx}`; }
-    function statusId(qno, idx){ return `st_${cssId(qno)}_${idx}`; }
-
-    function choiceRadio(qno, idx, val, current){
-      const checked = (String(current||"") === val) ? "checked" : "";
-      const label = (val === "NA") ? "N/A" : (val === "NS" ? "N/S" : val);
-      return `
-        <label>
-          <input type="radio" name="${radioName(qno,idx)}" value="${val}" ${checked}/>
-          ${label}
-        </label>
-      `;
-    }
-
-    async function savePgno(qid, qno, idx){
+    async function savePgno(qid, qno, idx, pgnoText){
       clearError();
       const st = document.getElementById(statusId(qno,idx));
       st.textContent = "Saving…";
 
-      const radios = document.getElementsByName(radioName(qno,idx));
+      const radios = Array.from(document.getElementsByName(radioName(qno,idx)));
       let val = null;
-      radios.forEach(r=>{ if (r.checked) val = r.value; });
+      for (const r of radios){
+        if (r.checked) { val = r.value; break; }
+      }
 
       const remarks = document.getElementById(taId(qno,idx)).value;
 
+      // Use UPSERT so it works even if the row did not exist yet
       const { error } = await supabase
         .from("answers_pgno")
-        .update({ response: val, remarks })
-        .eq("questionnaire_id", qid)
-        .eq("question_no", qno)
-        .eq("pgno_index", idx);
+        .upsert(
+          {
+            questionnaire_id: qid,
+            question_no: qno,
+            pgno_index: idx,
+            pgno_text: pgnoText,
+            response: val,
+            remarks
+          },
+          { onConflict: "questionnaire_id,question_no,pgno_index" }
+        );
 
       if (error){
         st.textContent = "";
         setError("Save failed: " + error.message);
         return;
       }
+
       st.textContent = "Saved.";
       setTimeout(()=> st.textContent="", 1200);
     }
 
+    function buildPgnoFromLibraryQuestion(q, qid){
+      // Preferred: NegObs_Bullets array if present
+      const bullets = Array.isArray(q?.NegObs_Bullets) ? q.NegObs_Bullets : null;
+
+      if (bullets && bullets.length){
+        return bullets.map((t, i) => ({
+          questionnaire_id: qid,
+          question_no: q["No."] || "",
+          pgno_index: i + 1,
+          pgno_text: String(t || "").trim(),
+          response: null,
+          remarks: ""
+        })).filter(r => r.pgno_text);
+      }
+
+      // Fallback: attempt to use Potential Grounds for Negative Observations (string)
+      const pgnoTxt = String(q?.["Potential Grounds for Negative Observations"] || "").trim();
+      if (!pgnoTxt) return [];
+
+      // Split into lines that look meaningful
+      const lines = pgnoTxt.split("\n").map(s => s.trim()).filter(Boolean);
+      // Keep only bullet-like or sentence-like lines (avoid section headings)
+      const usable = lines.filter(s => s.length > 6);
+
+      return usable.slice(0, 50).map((t, i) => ({
+        questionnaire_id: qid,
+        question_no: q["No."] || "",
+        pgno_index: i + 1,
+        pgno_text: t,
+        response: null,
+        remarks: ""
+      }));
+    }
+
     async function loadData(){
-      const session = await requireLogin();
+      await requireLogin();
 
       const qid = qs("qid") || localStorage.getItem("active_qid");
       if (!qid) throw new Error("No questionnaire id found. Open from Dashboard or Builder.");
+
+      // Load locked library for fallback when question_json is null
+      const library = await loadLockedLibraryJson(LOCKED_LIBRARY_JSON);
+      const libMap = new Map();
+      for (const obj of library){
+        const qno = String(obj?.["No."] || obj?.["No"] || "").trim();
+        if (qno) libMap.set(qno, obj);
+      }
 
       // Title
       const { data: qh, error: qhErr } = await supabase
@@ -294,14 +364,34 @@
       document.getElementById("pageSub").textContent =
         `Questionnaire ID: ${qh.id} | Status: ${qh.status}`;
 
-      // Questions (JSON snapshot)
+      // Questions list
+      // IMPORTANT: do not .order("seq") because your schema may not have seq
       const { data: qq, error: qqErr } = await supabase
         .from("questionnaire_questions")
-        .select("questionnaire_id, seq, question_no, question_json")
-        .eq("questionnaire_id", qid)
-        .order("seq", { ascending: true });
+        .select("questionnaire_id, seq, sort_order, question_no, question_json")
+        .eq("questionnaire_id", qid);
 
       if (qqErr) throw qqErr;
+
+      const qqRows = (qq || []).slice().sort((a,b)=>{
+        const ao = (a.seq ?? a.sort_order ?? 0);
+        const bo = (b.seq ?? b.sort_order ?? 0);
+        return ao - bo;
+      });
+
+      if (!qqRows.length){
+        const content = document.getElementById("content");
+        content.innerHTML = `
+          <div class="card">
+            <div class="note">
+              No questions found for this questionnaire.<br/>
+              This usually means the questionnaire was created but compilation did not insert any question rows.
+            </div>
+            <div class="pre">Return to Company page and create again after fixing compilation.</div>
+          </div>
+        `;
+        return;
+      }
 
       // PGNO rows
       const { data: ap, error: apErr } = await supabase
@@ -315,7 +405,7 @@
 
       // Group PGNO by question_no
       const map = {};
-      (ap||[]).forEach(r=>{
+      (ap || []).forEach(r=>{
         map[r.question_no] = map[r.question_no] || [];
         map[r.question_no].push(r);
       });
@@ -323,18 +413,45 @@
       const content = document.getElementById("content");
       content.innerHTML = "";
 
-      (qq||[]).forEach(row=>{
-        const q = row.question_json;
-        const pgnoRows = map[row.question_no] || [];
-        // attach qid so save knows it
-        pgnoRows.forEach(r=> r.questionnaire_id = qid);
+      for (const row of qqRows){
+        const qno = String(row.question_no || "").trim();
+        const qObj = row.question_json || libMap.get(qno);
 
-        const card = renderQuestionCard(q, pgnoRows);
+        if (!qObj){
+          const warn = document.createElement("div");
+          warn.className = "card";
+          warn.innerHTML = `
+            <div class="note">
+              Missing question content for <b>${esc(qno)}</b>.<br/>
+              Neither questionnaire_questions.question_json nor locked library JSON contained this question number.
+            </div>
+          `;
+          content.appendChild(warn);
+          continue;
+        }
+
+        let pgnoRows = map[qno] || [];
+        // attach qid so save knows it
+        pgnoRows = pgnoRows.map(r => ({ ...r, questionnaire_id: qid }));
+
+        // If answers_pgno were not pre-generated, build on the fly from the library question content
+        if (!pgnoRows.length){
+          const built = buildPgnoFromLibraryQuestion(qObj, qid);
+          // Ensure question_no aligns with row.question_no
+          for (const b of built){
+            b.question_no = qno;
+            b.questionnaire_id = qid;
+          }
+          pgnoRows = built;
+        }
+
+        const card = renderQuestionCard(qObj, pgnoRows);
         content.appendChild(card);
-      });
+      }
     }
 
-    loadData().catch(e=> setError(e.message));
+    clearError();
+    loadData().catch(e => setError(e?.message || String(e)));
   </script>
 </body>
 </html>
