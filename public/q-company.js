@@ -1,13 +1,14 @@
 // public/q-company.js
 import { loadLockedLibraryJson } from "./question_library_loader.js";
 
+// =====================
+// Supabase config
+// =====================
 const SUPABASE_URL = "https://bdidrcyufazskpuwmfca.supabase.co";
-const SUPABASE_ANON_KEY =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJkaWRyY3l1ZmF6c2twdXdtZmNhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc5NDI4ODMsImV4cCI6MjA4MzUxODg4M30.Uqj4WCzoNS9wnlzI-xew6iTFzTUi77dcGeBjUgFjZbQ";
-
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJkaWRyY3l1ZmF6c2twdXdtZmNhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc5NDI4ODMsImV4cCI6MjA4MzUxODg4M30.Uqj4WCzoNS9wnlzI-xew6iTFzTUi77dcGeBjUgFjZbQ";
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// IMPORTANT: This MUST be the EXACT JSON used by Read-Only.
+// IMPORTANT: lock to the EXACT JSON you confirmed
 const LOCKED_LIBRARY_JSON = "./sire_questions_all_columns_named.json";
 
 const SESSION_KEY_COMPAT = "q_session_v1";
@@ -20,52 +21,53 @@ const UI_ROLE_MAP = {
   inspector: "Inspector / Third Party"
 };
 
-function roleToUi(role){ return UI_ROLE_MAP[role] || role || ""; }
-function el(id){ return document.getElementById(id); }
-function setSubLine(text){ el("subLine").textContent = text; }
+function roleToUi(role) { return UI_ROLE_MAP[role] || role || ""; }
+function el(id) { return document.getElementById(id); }
 
-function showWarn(msg){
+function setSubLine(text) { el("subLine").textContent = text; }
+
+function showWarn(msg) {
   const w = el("warnBox");
   w.textContent = msg;
   w.style.display = "block";
 }
 
-function clearWarn(){
+function clearWarn() {
   const w = el("warnBox");
   w.textContent = "";
   w.style.display = "none";
 }
 
-function escapeHtml(str){
+function escapeHtml(str) {
   return String(str ?? "")
-    .replaceAll("&","&amp;")
-    .replaceAll("<","&lt;")
-    .replaceAll(">","&gt;")
-    .replaceAll('"',"&quot;")
-    .replaceAll("'","&#039;");
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
 }
 
-function fmtTs(ts){
+function fmtTs(ts) {
   if (!ts) return "-";
-  try{ return new Date(ts).toLocaleString(); } catch { return String(ts); }
+  try { return new Date(ts).toLocaleString(); } catch { return String(ts); }
 }
 
-function statusPill(status){
+function statusPill(status) {
   const s = String(status || "");
   const cls = (s === "submitted") ? "submitted" : (s === "pending_office_review" ? "pending" : "progress");
   const label = (s === "in_progress") ? "In Progress" :
-                (s === "pending_office_review") ? "Pending Office Review" :
-                (s === "submitted") ? "Submitted" : s;
+    (s === "pending_office_review") ? "Pending Office Review" :
+      (s === "submitted") ? "Submitted" : s;
   return `<span class="pill ${cls}">${label}</span>`;
 }
 
 // ----------------------
 // Auth + profile
 // ----------------------
-async function getUserOrWarn(){
+async function getUserOrWarn() {
   const { data: { user }, error } = await supabaseClient.auth.getUser();
   if (error) showWarn("Auth error: " + error.message);
-  if (!user){
+  if (!user) {
     showWarn("You are not logged in. Please login first.");
     setSubLine("Not logged in.");
     return null;
@@ -73,7 +75,7 @@ async function getUserOrWarn(){
   return user;
 }
 
-async function getMyProfile(userId){
+async function getMyProfile(userId) {
   const { data, error } = await supabaseClient
     .from("profiles")
     .select("username, role, vessel_id")
@@ -83,7 +85,7 @@ async function getMyProfile(userId){
   if (error) throw error;
 
   let vesselName = "";
-  if (data?.vessel_id){
+  if (data?.vessel_id) {
     const { data: v, error: vErr } = await supabaseClient
       .from("vessels")
       .select("name")
@@ -98,7 +100,7 @@ async function getMyProfile(userId){
 // ----------------------
 // Data loading
 // ----------------------
-async function loadVessels(){
+async function loadVessels() {
   const { data, error } = await supabaseClient
     .from("vessels")
     .select("id, name, is_active")
@@ -108,7 +110,7 @@ async function loadVessels(){
   return data || [];
 }
 
-async function loadQuestionnaires(){
+async function loadQuestionnaires() {
   const { data, error } = await supabaseClient
     .from("questionnaires")
     .select("id, title, status, created_at, updated_at, vessel_id")
@@ -132,7 +134,7 @@ async function loadQuestionnaires(){
 }
 
 // Templates
-async function loadTemplates(){
+async function loadTemplates() {
   const { data, error } = await supabaseClient
     .from("questionnaire_templates")
     .select("id, name, description, is_active, created_at, updated_at")
@@ -141,64 +143,96 @@ async function loadTemplates(){
   return data || [];
 }
 
-async function loadTemplateCounts(){
+async function loadTemplateCounts() {
   const { data, error } = await supabaseClient
     .from("questionnaire_template_questions")
     .select("template_id, question_no");
   if (error) throw error;
 
   const map = new Map();
-  for (const row of (data || [])){
+  for (const row of (data || [])) {
     map.set(row.template_id, (map.get(row.template_id) || 0) + 1);
   }
   return map;
 }
 
 // ----------------------
-// Library parsing (flexible field mapping)
+// Library parsing (MATCHES sire_questions_all_columns_named.json)
 // ----------------------
 let LIB = [];
 let FILTERED = [];
 let SELECTED_SET = new Set(); // question_no strings
 
-function pick(obj, keys){
-  for (const k of keys){
+function pick(obj, keys) {
+  for (const k of keys) {
     if (obj && obj[k] != null && obj[k] !== "") return obj[k];
   }
   return "";
 }
 
-function getQno(q){
-  return String(
-    pick(q, ["question_no","questionNo","id","qid","QuestionNo","Question ID","QuestionID"])
-  ).trim();
+function getQno(q) {
+  // Your JSON uses "No." like "5.8.1"
+  return String(pick(q, ["No.", "No", "question_no", "questionNo", "id", "qid", "QuestionNo", "Question ID", "QuestionID"])).trim();
 }
 
-function getChapter(q){ return String(pick(q, ["chapter","Chapter"])).trim(); }
-function getSection(q){ return String(pick(q, ["section","Section"])).trim(); }
-function getQType(q){ return String(pick(q, ["question_type","questionType","qtype","Question Type"])).trim(); }
-function getVesselType(q){ return String(pick(q, ["vessel_type","vesselType","Vessel Type"])).trim(); }
-function getResponseType(q){ return String(pick(q, ["response_type","responseType","Response Type"])).trim(); }
-function getRisk(q){ return String(pick(q, ["risk_level","riskLevel","Risk Level"])).trim(); }
-function getRoviq(q){
-  const val = pick(q, ["roviq","roviq_list_contains","ROVIQ","ROVIQ List contains"]);
+function getChapter(q) {
+  // Your JSON uses "Chap"
+  return String(pick(q, ["Chap", "chapter", "Chapter"])).trim();
+}
+
+function getSection(q) {
+  // Your JSON uses "Sect"
+  return String(pick(q, ["Sect", "section", "Section"])).trim();
+}
+
+function getQType(q) {
+  // Your JSON uses "Question Type"
+  return String(pick(q, ["Question Type", "question_type", "questionType", "qtype"])).trim();
+}
+
+function getVesselType(q) {
+  // Your JSON uses "Vessel Type"
+  return String(pick(q, ["Vessel Type", "vessel_type", "vesselType"])).trim();
+}
+
+function getResponseType(q) {
+  // Normalize 3 columns into 1 filterable string
+  const hw = String(pick(q, ["Hardware Response Type"])).trim();
+  const hu = String(pick(q, ["Human Response Type"])).trim();
+  const pr = String(pick(q, ["Process Response Type"])).trim();
+  return [hw, hu, pr].filter(Boolean).join(" | ");
+}
+
+function getRisk(q) {
+  // Your JSON uses "Risk Level"
+  return String(pick(q, ["Risk Level", "risk_level", "riskLevel"])).trim();
+}
+
+function getRoviq(q) {
+  // Your JSON uses "ROVIQ List"
+  const val = pick(q, ["ROVIQ List", "ROVIQ List contains", "roviq", "roviq_list_contains", "ROVIQ"]);
   if (val === true) return "Yes";
   if (val === false) return "No";
   return String(val || "").trim();
 }
 
-function getTextBlob(q){
-  const a = pick(q, ["question","Question","question_text","questionText"]);
-  const b = pick(q, ["expected_evidence","Expected Evidence","expectedEvidence"]);
-  const c = pick(q, ["inspector_guidance","Inspector Guidance","inspectorGuidance"]);
-  return `${a} ${b} ${c}`.toLowerCase();
+function getTextBlob(q) {
+  const a = pick(q, ["Question", "question", "question_text", "questionText"]);
+  const b = pick(q, ["Expected Evidence", "expected_evidence", "expectedEvidence"]);
+  const c = pick(q, ["Inspection Guidance", "inspector_guidance", "Inspector Guidance", "inspectorGuidance"]);
+  const d = pick(q, ["Suggested Inspector Actions", "Suggested Actions", "suggested_actions"]);
+  const e = pick(q, ["Potential Grounds for Negative Observations", "Negative Observations", "negative_observations"]);
+  const f = pick(q, ["Section Name", "Short Text"]);
+  return `${a} ${b} ${c} ${d} ${e} ${f}`.toLowerCase();
 }
 
-function uniqSorted(arr){
-  return [...new Set(arr.filter(x => x != null && String(x).trim() !== "").map(x => String(x).trim()))].sort();
+function uniqSorted(arr) {
+  return [...new Set(arr
+    .filter(x => x != null && String(x).trim() !== "")
+    .map(x => String(x).trim()))].sort();
 }
 
-function fillSelect(selectEl, values, placeholder){
+function fillSelect(selectEl, values, placeholder) {
   selectEl.innerHTML =
     `<option value="">${escapeHtml(placeholder)}</option>` +
     values.map(v => `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join("");
@@ -207,7 +241,7 @@ function fillSelect(selectEl, values, placeholder){
 // ----------------------
 // Filters UI
 // ----------------------
-function applyFilters(){
+function applyFilters() {
   const s = el("fltSearch").value.trim().toLowerCase();
   const ch = el("fltChapter").value;
   const sec = el("fltSection").value;
@@ -224,34 +258,47 @@ function applyFilters(){
     if (ch && getChapter(q) !== ch) return false;
     if (sec && getSection(q) !== sec) return false;
     if (qt && getQType(q) !== qt) return false;
-    if (vt && getVesselType(q) !== vt) return false;
+
+    // Vessel Type in your JSON is comma-separated list, so "contains" match is better.
+    if (vt) {
+      const vstr = getVesselType(q);
+      const parts = vstr.split(",").map(x => x.trim()).filter(Boolean);
+      if (!parts.includes(vt)) return false;
+    }
+
     if (rt && getResponseType(q) !== rt) return false;
     if (rk && getRisk(q) !== rk) return false;
-    if (rv && getRoviq(q) !== rv) return false;
 
-    if (s){
-      const blob = `${qno} ${getChapter(q)} ${getSection(q)} ${getQType(q)} ${getVesselType(q)} ${getResponseType(q)} ${getTextBlob(q)}`;
+    // ROVIQ is a comma-separated list, so "contains" match is better.
+    if (rv) {
+      const rstr = getRoviq(q);
+      if (!String(rstr).includes(rv)) return false;
+    }
+
+    if (s) {
+      const blob = `${qno} ${getChapter(q)} ${getSection(q)} ${getQType(q)} ${getVesselType(q)} ${getResponseType(q)} ${getRisk(q)} ${getRoviq(q)} ${getTextBlob(q)}`.toLowerCase();
       if (!blob.includes(s)) return false;
     }
+
     return true;
   });
 
   el("fltCount").textContent = `${FILTERED.length} questions currently selected by filters`;
 }
 
-function renderSelectedSummary(){
+function renderSelectedSummary() {
   el("selectedCount").textContent = `${SELECTED_SET.size} questions selected for compile`;
 }
 
-function selectAllFiltered(){
-  for (const q of FILTERED){
+function selectAllFiltered() {
+  for (const q of FILTERED) {
     const qno = getQno(q);
     if (qno) SELECTED_SET.add(qno);
   }
   renderSelectedSummary();
 }
 
-function clearSelected(){
+function clearSelected() {
   SELECTED_SET = new Set();
   renderSelectedSummary();
 }
@@ -263,18 +310,16 @@ let ALL_Q = [];
 let VESSELS = [];
 let PROFILE = null;
 
-function renderVesselSelect(){
+function renderVesselSelect() {
   const sel = el("vesselSelect");
-  if (!VESSELS.length){
+  if (!VESSELS.length) {
     sel.innerHTML = `<option value="">(No vessels found)</option>`;
     return;
   }
-  sel.innerHTML = VESSELS
-    .map(v => `<option value="${escapeHtml(v.id)}">${escapeHtml(v.name)}</option>`)
-    .join("");
+  sel.innerHTML = VESSELS.map(v => `<option value="${escapeHtml(v.id)}">${escapeHtml(v.name)}</option>`).join("");
 }
 
-function renderQuestionnairesTable(){
+function renderQuestionnairesTable() {
   const term = el("searchInput").value.trim().toLowerCase();
   const body = el("tableBody");
 
@@ -286,7 +331,7 @@ function renderQuestionnairesTable(){
     return vessel.toLowerCase().includes(term) || t.toLowerCase().includes(term) || s.toLowerCase().includes(term);
   });
 
-  if (!rows.length){
+  if (!rows.length) {
     body.innerHTML = `<tr><td colspan="6" class="small">No questionnaires found.</td></tr>`;
     return;
   }
@@ -343,28 +388,28 @@ function renderQuestionnairesTable(){
   });
 }
 
-async function updateStatus(qid, newStatus){
+async function updateStatus(qid, newStatus) {
   clearWarn();
   const { error } = await supabaseClient
     .from("questionnaires")
     .update({ status: newStatus })
     .eq("id", qid);
 
-  if (error){
+  if (error) {
     showWarn("Status update failed: " + error.message);
     return;
   }
   await refreshAll();
 }
 
-async function deleteQuestionnaire(qid){
+async function deleteQuestionnaire(qid) {
   clearWarn();
   const { error } = await supabaseClient
     .from("questionnaires")
     .delete()
     .eq("id", qid);
 
-  if (error){
+  if (error) {
     showWarn("Delete failed: " + error.message);
     return;
   }
@@ -377,11 +422,11 @@ async function deleteQuestionnaire(qid){
 let TEMPLATES = [];
 let TEMPLATE_COUNTS = new Map();
 
-function renderTemplates(){
+function renderTemplates() {
   const body = el("tplBody");
   const isSuper = (PROFILE?.role === "super_admin");
 
-  if (!TEMPLATES.length){
+  if (!TEMPLATES.length) {
     body.innerHTML = `<tr><td colspan="5" class="small">No templates found.</td></tr>`;
     return;
   }
@@ -422,12 +467,12 @@ function renderTemplates(){
   });
 }
 
-async function createTemplate(){
+async function createTemplate() {
   clearWarn();
   const name = el("tplName").value.trim();
   const desc = el("tplDesc").value.trim();
 
-  if (!name){
+  if (!name) {
     showWarn("Template name is required.");
     return;
   }
@@ -438,7 +483,7 @@ async function createTemplate(){
     .select("id")
     .single();
 
-  if (error){
+  if (error) {
     showWarn("Create template failed: " + error.message);
     return;
   }
@@ -446,31 +491,35 @@ async function createTemplate(){
   el("tplName").value = "";
   el("tplDesc").value = "";
 
-  if (confirm("Template created. Compile it now using the currently SELECTED questions?")){
+  if (confirm("Template created. Compile it now using the currently SELECTED questions?")) {
     await compileTemplateQuestions(data.id);
   } else {
     await refreshTemplates();
   }
 }
 
-async function compileTemplateQuestions(templateId){
+async function compileTemplateQuestions(templateId) {
   clearWarn();
 
-  if (SELECTED_SET.size < 1){
+  if (SELECTED_SET.size < 1) {
     showWarn("No questions selected. Select questions first, then compile.");
     return;
   }
 
-  const { error: delErr } = await supabaseClient
-    .from("questionnaire_template_questions")
-    .delete()
-    .eq("template_id", templateId);
+  // Wipe old rows
+  {
+    const { error } = await supabaseClient
+      .from("questionnaire_template_questions")
+      .delete()
+      .eq("template_id", templateId);
 
-  if (delErr){
-    showWarn("Failed clearing template questions: " + delErr.message);
-    return;
+    if (error) {
+      showWarn("Failed clearing template questions: " + error.message);
+      return;
+    }
   }
 
+  // Insert new rows with sort_order based on insertion order
   const selected = Array.from(SELECTED_SET);
   const payload = selected.map((qno, idx) => ({
     template_id: templateId,
@@ -482,7 +531,7 @@ async function compileTemplateQuestions(templateId){
     .from("questionnaire_template_questions")
     .insert(payload);
 
-  if (error){
+  if (error) {
     showWarn("Compile failed: " + error.message);
     return;
   }
@@ -490,17 +539,17 @@ async function compileTemplateQuestions(templateId){
   await refreshTemplates();
 }
 
-async function createQuestionnaireFromTemplateFlow(templateId){
+async function createQuestionnaireFromTemplateFlow(templateId) {
   clearWarn();
 
   const vesselId = el("vesselSelect").value;
   const title = el("titleInput").value.trim();
 
-  if (!vesselId){
+  if (!vesselId) {
     showWarn("Select a vessel first (left panel Vessel).");
     return;
   }
-  if (!title){
+  if (!title) {
     showWarn("Enter a title first (left panel Title).");
     return;
   }
@@ -512,7 +561,7 @@ async function createQuestionnaireFromTemplateFlow(templateId){
       p_title: title
     });
 
-  if (error){
+  if (error) {
     showWarn("Create from template failed: " + error.message);
     return;
   }
@@ -520,33 +569,34 @@ async function createQuestionnaireFromTemplateFlow(templateId){
   const qid = data;
   await refreshAll();
 
-  if (qid){
+  if (qid) {
     window.location.href = "./q-answer.html?qid=" + encodeURIComponent(qid);
   }
 }
 
 // ----------------------
-// Create questionnaire by compiling (Option A)
+// Create questionnaire by compile (Option A)
 // ----------------------
-async function createQuestionnaireByCompile(userId){
+async function createQuestionnaireByCompile(userId) {
   clearWarn();
 
   const vesselId = el("vesselSelect").value;
   const title = el("titleInput").value.trim();
 
-  if (!vesselId){
+  if (!vesselId) {
     showWarn("Please select a vessel.");
     return;
   }
-  if (!title){
+  if (!title) {
     showWarn("Please enter a title.");
     return;
   }
-  if (SELECTED_SET.size < 1){
+  if (SELECTED_SET.size < 1) {
     showWarn("No questions selected. Adjust filters, then click Select All Filtered.");
     return;
   }
 
+  // 1) Create questionnaire
   const payload = { title, vessel_id: vesselId, status: "in_progress", created_by: userId };
 
   const { data: q, error: qErr } = await supabaseClient
@@ -555,13 +605,14 @@ async function createQuestionnaireByCompile(userId){
     .select("id")
     .single();
 
-  if (qErr){
+  if (qErr) {
     showWarn("Create questionnaire failed: " + qErr.message);
     return;
   }
 
   const qid = q.id;
 
+  // 2) Map selected questions into questionnaire_questions
   const selected = Array.from(SELECTED_SET);
   const rows = selected.map(qno => ({ questionnaire_id: qid, question_no: qno }));
 
@@ -569,7 +620,7 @@ async function createQuestionnaireByCompile(userId){
     .from("questionnaire_questions")
     .insert(rows);
 
-  if (qqErr){
+  if (qqErr) {
     showWarn("Created questionnaire, but failed to compile questions: " + qqErr.message);
     return;
   }
@@ -583,13 +634,13 @@ async function createQuestionnaireByCompile(userId){
 // ----------------------
 // Refresh
 // ----------------------
-async function refreshTemplates(){
+async function refreshTemplates() {
   TEMPLATES = await loadTemplates();
   TEMPLATE_COUNTS = await loadTemplateCounts();
   renderTemplates();
 }
 
-async function refreshAll(){
+async function refreshAll() {
   VESSELS = await loadVessels();
   renderVesselSelect();
 
@@ -602,15 +653,15 @@ async function refreshAll(){
 // ----------------------
 // Init
 // ----------------------
-async function init(){
+async function init() {
   clearWarn();
 
   const user = await getUserOrWarn();
   if (!user) return;
 
-  try{
+  try {
     PROFILE = await getMyProfile(user.id);
-  }catch(e){
+  } catch (e) {
     setSubLine("Logged in, but profile missing or blocked.");
     showWarn("Profile missing or blocked by RLS. Ensure a row exists in public.profiles for this user.");
     return;
@@ -633,41 +684,61 @@ async function init(){
   setSubLine("Connected. Loading question library, vessels, questionnaires, templates...");
 
   // Load library JSON (locked)
-  try{
+  try {
     LIB = await loadLockedLibraryJson(LOCKED_LIBRARY_JSON);
-  }catch(e){
+  } catch (e) {
     showWarn(
-      `Question library load failed: ${String(e.message || e)}\n\n` +
-      `Fix: confirm the file exists at: ${LOCKED_LIBRARY_JSON} (public folder) and is reachable via browser.`
+      `Question library load failed.\n\n` +
+      `Expected to load: ${LOCKED_LIBRARY_JSON}\n` +
+      `Error: ${String(e.message || e)}\n\n` +
+      `Fix: ensure the file exists in /public and the filename matches exactly.`
     );
     setSubLine("Error loading library JSON.");
+    LIB = [];
   }
 
-  if (LIB.length){
+  // Build filter dropdowns
+  if (LIB.length) {
     const chapters = uniqSorted(LIB.map(getChapter));
     const sections = uniqSorted(LIB.map(getSection));
     const qtypes = uniqSorted(LIB.map(getQType));
-    const vtypes = uniqSorted(LIB.map(getVesselType));
-    const rtypes = uniqSorted(LIB.map(getResponseType));
+
+    // Vessel Type is often multi-valued "Chemical, LNG, LPG, Oil" -> split into distinct options
+    const vesselTypes = uniqSorted(
+      LIB.flatMap(q => String(getVesselType(q) || "").split(",").map(x => x.trim()).filter(Boolean))
+    );
+
+    const responseTypes = uniqSorted(LIB.map(getResponseType));
     const risks = uniqSorted(LIB.map(getRisk));
-    const roviq = uniqSorted(LIB.map(getRoviq));
+
+    // ROVIQ list is multi-valued -> split to distinct options
+    const roviqValues = uniqSorted(
+      LIB.flatMap(q => String(getRoviq(q) || "").split(",").map(x => x.trim()).filter(Boolean))
+    );
 
     fillSelect(el("fltChapter"), chapters, "Chapter");
     fillSelect(el("fltSection"), sections, "Section");
     fillSelect(el("fltQType"), qtypes, "Question Type");
-    fillSelect(el("fltVesselType"), vtypes, "Vessel Type");
-    fillSelect(el("fltResponseType"), rtypes, "Response Type");
+    fillSelect(el("fltVesselType"), vesselTypes, "Vessel Type");
+    fillSelect(el("fltResponseType"), responseTypes, "Response Type");
     fillSelect(el("fltRisk"), risks, "Risk Level");
-    fillSelect(el("fltRoviq"), roviq, "ROVIQ List contains");
+    fillSelect(el("fltRoviq"), roviqValues, "ROVIQ List contains");
 
     applyFilters();
     renderSelectedSummary();
+  } else {
+    // Keep selects usable even if LIB fails
+    ["fltChapter", "fltSection", "fltQType", "fltVesselType", "fltResponseType", "fltRisk", "fltRoviq"].forEach(id => {
+      const s = el(id);
+      if (s) s.innerHTML = `<option value="">(library not loaded)</option>`;
+    });
   }
 
-  try{
+  // Load DB data
+  try {
     await refreshAll();
     setSubLine("Ready.");
-  }catch(e){
+  } catch (e) {
     showWarn("Load failed: " + String(e.message || e));
     setSubLine("Error loading data.");
   }
@@ -680,7 +751,7 @@ async function init(){
   el("clearBtn").addEventListener("click", () => { el("titleInput").value = ""; });
 
   // Filters
-  ["fltSearch","fltChapter","fltSection","fltQType","fltVesselType","fltResponseType","fltRisk","fltRoviq"].forEach(id => {
+  ["fltSearch", "fltChapter", "fltSection", "fltQType", "fltVesselType", "fltResponseType", "fltRisk", "fltRoviq"].forEach(id => {
     el(id).addEventListener("input", () => { applyFilters(); });
     el(id).addEventListener("change", () => { applyFilters(); });
   });
