@@ -2,8 +2,16 @@
 import { loadLockedLibraryJson } from "./question_library_loader.js";
 
 const SUPABASE_URL = "https://bdidrcyufazskpuwmfca.supabase.co";
-const SUPABASE_ANON_KEY = "YOUR_ANON_KEY_HERE"; // keep your existing key
-const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const SUPABASE_ANON_KEY =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJkaWRyY3l1ZmF6c2twdXdtZmNhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc5NDI4ODMsImV4cCI6MjA4MzUxODg4M30.Uqj4WCzoNS9wnlzI-xew6iTFzTUi77dcGeBjUgFjZbQ";
+
+const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true,
+  },
+});
 
 // Lock to EXACT library JSON
 const LOCKED_LIBRARY_JSON = "./sire_questions_all_columns_named.json";
@@ -15,64 +23,85 @@ const UI_ROLE_MAP = {
   company_admin: "Company Admin",
   company_superintendent: "Company Superintendent",
   vessel: "Vessel",
-  inspector: "Inspector / Third Party"
+  inspector: "Inspector / Third Party",
 };
 
-function roleToUi(role){ return UI_ROLE_MAP[role] || role || ""; }
-function el(id){ return document.getElementById(id); }
+function roleToUi(role) {
+  return UI_ROLE_MAP[role] || role || "";
+}
+function el(id) {
+  return document.getElementById(id);
+}
 
-function setSubLine(text){ el("subLine").textContent = text; }
+function setSubLine(text) {
+  el("subLine").textContent = text;
+}
 
-function showWarn(msg){
+function showWarn(msg) {
   const w = el("warnBox");
   w.textContent = msg;
   w.style.display = "block";
 }
 
-function clearWarn(){
+function clearWarn() {
   const w = el("warnBox");
   w.textContent = "";
   w.style.display = "none";
 }
 
-function escapeHtml(str){
+function escapeHtml(str) {
   return String(str ?? "")
-    .replaceAll("&","&amp;")
-    .replaceAll("<","&lt;")
-    .replaceAll(">","&gt;")
-    .replaceAll('"',"&quot;")
-    .replaceAll("'","&#039;");
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
 }
 
-function fmtTs(ts){
+function fmtTs(ts) {
   if (!ts) return "-";
-  try{ return new Date(ts).toLocaleString(); } catch { return String(ts); }
+  try {
+    return new Date(ts).toLocaleString();
+  } catch {
+    return String(ts);
+  }
 }
 
-function statusPill(status){
+function statusPill(status) {
   const s = String(status || "");
-  const cls = (s === "submitted") ? "submitted" : (s === "pending_office_review" ? "pending" : "progress");
-  const label = (s === "in_progress") ? "In Progress" :
-                (s === "pending_office_review") ? "Pending Office Review" :
-                (s === "submitted") ? "Submitted" : s;
+  const cls =
+    s === "submitted" ? "submitted" : s === "pending_office_review" ? "pending" : "progress";
+  const label =
+    s === "in_progress"
+      ? "In Progress"
+      : s === "pending_office_review"
+      ? "Pending Office Review"
+      : s === "submitted"
+      ? "Submitted"
+      : s;
   return `<span class="pill ${cls}">${label}</span>`;
 }
 
 // ----------------------
-// Auth + profile
+// Auth + profile (FIXED)
 // ----------------------
-async function getUserOrWarn(){
-  const { data: { user }, error } = await supabaseClient.auth.getUser();
-  if (error) showWarn("Auth error: " + error.message);
-  if (!user){
+async function getSessionOrWarn() {
+  const { data, error } = await supabaseClient.auth.getSession();
+  if (error) {
+    showWarn("Auth error: " + error.message);
+    setSubLine("Auth error.");
+    return null;
+  }
+  const session = data?.session || null;
+  if (!session?.user) {
     showWarn("You are not logged in. Please login first.");
     setSubLine("Not logged in.");
     return null;
   }
-  return user;
+  return session;
 }
 
-async function getMyProfile(userId){
+async function getMyProfile(userId) {
   const { data, error } = await supabaseClient
     .from("profiles")
     .select("username, role, vessel_id")
@@ -82,7 +111,7 @@ async function getMyProfile(userId){
   if (error) throw error;
 
   let vesselName = "";
-  if (data?.vessel_id){
+  if (data?.vessel_id) {
     const { data: v, error: vErr } = await supabaseClient
       .from("vessels")
       .select("name")
@@ -97,7 +126,7 @@ async function getMyProfile(userId){
 // ----------------------
 // Data loading
 // ----------------------
-async function loadVessels(){
+async function loadVessels() {
   const { data, error } = await supabaseClient
     .from("vessels")
     .select("id, name, is_active")
@@ -107,7 +136,7 @@ async function loadVessels(){
   return data || [];
 }
 
-async function loadQuestionnaires(){
+async function loadQuestionnaires() {
   const { data, error } = await supabaseClient
     .from("questionnaires")
     .select("id, title, status, created_at, updated_at, vessel_id")
@@ -115,23 +144,23 @@ async function loadQuestionnaires(){
   if (error) throw error;
 
   const rows = data || [];
-  const vesselIds = [...new Set(rows.map(r => r.vessel_id).filter(Boolean))];
+  const vesselIds = [...new Set(rows.map((r) => r.vessel_id).filter(Boolean))];
 
-  if (!vesselIds.length) return rows.map(r => ({ ...r, vessel_name: "" }));
+  if (!vesselIds.length) return rows.map((r) => ({ ...r, vessel_name: "" }));
 
   const { data: vessels, error: vErr } = await supabaseClient
     .from("vessels")
     .select("id, name")
     .in("id", vesselIds);
 
-  if (vErr) return rows.map(r => ({ ...r, vessel_name: "" }));
+  if (vErr) return rows.map((r) => ({ ...r, vessel_name: "" }));
 
-  const map = new Map((vessels || []).map(v => [v.id, v.name]));
-  return rows.map(r => ({ ...r, vessel_name: map.get(r.vessel_id) || "" }));
+  const map = new Map((vessels || []).map((v) => [v.id, v.name]));
+  return rows.map((r) => ({ ...r, vessel_name: map.get(r.vessel_id) || "" }));
 }
 
 // Templates
-async function loadTemplates(){
+async function loadTemplates() {
   const { data, error } = await supabaseClient
     .from("questionnaire_templates")
     .select("id, name, description, is_active, created_at, updated_at")
@@ -140,14 +169,14 @@ async function loadTemplates(){
   return data || [];
 }
 
-async function loadTemplateCounts(){
+async function loadTemplateCounts() {
   const { data, error } = await supabaseClient
     .from("questionnaire_template_questions")
     .select("template_id, question_no");
   if (error) throw error;
 
   const map = new Map();
-  for (const row of (data || [])){
+  for (const row of data || []) {
     map.set(row.template_id, (map.get(row.template_id) || 0) + 1);
   }
   return map;
@@ -161,65 +190,65 @@ let LIB_BY_NO = new Map();
 let FILTERED = [];
 let SELECTED_SET = new Set(); // question_no strings
 
-function pick(obj, keys){
-  for (const k of keys){
+function pick(obj, keys) {
+  for (const k of keys) {
     if (obj && obj[k] != null && obj[k] !== "") return obj[k];
   }
   return "";
 }
 
-function getQno(q){
+function getQno(q) {
   return String(
-    pick(q, ["No.","No", "question_no","questionNo","id","qid","QuestionNo","Question ID","QuestionID"])
+    pick(q, ["No.", "No", "question_no", "questionNo", "id", "qid", "QuestionNo", "Question ID", "QuestionID"])
   ).trim();
 }
 
-function getChapter(q){
-  const v = pick(q, ["Chap","chapter","Chapter"]);
+function getChapter(q) {
+  const v = pick(q, ["Chap", "chapter", "Chapter"]);
   return String(v ?? "").trim();
 }
 
-function getQType(q){
-  return String(pick(q, ["Question Type","question_type","questionType","qtype"])).trim();
+function getQType(q) {
+  return String(pick(q, ["Question Type", "question_type", "questionType", "qtype"])).trim();
 }
 
-function getVesselTypeRaw(q){
-  return String(pick(q, ["Vessel Type","vessel_type","vesselType"])).trim();
+function getVesselTypeRaw(q) {
+  return String(pick(q, ["Vessel Type", "vessel_type", "vesselType"])).trim();
 }
 
-function getRankAllocRaw(q){
-  return String(pick(q, ["Company Rank Allocation","SPIS Rank Allocation","Rank Allocation"])).trim();
+function getRankAllocRaw(q) {
+  return String(pick(q, ["Company Rank Allocation", "SPIS Rank Allocation", "Rank Allocation"])).trim();
 }
 
-function hasResponse(q, kind){
-  if (kind === "Human"){
-    const v = String(pick(q, ["Human Response Type","Human Response","Human"])).trim();
+function hasResponse(q, kind) {
+  if (kind === "Human") {
+    const v = String(pick(q, ["Human Response Type", "Human Response", "Human"])).trim();
     return v !== "" && v.toLowerCase() !== "none";
   }
-  if (kind === "Hardware"){
-    const v = String(pick(q, ["Hardware Response Type","Hardware Response","Hardware"])).trim();
+  if (kind === "Hardware") {
+    const v = String(pick(q, ["Hardware Response Type", "Hardware Response", "Hardware"])).trim();
     return v !== "" && v.toLowerCase() !== "none";
   }
-  if (kind === "Process"){
-    const v = String(pick(q, ["Process Response Type","Process Response","Process"])).trim();
+  if (kind === "Process") {
+    const v = String(pick(q, ["Process Response Type", "Process Response", "Process"])).trim();
     return v !== "" && v.toLowerCase() !== "none";
   }
-  if (kind === "Photo"){
-    const v = pick(q, ["Photo Response","Photo"]);
+  if (kind === "Photo") {
+    const v = pick(q, ["Photo Response", "Photo"]);
     return String(v ?? "").trim().toUpperCase() === "Y" || v === true;
   }
   return false;
 }
 
-function getTextBlob(q){
-  const a = pick(q, ["Question","question","question_text","questionText"]);
-  const b = pick(q, ["Expected Evidence","expected_evidence","expectedEvidence"]);
-  const c = pick(q, ["Inspection Guidance","Inspector Guidance","inspector_guidance","inspectorGuidance"]);
+function getTextBlob(q) {
+  const a = pick(q, ["Question", "question", "question_text", "questionText"]);
+  const b = pick(q, ["Expected Evidence", "expected_evidence", "expectedEvidence"]);
+  const c = pick(q, ["Inspection Guidance", "Inspector Guidance", "inspector_guidance", "inspectorGuidance"]);
   return `${a} ${b} ${c}`.toLowerCase();
 }
 
 // ----------------------
-// Filter UI (Read-Only style dropdowns)
+// Filters (requested set only)
 // ----------------------
 const VESSEL_TYPES_FIXED = ["Chemical", "LNG", "LPG", "Oil"];
 
@@ -232,7 +261,7 @@ const RANKS_FIXED = [
   "Engine Officers",
   "All Crew",
   "Galley Staff",
-  "Deck Ratings"
+  "Deck Ratings",
 ];
 
 const RESP_TYPES_FIXED = ["Human", "Hardware", "Process", "Photo"];
@@ -242,14 +271,14 @@ const FILTERS = {
   qtype: { label: "Question Type", values: [], selected: new Set() },
   vessel: { label: "Vessel Type", values: VESSEL_TYPES_FIXED, selected: new Set() },
   rank: { label: "Rank Allocation", values: RANKS_FIXED, selected: new Set() },
-  resp: { label: "Response", values: RESP_TYPES_FIXED, selected: new Set() }
+  resp: { label: "Response", values: RESP_TYPES_FIXED, selected: new Set() },
 };
 
-function closeAllFilterMenus(){
-  document.querySelectorAll(".fltDD.open").forEach(d => d.classList.remove("open"));
+function closeAllFilterMenus() {
+  document.querySelectorAll(".fltDD.open").forEach((d) => d.classList.remove("open"));
 }
 
-function renderFilterBar(){
+function renderFilterBar() {
   const row = el("filterRow");
   row.innerHTML = "";
 
@@ -269,29 +298,30 @@ function renderFilterBar(){
             <button type="button" class="fltMiniBtn" data-none="1">None</button>
           </div>
         </div>
-        <div data-items="1"></div>
+        <div class="fltItems" data-items="1"></div>
       </div>
     `;
 
     const btn = wrap.querySelector("[data-btn]");
-    const menu = wrap.querySelector("[data-menu]");
     const items = wrap.querySelector("[data-items]");
     const btnAll = wrap.querySelector("[data-all]");
     const btnNone = wrap.querySelector("[data-none]");
 
     const rebuildItems = () => {
       const values = f.values || [];
-      items.innerHTML = values.map(v => {
-        const checked = f.selected.has(String(v));
-        return `
-          <label class="fltItem">
-            <input type="checkbox" data-val="${escapeHtml(String(v))}" ${checked ? "checked" : ""}/>
-            <span>${escapeHtml(String(v))}</span>
-          </label>
-        `;
-      }).join("");
+      items.innerHTML = values
+        .map((v) => {
+          const checked = f.selected.has(String(v));
+          return `
+            <label class="fltItem">
+              <input type="checkbox" data-val="${escapeHtml(String(v))}" ${checked ? "checked" : ""}/>
+              <span>${escapeHtml(String(v))}</span>
+            </label>
+          `;
+        })
+        .join("");
 
-      items.querySelectorAll("input[type=checkbox]").forEach(cb => {
+      items.querySelectorAll("input[type=checkbox]").forEach((cb) => {
         cb.addEventListener("change", () => {
           const v = cb.getAttribute("data-val");
           if (!v) return;
@@ -310,7 +340,7 @@ function renderFilterBar(){
     });
 
     btnAll.addEventListener("click", () => {
-      f.selected = new Set((f.values || []).map(v => String(v)));
+      f.selected = new Set((f.values || []).map((v) => String(v)));
       rebuildItems();
       applyFilters();
     });
@@ -332,63 +362,65 @@ function renderFilterBar(){
   makeDD("resp");
 }
 
-function normList(str){
-  return String(str || "")
-    .split(",")
-    .map(s => s.trim())
-    .filter(Boolean);
-}
-
-function applyFilters(){
+function applyFilters() {
   const s = el("fltSearch").value.trim().toLowerCase();
 
-  FILTERED = LIB.filter(q => {
+  FILTERED = LIB.filter((q) => {
     const qno = getQno(q);
     if (!qno) return false;
 
     // Chapters
-    if (FILTERS.chapters.selected.size){
+    if (FILTERS.chapters.selected.size) {
       const ch = getChapter(q);
       if (!FILTERS.chapters.selected.has(String(ch))) return false;
     }
 
-    // Question type
-    if (FILTERS.qtype.selected.size){
+    // Question Type
+    if (FILTERS.qtype.selected.size) {
       const qt = getQType(q);
       if (!FILTERS.qtype.selected.has(String(qt))) return false;
     }
 
-    // Vessel type: match if question vessel type string contains any selected type
-    if (FILTERS.vessel.selected.size){
+    // Vessel Type: match if library field contains any selected type
+    if (FILTERS.vessel.selected.size) {
       const raw = getVesselTypeRaw(q).toLowerCase();
       let ok = false;
-      for (const t of FILTERS.vessel.selected){
-        if (raw.includes(String(t).toLowerCase())) { ok = true; break; }
+      for (const t of FILTERS.vessel.selected) {
+        if (raw.includes(String(t).toLowerCase())) {
+          ok = true;
+          break;
+        }
       }
       if (!ok) return false;
     }
 
-    // Rank allocation: match if allocation list includes any selected rank (substring match)
-    if (FILTERS.rank.selected.size){
+    // Rank allocation: substring match
+    if (FILTERS.rank.selected.size) {
       const alloc = getRankAllocRaw(q).toLowerCase();
       let ok = false;
-      for (const r of FILTERS.rank.selected){
-        if (alloc.includes(String(r).toLowerCase())) { ok = true; break; }
+      for (const r of FILTERS.rank.selected) {
+        if (alloc.includes(String(r).toLowerCase())) {
+          ok = true;
+          break;
+        }
       }
       if (!ok) return false;
     }
 
-    // Response filter: pass if question supports ANY selected response type
-    if (FILTERS.resp.selected.size){
+    // Response: pass if question supports ANY selected response type
+    if (FILTERS.resp.selected.size) {
       let ok = false;
-      for (const k of FILTERS.resp.selected){
-        if (hasResponse(q, String(k))) { ok = true; break; }
+      for (const k of FILTERS.resp.selected) {
+        if (hasResponse(q, String(k))) {
+          ok = true;
+          break;
+        }
       }
       if (!ok) return false;
     }
 
     // Search
-    if (s){
+    if (s) {
       const blob = `${qno} ${getChapter(q)} ${getQType(q)} ${getVesselTypeRaw(q)} ${getRankAllocRaw(q)} ${getTextBlob(q)}`;
       if (!blob.toLowerCase().includes(s)) return false;
     }
@@ -399,19 +431,19 @@ function applyFilters(){
   el("fltCount").textContent = `${FILTERED.length} questions currently selected by filters`;
 }
 
-function renderSelectedSummary(){
+function renderSelectedSummary() {
   el("selectedCount").textContent = `${SELECTED_SET.size} questions selected for compile`;
 }
 
-function selectAllFiltered(){
-  for (const q of FILTERED){
+function selectAllFiltered() {
+  for (const q of FILTERED) {
     const qno = getQno(q);
     if (qno) SELECTED_SET.add(qno);
   }
   renderSelectedSummary();
 }
 
-function clearSelected(){
+function clearSelected() {
   SELECTED_SET = new Set();
   renderSelectedSummary();
 }
@@ -423,62 +455,74 @@ let ALL_Q = [];
 let VESSELS = [];
 let PROFILE = null;
 
-function renderVesselSelect(){
+function renderVesselSelect() {
   const sel = el("vesselSelect");
-  if (!VESSELS.length){
+  if (!VESSELS.length) {
     sel.innerHTML = `<option value="">(No vessels found)</option>`;
     return;
   }
-  sel.innerHTML = VESSELS.map(v => `<option value="${escapeHtml(v.id)}">${escapeHtml(v.name)}</option>`).join("");
+  sel.innerHTML = VESSELS
+    .map((v) => `<option value="${escapeHtml(v.id)}">${escapeHtml(v.name)}</option>`)
+    .join("");
 }
 
-function renderQuestionnairesTable(){
+function renderQuestionnairesTable() {
   const term = el("searchInput").value.trim().toLowerCase();
   const body = el("tableBody");
 
-  const rows = ALL_Q.filter(q => {
+  const rows = ALL_Q.filter((q) => {
     if (!term) return true;
     const vessel = q?.vessel_name || "";
-    const s = String(q.status || "");
-    const t = String(q.title || "");
-    return vessel.toLowerCase().includes(term) || t.toLowerCase().includes(term) || s.toLowerCase().includes(term);
+    const st = String(q.status || "");
+    const tt = String(q.title || "");
+    return (
+      vessel.toLowerCase().includes(term) ||
+      tt.toLowerCase().includes(term) ||
+      st.toLowerCase().includes(term)
+    );
   });
 
-  if (!rows.length){
+  const isSuper = PROFILE?.role === "super_admin";
+
+  if (!rows.length) {
     body.innerHTML = `<tr><td colspan="6" class="small">No questionnaires found.</td></tr>`;
     return;
   }
 
-  const isSuper = (PROFILE?.role === "super_admin");
+  body.innerHTML = rows
+    .map((q) => {
+      const vessel = q?.vessel_name || "";
+      return `
+        <tr>
+          <td>${statusPill(q.status)}</td>
+          <td>${escapeHtml(vessel)}</td>
+          <td>
+            <div style="font-weight:950;">${escapeHtml(q.title)}</div>
+            <div class="small mono">ID: ${escapeHtml(q.id)}</div>
+          </td>
+          <td class="small">
+            <div>Updated: ${escapeHtml(fmtTs(q.updated_at))}</div>
+            <div>Created: ${escapeHtml(fmtTs(q.created_at))}</div>
+          </td>
+          <td>
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+              <a class="btn btn-muted" href="./q-answer.html?qid=${encodeURIComponent(q.id)}">Open</a>
+              ${
+                isSuper
+                  ? `<button class="btn btn-danger" type="button" data-del="1" data-id="${escapeHtml(q.id)}">Delete</button>`
+                  : ``
+              }
+            </div>
+          </td>
+          <td class="small">
+            Answer in <span class="mono">q-answer.html?qid=&lt;uuid&gt;</span>
+          </td>
+        </tr>
+      `;
+    })
+    .join("");
 
-  body.innerHTML = rows.map(q => {
-    const vessel = q?.vessel_name || "";
-    return `
-      <tr>
-        <td>${statusPill(q.status)}</td>
-        <td>${escapeHtml(vessel)}</td>
-        <td>
-          <div style="font-weight:950;">${escapeHtml(q.title)}</div>
-          <div class="small mono">ID: ${escapeHtml(q.id)}</div>
-        </td>
-        <td class="small">
-          <div>Updated: ${escapeHtml(fmtTs(q.updated_at))}</div>
-          <div>Created: ${escapeHtml(fmtTs(q.created_at))}</div>
-        </td>
-        <td>
-          <div style="display:flex; gap:8px; flex-wrap:wrap;">
-            <a class="btn btn-muted" href="./q-answer.html?qid=${encodeURIComponent(q.id)}">Open</a>
-            ${isSuper ? `<button class="btn btn-danger" type="button" data-del="1" data-id="${escapeHtml(q.id)}">Delete</button>` : ``}
-          </div>
-        </td>
-        <td class="small">
-          Answer in <span class="mono">q-answer.html?qid=&lt;uuid&gt;</span>
-        </td>
-      </tr>
-    `;
-  }).join("");
-
-  body.querySelectorAll("button[data-del]").forEach(btn => {
+  body.querySelectorAll("button[data-del]").forEach((btn) => {
     btn.addEventListener("click", async () => {
       const qid = btn.getAttribute("data-id");
       if (!qid) return;
@@ -488,14 +532,10 @@ function renderQuestionnairesTable(){
   });
 }
 
-async function deleteQuestionnaire(qid){
+async function deleteQuestionnaire(qid) {
   clearWarn();
-  const { error } = await supabaseClient
-    .from("questionnaires")
-    .delete()
-    .eq("id", qid);
-
-  if (error){
+  const { error } = await supabaseClient.from("questionnaires").delete().eq("id", qid);
+  if (error) {
     showWarn("Delete failed: " + error.message);
     return;
   }
@@ -508,34 +548,48 @@ async function deleteQuestionnaire(qid){
 let TEMPLATES = [];
 let TEMPLATE_COUNTS = new Map();
 
-function renderTemplates(){
+function renderTemplates() {
   const body = el("tplBody");
-  const isSuper = (PROFILE?.role === "super_admin");
+  const isSuper = PROFILE?.role === "super_admin";
 
-  if (!TEMPLATES.length){
+  if (!TEMPLATES.length) {
     body.innerHTML = `<tr><td colspan="5" class="small">No templates found.</td></tr>`;
     return;
   }
 
-  body.innerHTML = TEMPLATES.map(t => {
-    const cnt = TEMPLATE_COUNTS.get(t.id) || 0;
-    return `
-      <tr>
-        <td style="font-weight:950;">${escapeHtml(t.name)}</td>
-        <td class="small">${escapeHtml(t.description || "")}</td>
-        <td class="small">${cnt}</td>
-        <td class="small">${escapeHtml(fmtTs(t.updated_at || t.created_at))}</td>
-        <td>
-          <div style="display:flex; gap:8px; flex-wrap:wrap;">
-            ${isSuper ? `<button class="btn btn-outline" data-tpl-compile="1" data-id="${escapeHtml(t.id)}">Compile (replace questions)</button>` : ``}
-            ${isSuper ? `<button class="btn btn-outline" data-tpl-createq="1" data-id="${escapeHtml(t.id)}">Create Questionnaire for Vessel</button>` : ``}
-          </div>
-        </td>
-      </tr>
-    `;
-  }).join("");
+  body.innerHTML = TEMPLATES
+    .map((t) => {
+      const cnt = TEMPLATE_COUNTS.get(t.id) || 0;
+      return `
+        <tr>
+          <td style="font-weight:950;">${escapeHtml(t.name)}</td>
+          <td class="small">${escapeHtml(t.description || "")}</td>
+          <td class="small">${cnt}</td>
+          <td class="small">${escapeHtml(fmtTs(t.updated_at || t.created_at))}</td>
+          <td>
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+              ${
+                isSuper
+                  ? `<button class="btn btn-outline" data-tpl-compile="1" data-id="${escapeHtml(
+                      t.id
+                    )}">Compile (replace questions)</button>`
+                  : ``
+              }
+              ${
+                isSuper
+                  ? `<button class="btn btn-outline" data-tpl-createq="1" data-id="${escapeHtml(
+                      t.id
+                    )}">Create Questionnaire for Vessel</button>`
+                  : ``
+              }
+            </div>
+          </td>
+        </tr>
+      `;
+    })
+    .join("");
 
-  body.querySelectorAll("button[data-tpl-compile]").forEach(btn => {
+  body.querySelectorAll("button[data-tpl-compile]").forEach((btn) => {
     btn.addEventListener("click", async () => {
       const tid = btn.getAttribute("data-id");
       if (!tid) return;
@@ -544,7 +598,7 @@ function renderTemplates(){
     });
   });
 
-  body.querySelectorAll("button[data-tpl-createq]").forEach(btn => {
+  body.querySelectorAll("button[data-tpl-createq]").forEach((btn) => {
     btn.addEventListener("click", async () => {
       const tid = btn.getAttribute("data-id");
       if (!tid) return;
@@ -553,12 +607,12 @@ function renderTemplates(){
   });
 }
 
-async function createTemplate(){
+async function createTemplate() {
   clearWarn();
   const name = el("tplName").value.trim();
   const desc = el("tplDesc").value.trim();
 
-  if (!name){
+  if (!name) {
     showWarn("Template name is required.");
     return;
   }
@@ -569,7 +623,7 @@ async function createTemplate(){
     .select("id")
     .single();
 
-  if (error){
+  if (error) {
     showWarn("Create template failed: " + error.message);
     return;
   }
@@ -577,17 +631,17 @@ async function createTemplate(){
   el("tplName").value = "";
   el("tplDesc").value = "";
 
-  if (confirm("Template created. Compile it now using the currently SELECTED questions?")){
+  if (confirm("Template created. Compile it now using the currently SELECTED questions?")) {
     await compileTemplateQuestions(data.id);
   } else {
     await refreshTemplates();
   }
 }
 
-async function compileTemplateQuestions(templateId){
+async function compileTemplateQuestions(templateId) {
   clearWarn();
 
-  if (SELECTED_SET.size < 1){
+  if (SELECTED_SET.size < 1) {
     showWarn("No questions selected. Select questions first, then compile.");
     return;
   }
@@ -597,7 +651,7 @@ async function compileTemplateQuestions(templateId){
     .delete()
     .eq("template_id", templateId);
 
-  if (delErr){
+  if (delErr) {
     showWarn("Failed clearing template questions: " + delErr.message);
     return;
   }
@@ -606,14 +660,12 @@ async function compileTemplateQuestions(templateId){
   const payload = selected.map((qno, idx) => ({
     template_id: templateId,
     question_no: qno,
-    sort_order: idx
+    sort_order: idx,
   }));
 
-  const { error } = await supabaseClient
-    .from("questionnaire_template_questions")
-    .insert(payload);
+  const { error } = await supabaseClient.from("questionnaire_template_questions").insert(payload);
 
-  if (error){
+  if (error) {
     showWarn("Compile failed: " + error.message);
     return;
   }
@@ -621,29 +673,28 @@ async function compileTemplateQuestions(templateId){
   await refreshTemplates();
 }
 
-async function createQuestionnaireFromTemplateFlow(templateId){
+async function createQuestionnaireFromTemplateFlow(templateId) {
   clearWarn();
 
   const vesselId = el("vesselSelect").value;
   const title = el("titleInput").value.trim();
 
-  if (!vesselId){
+  if (!vesselId) {
     showWarn("Select a vessel first (Vessel).");
     return;
   }
-  if (!title){
+  if (!title) {
     showWarn("Enter a title first (Title).");
     return;
   }
 
-  const { data, error } = await supabaseClient
-    .rpc("create_questionnaire_from_template", {
-      p_template_id: templateId,
-      p_vessel_id: vesselId,
-      p_title: title
-    });
+  const { data, error } = await supabaseClient.rpc("create_questionnaire_from_template", {
+    p_template_id: templateId,
+    p_vessel_id: vesselId,
+    p_title: title,
+  });
 
-  if (error){
+  if (error) {
     showWarn("Create from template failed: " + error.message);
     return;
   }
@@ -651,7 +702,7 @@ async function createQuestionnaireFromTemplateFlow(templateId){
   const qid = data;
   await refreshAll();
 
-  if (qid){
+  if (qid) {
     window.location.href = "./q-answer.html?qid=" + encodeURIComponent(qid);
   }
 }
@@ -659,31 +710,59 @@ async function createQuestionnaireFromTemplateFlow(templateId){
 // ----------------------
 // Create questionnaire by compiling (Option A)
 // ----------------------
-function chunk(arr, size){
+function chunk(arr, size) {
   const out = [];
-  for (let i=0; i<arr.length; i+=size) out.push(arr.slice(i, i+size));
+  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
   return out;
 }
 
-async function createQuestionnaireByCompile(userId){
+function getPgnoBullets(qObj) {
+  // Preferred: NegObs_Bullets is an array (your JSON has this)
+  const a = qObj?.NegObs_Bullets;
+  if (Array.isArray(a) && a.length) {
+    return a.map((x) => String(x || "").trim()).filter(Boolean);
+  }
+
+  // Fallback: Potential Grounds for Negative Observations text
+  const raw = qObj?.["Potential Grounds for Negative Observations"];
+  if (!raw) return [];
+
+  const lines = String(raw)
+    .split("\n")
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  // Keep lines that look like bullets or meaningful statements
+  const cleaned = [];
+  for (const ln of lines) {
+    const t = ln.replace(/^[-•o*]+\s*/, "").trim();
+    if (!t) continue;
+    // ignore headings that are too generic
+    cleaned.push(t);
+  }
+
+  return cleaned;
+}
+
+async function createQuestionnaireByCompile(userId) {
   clearWarn();
 
   const btn = el("createBtn");
   btn.disabled = true;
 
-  try{
+  try {
     const vesselId = el("vesselSelect").value;
     const title = el("titleInput").value.trim();
 
-    if (!vesselId){
+    if (!vesselId) {
       showWarn("Please select a vessel.");
       return;
     }
-    if (!title){
+    if (!title) {
       showWarn("Please enter a title.");
       return;
     }
-    if (SELECTED_SET.size < 1){
+    if (SELECTED_SET.size < 1) {
       showWarn("No questions selected. Adjust filters, then click Select All Filtered.");
       return;
     }
@@ -698,60 +777,102 @@ async function createQuestionnaireByCompile(userId){
       .select("id")
       .single();
 
-    if (qErr){
+    if (qErr) {
       showWarn("Create questionnaire failed: " + qErr.message);
       return;
     }
 
     const qid = q.id;
 
-    // 2) Insert questionnaire_questions in chunks
+    // 2) Build questionnaire_questions rows (MUST include question_json to avoid NOT NULL error)
     const selected = Array.from(SELECTED_SET);
 
-    // build row objects
-    const rows = [];
+    const qqRows = [];
     const missing = [];
-    for (const qno of selected){
-      const qObj = LIB_BY_NO.get(String(qno));
-      if (!qObj){
+
+    for (let i = 0; i < selected.length; i++) {
+      const qno = String(selected[i]);
+      const qObj = LIB_BY_NO.get(qno);
+      if (!qObj) {
         missing.push(qno);
         continue;
       }
-      // If your DB column is nullable, this still works.
-      rows.push({ questionnaire_id: qid, question_no: String(qno), question_json: qObj });
+
+      // seq is used by your q-answer.html ordering
+      qqRows.push({
+        questionnaire_id: qid,
+        seq: i + 1,
+        question_no: qno,
+        question_json: qObj,
+      });
     }
 
-    if (missing.length){
+    if (missing.length) {
       showWarn(
         "Some selected question numbers were not found in the locked library JSON:\n" +
-        missing.slice(0, 30).join(", ") +
-        (missing.length > 30 ? ` ... (+${missing.length - 30} more)` : "")
+          missing.slice(0, 30).join(", ") +
+          (missing.length > 30 ? ` ... (+${missing.length - 30} more)` : "")
       );
     }
 
-    const batches = chunk(rows, 50);
-    for (let i=0; i<batches.length; i++){
-      setSubLine(`Compiling questions... (${i+1}/${batches.length})`);
-      const { error: insErr } = await supabaseClient
-        .from("questionnaire_questions")
-        .insert(batches[i]);
-      if (insErr){
-        // cleanup created questionnaire to avoid half-created state
+    const qqBatches = chunk(qqRows, 50);
+    for (let i = 0; i < qqBatches.length; i++) {
+      setSubLine(`Compiling questions... (${i + 1}/${qqBatches.length})`);
+      const { error: insErr } = await supabaseClient.from("questionnaire_questions").insert(qqBatches[i]);
+      if (insErr) {
+        // Cleanup created questionnaire
         await supabaseClient.from("questionnaires").delete().eq("id", qid);
-        showWarn(
-          "Created questionnaire, but failed to compile questions:\n" +
-          insErr.message +
-          "\n\nFix: run SQL to drop NOT NULL on questionnaire_questions.question_json (recommended), then try again."
-        );
+        showWarn("Created questionnaire, but failed to compile questions:\n" + insErr.message);
         return;
       }
+    }
+
+    // 3) Create answers_pgno rows so q-answer.html Save works
+    // If table/RLS blocks it, we warn but do not fail the whole create.
+    try {
+      setSubLine("Creating PGNO answer rows...");
+
+      const apRows = [];
+      for (const row of qqRows) {
+        const qObj = row.question_json;
+        const bullets = getPgnoBullets(qObj);
+
+        for (let idx = 0; idx < bullets.length; idx++) {
+          apRows.push({
+            questionnaire_id: qid,
+            question_no: row.question_no,
+            pgno_index: idx + 1,
+            pgno_text: bullets[idx],
+            response: null,
+            remarks: "",
+          });
+        }
+      }
+
+      // insert in larger chunks (fewer calls)
+      const apBatches = chunk(apRows, 200);
+      for (let i = 0; i < apBatches.length; i++) {
+        setSubLine(`Creating PGNO rows... (${i + 1}/${apBatches.length})`);
+        const { error: apErr } = await supabaseClient.from("answers_pgno").insert(apBatches[i]);
+        if (apErr) {
+          // Do not rollback the questionnaire; warn only
+          showWarn(
+            "Questionnaire created and questions compiled, but PGNO answer rows could not be created.\n" +
+              "This usually means RLS or table constraints on answers_pgno.\n\n" +
+              "Error: " + apErr.message
+          );
+          break;
+        }
+      }
+    } catch (e) {
+      showWarn("Questionnaire created, but PGNO row creation failed: " + String(e?.message || e));
     }
 
     el("titleInput").value = "";
     await refreshAll();
 
+    // Open answer page
     window.location.href = "./q-answer.html?qid=" + encodeURIComponent(qid);
-
   } finally {
     btn.disabled = false;
     setSubLine("Ready.");
@@ -761,13 +882,13 @@ async function createQuestionnaireByCompile(userId){
 // ----------------------
 // Refresh
 // ----------------------
-async function refreshTemplates(){
+async function refreshTemplates() {
   TEMPLATES = await loadTemplates();
   TEMPLATE_COUNTS = await loadTemplateCounts();
   renderTemplates();
 }
 
-async function refreshAll(){
+async function refreshAll() {
   VESSELS = await loadVessels();
   renderVesselSelect();
 
@@ -780,24 +901,35 @@ async function refreshAll(){
 // ----------------------
 // Init
 // ----------------------
-async function init(){
+async function init() {
   clearWarn();
   el("libraryLockLine").textContent = `Library locked to: ${LOCKED_LIBRARY_JSON}`;
 
-  // global click closes menus
+  // Close filter menus when clicking outside
   document.addEventListener("click", (e) => {
     const inside = e.target.closest(".fltDD");
     if (!inside) closeAllFilterMenus();
   });
 
-  const user = await getUserOrWarn();
-  if (!user) return;
+  // Escape closes menus
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") closeAllFilterMenus();
+  });
 
-  try{
+  const session = await getSessionOrWarn();
+  if (!session) return;
+
+  const user = session.user;
+
+  try {
     PROFILE = await getMyProfile(user.id);
-  }catch(e){
+  } catch (e) {
     setSubLine("Logged in, but profile missing or blocked.");
-    showWarn("Profile missing or blocked by RLS. Ensure a row exists in public.profiles for this user.");
+    showWarn(
+      "Profile missing or blocked by RLS.\n" +
+      "Ensure a row exists in public.profiles for this user, and RLS allows select.\n\n" +
+      "Error: " + String(e?.message || e)
+    );
     return;
   }
 
@@ -808,34 +940,37 @@ async function init(){
   el("roleLine").textContent = `Role: ${uiRole}`;
 
   const vesselName = PROFILE?.vessels?.name || "";
-  localStorage.setItem(SESSION_KEY_COMPAT, JSON.stringify({
-    username: PROFILE.username || "",
-    role: uiRole,
-    vessel: vesselName,
-    created_at: new Date().toISOString()
-  }));
+  localStorage.setItem(
+    SESSION_KEY_COMPAT,
+    JSON.stringify({
+      username: PROFILE.username || "",
+      role: uiRole,
+      vessel: vesselName,
+      created_at: new Date().toISOString(),
+    })
+  );
 
   setSubLine("Loading question library...");
 
   // Load library JSON
-  try{
+  try {
     LIB = await loadLockedLibraryJson(LOCKED_LIBRARY_JSON);
     LIB_BY_NO = new Map();
-    for (const q of LIB){
+    for (const q of LIB) {
       const qno = getQno(q);
       if (qno) LIB_BY_NO.set(String(qno), q);
     }
-  }catch(e){
-    showWarn(`Question library load failed: ${String(e.message || e)}`);
+  } catch (e) {
+    showWarn(`Question library load failed:\n${String(e.message || e)}`);
     setSubLine("Error loading library JSON.");
   }
 
   // Build filter values from LIB
-  if (LIB.length){
-    // chapters as unique sorted
-    const chapters = [...new Set(LIB.map(getChapter).filter(Boolean).map(String))].sort((a,b) => {
-      const na = Number(a), nb = Number(b);
-      if (!Number.isNaN(na) && !Number.isNaN(nb)) return na-nb;
+  if (LIB.length) {
+    const chapters = [...new Set(LIB.map(getChapter).filter(Boolean).map(String))].sort((a, b) => {
+      const na = Number(a),
+        nb = Number(b);
+      if (!Number.isNaN(na) && !Number.isNaN(nb)) return na - nb;
       return a.localeCompare(b);
     });
 
@@ -843,21 +978,19 @@ async function init(){
 
     FILTERS.chapters.values = chapters;
     FILTERS.qtype.values = qtypes;
-    // vessel/rank/resp are fixed
 
     renderFilterBar();
     applyFilters();
     renderSelectedSummary();
   } else {
-    // still render bar so UI is stable
     renderFilterBar();
   }
 
   // Load DB data
-  try{
+  try {
     await refreshAll();
     setSubLine("Ready.");
-  }catch(e){
+  } catch (e) {
     showWarn("Load failed: " + String(e.message || e));
     setSubLine("Error loading data.");
   }
@@ -867,9 +1000,10 @@ async function init(){
   el("searchInput").addEventListener("input", renderQuestionnairesTable);
 
   el("createBtn").addEventListener("click", () => createQuestionnaireByCompile(user.id));
-  el("clearBtn").addEventListener("click", () => { el("titleInput").value = ""; });
+  el("clearBtn").addEventListener("click", () => {
+    el("titleInput").value = "";
+  });
 
-  // Search filter
   el("fltSearch").addEventListener("input", applyFilters);
 
   el("btnSelectAllFiltered").addEventListener("click", () => {
@@ -879,7 +1013,6 @@ async function init(){
 
   el("btnClearSelected").addEventListener("click", clearSelected);
 
-  // Templates
   el("btnCreateTemplate").addEventListener("click", createTemplate);
 
   // Logout

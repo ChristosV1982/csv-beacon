@@ -18,7 +18,9 @@ export async function loadLockedLibraryJson(lockedPath) {
   // Accept either:
   // 1) Array of question objects
   // 2) { questions: [...] }
-  const questions = Array.isArray(data) ? data : (Array.isArray(data?.questions) ? data.questions : null);
+  const questions = Array.isArray(data)
+    ? data
+    : (Array.isArray(data?.questions) ? data.questions : null);
 
   if (!Array.isArray(questions)) {
     throw new Error(

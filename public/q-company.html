@@ -195,76 +195,85 @@
       border-top:1px solid #d5deef;
     }
 
-    /* --- Filter dropdowns (Read-Only style, stable sizing) --- */
-    .fltRow{
+    /* Filter dropdowns (Read-Only style) */
+    .filterRow{
       display:flex;
       flex-wrap:wrap;
       gap:10px;
-      align-items:center;
       margin-top:10px;
+      align-items:flex-start;
     }
-    .fltDD{ position:relative; display:inline-block; }
+    .fltDD{ position:relative; }
     .fltBtn{
-      border:1px solid #cbd7ee;
-      background:#fff;
+      border-radius:10px;
+      padding:9px 12px;
+      background:#f7fbff;
+      border:1px solid #d5deef;
       color:#1a4170;
       font-weight:900;
-      border-radius:10px;
-      padding:10px 12px;
       cursor:pointer;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.08);
-      line-height:1;
+      white-space:nowrap;
     }
-    .fltBtn:hover{ filter:brightness(0.98); }
+    .fltBtn:hover{ filter:brightness(.98); }
+
     .fltMenu{
-      display:none;
       position:absolute;
-      top:44px;
+      top:42px;
       left:0;
-      width:340px;
-      max-width: 78vw;
-      max-height:340px;
-      overflow:auto;
+      width: 330px;
+      max-width: calc(100vw - 60px);
       background:#fff;
-      border:1px solid #cbd7ee;
+      border:1px solid #d5deef;
       border-radius:12px;
-      box-shadow: 0 12px 40px rgba(0,0,0,0.18);
-      z-index: 5000;
-      padding:10px;
+      box-shadow: 0 14px 44px rgba(0,0,0,0.18);
+      z-index: 50;
+      display:none;
+      overflow:hidden;
     }
     .fltDD.open .fltMenu{ display:block; }
+
     .fltHdr{
       display:flex;
       align-items:center;
       justify-content:space-between;
-      gap:10px;
-      margin-bottom:8px;
-      position:sticky;
-      top:0;
-      background:#fff;
-      padding-bottom:8px;
+      padding:10px 10px;
       border-bottom:1px solid #e6eefb;
-      z-index:2;
+      background:#f7fbff;
+      gap:10px;
     }
-    .fltTitle{ font-weight:950; color:#1a4170; }
+    .fltTitle{
+      font-weight:950;
+      color:#1a4170;
+      white-space:nowrap;
+    }
     .fltHdrBtns{ display:flex; gap:8px; }
     .fltMiniBtn{
-      border:1px solid #cbd7ee;
-      background:#f7fbff;
+      border-radius:10px;
+      border:1px solid #d5deef;
+      background:#fff;
       color:#1a4170;
       font-weight:900;
-      border-radius:10px;
       padding:6px 10px;
       cursor:pointer;
     }
+    .fltMiniBtn:hover{ background:#f2f7ff; }
+
+    .fltItems{
+      max-height: 260px;
+      overflow:auto;
+      padding:8px;
+      background:#fff;
+    }
     .fltItem{
       display:flex;
-      align-items:center;
       gap:10px;
-      padding:8px 6px;
+      align-items:center;
+      padding:8px 8px;
       border-radius:10px;
       cursor:pointer;
       user-select:none;
+      color:#1a4170;
+      font-weight:900;
     }
     .fltItem:hover{ background:#f2f7ff; }
     .fltItem input{ width:auto; }
@@ -307,12 +316,11 @@
         </div>
 
         <div class="grid">
-          <!-- LEFT -->
           <div>
             <div class="note">
               <b>Create Questionnaire (Option A: no empty questionnaires)</b>
               <div class="mono" style="margin-top:6px;">
-                Creates: <span class="mono">public.questionnaires</span> + compiles selected questions into <span class="mono">public.questionnaire_questions</span>
+                Creates: <span class="mono">public.questionnaires</span> + compiles into <span class="mono">public.questionnaire_questions</span>
               </div>
               <div class="mono" style="margin-top:6px;" id="libraryLockLine">Library locked to: ...</div>
             </div>
@@ -333,7 +341,7 @@
             <label for="fltSearch">Search</label>
             <input id="fltSearch" type="text" placeholder="Search question no / text / chapter..." />
 
-            <div class="fltRow" id="filterRow"></div>
+            <div class="filterRow" id="filterRow"></div>
 
             <div class="rowActions">
               <button class="btn btn-muted" id="btnSelectAllFiltered" type="button">Select All Filtered</button>
@@ -350,7 +358,7 @@
             <div class="note">
               <b>Standard Questionnaires (Templates)</b>
               <div class="mono" style="margin-top:6px;">
-                Create templates (superuser), compile questions into them, then create vessel questionnaires from templates.
+                Create templates (superuser), compile questions, then create questionnaires from templates.
               </div>
             </div>
 
@@ -385,15 +393,13 @@
                 <tbody id="tplBody"></tbody>
               </table>
             </div>
-
           </div>
 
-          <!-- RIGHT -->
           <div>
             <div class="note">
               <b>Questionnaires</b>
               <div class="mono" style="margin-top:6px;">
-                Loaded from Supabase. Open to answer: <span class="mono">q-answer.html?qid=&lt;uuid&gt;</span>
+                Open to answer: <span class="mono">q-answer.html?qid=&lt;uuid&gt;</span>
               </div>
             </div>
 
@@ -405,7 +411,7 @@
                     <th style="width:260px;">Vessel</th>
                     <th>Title</th>
                     <th style="width:220px;">Updated</th>
-                    <th style="width:520px;">Actions</th>
+                    <th style="width:360px;">Actions</th>
                     <th style="width:260px;">Notes</th>
                   </tr>
                 </thead>
@@ -420,8 +426,8 @@
               </div>
             </div>
           </div>
-        </div>
 
+        </div>
       </div>
     </div>
   </div>
