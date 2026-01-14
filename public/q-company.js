@@ -372,7 +372,7 @@ async function loadVessels(supabase) {
 async function loadQuestionnaires(supabase) {
   const { data, error } = await supabase
     .from("questionnaires")
-    .select("id, title, status, created_at, updated_at, vessel_id, assigned_position, mode")
+    .select("id, title, status, created_at, updated_at, vessel_id, assigned_position")
     .order("updated_at", { ascending: false });
 
   if (error) throw error;
