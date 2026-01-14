@@ -187,6 +187,7 @@
   </div>
 
   <script>
+    // Keep this client local for login operations (minimal change).
     const supabaseClient = window.supabase.createClient(
       "https://bdidrcyufazskpuwmfca.supabase.co",
       "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJkaWRyY3l1ZmF6c2twdXdtZmNhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc5NDI4ODMsImV4cCI6MjA4MzUxODg4M30.Uqj4WCzoNS9wnlzI-xew6iTFzTUi77dcGeBjUgFjZbQ"
@@ -207,7 +208,11 @@
       const v = String(usernameOrEmail || "").trim();
       if (!v) return "";
       if (v.includes("@")) return v;
-      return `${v}@${AUTH.USERNAME_DOMAIN}`;
+
+      // AUTH.USERNAME_DOMAIN is now defined in public/auth.js.
+      // Fallback included to avoid future regressions if auth.js fails to load.
+      const domain = (window.AUTH && AUTH.USERNAME_DOMAIN) ? AUTH.USERNAME_DOMAIN : "csvtest.local";
+      return `${v}@${domain}`;
     }
 
     async function fetchMyProfile(userId){

@@ -7,6 +7,19 @@
   const SUPABASE_ANON_KEY =
     "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJkaWRyY3l1ZmF6c2twdXdtZmNhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc5NDI4ODMsImV4cCI6MjA4MzUxODg4M30.Uqj4WCzoNS9wnlzI-xew6iTFzTUi77dcGeBjUgFjZbQ";
 
+  // IMPORTANT: login.html builds email as: username@USERNAME_DOMAIN
+  // This must exist, otherwise email becomes username@undefined and login fails.
+  const USERNAME_DOMAIN = "csvtest.local";
+
+  // Canonical role constants used across pages
+  const ROLES = {
+    SUPER_ADMIN: "super_admin",
+    COMPANY_ADMIN: "company_admin",
+    COMPANY_SUPERINTENDENT: "company_superintendent",
+    VESSEL: "vessel",
+    INSPECTOR: "inspector",
+  };
+
   const UI_ROLE_MAP = {
     super_admin: "Super Admin",
     company_admin: "Company Admin",
@@ -40,17 +53,23 @@
     if (window.__SUPABASE_CLIENT) return window.__SUPABASE_CLIENT;
 
     if (!window.supabase?.createClient) {
-      showPageMessage("Supabase JS not loaded. Check the <script> tag for @supabase/supabase-js.");
+      showPageMessage(
+        "Supabase JS not loaded. Check the <script> tag for @supabase/supabase-js."
+      );
       throw new Error("Supabase JS not available");
     }
 
-    window.__SUPABASE_CLIENT = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      auth: {
-        persistSession: true,
-        autoRefreshToken: true,
-        detectSessionInUrl: true,
-      },
-    });
+    window.__SUPABASE_CLIENT = window.supabase.createClient(
+      SUPABASE_URL,
+      SUPABASE_ANON_KEY,
+      {
+        auth: {
+          persistSession: true,
+          autoRefreshToken: true,
+          detectSessionInUrl: true,
+        },
+      }
+    );
 
     return window.__SUPABASE_CLIENT;
   }
@@ -61,6 +80,22 @@
     if (u.startsWith("chiefofficer_")) return "chief_officer";
     if (u.startsWith("chiefengineer_")) return "chief_engineer";
     return null;
+  }
+
+  function qs(name) {
+    return new URLSearchParams(window.location.search).get(name);
+  }
+
+  // Allow only internal relative paths (prevents open redirects)
+  function safePath(p) {
+    const v = String(p || "").trim();
+    if (!v) return "";
+    if (v.includes("://")) return "";
+    if (v.startsWith("//")) return "";
+    if (v.toLowerCase().startsWith("javascript:")) return "";
+    // allow ./xxx or /xxx or xxx (same folder)
+    if (v.startsWith("./") || v.startsWith("/") || /^[A-Za-z0-9._-]+/.test(v)) return v;
+    return "";
   }
 
   async function getSession() {
@@ -99,7 +134,8 @@
       showPageMessage(
         "Profile missing or blocked by RLS.\n" +
           "Ensure a row exists in public.profiles for this user, and RLS allows select.\n\n" +
-          "Error: " + String(e?.message || e)
+          "Error: " +
+          String(e?.message || e)
       );
       throw e;
     }
@@ -133,6 +169,13 @@
 
   window.AUTH = {
     SUPABASE_URL,
+    SUPABASE_ANON_KEY,
+
+    USERNAME_DOMAIN,
+    ROLES,
+    qs,
+    safePath,
+
     roleToUi,
     ensureSupabase,
     requireAuth,
