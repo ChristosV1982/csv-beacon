@@ -1,17 +1,15 @@
 // public/auth.js
-// Central auth + Supabase singleton + role guards.
-// Load AFTER supabase-js (<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>)
-
 (() => {
+  "use strict";
+
+  const AUTH_BUILD = "AUTH-2026-01-14B";
+
   const SUPABASE_URL = "https://bdidrcyufazskpuwmfca.supabase.co";
   const SUPABASE_ANON_KEY =
     "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJkaWRyY3l1ZmF6c2twdXdtZmNhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc5NDI4ODMsImV4cCI6MjA4MzUxODg4M30.Uqj4WCzoNS9wnlzI-xew6iTFzTUi77dcGeBjUgFjZbQ";
 
-  // IMPORTANT: login.html builds email as: username@USERNAME_DOMAIN
-  // This must exist, otherwise email becomes username@undefined and login fails.
   const USERNAME_DOMAIN = "csvtest.local";
 
-  // Canonical role constants used across pages
   const ROLES = {
     SUPER_ADMIN: "super_admin",
     COMPANY_ADMIN: "company_admin",
@@ -21,20 +19,43 @@
   };
 
   const UI_ROLE_MAP = {
-    super_admin: "Super Admin",
-    company_admin: "Company Admin",
-    company_superintendent: "Company Superintendent",
-    vessel: "Vessel",
-    inspector: "Inspector / Third Party",
+    [ROLES.SUPER_ADMIN]: "Super Admin",
+    [ROLES.COMPANY_ADMIN]: "Company Admin",
+    [ROLES.COMPANY_SUPERINTENDENT]: "Company Superintendent",
+    [ROLES.VESSEL]: "Vessel",
+    [ROLES.INSPECTOR]: "Inspector / Third Party",
   };
 
   function roleToUi(role) {
     return UI_ROLE_MAP[role] || role || "";
   }
 
+  function qs(name) {
+    try {
+      return new URLSearchParams(window.location.search || "").get(name);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function safePath(p) {
+    const v = String(p || "").trim();
+    if (!v) return "";
+    if (v.startsWith("http://") || v.startsWith("https://") || v.startsWith("//")) return "";
+    if (v.includes("..")) return "";
+    if (!v.endsWith(".html")) return "";
+    return v;
+  }
+
+  function usernameToEmail(usernameOrEmail) {
+    const v = String(usernameOrEmail || "").trim();
+    if (!v) return "";
+    if (v.includes("@")) return v;
+    return `${v}@${USERNAME_DOMAIN}`;
+  }
+
   function showPageMessage(msg) {
-    // Try common containers first
-    const ids = ["warnBox", "errBox"];
+    const ids = ["warnBox", "errBox", "loginError"];
     for (const id of ids) {
       const el = document.getElementById(id);
       if (el) {
@@ -43,33 +64,20 @@
         return;
       }
     }
-    // Fallback
-    try {
-      alert(msg);
-    } catch (_) {}
+    try { alert(msg); } catch (_) {}
   }
 
   function ensureSupabase() {
     if (window.__SUPABASE_CLIENT) return window.__SUPABASE_CLIENT;
 
     if (!window.supabase?.createClient) {
-      showPageMessage(
-        "Supabase JS not loaded. Check the <script> tag for @supabase/supabase-js."
-      );
+      showPageMessage("Supabase JS not loaded. Check @supabase/supabase-js script tag.");
       throw new Error("Supabase JS not available");
     }
 
-    window.__SUPABASE_CLIENT = window.supabase.createClient(
-      SUPABASE_URL,
-      SUPABASE_ANON_KEY,
-      {
-        auth: {
-          persistSession: true,
-          autoRefreshToken: true,
-          detectSessionInUrl: true,
-        },
-      }
-    );
+    window.__SUPABASE_CLIENT = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
+    });
 
     return window.__SUPABASE_CLIENT;
   }
@@ -80,22 +88,6 @@
     if (u.startsWith("chiefofficer_")) return "chief_officer";
     if (u.startsWith("chiefengineer_")) return "chief_engineer";
     return null;
-  }
-
-  function qs(name) {
-    return new URLSearchParams(window.location.search).get(name);
-  }
-
-  // Allow only internal relative paths (prevents open redirects)
-  function safePath(p) {
-    const v = String(p || "").trim();
-    if (!v) return "";
-    if (v.includes("://")) return "";
-    if (v.startsWith("//")) return "";
-    if (v.toLowerCase().startsWith("javascript:")) return "";
-    // allow ./xxx or /xxx or xxx (same folder)
-    if (v.startsWith("./") || v.startsWith("/") || /^[A-Za-z0-9._-]+/.test(v)) return v;
-    return "";
   }
 
   async function getSession() {
@@ -114,7 +106,7 @@
 
     const { data: profile, error } = await sb
       .from("profiles")
-      .select("id, username, role, vessel_id")
+      .select("id, username, role, vessel_id, position, is_active")
       .eq("id", user.id)
       .single();
 
@@ -133,9 +125,8 @@
     } catch (e) {
       showPageMessage(
         "Profile missing or blocked by RLS.\n" +
-          "Ensure a row exists in public.profiles for this user, and RLS allows select.\n\n" +
-          "Error: " +
-          String(e?.message || e)
+        "Ensure a row exists in public.profiles for this user, and RLS allows select.\n\n" +
+        "Error: " + String(e?.message || e)
       );
       throw e;
     }
@@ -147,13 +138,18 @@
       return null;
     }
 
+    if (profile && profile.is_active === false) {
+      showPageMessage("Your account is inactive. Please contact the administrator.");
+      await ensureSupabase().auth.signOut();
+      window.location.href = redirectTo;
+      return null;
+    }
+
     if (allowedRoles && Array.isArray(allowedRoles) && allowedRoles.length) {
       const ok = allowedRoles.includes(profile?.role);
       if (!ok) {
         showPageMessage("Access denied for your role. Redirecting…");
-        setTimeout(() => {
-          window.location.href = unauthorizedRedirect;
-        }, 600);
+        setTimeout(() => { window.location.href = unauthorizedRedirect; }, 600);
         return null;
       }
     }
@@ -168,15 +164,15 @@
   }
 
   window.AUTH = {
+    AUTH_BUILD,
     SUPABASE_URL,
     SUPABASE_ANON_KEY,
-
     USERNAME_DOMAIN,
     ROLES,
+    roleToUi,
     qs,
     safePath,
-
-    roleToUi,
+    usernameToEmail,
     ensureSupabase,
     requireAuth,
     getSessionUserProfile,

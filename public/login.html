@@ -46,6 +46,12 @@
       text-align: center;
       font-weight: 800;
     }
+    .build {
+      margin-top: 6px;
+      font-size: 0.85rem;
+      opacity: 0.85;
+      font-weight: 700;
+    }
     .card {
       background: #ffffff;
       border: 1px solid #d5deef;
@@ -132,6 +138,7 @@
       font-weight: 900;
       font-size: 0.95rem;
       line-height: 1.35;
+      white-space: pre-wrap;
     }
     .hint {
       margin-top: 12px;
@@ -148,7 +155,6 @@
   </style>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="./auth.js"></script>
 </head>
 
 <body>
@@ -157,6 +163,7 @@
     <div class="subtitle">
       Users login with <b>Username + Password</b>.<br/>
       Internally we use: <span class="mono">username@csvtest.local</span>
+      <div class="build" id="buildTag">BUILD: LOGIN-2026-01-14B</div>
     </div>
 
     <div class="card">
@@ -187,106 +194,132 @@
   </div>
 
   <script>
-    // Keep this client local for login operations (minimal change).
-    const supabaseClient = window.supabase.createClient(
-      "https://bdidrcyufazskpuwmfca.supabase.co",
-      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJkaWRyY3l1ZmF6c2twdXdtZmNhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc5NDI4ODMsImV4cCI6MjA4MzUxODg4M30.Uqj4WCzoNS9wnlzI-xew6iTFzTUi77dcGeBjUgFjZbQ"
-    );
+    (function () {
+      "use strict";
 
-    function setError(msg){
-      const el = document.getElementById("errBox");
-      el.textContent = msg;
-      el.style.display = "block";
-    }
-    function clearError(){
-      const el = document.getElementById("errBox");
-      el.textContent = "";
-      el.style.display = "none";
-    }
+      // ---- FIXED, LOCAL CONFIG (no dependency on AUTH.*) ----
+      const BUILD = "LOGIN-2026-01-14B";
+      const SUPABASE_URL = "https://bdidrcyufazskpuwmfca.supabase.co";
+      const SUPABASE_ANON_KEY =
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJkaWRyY3l1ZmF6c2twdXdtZmNhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc5NDI4ODMsImV4cCI6MjA4MzUxODg4M30.Uqj4WCzoNS9wnlzI-xew6iTFzTUi77dcGeBjUgFjZbQ";
+      const USERNAME_DOMAIN = "csvtest.local";
 
-    function usernameToEmail(usernameOrEmail){
-      const v = String(usernameOrEmail || "").trim();
-      if (!v) return "";
-      if (v.includes("@")) return v;
+      const errEl = document.getElementById("errBox");
+      function setError(msg) { errEl.textContent = msg; errEl.style.display = "block"; }
+      function clearError() { errEl.textContent = ""; errEl.style.display = "none"; }
 
-      // AUTH.USERNAME_DOMAIN is now defined in public/auth.js.
-      // Fallback included to avoid future regressions if auth.js fails to load.
-      const domain = (window.AUTH && AUTH.USERNAME_DOMAIN) ? AUTH.USERNAME_DOMAIN : "csvtest.local";
-      return `${v}@${domain}`;
-    }
-
-    async function fetchMyProfile(userId){
-      const { data, error } = await supabaseClient
-        .from("profiles")
-        .select("id, username, role, vessel_id")
-        .eq("id", userId)
-        .single();
-      if (error) throw error;
-      return data;
-    }
-
-    function routeByRole(dbRole){
-      const R = AUTH.ROLES;
-      if (dbRole === R.VESSEL) return "./q-vessel.html";
-      if (dbRole === R.INSPECTOR) return "./q-inspector.html";
-      if (dbRole === R.COMPANY_ADMIN || dbRole === R.COMPANY_SUPERINTENDENT || dbRole === R.SUPER_ADMIN) return "./q-dashboard.html";
-      return "./q-dashboard.html";
-    }
-
-    async function doLogin(){
-      clearError();
-
-      const username = document.getElementById("username").value.trim();
-      const password = document.getElementById("password").value;
-
-      if (!username || !password){
-        setError("Please enter username and password.");
+      if (!window.supabase?.createClient) {
+        setError("Supabase JS not loaded. Check the @supabase/supabase-js script tag.");
         return;
       }
 
-      const email = usernameToEmail(username);
+      const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+        auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
+      });
 
-      const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
-      if (error){
-        setError("Login failed: " + error.message);
-        return;
+      function usernameToEmail(usernameOrEmail) {
+        const v = String(usernameOrEmail || "").trim();
+        if (!v) return "";
+        if (v.includes("@")) return v;
+        return `${v}@${USERNAME_DOMAIN}`;
       }
 
-      const user = data.user;
-      if (!user){
-        setError("Login failed: no user returned.");
-        return;
+      function qs(name) {
+        try { return new URLSearchParams(window.location.search || "").get(name); }
+        catch (_) { return null; }
       }
 
-      let profile;
-      try {
-        profile = await fetchMyProfile(user.id);
-      } catch (e) {
-        setError("Login OK but profile missing or blocked. Ensure a row exists in public.profiles for this user.");
-        return;
+      function safePath(p) {
+        const v = String(p || "").trim();
+        if (!v) return "";
+        if (v.startsWith("http://") || v.startsWith("https://") || v.startsWith("//")) return "";
+        if (v.includes("..")) return "";
+        if (!v.endsWith(".html")) return "";
+        return v;
       }
 
-      // If a protected page sent us here, honor it
-      const returnTo = AUTH.safePath(AUTH.qs("returnTo"));
-      if (returnTo) {
-        window.location.href = returnTo;
-        return;
+      async function fetchMyProfile(userId) {
+        const { data, error } = await supabaseClient
+          .from("profiles")
+          .select("id, username, role, vessel_id, is_active, position")
+          .eq("id", userId)
+          .single();
+        if (error) throw error;
+        return data;
       }
 
-      window.location.href = routeByRole(profile.role);
-    }
+      function routeByRole(role) {
+        // role values must match your DB: public.profiles.role
+        if (role === "vessel") return "./q-vessel.html";
+        if (role === "inspector") return "./q-inspector.html";
+        // company_admin / company_superintendent / super_admin -> dashboard
+        return "./q-dashboard.html";
+      }
 
-    async function doLogout(){
-      clearError();
-      await supabaseClient.auth.signOut();
-      localStorage.removeItem("q_session_v1");
-      setError("Logged out.");
-    }
+      async function doLogin() {
+        clearError();
 
-    document.getElementById("loginBtn").addEventListener("click", doLogin);
-    document.getElementById("logoutBtn").addEventListener("click", doLogout);
-    document.getElementById("password").addEventListener("keydown", (e) => { if (e.key === "Enter") doLogin(); });
-    document.getElementById("username").addEventListener("keydown", (e) => { if (e.key === "Enter") doLogin(); });
+        const username = document.getElementById("username").value.trim();
+        const password = document.getElementById("password").value;
+
+        if (!username || !password) {
+          setError("Please enter username and password.");
+          return;
+        }
+
+        const email = usernameToEmail(username);
+        console.log(`[${BUILD}] attempting login with email:`, email);
+
+        const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+        if (error) {
+          setError("Login failed: " + error.message);
+          return;
+        }
+
+        const user = data.user;
+        if (!user) {
+          setError("Login failed: no user returned.");
+          return;
+        }
+
+        let profile;
+        try {
+          profile = await fetchMyProfile(user.id);
+        } catch (e) {
+          setError(
+            "Login OK but profile missing or blocked by RLS.\n" +
+            "Ensure a row exists in public.profiles for this user, and RLS allows select."
+          );
+          return;
+        }
+
+        if (profile && profile.is_active === false) {
+          setError("Your account is inactive. Please contact the administrator.");
+          await supabaseClient.auth.signOut();
+          return;
+        }
+
+        const returnTo = safePath(qs("returnTo"));
+        if (returnTo) {
+          window.location.href = returnTo;
+          return;
+        }
+
+        window.location.href = routeByRole(profile.role);
+      }
+
+      async function doLogout() {
+        clearError();
+        await supabaseClient.auth.signOut();
+        localStorage.removeItem("q_session_v1");
+        setError("Logged out.");
+      }
+
+      document.getElementById("loginBtn").addEventListener("click", doLogin);
+      document.getElementById("logoutBtn").addEventListener("click", doLogout);
+      document.getElementById("password").addEventListener("keydown", (e) => { if (e.key === "Enter") doLogin(); });
+      document.getElementById("username").addEventListener("keydown", (e) => { if (e.key === "Enter") doLogin(); });
+    })();
   </script>
 </body>
 </html>
