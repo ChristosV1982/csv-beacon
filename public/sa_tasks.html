@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>My Self-Assessment Tasks</title>
+
+  <link rel="stylesheet" href="./style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="./auth.js"></script>
+
+  <style>
+    body { margin:0; font-family:"Segoe UI", Arial, sans-serif; background:#f5f7fb; }
+    .topbar { background:#1a4170; color:#fff; padding:12px 16px; display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; }
+    .wrap { padding:18px; max-width:1400px; margin:0 auto; }
+    .btn { background:#295eb0; color:#fff; border:none; border-radius:10px; padding:10px 14px; font-weight:900; cursor:pointer; }
+    .btn2 { background:#eaf1fb; color:#1a4170; border:1px solid #d5deef; border-radius:10px; padding:10px 14px; font-weight:900; cursor:pointer; }
+    .card { background:#fff; border:1px solid #d5deef; border-radius:14px; padding:14px; box-shadow: 0 4px 18px rgba(18,44,87,0.10); }
+    .muted { color:#35507b; font-weight:800; }
+    .warn { margin-top:10px; background:#fff2f2; border:1px solid #f1c7c7; color:#7a1f1f; font-weight:900; border-radius:12px; padding:10px; display:none; white-space:pre-wrap; }
+    table { width:100%; border-collapse:collapse; }
+    th, td { padding:10px; border-bottom:1px solid #e6eefb; vertical-align:top; }
+    th { text-align:left; background:#f2f7ff; color:#1a4170; font-weight:950; position:sticky; top:0; }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <div><b>My Self-Assessment Tasks</b></div>
+    <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+      <div id="userBadge" style="font-weight:800; opacity:0.95;"></div>
+      <button class="btn2" onclick="location.href='./q-dashboard.html'">Dashboard</button>
+      <button class="btn2" onclick="location.href='./sa_compare.html'">Pre/Post Compare</button>
+      <button class="btn" id="logoutBtn">Logout</button>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <div class="card">
+      <div class="muted">This list is driven by <b>self_assess_instances</b> and RLS. You will only see tasks assigned to your role/position.</div>
+      <div id="warnBox" class="warn"></div>
+
+      <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:12px;">
+        <button class="btn2" id="refreshBtn">Refresh</button>
+      </div>
+
+      <div style="margin-top:12px; overflow:auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>Campaign</th>
+              <th>Vessel</th>
+              <th>Questionnaire</th>
+              <th>Status</th>
+              <th>Due</th>
+              <th>Updated</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="rows"></tbody><!DOCTYPE html>
+          <html lang="en">
+          <head>
+            <meta charset="UTF-8" />
+            <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+            <title>SIRE 2.0 – My Self-Assessments</title>
+
+            <link rel="stylesheet" href="style.css" />
+            <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+            <script src="./auth.js"></script>
+
+            <style>
+              body {
+                margin:0;
+                font-family:"Segoe UI", Arial, sans-serif;
+                background:#f5f7fb;
+                color:#14223a;
+              }
+              .topbar {
+                background:#1a4170; color:#fff;
+                padding:12px 16px;
+                display:flex; justify-content:space-between; align-items:center;
+                gap:10px; flex-wrap:wrap;
+              }
+              .wrap { padding:18px; max-width:1200px; margin:0 auto; }
+              .btn {
+                background:#295eb0; color:#fff; border:none;
+                border-radius:10px; padding:10px 14px;
+                font-weight:900; cursor:pointer;
+              }
+              .btn2 {
+                background:#eaf1fb; color:#1a4170; border:1px solid #c9d9f3;
+                border-radius:10px; padding:10px 14px;
+                font-weight:900; cursor:pointer;
+              }
+              .btn:disabled, .btn2:disabled { opacity:0.55; cursor:not-allowed; }
+              .card {
+                background:#fff;
+                border:1px solid #dbe6f6;
+                border-radius:14px;
+                padding:14px;
+                box-shadow: 0 10px 30px rgba(12,24,48,0.06);
+              }
+              .muted { color:#4d6283; font-weight:650; }
+              .row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+              select, input {
+                padding:10px 10px;
+                border-radius:10px;
+                border:1px solid #c9d9f3;
+                background:#fff;
+                font-weight:700;
+              }
+              table {
+                width:100%;
+                border-collapse: collapse;
+                margin-top:10px;
+                background:#fff;
+                border:1px solid #dbe6f6;
+                border-radius:14px;
+                overflow:hidden;
+              }
+              th, td {
+                padding:10px 10px;
+                border-bottom:1px solid #e7effb;
+                vertical-align:top;
+                text-align:left;
+                font-size:0.95rem;
+              }
+              th {
+                background:#f0f6ff;
+                color:#1a4170;
+                font-weight:900;
+              }
+              .pill {
+                display:inline-block;
+                padding:4px 10px;
+                border-radius:999px;
+                background:#f0f6ff;
+                border:1px solid #c9d9f3;
+                color:#1a4170;
+                font-weight:900;
+                font-size:0.85rem;
+              }
+              .warn {
+                margin-top:10px;
+                color:#8b1d1d;
+                background:#ffeaea;
+                border:1px solid #ffc7c7;
+                padding:10px 12px;
+                border-radius:12px;
+                font-weight:800;
+                white-space:pre-wrap;
+              }
+            </style>
+          </head>
+          <body>
+            <div class="topbar">
+              <div style="font-weight:900;">My Self-Assessments</div>
+              <div class="row">
+                <div id="userBadge" style="font-weight:800;"></div>
+                <button class="btn2" onclick="location.href='./q-dashboard.html'">Back</button>
+                <button class="btn" id="logoutBtn">Logout</button>
+              </div>
+            </div>
+
+            <div class="wrap">
+              <div class="card">
+                <div class="row" style="justify-content:space-between;">
+                  <div>
+                    <div style="font-weight:900; font-size:1.05rem;">Assigned Questionnaires</div>
+                    <div class="muted">These are the self-assessment questionnaires assigned to you (by role and vessel).</div>
+                  </div>
+                  <div class="row">
+                    <label class="muted" style="font-weight:900;">Campaign</label>
+                    <select id="campaignFilter"></select>
+                    <button class="btn2" id="refreshBtn">Refresh</button>
+                  </div>
+                </div>
+
+                <div id="warnBox" class="warn" style="display:none;"></div>
+
+                <table>
+                  <thead>
+                    <tr>
+                      <th style="width:34%;">Title</th>
+                      <th style="width:16%;">Vessel</th>
+                      <th style="width:12%;">Due</th>
+                      <th style="width:12%;">Status</th>
+                      <th style="width:26%;">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="rowsBody">
+                    <tr><td colspan="5" class="muted">Loading...</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <script type="module" src="./sa_tasks.js"></script>
+          </body>
+          </html>
+
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./sa_tasks.js"></script>
+  <script>
+    (async () => {
+      const me = await AUTH.requireAuth([]);
+      if (!me) return;
+      AUTH.fillUserBadge(me, "userBadge");
+      document.getElementById("logoutBtn").addEventListener("click", AUTH.logoutAndGoLogin);
+    })();
+  </script>
+</body>
+</html>
