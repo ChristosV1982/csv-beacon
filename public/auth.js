@@ -43,34 +43,18 @@ function safePath(p) {
   if (p.includes("://")) return "";
   if (p.startsWith("//")) return "";
   if (!p.endsWith(".html")) return "";
+  // allow "./x.html" or "x.html"
   return p.startsWith("./") ? p : `./${p}`;
 }
 
-async function tryGetVesselName(vesselId) {
-  if (!vesselId) return "";
-  try {
-    const supabaseClient = getClient();
-    const { data, error } = await supabaseClient
-      .from("vessels")
-      .select("name")
-      .eq("id", vesselId)
-      .maybeSingle();
-    if (error) return "";
-    return data?.name || "";
-  } catch {
-    return "";
-  }
-}
-
-function setCompatSession(profile, user, vesselName) {
+function setCompatSession(profile, user) {
+  const vesselName = profile?.vessels?.name || "";
   localStorage.setItem(
     SESSION_KEY_COMPAT,
     JSON.stringify({
       username: profile?.username || (user?.email ? user.email.split("@")[0] : ""),
       role: profile?.role || "",
-      position: profile?.position || "",
-      vessel_id: profile?.vessel_id || null,
-      vessel: vesselName || "",
+      vessel: vesselName,
       created_at: new Date().toISOString(),
     })
   );
@@ -87,18 +71,17 @@ async function getMyProfile() {
 
   const user = session.user;
 
+  // IMPORTANT: keep this select minimal to avoid any unnecessary recursion/policy complexity.
   const { data: profile, error: profErr } = await supabaseClient
     .from("profiles")
-    .select("id, username, role, vessel_id, position")
+    .select("id, username, role, vessel_id")
     .eq("id", user.id)
     .single();
 
   if (profErr) throw profErr;
 
-  const vesselName = await tryGetVesselName(profile?.vessel_id);
-  setCompatSession(profile, user, vesselName);
-
-  return { user, profile, vesselName };
+  setCompatSession(profile, user);
+  return { user, profile };
 }
 
 function redirectToLogin() {
@@ -112,13 +95,14 @@ function redirectToDashboard() {
 
 /**
  * Require authentication + (optionally) specific DB roles.
- * @param {string[]} allowedRoles - array of DB role strings. If empty/null -> any logged-in role allowed.
+ * @param {string[]} allowedRoles - array of DB role strings (ROLES.*). If empty/null -> any logged-in role allowed.
  */
 async function requireAuth(allowedRoles) {
   try {
     const me = await getMyProfile();
 
     if (!me || !me.user || !me.profile) {
+      // Not logged in or profile missing
       localStorage.removeItem(SESSION_KEY_COMPAT);
       redirectToLogin();
       return null;
@@ -128,13 +112,16 @@ async function requireAuth(allowedRoles) {
 
     if (Array.isArray(allowedRoles) && allowedRoles.length > 0) {
       if (!allowedRoles.includes(role)) {
+        // Logged in but not allowed here
         redirectToDashboard();
         return null;
       }
     }
 
+    // Allowed
     return me;
   } catch (e) {
+    // Any error (including RLS) -> force back to login with a clean state
     console.error("Auth guard error:", e);
     localStorage.removeItem(SESSION_KEY_COMPAT);
     redirectToLogin();
@@ -146,31 +133,25 @@ async function logoutAndGoLogin() {
   const supabaseClient = getClient();
   try {
     await supabaseClient.auth.signOut();
-  } catch {}
+  } catch (e) {
+    // ignore
+  }
   localStorage.removeItem(SESSION_KEY_COMPAT);
   window.location.href = "./login.html";
 }
 
+// Small UI helper for protected pages
 function fillUserBadge(me, badgeId) {
   const el = document.getElementById(badgeId);
   if (!el || !me) return;
 
   const username = me.profile?.username || (me.user?.email ? me.user.email.split("@")[0] : "");
   const role = me.profile?.role || "";
-  const position = me.profile?.position || "";
-  const vesselName = me.vesselName || "";
-
-  const extra = [
-    position ? `Position: ${position}` : "",
-    vesselName ? `Vessel: ${vesselName}` : "",
-  ].filter(Boolean).join(" | ");
-
-  el.textContent = `User: ${username} | Role: ${role}` + (extra ? ` | ${extra}` : "");
+  el.textContent = `User: ${username} | Role: ${role}`;
 }
 
 window.AUTH = {
   ROLES,
-  getClient,
   requireAuth,
   logoutAndGoLogin,
   fillUserBadge,

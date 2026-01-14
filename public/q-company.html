@@ -7,6 +7,7 @@
 
   <link rel="stylesheet" href="style.css" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="./auth.js"></script>
 
   <style>
     body{
@@ -310,7 +311,7 @@
             <span class="mono" id="roleLine">Role: ...</span>
           </div>
           <div class="right">
-            <input id="searchInput" type="text" placeholder="Search title / vessel / status..." style="min-width:260px;" />
+            <input id="searchInput" type="text" placeholder="Search title / vessel / status / assigned..." style="min-width:260px;" />
             <button class="btn btn-muted" id="refreshBtn" type="button">Refresh</button>
           </div>
         </div>
@@ -323,6 +324,9 @@
                 Creates: <span class="mono">public.questionnaires</span> + compiles into <span class="mono">public.questionnaire_questions</span>
               </div>
               <div class="mono" style="margin-top:6px;" id="libraryLockLine">Library locked to: ...</div>
+              <div class="mono" style="margin-top:6px;">
+                Assignment: CO/CE see only their assigned questionnaires (or All roles). Master sees all for the vessel.
+              </div>
             </div>
 
             <label for="vesselSelect">Vessel</label>
@@ -330,6 +334,14 @@
 
             <label for="titleInput">Title</label>
             <input id="titleInput" type="text" placeholder="e.g. SIRE 2.0 Pre-Inspection – Jan 2026" />
+
+            <label for="assignedSelect">Assigned To (Vessel Role)</label>
+            <select id="assignedSelect">
+              <option value="">All roles (default)</option>
+              <option value="master">Master</option>
+              <option value="chief_officer">Chief Officer</option>
+              <option value="chief_engineer">Chief Engineer</option>
+            </select>
 
             <div class="note" style="margin-top:12px;">
               <b>Compile Questionnaire (select questions)</b><br/>
@@ -409,6 +421,7 @@
                   <tr>
                     <th style="width:140px;">Status</th>
                     <th style="width:260px;">Vessel</th>
+                    <th style="width:200px;">Assigned</th>
                     <th>Title</th>
                     <th style="width:220px;">Updated</th>
                     <th style="width:360px;">Actions</th>

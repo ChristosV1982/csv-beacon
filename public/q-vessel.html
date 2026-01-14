@@ -3,54 +3,82 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Vessel Questionnaire</title>
+  <title>Vessel – My Questionnaires</title>
+
   <link rel="stylesheet" href="style.css" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="./auth.js"></script>
+
   <style>
-    body { margin:0; font-family:"Segoe UI", Arial, sans-serif; background:#f5f7fb; }
-    .topbar { background:#1a4170; color:#fff; padding:12px 16px; display:flex; justify-content:space-between; align-items:center; }
-    .wrap { padding:18px; }
+    body { margin:0; font-family:"Segoe UI", Arial, sans-serif; background:#f5f7fb; color:#14223a; }
+    .topbar { background:#1a4170; color:#fff; padding:12px 16px; display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; }
+    .wrap { padding:18px; max-width:1200px; margin:0 auto; }
     .btn { background:#295eb0; color:#fff; border:none; border-radius:10px; padding:10px 14px; font-weight:900; cursor:pointer; }
-    .btn2 { background:#eaf1fb; color:#1a4170; border:1px solid #d5deef; border-radius:10px; padding:10px 14px; font-weight:900; cursor:pointer; }
-    .card { background:#fff; border:1px solid #d5deef; border-radius:14px; padding:14px; margin-top:12px; }
+    .btn2 { background:#eaf1fb; color:#1a4170; border:1px solid #c9d9f3; border-radius:10px; padding:10px 14px; font-weight:900; cursor:pointer; }
+    .card { background:#fff; border:1px solid #dbe6f6; border-radius:14px; padding:14px; box-shadow:0 10px 30px rgba(12,24,48,0.06); }
+    .muted { color:#4d6283; font-weight:650; }
+    table { width:100%; border-collapse:collapse; margin-top:12px; border:1px solid #dbe6f6; border-radius:14px; overflow:hidden; background:#fff; }
+    th, td { padding:10px; border-bottom:1px solid #e7effb; text-align:left; vertical-align:top; }
+    th { background:#f0f6ff; color:#1a4170; font-weight:900; }
+    .pill { display:inline-block; padding:4px 10px; border-radius:999px; background:#f0f6ff; border:1px solid #c9d9f3; color:#1a4170; font-weight:900; font-size:0.85rem; }
+    .warn { margin-top:10px; color:#8b1d1d; background:#ffeaea; border:1px solid #ffc7c7; padding:10px 12px; border-radius:12px; font-weight:800; white-space:pre-wrap; display:none; }
+    select { padding:8px 10px; border-radius:10px; border:1px solid #c9d9f3; font-weight:800; }
   </style>
 </head>
+
 <body>
   <div class="topbar">
-    <div><b>Vessel Questionnaire</b></div>
-    <div style="display:flex; gap:10px; align-items:center;">
-      <div id="userBadge" style="font-weight:800; opacity:0.95;"></div>
+    <div style="font-weight:900;">Vessel – My Questionnaires</div>
+    <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+      <div id="userBadge" style="font-weight:800;"></div>
       <button class="btn2" onclick="location.href='./q-dashboard.html'">Dashboard</button>
-      <button class="btn2" onclick="location.href='./library.html'">Read Only</button>
+      <button class="btn2" onclick="location.href='./sa_tasks.html'">SA Tasks</button>
+      <button class="btn2" onclick="location.href='./index.html'">Mode Selection</button>
       <button class="btn" id="logoutBtn">Logout</button>
     </div>
   </div>
 
   <div class="wrap">
     <div class="card">
-      <h3 style="margin:0 0 8px 0;">Protected Page</h3>
-      <div>This page is accessible only to: <b>Vessel</b> and <b>Company</b> roles (and Super Admin).</div>
-      <div style="margin-top:10px;">
-        <button class="btn2" onclick="location.href='./q-answer.html'">Go to Answering</button>
+      <div style="display:flex; justify-content:space-between; align-items:flex-end; gap:10px; flex-wrap:wrap;">
+        <div>
+          <div style="font-weight:900; font-size:1.05rem;">Questionnaires for this vessel</div>
+          <div class="muted">
+            The list is filtered automatically by vessel + role assignment.
+            Master can see all questionnaires for the vessel.
+          </div>
+        </div>
+        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+          <select id="statusFilter">
+            <option value="">All statuses</option>
+            <option value="draft">draft</option>
+            <option value="in_progress">in_progress</option>
+            <option value="submitted">submitted</option>
+          </select>
+          <button class="btn2" id="refreshBtn">Refresh</button>
+        </div>
       </div>
+
+      <div id="warnBox" class="warn"></div>
+
+      <table>
+        <thead>
+          <tr>
+            <th style="width:40%;">Title</th>
+            <th style="width:18%;">Assigned</th>
+            <th style="width:16%;">Type</th>
+            <th style="width:14%;">Updated</th>
+            <th style="width:12%;">Status</th>
+            <th style="width:10%;">Action</th>
+          </tr>
+        </thead>
+        <tbody id="rowsBody">
+          <tr><td colspan="6" class="muted">Loading…</td></tr>
+        </tbody>
+      </table>
     </div>
   </div>
 
-  <script>
-    (async () => {
-      const R = AUTH.ROLES;
-      const me = await AUTH.requireAuth([
-        R.SUPER_ADMIN,
-        R.COMPANY_ADMIN,
-        R.COMPANY_SUPERINTENDENT,
-        R.VESSEL
-      ]);
-      if (!me) return;
-
-      AUTH.fillUserBadge(me, "userBadge");
-      document.getElementById("logoutBtn").addEventListener("click", AUTH.logoutAndGoLogin);
-    })();
-  </script>
+  <script type="module" src="./q-vessel.js"></script>
 </body>
 </html>
