@@ -1,17 +1,15 @@
 // public/q-company.js
 import { loadLockedLibraryJson } from "./question_library_loader.js";
 
-const SUPABASE_URL = "https://bdidrcyufazskpuwmfca.supabase.co";
-const SUPABASE_ANON_KEY =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJkaWRyY3l1ZmF6c2twdXdtZmNhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc5NDI4ODMsImV4cCI6MjA4MzUxODg4M30.Uqj4WCzoNS9wnlzI-xew6iTFzTUi77dcGeBjUgFjZbQ";
+/**
+ * IMPORTANT:
+ * - Supabase config must be centralized in public/auth.js
+ * - q-company.html must include:
+ *     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+ *     <script src="./auth.js"></script>
+ */
 
-const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-  auth: {
-    persistSession: true,
-    autoRefreshToken: true,
-    detectSessionInUrl: true,
-  },
-});
+const supabaseClient = window.AUTH.ensureSupabase();
 
 // Lock to EXACT library JSON
 const LOCKED_LIBRARY_JSON = "./sire_questions_all_columns_named.json";
@@ -38,14 +36,12 @@ function setSubLine(text) {
 
 function showWarn(msg) {
   const w = el("warnBox");
-  if (!w) return;
-  w.textContent = msg || "";
-  w.style.display = msg ? "block" : "none";
+  w.textContent = msg;
+  w.style.display = "block";
 }
 
 function clearWarn() {
   const w = el("warnBox");
-  if (!w) return;
   w.textContent = "";
   w.style.display = "none";
 }
@@ -153,14 +149,11 @@ async function loadVessels() {
 }
 
 async function loadQuestionnaires() {
-  // IMPORTANT:
-  // Do NOT select "mode" here unless you have a real column named "mode" in public.questionnaires.
-  // Selecting a non-existent field named "mode" can trigger Postgres ordered-set aggregate errors via PostgREST.
+  // IMPORTANT: Do NOT select "mode" here to avoid Postgres calling mode() aggregate
   const { data, error } = await supabaseClient
     .from("questionnaires")
     .select("id, title, status, created_at, updated_at, vessel_id, assigned_position")
     .order("updated_at", { ascending: false });
-
   if (error) throw error;
 
   const rows = data || [];
@@ -219,7 +212,17 @@ function pick(obj, keys) {
 
 function getQno(q) {
   return String(
-    pick(q, ["No.", "No", "question_no", "questionNo", "id", "qid", "QuestionNo", "Question ID", "QuestionID"])
+    pick(q, [
+      "No.",
+      "No",
+      "question_no",
+      "questionNo",
+      "id",
+      "qid",
+      "QuestionNo",
+      "Question ID",
+      "QuestionID",
+    ])
   ).trim();
 }
 
@@ -268,7 +271,7 @@ function getTextBlob(q) {
 }
 
 // ----------------------
-// Filters (requested set only)
+// Filters
 // ----------------------
 const VESSEL_TYPES_FIXED = ["Chemical", "LNG", "LPG", "Oil"];
 
@@ -587,16 +590,12 @@ function renderTemplates() {
             <div style="display:flex; gap:8px; flex-wrap:wrap;">
               ${
                 isSuper
-                  ? `<button class="btn btn-outline" data-tpl-compile="1" data-id="${escapeHtml(
-                      t.id
-                    )}">Compile (replace questions)</button>`
+                  ? `<button class="btn btn-outline" data-tpl-compile="1" data-id="${escapeHtml(t.id)}">Compile (replace questions)</button>`
                   : ``
               }
               ${
                 isSuper
-                  ? `<button class="btn btn-outline" data-tpl-createq="1" data-id="${escapeHtml(
-                      t.id
-                    )}">Create Questionnaire for Vessel</button>`
+                  ? `<button class="btn btn-outline" data-tpl-createq="1" data-id="${escapeHtml(t.id)}">Create Questionnaire for Vessel</button>`
                   : ``
               }
             </div>
@@ -747,7 +746,7 @@ async function createQuestionnaireFromTemplateFlow(templateId) {
 }
 
 // ----------------------
-// Create questionnaire by compiling
+// Create questionnaire by compiling (Option A)
 // ----------------------
 function chunk(arr, size) {
   const out = [];
@@ -825,8 +824,8 @@ async function createQuestionnaireByCompile(userId) {
     }
 
     const qid = q.id;
-
     const selected = Array.from(SELECTED_SET);
+
     const qqRows = [];
     const missing = [];
 
@@ -961,6 +960,15 @@ async function init() {
       "Ensure a row exists in public.profiles for this user, and RLS allows select.\n\n" +
       "Error: " + String(e?.message || e)
     );
+    return;
+  }
+
+  // (a) HARD ROLE GUARD: vessel users must not access Company view
+  const allowedCompanyRoles = new Set(["super_admin", "company_admin", "company_superintendent"]);
+  if (!allowedCompanyRoles.has(PROFILE.role)) {
+    setSubLine("Access denied.");
+    showWarn("Access denied for your role. Redirecting to Vessel view…");
+    setTimeout(() => (window.location.href = "./q-vessel.html"), 450);
     return;
   }
 

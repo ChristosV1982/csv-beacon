@@ -1,161 +1,142 @@
-/* public/auth.js
-   Centralized Supabase auth + role-based route protection.
-*/
+// public/auth.js
+// Central auth + Supabase singleton + role guards.
+// Load AFTER supabase-js (<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>)
 
-const SUPABASE_URL = "https://bdidrcyufazskpuwmfca.supabase.co";
-const SUPABASE_ANON_KEY =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJkaWRyY3l1ZmF6c2twdXdtZmNhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc5NDI4ODMsImV4cCI6MjA4MzUxODg4M30.Uqj4WCzoNS9wnlzI-xew6iTFzTUi77dcGeBjUgFjZbQ";
+(() => {
+  const SUPABASE_URL = "https://bdidrcyufazskpuwmfca.supabase.co";
+  const SUPABASE_ANON_KEY =
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJkaWRyY3l1ZmF6c2twdXdtZmNhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc5NDI4ODMsImV4cCI6MjA4MzUxODg4M30.Uqj4WCzoNS9wnlzI-xew6iTFzTUi77dcGeBjUgFjZbQ";
 
-const SESSION_KEY_COMPAT = "q_session_v1"; // compatibility for any older pages
-const USERNAME_DOMAIN = "csvtest.local";   // username@csvtest.local
+  const UI_ROLE_MAP = {
+    super_admin: "Super Admin",
+    company_admin: "Company Admin",
+    company_superintendent: "Company Superintendent",
+    vessel: "Vessel",
+    inspector: "Inspector / Third Party",
+  };
 
-// Role values are the DB values stored in public.profiles.role
-const ROLES = {
-  SUPER_ADMIN: "super_admin",
-  COMPANY_ADMIN: "company_admin",
-  COMPANY_SUPERINTENDENT: "company_superintendent",
-  VESSEL: "vessel",
-  INSPECTOR: "inspector",
-};
-
-function mustHaveSupabase() {
-  if (!window.supabase || !window.supabase.createClient) {
-    throw new Error("Supabase library missing. Ensure the supabase-js CDN script is included before auth.js.");
+  function roleToUi(role) {
+    return UI_ROLE_MAP[role] || role || "";
   }
-}
 
-function getClient() {
-  mustHaveSupabase();
-  if (!window.__supabaseClient) {
-    window.__supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  function showPageMessage(msg) {
+    // Try common containers first
+    const ids = ["warnBox", "errBox"];
+    for (const id of ids) {
+      const el = document.getElementById(id);
+      if (el) {
+        el.textContent = msg;
+        el.style.display = "block";
+        return;
+      }
+    }
+    // Fallback
+    try {
+      alert(msg);
+    } catch (_) {}
   }
-  return window.__supabaseClient;
-}
 
-function qs(name) {
-  const u = new URL(window.location.href);
-  return u.searchParams.get(name);
-}
+  function ensureSupabase() {
+    if (window.__SUPABASE_CLIENT) return window.__SUPABASE_CLIENT;
 
-function safePath(p) {
-  // Only allow local same-folder navigation like "./q-dashboard.html"
-  if (!p) return "";
-  if (p.includes("://")) return "";
-  if (p.startsWith("//")) return "";
-  if (!p.endsWith(".html")) return "";
-  // allow "./x.html" or "x.html"
-  return p.startsWith("./") ? p : `./${p}`;
-}
+    if (!window.supabase?.createClient) {
+      showPageMessage("Supabase JS not loaded. Check the <script> tag for @supabase/supabase-js.");
+      throw new Error("Supabase JS not available");
+    }
 
-function setCompatSession(profile, user) {
-  const vesselName = profile?.vessels?.name || "";
-  localStorage.setItem(
-    SESSION_KEY_COMPAT,
-    JSON.stringify({
-      username: profile?.username || (user?.email ? user.email.split("@")[0] : ""),
-      role: profile?.role || "",
-      vessel: vesselName,
-      created_at: new Date().toISOString(),
-    })
-  );
-}
+    window.__SUPABASE_CLIENT = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
+      },
+    });
 
-async function getMyProfile() {
-  const supabaseClient = getClient();
+    return window.__SUPABASE_CLIENT;
+  }
 
-  const { data: sessionData, error: sessionErr } = await supabaseClient.auth.getSession();
-  if (sessionErr) throw sessionErr;
+  function deriveVesselPosition(username) {
+    const u = String(username || "").trim().toLowerCase();
+    if (u.startsWith("master_")) return "master";
+    if (u.startsWith("chiefofficer_")) return "chief_officer";
+    if (u.startsWith("chiefengineer_")) return "chief_engineer";
+    return null;
+  }
 
-  const session = sessionData?.session;
-  if (!session?.user) return null;
+  async function getSession() {
+    const sb = ensureSupabase();
+    const { data, error } = await sb.auth.getSession();
+    if (error) throw error;
+    return data?.session || null;
+  }
 
-  const user = session.user;
+  async function getSessionUserProfile() {
+    const sb = ensureSupabase();
+    const session = await getSession();
+    if (!session?.user) return { session: null, user: null, profile: null };
 
-  // IMPORTANT: keep this select minimal to avoid any unnecessary recursion/policy complexity.
-  const { data: profile, error: profErr } = await supabaseClient
-    .from("profiles")
-    .select("id, username, role, vessel_id")
-    .eq("id", user.id)
-    .single();
+    const user = session.user;
 
-  if (profErr) throw profErr;
+    const { data: profile, error } = await sb
+      .from("profiles")
+      .select("id, username, role, vessel_id")
+      .eq("id", user.id)
+      .single();
 
-  setCompatSession(profile, user);
-  return { user, profile };
-}
+    if (error) throw error;
 
-function redirectToLogin() {
-  const returnTo = encodeURIComponent(window.location.pathname.split("/").pop() || "q-dashboard.html");
-  window.location.href = `./login.html?returnTo=${returnTo}`;
-}
+    return { session, user, profile };
+  }
 
-function redirectToDashboard() {
-  window.location.href = "./q-dashboard.html";
-}
+  async function requireAuth(allowedRoles = null, opts = {}) {
+    const redirectTo = opts.redirectTo || "./login.html";
+    const unauthorizedRedirect = opts.unauthorizedRedirect || "./q-dashboard.html";
 
-/**
- * Require authentication + (optionally) specific DB roles.
- * @param {string[]} allowedRoles - array of DB role strings (ROLES.*). If empty/null -> any logged-in role allowed.
- */
-async function requireAuth(allowedRoles) {
-  try {
-    const me = await getMyProfile();
+    let bundle;
+    try {
+      bundle = await getSessionUserProfile();
+    } catch (e) {
+      showPageMessage(
+        "Profile missing or blocked by RLS.\n" +
+          "Ensure a row exists in public.profiles for this user, and RLS allows select.\n\n" +
+          "Error: " + String(e?.message || e)
+      );
+      throw e;
+    }
 
-    if (!me || !me.user || !me.profile) {
-      // Not logged in or profile missing
-      localStorage.removeItem(SESSION_KEY_COMPAT);
-      redirectToLogin();
+    const { session, user, profile } = bundle;
+
+    if (!session?.user) {
+      window.location.href = redirectTo;
       return null;
     }
 
-    const role = me.profile.role;
-
-    if (Array.isArray(allowedRoles) && allowedRoles.length > 0) {
-      if (!allowedRoles.includes(role)) {
-        // Logged in but not allowed here
-        redirectToDashboard();
+    if (allowedRoles && Array.isArray(allowedRoles) && allowedRoles.length) {
+      const ok = allowedRoles.includes(profile?.role);
+      if (!ok) {
+        showPageMessage("Access denied for your role. Redirecting…");
+        setTimeout(() => {
+          window.location.href = unauthorizedRedirect;
+        }, 600);
         return null;
       }
     }
 
-    // Allowed
-    return me;
-  } catch (e) {
-    // Any error (including RLS) -> force back to login with a clean state
-    console.error("Auth guard error:", e);
-    localStorage.removeItem(SESSION_KEY_COMPAT);
-    redirectToLogin();
-    return null;
+    return {
+      session,
+      user,
+      profile,
+      uiRole: roleToUi(profile?.role),
+      vesselPosition: deriveVesselPosition(profile?.username),
+    };
   }
-}
 
-async function logoutAndGoLogin() {
-  const supabaseClient = getClient();
-  try {
-    await supabaseClient.auth.signOut();
-  } catch (e) {
-    // ignore
-  }
-  localStorage.removeItem(SESSION_KEY_COMPAT);
-  window.location.href = "./login.html";
-}
-
-// Small UI helper for protected pages
-function fillUserBadge(me, badgeId) {
-  const el = document.getElementById(badgeId);
-  if (!el || !me) return;
-
-  const username = me.profile?.username || (me.user?.email ? me.user.email.split("@")[0] : "");
-  const role = me.profile?.role || "";
-  el.textContent = `User: ${username} | Role: ${role}`;
-}
-
-window.AUTH = {
-  ROLES,
-  requireAuth,
-  logoutAndGoLogin,
-  fillUserBadge,
-  safePath,
-  qs,
-  USERNAME_DOMAIN,
-};
+  window.AUTH = {
+    SUPABASE_URL,
+    roleToUi,
+    ensureSupabase,
+    requireAuth,
+    getSessionUserProfile,
+    deriveVesselPosition,
+  };
+})();

@@ -36,6 +36,14 @@
       text-decoration:none;display:inline-block;
     }
     .btn-outline:hover{background:rgba(255,255,255,0.08);}
+    .btn{
+      border:none;border-radius:10px;
+      background:#295eb0;color:#fff;
+      font-weight:900;font-size:1rem;
+      padding:9px 14px;cursor:pointer;
+      box-shadow:0 2px 10px rgba(0,0,0,0.15);
+    }
+    .btn:hover{filter:brightness(.97);}
     .card{
       background:#ffffff;color:#1a4170;
       border:1px solid #d5deef;border-radius:16px;
@@ -74,14 +82,6 @@
       resize:vertical;
     }
     .saveRow{display:flex;gap:10px;align-items:center;margin-top:10px;flex-wrap:wrap;}
-    .btn{
-      border:none;border-radius:10px;
-      background:#295eb0;color:#fff;
-      font-weight:900;font-size:1rem;
-      padding:9px 14px;cursor:pointer;
-      box-shadow:0 2px 10px rgba(0,0,0,0.15);
-    }
-    .btn:hover{filter:brightness(.97);}
     .status{font-weight:900;}
     .err{
       background:#fff2f2;color:#7a1f1f;
@@ -112,7 +112,8 @@
         <div class="title" id="pageTitle">Questionnaire</div>
         <div class="muted" id="pageSub">Loading…</div>
       </div>
-      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+        <button class="btn" id="submitBtn" type="button" style="display:none;">Submit</button>
         <a class="btn-outline" href="./q-dashboard.html">Dashboard</a>
         <a class="btn-outline" href="./library.html">Read Only</a>
         <a class="btn-outline" href="./index.html">Mode Selection</a>
@@ -130,7 +131,6 @@
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJkaWRyY3l1ZmF6c2twdXdtZmNhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc5NDI4ODMsImV4cCI6MjA4MzUxODg4M30.Uqj4WCzoNS9wnlzI-xew6iTFzTUi77dcGeBjUgFjZbQ";
     const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    // Must match the same locked JSON used in q-company.js
     const LOCKED_LIBRARY_JSON = "./sire_questions_all_columns_named.json";
 
     function qs(name){ return new URLSearchParams(location.search).get(name); }
@@ -151,6 +151,16 @@
       if (error) throw error;
       if (!data.session) window.location.href = "./login.html";
       return data.session;
+    }
+
+    async function getMyProfile(userId){
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("username, role, vessel_id, position")
+        .eq("id", userId)
+        .single();
+      if (error) throw error;
+      return data;
     }
 
     function esc(s){
@@ -229,32 +239,33 @@
 
       const pgnoBox = wrapper.querySelector(`#pgno-${cssId(qno)}`);
 
-      // Ensure stable order
-      pgnoRows.sort((a,b)=> (a.pgno_index||0)-(b.pgno_index||0)).forEach(row=>{
-        const el = document.createElement("div");
-        el.className="pgno";
-        el.innerHTML = `
-          <div class="pgno-title">PGNO ${esc(String(row.pgno_index))}</div>
-          <div class="pre">${esc(row.pgno_text || "")}</div>
+      pgnoRows
+        .slice()
+        .sort((a,b)=> (a.pgno_index||0)-(b.pgno_index||0))
+        .forEach(row=>{
+          const el = document.createElement("div");
+          el.className="pgno";
+          el.innerHTML = `
+            <div class="pgno-title">PGNO ${esc(String(row.pgno_index))}</div>
+            <div class="pre">${esc(row.pgno_text || "")}</div>
 
-          <div class="choices">
-            ${choiceRadio(qno,row.pgno_index,'Y',row.response)}
-            ${choiceRadio(qno,row.pgno_index,'N',row.response)}
-            ${choiceRadio(qno,row.pgno_index,'NA',row.response)}
-            ${choiceRadio(qno,row.pgno_index,'NS',row.response)}
-          </div>
+            <div class="choices">
+              ${choiceRadio(qno,row.pgno_index,'Y',row.response)}
+              ${choiceRadio(qno,row.pgno_index,'N',row.response)}
+              ${choiceRadio(qno,row.pgno_index,'NA',row.response)}
+              ${choiceRadio(qno,row.pgno_index,'NS',row.response)}
+            </div>
 
-          <textarea placeholder="Remarks for this PGNO…" id="${taId(qno,row.pgno_index)}">${esc(row.remarks||"")}</textarea>
+            <textarea placeholder="Remarks for this PGNO…" id="${taId(qno,row.pgno_index)}">${esc(row.remarks||"")}</textarea>
 
-          <div class="saveRow">
-            <button class="btn" type="button" id="${saveId(qno,row.pgno_index)}">Save</button>
-            <span class="status" id="${statusId(qno,row.pgno_index)}"></span>
-          </div>
-        `;
-        pgnoBox.appendChild(el);
-      });
+            <div class="saveRow">
+              <button class="btn" type="button" id="${saveId(qno,row.pgno_index)}">Save</button>
+              <span class="status" id="${statusId(qno,row.pgno_index)}"></span>
+            </div>
+          `;
+          pgnoBox.appendChild(el);
+        });
 
-      // Hook save buttons
       pgnoRows.forEach(row=>{
         const btn = wrapper.querySelector(`#${saveId(qno,row.pgno_index)}`);
         btn.addEventListener("click", async ()=>{
@@ -278,7 +289,6 @@
 
       const remarks = document.getElementById(taId(qno,idx)).value;
 
-      // Use UPSERT so it works even if the row did not exist yet
       const { error } = await supabase
         .from("answers_pgno")
         .upsert(
@@ -304,7 +314,6 @@
     }
 
     function buildPgnoFromLibraryQuestion(q, qid){
-      // Preferred: NegObs_Bullets array if present
       const bullets = Array.isArray(q?.NegObs_Bullets) ? q.NegObs_Bullets : null;
 
       if (bullets && bullets.length){
@@ -318,13 +327,10 @@
         })).filter(r => r.pgno_text);
       }
 
-      // Fallback: attempt to use Potential Grounds for Negative Observations (string)
       const pgnoTxt = String(q?.["Potential Grounds for Negative Observations"] || "").trim();
       if (!pgnoTxt) return [];
 
-      // Split into lines that look meaningful
       const lines = pgnoTxt.split("\n").map(s => s.trim()).filter(Boolean);
-      // Keep only bullet-like or sentence-like lines (avoid section headings)
       const usable = lines.filter(s => s.length > 6);
 
       return usable.slice(0, 50).map((t, i) => ({
@@ -337,13 +343,77 @@
       }));
     }
 
+    function getExpectedPgnoCount(qObj){
+      const built = buildPgnoFromLibraryQuestion(qObj, "00000000-0000-0000-0000-000000000000");
+      return built.length;
+    }
+
+    async function submitFlow(qid, profile, qqRows, answersMap){
+      clearError();
+
+      // Expected total PGNOs
+      let expected = 0;
+      for (const row of qqRows){
+        const qno = String(row.question_no || "").trim();
+        const qObj = row.question_json || null;
+        if (!qObj) continue;
+        expected += getExpectedPgnoCount(qObj);
+      }
+
+      // Answered PGNOs (based on saved rows)
+      let answered = 0;
+      for (const [k, v] of answersMap.entries()){
+        if (v && v.response != null && v.response !== "") answered++;
+      }
+
+      const pct = expected ? Math.round((answered / expected) * 100) : 0;
+
+      if (expected && answered < expected){
+        const ok = confirm(
+          `This questionnaire is not fully completed.\n\n` +
+          `Completed: ${answered}/${expected} (${pct}%).\n\n` +
+          `Submit anyway?`
+        );
+        if (!ok) return;
+      } else {
+        const ok = confirm("Submit this questionnaire now?");
+        if (!ok) return;
+      }
+
+      // RPC submit (preferred)
+      const { error: rpcErr } = await supabase.rpc("submit_questionnaire", { p_qid: qid });
+      if (rpcErr){
+        setError("Submit failed: " + rpcErr.message);
+        return;
+      }
+
+      // Redirect based on role
+      const role = String(profile?.role || "");
+      if (role === "vessel") window.location.href = "./q-vessel.html";
+      else window.location.href = "./q-company.html";
+    }
+
     async function loadData(){
-      await requireLogin();
+      const session = await requireLogin();
+      const userId = session.user.id;
 
       const qid = qs("qid") || localStorage.getItem("active_qid");
       if (!qid) throw new Error("No questionnaire id found. Open from Dashboard or Builder.");
 
-      // Load locked library for fallback when question_json is null
+      const profile = await getMyProfile(userId);
+
+      // Hard access check (server-side)
+      const { data: can, error: canErr } = await supabase.rpc("can_access_questionnaire", { p_qid: qid });
+      if (canErr) throw canErr;
+      if (!can) throw new Error("Access denied for this questionnaire.");
+
+      // Submit button
+      const submitBtn = document.getElementById("submitBtn");
+      submitBtn.style.display = "inline-block";
+      if (String(profile.role) === "vessel") submitBtn.textContent = "Submit to Office";
+      else submitBtn.textContent = "Final Submit";
+
+      // Load locked library (only used if question_json missing)
       const library = await loadLockedLibraryJson(LOCKED_LIBRARY_JSON);
       const libMap = new Map();
       for (const obj of library){
@@ -351,26 +421,23 @@
         if (qno) libMap.set(qno, obj);
       }
 
-      // Title
+      // Header
       const { data: qh, error: qhErr } = await supabase
         .from("questionnaires")
-        .select("id,title,status,created_at")
+        .select("id,title,status,created_at,updated_at")
         .eq("id", qid)
         .single();
-
       if (qhErr) throw qhErr;
 
       document.getElementById("pageTitle").textContent = qh.title || "Questionnaire";
       document.getElementById("pageSub").textContent =
-        `Questionnaire ID: ${qh.id} | Status: ${qh.status}`;
+        `Questionnaire ID: ${qh.id} | Status: ${qh.status} | Updated: ${new Date(qh.updated_at || qh.created_at).toLocaleString()}`;
 
-      // Questions list
-      // IMPORTANT: do not .order("seq") because your schema may not have seq
+      // Questions
       const { data: qq, error: qqErr } = await supabase
         .from("questionnaire_questions")
         .select("questionnaire_id, seq, sort_order, question_no, question_json")
         .eq("questionnaire_id", qid);
-
       if (qqErr) throw qqErr;
 
       const qqRows = (qq || []).slice().sort((a,b)=>{
@@ -380,28 +447,32 @@
       });
 
       if (!qqRows.length){
-        const content = document.getElementById("content");
-        content.innerHTML = `
+        document.getElementById("content").innerHTML = `
           <div class="card">
             <div class="note">
               No questions found for this questionnaire.<br/>
-              This usually means the questionnaire was created but compilation did not insert any question rows.
+              This usually means compilation did not insert question rows.
             </div>
-            <div class="pre">Return to Company page and create again after fixing compilation.</div>
           </div>
         `;
         return;
       }
 
-      // PGNO rows
+      // PGNO answers
       const { data: ap, error: apErr } = await supabase
         .from("answers_pgno")
         .select("questionnaire_id, question_no, pgno_index, pgno_text, response, remarks")
         .eq("questionnaire_id", qid)
         .order("question_no", { ascending: true })
         .order("pgno_index", { ascending: true });
-
       if (apErr) throw apErr;
+
+      // answersMap for submit progress
+      const answersMap = new Map();
+      (ap || []).forEach(r=>{
+        const key = `${r.question_no}__${r.pgno_index}`;
+        answersMap.set(key, r);
+      });
 
       // Group PGNO by question_no
       const map = {};
@@ -422,8 +493,7 @@
           warn.className = "card";
           warn.innerHTML = `
             <div class="note">
-              Missing question content for <b>${esc(qno)}</b>.<br/>
-              Neither questionnaire_questions.question_json nor locked library JSON contained this question number.
+              Missing question content for <b>${esc(qno)}</b>.
             </div>
           `;
           content.appendChild(warn);
@@ -431,13 +501,10 @@
         }
 
         let pgnoRows = map[qno] || [];
-        // attach qid so save knows it
         pgnoRows = pgnoRows.map(r => ({ ...r, questionnaire_id: qid }));
 
-        // If answers_pgno were not pre-generated, build on the fly from the library question content
         if (!pgnoRows.length){
           const built = buildPgnoFromLibraryQuestion(qObj, qid);
-          // Ensure question_no aligns with row.question_no
           for (const b of built){
             b.question_no = qno;
             b.questionnaire_id = qid;
@@ -448,6 +515,12 @@
         const card = renderQuestionCard(qObj, pgnoRows);
         content.appendChild(card);
       }
+
+      // Wire submit (after we have qqRows and answersMap)
+      submitBtn.addEventListener("click", () => submitFlow(qid, profile, qqRows.map(r => ({
+        ...r,
+        question_json: r.question_json || libMap.get(String(r.question_no || "").trim()) || null
+      })), answersMap));
     }
 
     clearError();

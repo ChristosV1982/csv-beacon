@@ -1,3 +1,4 @@
+<!-- public/q-company.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -19,7 +20,6 @@
       color:#fff;
     }
     .wrap{ max-width: 1600px; margin: 0 auto; }
-
     .topbar{
       display:flex;
       gap:12px;
@@ -196,7 +196,7 @@
       border-top:1px solid #d5deef;
     }
 
-    /* Filter dropdowns (Read-Only style) */
+    /* Filter dropdowns */
     .filterRow{
       display:flex;
       flex-wrap:wrap;
@@ -291,12 +291,11 @@
 
       <div class="top-actions">
         <a class="btn btn-outline" href="./q-dashboard.html">Dashboard</a>
-        <a class="btn btn-outline" href="./q-vessel.html">Vessel</a>
+        <a class="btn btn-outline" href="./q-company.html">Company</a>
         <a class="btn btn-outline" href="./q-inspector.html">Inspector</a>
         <a class="btn btn-outline" href="./q-report.html">Reports</a>
         <a class="btn btn-outline" href="./library.html">Read Only</a>
         <a class="btn btn-outline" href="./index.html">Mode Selection</a>
-        <a class="btn btn-muted" href="./login.html">Login</a>
         <button class="btn btn-outline" id="logoutBtn" type="button">Logout</button>
       </div>
     </div>
@@ -324,9 +323,6 @@
                 Creates: <span class="mono">public.questionnaires</span> + compiles into <span class="mono">public.questionnaire_questions</span>
               </div>
               <div class="mono" style="margin-top:6px;" id="libraryLockLine">Library locked to: ...</div>
-              <div class="mono" style="margin-top:6px;">
-                Assignment: CO/CE see only their assigned questionnaires (or All roles). Master sees all for the vessel.
-              </div>
             </div>
 
             <label for="vesselSelect">Vessel</label>
@@ -421,7 +417,7 @@
                   <tr>
                     <th style="width:140px;">Status</th>
                     <th style="width:260px;">Vessel</th>
-                    <th style="width:200px;">Assigned</th>
+                    <th style="width:180px;">Assigned</th>
                     <th>Title</th>
                     <th style="width:220px;">Updated</th>
                     <th style="width:360px;">Actions</th>

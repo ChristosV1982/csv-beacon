@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Superuser Admin</title>
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="./auth.js"></script>
+</head>
+<body style="margin:0; font-family:Segoe UI, Arial, sans-serif; background:#f5f7fb; color:#14223a;">
+  <div style="background:#1a4170; color:#fff; padding:12px 16px; display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
+    <div style="font-weight:900;">Superuser Admin</div>
+    <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+      <button class="btn2" onclick="location.href='./q-dashboard.html'">Dashboard</button>
+      <button class="btn2" onclick="location.href='./index.html'">Mode Selection</button>
+      <button class="btn" id="logoutBtn">Logout</button>
+    </div>
+  </div>
+
+  <div style="max-width:1100px; margin:0 auto; padding:18px;">
+    <div id="warnBox" class="warn" style="display:none;"></div>
+
+    <div class="card" style="background:#fff; border:1px solid #dbe6f6; border-radius:14px; padding:14px; box-shadow:0 10px 30px rgba(12,24,48,0.06);">
+      <div style="font-weight:950; font-size:1.05rem;">Role / Rights Administration (coming next)</div>
+      <div style="margin-top:8px; color:#4d6283; font-weight:700; line-height:1.35;">
+        This page is reserved for <b>super_admin</b> only.<br/>
+        Next step: a matrix where the Superuser can assign vessels, roles, and module-level rights.
+      </div>
+
+      <div style="margin-top:14px; font-weight:900;">Planned sections</div>
+      <ul style="margin-top:8px; color:#35507b; font-weight:800;">
+        <li>Users: create / disable / reset</li>
+        <li>Vessels: add / deactivate</li>
+        <li>Role assignments per vessel</li>
+        <li>Module rights (Dashboard, Vessel, Company, Inspector, Reports, Read-only, etc.)</li>
+      </ul>
+    </div>
+  </div>
+
+  <script type="module" src="./su-admin.js"></script>
+</body>
+</html>

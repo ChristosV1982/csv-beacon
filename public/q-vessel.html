@@ -1,3 +1,4 @@
+<!-- public/q-vessel.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -7,7 +8,7 @@
 
   <link rel="stylesheet" href="style.css" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="./auth.js?v=20260114_1"></script>
+  <script src="./auth.js"></script>
 
   <style>
     body { margin:0; font-family:"Segoe UI", Arial, sans-serif; background:#f5f7fb; color:#14223a; }
@@ -53,6 +54,7 @@
             <option value="">All statuses</option>
             <option value="draft">draft</option>
             <option value="in_progress">in_progress</option>
+            <option value="pending_office_review">pending_office_review</option>
             <option value="submitted">submitted</option>
           </select>
           <button class="btn2" id="refreshBtn">Refresh</button>
@@ -79,6 +81,6 @@
     </div>
   </div>
 
-  <script type="module" src="./q-vessel.js?v=20260114_1"></script>
+  <script type="module" src="./q-vessel.js"></script>
 </body>
 </html>
