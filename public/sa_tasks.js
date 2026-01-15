@@ -5,18 +5,18 @@ function el(id) { return document.getElementById(id); }
 
 function showWarn(msg) {
   const w = el("warnBox");
-  if (w) {
-    w.textContent = msg || "";
-    w.style.display = msg ? "block" : "none";
-  }
+  if (!w) return;
+  w.textContent = msg || "";
+  w.style.display = msg ? "block" : "none";
 }
 
 function clearWarn() { showWarn(""); }
 
 function ensureSupabase() {
-  const sb = window.__supabaseClient;
-  if (!sb) throw new Error("Supabase client not initialized. Ensure auth.js is loaded and AUTH.requireAuth() is called.");
-  return sb;
+  if (!window.AUTH?.ensureSupabase) {
+    throw new Error("AUTH.ensureSupabase() not available. Ensure auth.js is loaded before sa_tasks.js.");
+  }
+  return window.AUTH.ensureSupabase();
 }
 
 function fmtDate(d) {
@@ -24,11 +24,15 @@ function fmtDate(d) {
   try { return new Date(d).toLocaleDateString(); } catch { return String(d); }
 }
 
+function fmtTs(d) {
+  if (!d) return "-";
+  try { return new Date(d).toLocaleString(); } catch { return String(d); }
+}
+
 function statusPill(status) {
   const s = String(status || "").toLowerCase();
   const label = status || "unknown";
 
-  // minimal inline style to avoid CSS edits
   const bg =
     (s === "submitted") ? "#e9fff0" :
     (s === "in_progress") ? "#fff9e8" :
@@ -44,16 +48,14 @@ function statusPill(status) {
     (s === "in_progress") ? "#7a5a12" :
     "#1a4170";
 
-  return `<span class="pill" style="background:${bg}; border-color:${border}; color:${color};">${label}</span>`;
+  return `<span class="pill" style="display:inline-block;padding:4px 10px;border-radius:999px;background:${bg};border:1px solid ${border};color:${color};font-weight:900;font-size:0.85rem;">${label}</span>`;
 }
 
 async function loadCampaigns(supabase) {
-  // With Step 2.0 policy, assignees can see only campaigns related to their assignments.
   const { data, error } = await supabase
     .from("self_assess_campaigns")
     .select("id, name, created_at")
     .order("created_at", { ascending: false });
-
   if (error) throw error;
   return data || [];
 }
@@ -66,15 +68,17 @@ async function loadMyTasks(supabase, campaignIdOrNull) {
       campaign_id,
       due_date,
       questionnaires (
-        id, title, status, updated_at, vessel_id
+        id, title, status, updated_at, created_at, vessel_id
       ),
       self_assess_campaigns (
         id, name
       )
-    `)
-    .order("updated_at", { ascending: false });
+    `);
 
   if (campaignIdOrNull) q = q.eq("campaign_id", campaignIdOrNull);
+
+  // NOTE: order by nested is not always supported consistently; order by due_date then load timestamps from questionnaires
+  q = q.order("due_date", { ascending: true, nullsFirst: false });
 
   const { data, error } = await q;
   if (error) throw error;
@@ -88,16 +92,16 @@ async function loadVesselNames(supabase, vesselIds) {
     .from("vessels")
     .select("id, name")
     .in("id", vesselIds);
-
   if (error) return new Map();
   return new Map((data || []).map(v => [v.id, v.name]));
 }
 
-function renderCampaignFilter(campaigns) {
+function renderCampaignFilter(campaigns, keepValue) {
   const sel = el("campaignFilter");
   if (!sel) return;
 
   sel.innerHTML = "";
+
   const o0 = document.createElement("option");
   o0.value = "";
   o0.textContent = "(All campaigns)";
@@ -109,17 +113,23 @@ function renderCampaignFilter(campaigns) {
     o.textContent = c.name;
     sel.appendChild(o);
   }
+
+  if (keepValue != null) sel.value = keepValue;
+}
+
+function getBodyEl() {
+  return el("rowsBody") || el("rows");
 }
 
 function renderRows(rows, vesselNameMap) {
-  const body = el("rowsBody");
+  const body = getBodyEl();
   if (!body) return;
 
   body.innerHTML = "";
 
   if (!rows.length) {
     const tr = document.createElement("tr");
-    tr.innerHTML = `<td colspan="5" class="muted">No assigned self-assessments found.</td>`;
+    tr.innerHTML = `<td colspan="7" class="muted">No assigned self-assessments found.</td>`;
     body.appendChild(tr);
     return;
   }
@@ -130,15 +140,19 @@ function renderRows(rows, vesselNameMap) {
     const vesselName = vesselNameMap.get(q.vessel_id) || "-";
     const title = q.title || r.questionnaire_id;
 
+    const updated = q.updated_at || q.created_at || null;
+
     const tr = document.createElement("tr");
     tr.innerHTML = `
+      <td><div style="font-weight:900;color:#1a4170;">${campName}</div></td>
+      <td style="font-weight:900;color:#1a4170;">${vesselName}</td>
       <td>
-        <div style="font-weight:900; color:#1a4170;">${title}</div>
-        <div class="muted" style="margin-top:4px;">Campaign: ${campName}</div>
+        <div style="font-weight:900;color:#1a4170;">${title}</div>
+        <div style="color:#4d6283;font-weight:700;margin-top:4px;">ID: ${r.questionnaire_id}</div>
       </td>
-      <td style="font-weight:900; color:#1a4170;">${vesselName}</td>
-      <td style="font-weight:900; color:#1a4170;">${fmtDate(r.due_date)}</td>
       <td>${statusPill(q.status)}</td>
+      <td style="font-weight:900;color:#1a4170;">${fmtDate(r.due_date)}</td>
+      <td style="font-weight:900;color:#1a4170;">${fmtTs(updated)}</td>
       <td>
         <button class="btn2" data-open="${r.questionnaire_id}">Open</button>
         <button class="btn2" data-submit="${r.questionnaire_id}" ${String(q.status||"").toLowerCase()==="submitted" ? "disabled" : ""}>Mark Submitted</button>
@@ -149,7 +163,6 @@ function renderRows(rows, vesselNameMap) {
 }
 
 async function markSubmitted(supabase, qid) {
-  // This may fail if your questionnaires UPDATE policy is limited to created_by/admin.
   const { error } = await supabase
     .from("questionnaires")
     .update({ status: "submitted" })
@@ -158,34 +171,8 @@ async function markSubmitted(supabase, qid) {
   if (error) throw error;
 }
 
-async function refresh() {
-  clearWarn();
-
-  const me = await AUTH.requireAuth([]); // any authenticated role
-  if (!me) return;
-
-  AUTH.fillUserBadge(me, "userBadge");
-  el("logoutBtn")?.addEventListener("click", AUTH.logoutAndGoLogin);
-
-  const supabase = ensureSupabase();
-
-  // campaigns
-  const campaigns = await loadCampaigns(supabase);
-  renderCampaignFilter(campaigns);
-
-  const campaignId = el("campaignFilter")?.value || null;
-
-  // tasks
-  const rows = await loadMyTasks(supabase, campaignId);
-
-  // vessels
-  const vesselIds = [...new Set(rows.map(r => r.questionnaires?.vessel_id).filter(Boolean))];
-  const vesselNameMap = await loadVesselNames(supabase, vesselIds);
-
-  renderRows(rows, vesselNameMap);
-
-  // wire actions
-  const body = el("rowsBody");
+function wireRowActions(supabase) {
+  const body = getBodyEl();
   if (!body) return;
 
   body.querySelectorAll("button[data-open]").forEach(btn => {
@@ -198,17 +185,16 @@ async function refresh() {
   body.querySelectorAll("button[data-submit]").forEach(btn => {
     btn.addEventListener("click", async () => {
       const qid = btn.getAttribute("data-submit");
+      if (!qid) return;
       btn.disabled = true;
       try {
         await markSubmitted(supabase, qid);
-        await refresh(); // reload
+        await refresh();
       } catch (e) {
-        // If update is not permitted, do not block user from answering.
         console.error(e);
         showWarn(
           "Could not update questionnaire status to 'submitted'. " +
-          "This is likely due to UPDATE policy on questionnaires. " +
-          "You can still complete the answers normally.\n\n" +
+          "This is likely due to UPDATE policy on questionnaires.\n\n" +
           "Error: " + String(e?.message || e)
         );
       } finally {
@@ -216,6 +202,34 @@ async function refresh() {
       }
     });
   });
+}
+
+async function refresh() {
+  clearWarn();
+
+  // If this page is opened without the wrapper auth in sa_tasks.html, enforce auth here too.
+  const me = await AUTH.requireAuth([]);
+  if (!me) return;
+
+  AUTH.fillUserBadge(me, "userBadge");
+
+  const supabase = ensureSupabase();
+
+  // Preserve selection across refresh
+  const selectedBefore = el("campaignFilter") ? el("campaignFilter").value : "";
+
+  const campaigns = await loadCampaigns(supabase);
+  renderCampaignFilter(campaigns, selectedBefore);
+
+  const campaignId = el("campaignFilter")?.value || null;
+
+  const rows = await loadMyTasks(supabase, campaignId);
+
+  const vesselIds = [...new Set(rows.map(r => r.questionnaires?.vessel_id).filter(Boolean))];
+  const vesselNameMap = await loadVesselNames(supabase, vesselIds);
+
+  renderRows(rows, vesselNameMap);
+  wireRowActions(supabase);
 }
 
 function init() {

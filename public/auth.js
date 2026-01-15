@@ -2,12 +2,14 @@
 (() => {
   "use strict";
 
-  const AUTH_BUILD = "AUTH-2026-01-14B";
+  const AUTH_BUILD = "AUTH-2026-01-15A";
 
   const SUPABASE_URL = "https://bdidrcyufazskpuwmfca.supabase.co";
   const SUPABASE_ANON_KEY =
     "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJkaWRyY3l1ZmF6c2twdXdtZmNhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc5NDI4ODMsImV4cCI6MjA4MzUxODg4M30.Uqj4WCzoNS9wnlzI-xew6iTFzTUi77dcGeBjUgFjZbQ";
 
+  // IMPORTANT:
+  // This domain must match whatever you used when bulk-creating auth users (email = username@domain).
   const USERNAME_DOMAIN = "csvtest.local";
 
   const ROLES = {
@@ -163,6 +165,36 @@
     };
   }
 
+  function fillUserBadge(me, elementId = "userBadge") {
+    const el = document.getElementById(elementId);
+    if (!el) return;
+
+    const username = me?.profile?.username || me?.user?.email || "(unknown)";
+    const uiRole = me?.uiRole || roleToUi(me?.profile?.role);
+    const pos = me?.profile?.position || me?.vesselPosition || "";
+    const posTxt = pos ? ` • ${pos}` : "";
+
+    el.textContent = `${username} • ${uiRole}${posTxt}`;
+  }
+
+  async function logoutAndGoLogin() {
+    try {
+      const sb = ensureSupabase();
+      await sb.auth.signOut();
+    } catch (_) {}
+    try {
+      // cleanup common keys used by the app
+      localStorage.removeItem("active_qid");
+      localStorage.removeItem("q_session_v1");
+    } catch (_) {}
+    window.location.href = "./login.html";
+  }
+
+  // “Switch User” is effectively a logout + go to login.
+  async function switchUser() {
+    await logoutAndGoLogin();
+  }
+
   window.AUTH = {
     AUTH_BUILD,
     SUPABASE_URL,
@@ -177,5 +209,8 @@
     requireAuth,
     getSessionUserProfile,
     deriveVesselPosition,
+    fillUserBadge,
+    logoutAndGoLogin,
+    switchUser,
   };
 })();
