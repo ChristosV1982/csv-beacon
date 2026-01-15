@@ -5,7 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Questionnaire Answers</title>
   <link rel="stylesheet" href="style.css" />
+
+  <!-- Supabase + Auth (must be in this order) -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="./auth.js"></script>
 
   <style>
     body{
@@ -127,9 +130,8 @@
   <script type="module">
     import { loadLockedLibraryJson } from "./question_library_loader.js";
 
-    const SUPABASE_URL = "https://bdidrcyufazskpuwmfca.supabase.co";
-    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJkaWRyY3l1ZmF6c2twdXdtZmNhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc5NDI4ODMsImV4cCI6MjA4MzUxODg4M30.Uqj4WCzoNS9wnlzI-xew6iTFzTUi77dcGeBjUgFjZbQ";
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    // Use the shared/auth.js client (single source of truth)
+    const supabase = AUTH.ensureSupabase();
 
     const LOCKED_LIBRARY_JSON = "./sire_questions_all_columns_named.json";
 
@@ -166,7 +168,7 @@
     function esc(s){
       return String(s||"")
         .replaceAll("&","&amp;").replaceAll("<","&lt;")
-        .replaceAll(">","&gt;").replaceAll('"',"&quot;")
+        .replaceAll(">","&gt;").replaceAll('"',"quot;")
         .replaceAll("'","&#039;");
     }
 
@@ -351,18 +353,15 @@
     async function submitFlow(qid, profile, qqRows, answersMap){
       clearError();
 
-      // Expected total PGNOs
       let expected = 0;
       for (const row of qqRows){
-        const qno = String(row.question_no || "").trim();
         const qObj = row.question_json || null;
         if (!qObj) continue;
         expected += getExpectedPgnoCount(qObj);
       }
 
-      // Answered PGNOs (based on saved rows)
       let answered = 0;
-      for (const [k, v] of answersMap.entries()){
+      for (const v of answersMap.values()){
         if (v && v.response != null && v.response !== "") answered++;
       }
 
@@ -380,14 +379,12 @@
         if (!ok) return;
       }
 
-      // RPC submit (preferred)
       const { error: rpcErr } = await supabase.rpc("submit_questionnaire", { p_qid: qid });
       if (rpcErr){
         setError("Submit failed: " + rpcErr.message);
         return;
       }
 
-      // Redirect based on role
       const role = String(profile?.role || "");
       if (role === "vessel") window.location.href = "./q-vessel.html";
       else window.location.href = "./q-company.html";
@@ -402,18 +399,14 @@
 
       const profile = await getMyProfile(userId);
 
-      // Hard access check (server-side)
       const { data: can, error: canErr } = await supabase.rpc("can_access_questionnaire", { p_qid: qid });
       if (canErr) throw canErr;
       if (!can) throw new Error("Access denied for this questionnaire.");
 
-      // Submit button
       const submitBtn = document.getElementById("submitBtn");
       submitBtn.style.display = "inline-block";
-      if (String(profile.role) === "vessel") submitBtn.textContent = "Submit to Office";
-      else submitBtn.textContent = "Final Submit";
+      submitBtn.textContent = (String(profile.role) === "vessel") ? "Submit to Office" : "Final Submit";
 
-      // Load locked library (only used if question_json missing)
       const library = await loadLockedLibraryJson(LOCKED_LIBRARY_JSON);
       const libMap = new Map();
       for (const obj of library){
@@ -421,7 +414,6 @@
         if (qno) libMap.set(qno, obj);
       }
 
-      // Header
       const { data: qh, error: qhErr } = await supabase
         .from("questionnaires")
         .select("id,title,status,created_at,updated_at")
@@ -433,7 +425,6 @@
       document.getElementById("pageSub").textContent =
         `Questionnaire ID: ${qh.id} | Status: ${qh.status} | Updated: ${new Date(qh.updated_at || qh.created_at).toLocaleString()}`;
 
-      // Questions
       const { data: qq, error: qqErr } = await supabase
         .from("questionnaire_questions")
         .select("questionnaire_id, seq, sort_order, question_no, question_json")
@@ -458,7 +449,6 @@
         return;
       }
 
-      // PGNO answers
       const { data: ap, error: apErr } = await supabase
         .from("answers_pgno")
         .select("questionnaire_id, question_no, pgno_index, pgno_text, response, remarks")
@@ -467,14 +457,11 @@
         .order("pgno_index", { ascending: true });
       if (apErr) throw apErr;
 
-      // answersMap for submit progress
       const answersMap = new Map();
       (ap || []).forEach(r=>{
-        const key = `${r.question_no}__${r.pgno_index}`;
-        answersMap.set(key, r);
+        answersMap.set(`${r.question_no}__${r.pgno_index}`, r);
       });
 
-      // Group PGNO by question_no
       const map = {};
       (ap || []).forEach(r=>{
         map[r.question_no] = map[r.question_no] || [];
@@ -500,27 +487,29 @@
           continue;
         }
 
-        let pgnoRows = map[qno] || [];
-        pgnoRows = pgnoRows.map(r => ({ ...r, questionnaire_id: qid }));
+        let pgnoRows = (map[qno] || []).map(r => ({ ...r, questionnaire_id: qid }));
 
         if (!pgnoRows.length){
-          const built = buildPgnoFromLibraryQuestion(qObj, qid);
-          for (const b of built){
-            b.question_no = qno;
-            b.questionnaire_id = qid;
-          }
+          const built = buildPgnoFromLibraryQuestion(qObj, qid).map(b => ({
+            ...b,
+            question_no: qno,
+            questionnaire_id: qid
+          }));
           pgnoRows = built;
         }
 
-        const card = renderQuestionCard(qObj, pgnoRows);
-        content.appendChild(card);
+        content.appendChild(renderQuestionCard(qObj, pgnoRows));
       }
 
-      // Wire submit (after we have qqRows and answersMap)
-      submitBtn.addEventListener("click", () => submitFlow(qid, profile, qqRows.map(r => ({
-        ...r,
-        question_json: r.question_json || libMap.get(String(r.question_no || "").trim()) || null
-      })), answersMap));
+      submitBtn.addEventListener("click", () => submitFlow(
+        qid,
+        profile,
+        qqRows.map(r => ({
+          ...r,
+          question_json: r.question_json || libMap.get(String(r.question_no || "").trim()) || null
+        })),
+        answersMap
+      ));
     }
 
     clearError();
