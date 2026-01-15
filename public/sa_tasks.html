@@ -1,3 +1,4 @@
+<!-- public/sa_tasks.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -40,9 +41,12 @@
     <div><b>My Self-Assessment Tasks</b></div>
     <div class="row">
       <div id="userBadge" style="font-weight:800; opacity:0.95;"></div>
+      <button class="btn2" id="loginBtn" type="button" style="display:none;">Login</button>
+      <button class="btn2" id="switchUserBtn" type="button">Switch User</button>
+      <button class="btn" id="logoutBtn" type="button" style="display:none;">Logout</button>
+
       <button class="btn2" type="button" onclick="location.href='./q-dashboard.html'">Dashboard</button>
       <button class="btn2" type="button" onclick="location.href='./sa_compare.html'">Pre/Post Compare</button>
-      <button class="btn" id="logoutBtn" type="button">Logout</button>
     </div>
   </div>
 
@@ -77,24 +81,21 @@
               <th>Action</th>
             </tr>
           </thead>
-
-          <!-- Support BOTH possible tbody IDs used by sa_tasks.js -->
-          <tbody id="rows"></tbody>
           <tbody id="rowsBody"></tbody>
         </table>
       </div>
     </div>
   </div>
 
-  <script type="module">
-    // Enforce auth FIRST, then import page module
-    const me = await AUTH.requireAuth([]);
-    if (!me) return;
-
-    AUTH.fillUserBadge(me, "userBadge");
-    document.getElementById("logoutBtn").addEventListener("click", AUTH.logoutAndGoLogin);
-
-    await import("./sa_tasks.js");
+  <script>
+    AUTH.setupAuthButtons({
+      badgeId: "userBadge",
+      loginBtnId: "loginBtn",
+      logoutBtnId: "logoutBtn",
+      switchBtnId: "switchUserBtn"
+    });
   </script>
+
+  <script type="module" src="./sa_tasks.js"></script>
 </body>
 </html>

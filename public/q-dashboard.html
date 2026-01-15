@@ -1,120 +1,230 @@
+<!-- public/q-dashboard.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Questionnaire Dashboard</title>
+  <title>SIRE 2.0 – Dashboard</title>
 
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="./style.css" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="./auth.js"></script>
 
   <style>
-    body { margin:0; font-family:"Segoe UI", Arial, sans-serif; background:#f5f7fb; }
-    .topbar { background:#1a4170; color:#fff; padding:12px 16px; display:flex; justify-content:space-between; align-items:center; }
-    .wrap { padding:18px; max-width:1400px; margin:0 auto; }
-    .btn { background:#295eb0; color:#fff; border:none; border-radius:10px; padding:10px 14px; font-weight:900; cursor:pointer; }
-    .btn2 { background:#eaf1fb; color:#1a4170; border:1px solid #d5deef; border-radius:10px; padding:10px 14px; font-weight:900; cursor:pointer; }
-    .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:12px; margin-top:14px; }
-    .card { background:#fff; border:1px solid #d5deef; border-radius:14px; padding:14px; }
-    .muted { color:#35507b; font-weight:800; }
-    h3 { color:#1a4170; }
+    body{margin:0;font-family:"Segoe UI",Arial,sans-serif;background:#f5f7fb;color:#14223a;}
+    .topbar{background:#1a4170;color:#fff;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;}
+    .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+    .wrap{padding:18px;max-width:1200px;margin:0 auto;}
+    .btn{background:#295eb0;color:#fff;border:none;border-radius:10px;padding:10px 14px;font-weight:900;cursor:pointer;}
+    .btn2{background:#eaf1fb;color:#1a4170;border:1px solid #c9d9f3;border-radius:10px;padding:10px 14px;font-weight:900;cursor:pointer;}
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin-top:14px;}
+    .card{background:#fff;border:1px solid #dbe6f6;border-radius:14px;padding:14px;box-shadow:0 10px 30px rgba(12,24,48,0.06);}
+    .title{font-weight:950;color:#1a4170;font-size:1.05rem;}
+    .muted{color:#4d6283;font-weight:650;margin-top:6px;line-height:1.35;}
+    .warn{display:none;margin-top:12px;color:#8b1d1d;background:#ffeaea;border:1px solid #ffc7c7;padding:10px 12px;border-radius:12px;font-weight:800;white-space:pre-wrap;}
   </style>
 </head>
 
 <body>
   <div class="topbar">
-    <div><b>Questionnaire Dashboard</b></div>
-    <div style="display:flex; gap:10px; align-items:center;">
-      <div id="userBadge" style="font-weight:800; opacity:0.95;"></div>
-      <button class="btn2" onclick="location.href='./library.html'">Read Only</button>
-      <button class="btn2" onclick="location.href='./index.html'">Mode Selection</button>
-      <button class="btn" id="logoutBtn">Logout</button>
+    <div style="font-weight:950;">SIRE 2.0 – Dashboard</div>
+    <div class="row">
+      <div id="userBadge" style="font-weight:800;opacity:.95;"></div>
+      <button class="btn2" id="loginBtn" type="button" style="display:none;">Login</button>
+      <button class="btn2" id="switchUserBtn" type="button">Switch User</button>
+      <button class="btn" id="logoutBtn" type="button" style="display:none;">Logout</button>
     </div>
   </div>
 
   <div class="wrap">
-    <div class="muted">
-      Secure entry point. Navigation will expand as we implement Self-Assessment assignments and Pre/Post-Inspection reporting.
-    </div>
+    <div id="warnBox" class="warn"></div>
 
     <div class="grid">
-      <!-- Existing cards (unchanged destinations) -->
-      <div class="card" id="cardVessel">
-        <h3 style="margin:0 0 8px 0;">Vessel View</h3>
-        <div class="muted">Open vessel questionnaire page.</div><br/>
-        <button class="btn2" onclick="location.href='./q-vessel.html'">Open</button>
+      <!-- Always available -->
+      <div class="card" data-card="library">
+        <div class="title">Read-Only Library</div>
+        <div class="muted">Open the locked SIRE 2.0 question library (no edits).</div>
+        <div style="margin-top:12px;">
+          <button class="btn2" type="button" onclick="location.href='./library.html'">Open</button>
+        </div>
       </div>
 
-      <div class="card" id="cardCompany">
-        <h3 style="margin:0 0 8px 0;">Company View</h3>
-        <div class="muted">Company dashboards / review.</div><br/>
-        <button class="btn2" onclick="location.href='./q-company.html'">Open</button>
+      <div class="card" data-card="compare">
+        <div class="title">Pre/Post Compare</div>
+        <div class="muted">Compare Self-Assessment vs Post-Inspection statistics.</div>
+        <div style="margin-top:12px;">
+          <button class="btn2" type="button" onclick="location.href='./sa_compare.html'">Open</button>
+        </div>
       </div>
 
-      <div class="card" id="cardInspector">
-        <h3 style="margin:0 0 8px 0;">Inspector View</h3>
-        <div class="muted">Read-only inspection view.</div><br/>
-        <button class="btn2" onclick="location.href='./q-inspector.html'">Open</button>
+      <!-- Vessel -->
+      <div class="card" data-card="vessel">
+        <div class="title">Vessel View – My Questionnaires</div>
+        <div class="muted">Vessel users see only assigned questionnaires. Master sees all for the vessel.</div>
+        <div style="margin-top:12px;">
+          <button class="btn2" type="button" onclick="location.href='./q-vessel.html'">Open</button>
+        </div>
       </div>
 
-      <div class="card" id="cardReports">
-        <h3 style="margin:0 0 8px 0;">Reports</h3>
-        <div class="muted">Reports and stats (company roles).</div><br/>
-        <button class="btn2" onclick="location.href='./q-report.html'">Open</button>
+      <div class="card" data-card="tasks">
+        <div class="title">My Self-Assessment Tasks</div>
+        <div class="muted">See tasks assigned to you (via RLS) and open questionnaires.</div>
+        <div style="margin-top:12px;">
+          <button class="btn2" type="button" onclick="location.href='./sa_tasks.html'">Open</button>
+        </div>
       </div>
 
-      <!-- NEW: Self-Assessment Tasks (assignees) -->
-      <div class="card" id="cardSATasks">
-        <h3 style="margin:0 0 8px 0;">Self-Assessment Tasks</h3>
-        <div class="muted">My assigned self-assessment questionnaires (by role/vessel).</div><br/>
-        <button class="btn2" onclick="location.href='./sa_tasks.html'">Open</button>
+      <!-- Company / Office -->
+      <div class="card" data-card="company">
+        <div class="title">Company Builder</div>
+        <div class="muted">Create questionnaires from filters/templates and assign roles.</div>
+        <div style="margin-top:12px;">
+          <button class="btn2" type="button" onclick="location.href='./q-company.html'">Open</button>
+        </div>
       </div>
 
-      <!-- NEW: Pre/Post Compare -->
-      <div class="card" id="cardCompare">
-        <h3 style="margin:0 0 8px 0;">Pre/Post Comparison</h3>
-        <div class="muted">Compare pre-inspection (SA) vs post-inspection observations.</div><br/>
-        <button class="btn2" onclick="location.href='./sa_compare.html'">Open</button>
+      <div class="card" data-card="assignments">
+        <div class="title">Self-Assessment Assignments</div>
+        <div class="muted">Create campaigns and assign questionnaires to vessel/company roles.</div>
+        <div style="margin-top:12px;">
+          <button class="btn2" type="button" onclick="location.href='./sa_assignments.html'">Open</button>
+        </div>
       </div>
 
-      <!-- NEW: Admin-only cards (hidden by default) -->
-      <div class="card" id="cardSAAssign" style="display:none;">
-        <h3 style="margin:0 0 8px 0;">SA Assignments (Admin)</h3>
-        <div class="muted">Create self-assessment campaigns and assign questionnaires.</div><br/>
-        <button class="btn2" onclick="location.href='./sa_assignments.html'">Open</button>
+      <div class="card" data-card="post">
+        <div class="title">Post-Inspection Entry</div>
+        <div class="muted">Mark which questions received observations and record PGNO tick(s).</div>
+        <div style="margin-top:12px;">
+          <button class="btn2" type="button" onclick="location.href='./post_inspection.html'">Open</button>
+        </div>
       </div>
 
-      <div class="card" id="cardPostInspection" style="display:none;">
-        <h3 style="margin:0 0 8px 0;">Post-Inspection</h3>
-        <div class="muted">Record vetting inspection observations and PGNO mapping.</div><br/>
-        <button class="btn2" onclick="location.href='./post_inspection.html'">Open</button>
+      <div class="card" data-card="poststats">
+        <div class="title">Post-Inspection Stats</div>
+        <div class="muted">Statistics for the post-inspection module.</div>
+        <div style="margin-top:12px;">
+          <button class="btn2" type="button" onclick="location.href='./post_inspection_stats.html'">Open</button>
+        </div>
+      </div>
+
+      <div class="card" data-card="reports">
+        <div class="title">Reports</div>
+        <div class="muted">Reporting & exports for office users.</div>
+        <div style="margin-top:12px;">
+          <button class="btn2" type="button" onclick="location.href='./q-report.html'">Open</button>
+        </div>
+      </div>
+
+      <div class="card" data-card="inspector">
+        <div class="title">Inspector / Third-Party</div>
+        <div class="muted">Inspector portal (as permitted by role/RLS).</div>
+        <div style="margin-top:12px;">
+          <button class="btn2" type="button" onclick="location.href='./q-inspector.html'">Open</button>
+        </div>
+      </div>
+
+      <!-- Super Admin only -->
+      <div class="card" data-card="suadmin">
+        <div class="title">Superuser Administration</div>
+        <div class="muted">Manage roles/rights/module access (scaffold page).</div>
+        <div style="margin-top:12px;">
+          <button class="btn2" type="button" onclick="location.href='./su-admin.html'">Open</button>
+        </div>
       </div>
     </div>
   </div>
 
   <script>
+    function showWarn(msg){
+      const w=document.getElementById("warnBox");
+      w.textContent=msg||"";
+      w.style.display=msg?"block":"none";
+    }
+
     (async () => {
-      const me = await AUTH.requireAuth([]); // any authenticated role
-      if (!me) return;
+      const bundle = await AUTH.setupAuthButtons({
+        badgeId: "userBadge",
+        loginBtnId: "loginBtn",
+        logoutBtnId: "logoutBtn",
+        switchBtnId: "switchUserBtn"
+      });
 
-      AUTH.fillUserBadge(me, "userBadge");
-      document.getElementById("logoutBtn").addEventListener("click", AUTH.logoutAndGoLogin);
-
-      const role = me?.profile?.role || "";
-
-      // Admin-only cards
-      const isAdmin = (role === AUTH.ROLES.SUPER_ADMIN || role === AUTH.ROLES.COMPANY_ADMIN);
-      if (isAdmin) {
-        const a = document.getElementById("cardSAAssign");
-        const p = document.getElementById("cardPostInspection");
-        if (a) a.style.display = "";
-        if (p) p.style.display = "";
+      // Logged out: hide everything except Library/Compare
+      if (!bundle?.session?.user) {
+        showWarn("You are logged out. Please Login.");
+        document.querySelectorAll("[data-card]").forEach(c => {
+          const k = c.getAttribute("data-card");
+          const keep = (k === "library" || k === "compare");
+          c.style.display = keep ? "block" : "none";
+        });
+        return;
       }
 
-      // Optional: hide inspector-only card for non-inspector (leave enabled if you prefer)
-      // if (role !== AUTH.ROLES.INSPECTOR) document.getElementById("cardInspector").style.display = "none";
-    })();
+      // Logged in: role-based visibility
+      const role = bundle.profile?.role;
+      const R = AUTH.ROLES;
+
+      const isSuper = role === R.SUPER_ADMIN;
+      const isCompanyAdmin = role === R.COMPANY_ADMIN;
+      const isCompanySup = role === R.COMPANY_SUPERINTENDENT;
+      const isVessel = role === R.VESSEL;
+      const isInspector = role === R.INSPECTOR;
+
+      function setVisible(cardKey, visible){
+        const el = document.querySelector(`[data-card="${cardKey}"]`);
+        if (el) el.style.display = visible ? "block" : "none";
+      }
+
+      // Defaults (start hidden)
+      ["company","assignments","post","poststats","reports","inspector","suadmin"].forEach(k => setVisible(k,false));
+      // Always visible when logged-in:
+      setVisible("library", true);
+      setVisible("compare", true);
+      setVisible("tasks", true);
+      setVisible("vessel", true);
+
+      if (isSuper) {
+        // Superuser sees everything
+        ["company","assignments","post","poststats","reports","inspector","suadmin"].forEach(k => setVisible(k,true));
+        return;
+      }
+
+      if (isVessel) {
+        // Vessel must NOT see company builder / admin modules
+        setVisible("company", false);
+        setVisible("assignments", false);
+        setVisible("post", false);
+        setVisible("poststats", false);
+        setVisible("reports", false);
+        setVisible("inspector", false);
+        setVisible("suadmin", false);
+        return;
+      }
+
+      if (isCompanyAdmin) {
+        ["company","assignments","post","poststats","reports","inspector"].forEach(k => setVisible(k,true));
+        setVisible("suadmin", false);
+        return;
+      }
+
+      if (isCompanySup) {
+        // Company superintendent should not build; but can do tasks, compare, post entry, reports if you want
+        setVisible("company", false);
+        setVisible("assignments", false);
+        setVisible("post", true);
+        setVisible("poststats", true);
+        setVisible("reports", true);
+        setVisible("inspector", true);
+        return;
+      }
+
+      if (isInspector) {
+        setVisible("tasks", false);
+        setVisible("vessel", false);
+        setVisible("inspector", true);
+        return;
+      }
+    })().catch(e => showWarn(String(e?.message || e)));
   </script>
 </body>
 </html>

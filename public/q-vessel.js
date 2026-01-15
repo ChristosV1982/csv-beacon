@@ -1,89 +1,59 @@
 // public/q-vessel.js
-// Requires in q-vessel.html:
-//   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-//   <script src="./auth.js"></script>
+// Lists questionnaires for the logged-in vessel user.
+// Super Admin / Company Admin can select a vessel and view its questionnaires.
 
-const sb = window.AUTH.ensureSupabase();
-
-function el(id) {
-  return document.getElementById(id);
-}
+function el(id) { return document.getElementById(id); }
 
 function showWarn(msg) {
   const w = el("warnBox");
-  w.textContent = msg;
-  w.style.display = "block";
+  if (!w) return;
+  w.textContent = msg || "";
+  w.style.display = msg ? "block" : "none";
 }
 
-function clearWarn() {
-  const w = el("warnBox");
-  w.textContent = "";
-  w.style.display = "none";
+function ensureSupabase() {
+  const sb = window.__supabaseClient || window.__SUPABASE_CLIENT;
+  if (!sb) throw new Error("Supabase client not initialized. Ensure auth.js is loaded.");
+  return sb;
 }
 
-function esc(s) {
-  return String(s ?? "")
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
+function fmtDate(d) {
+  if (!d) return "-";
+  try { return new Date(d).toLocaleString(); } catch { return String(d); }
 }
 
-function fmtTs(ts) {
-  if (!ts) return "-";
-  try {
-    return new Date(ts).toLocaleString();
-  } catch {
-    return String(ts);
-  }
+function pill(status) {
+  const s = String(status || "unknown").toLowerCase();
+  return `<span class="pill">${s}</span>`;
 }
 
-function assignedLabel(v) {
-  const s = String(v || "").toLowerCase();
-  if (!s) return "All roles";
-  if (s === "master") return "Master";
-  if (s === "chief_officer") return "Chief Officer";
-  if (s === "chief_engineer") return "Chief Engineer";
-  return s;
+async function loadVessels(supabase) {
+  const { data, error } = await supabase
+    .from("vessels")
+    .select("id,name,is_active")
+    .eq("is_active", true)
+    .order("name", { ascending: true });
+  if (error) throw error;
+  return data || [];
 }
 
-function statusPill(status) {
-  const s = String(status || "");
-  const label =
-    s === "in_progress"
-      ? "In Progress"
-      : s === "pending_office_review"
-      ? "Pending Office Review"
-      : s === "submitted"
-      ? "Submitted"
-      : s || "-";
-  return `<span class="pill">${esc(label)}</span>`;
-}
-
-function typeLabel(_) {
-  // You had a "Type" column; without querying a `mode` column (to avoid the Postgres mode() error),
-  // we show a neutral placeholder for now.
-  return "—";
-}
-
-async function loadMyQuestionnaires({ vesselId, vesselPosition, isMaster, status }) {
-  let q = sb
+async function loadQuestionnairesForVessel(supabase, vesselId, status, viewerRole, viewerPosition) {
+  let q = supabase
     .from("questionnaires")
-    // IMPORTANT: do NOT select "mode" here (can trigger Postgres mode() aggregate error)
-    .select("id, title, status, updated_at, created_at, assigned_position")
+    .select("id, title, status, updated_at, created_at, mode, assigned_position")
     .eq("vessel_id", vesselId)
     .order("updated_at", { ascending: false });
 
   if (status) q = q.eq("status", status);
 
-  if (!isMaster) {
-    // allow NULL (All roles) OR matches my position
-    if (vesselPosition) {
-      q = q.or(`assigned_position.is.null,assigned_position.eq.${vesselPosition}`);
-    } else {
-      // unknown vessel position => only All roles
-      q = q.is("assigned_position", null);
+  // If the viewer is a vessel user, enforce assignment filtering:
+  // - master: sees all
+  // - others: sees assigned_position IS NULL (all roles) OR assigned_position == their position
+  const isVesselViewer = (viewerRole === AUTH.ROLES.VESSEL);
+  if (isVesselViewer) {
+    const pos = String(viewerPosition || "").toLowerCase();
+    if (pos && pos !== "master") {
+      q = q.or(`assigned_position.is.null,assigned_position.eq.${pos}`);
     }
   }
 
@@ -92,85 +62,114 @@ async function loadMyQuestionnaires({ vesselId, vesselPosition, isMaster, status
   return data || [];
 }
 
-function renderRows(rows) {
+function render(rows) {
   const body = el("rowsBody");
+  if (!body) return;
+
+  body.innerHTML = "";
+
   if (!rows.length) {
-    body.innerHTML = `<tr><td colspan="6" class="muted">No questionnaires found.</td></tr>`;
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td colspan="5" class="muted">No questionnaires found for this vessel.</td>`;
+    body.appendChild(tr);
     return;
   }
 
-  body.innerHTML = rows
-    .map((r) => {
-      return `
-        <tr>
-          <td>
-            <div style="font-weight:950;">${esc(r.title || "")}</div>
-            <div class="muted" style="font-size:.9rem;">ID: ${esc(r.id)}</div>
-          </td>
-          <td>${esc(assignedLabel(r.assigned_position))}</td>
-          <td>${esc(typeLabel(r))}</td>
-          <td>${esc(fmtTs(r.updated_at || r.created_at))}</td>
-          <td>${statusPill(r.status)}</td>
-          <td>
-            <button class="btn2" type="button" data-open="1" data-id="${esc(r.id)}">Open</button>
-          </td>
-        </tr>
-      `;
-    })
-    .join("");
+  for (const r of rows) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>
+        <div style="font-weight:900; color:#1a4170;">${r.title || r.id}</div>
+        <div class="muted" style="margin-top:4px;">ID: ${r.id}</div>
+        <div class="muted" style="margin-top:4px;">Assigned: ${r.assigned_position || "ALL"}</div>
+      </td>
+      <td style="font-weight:900; color:#1a4170;">${r.mode || "-"}</td>
+      <td style="font-weight:900; color:#1a4170;">${fmtDate(r.updated_at || r.created_at)}</td>
+      <td>${pill(r.status)}</td>
+      <td><button class="btn2" data-open="${r.id}">Open</button></td>
+    `;
+    body.appendChild(tr);
+  }
 
-  body.querySelectorAll("button[data-open]").forEach((btn) => {
+  body.querySelectorAll("button[data-open]").forEach(btn => {
     btn.addEventListener("click", () => {
-      const qid = btn.getAttribute("data-id");
-      if (!qid) return;
-      localStorage.setItem("active_qid", qid);
+      const qid = btn.getAttribute("data-open");
       window.location.href = "./q-answer.html?qid=" + encodeURIComponent(qid);
     });
   });
 }
 
-async function refresh(me) {
-  clearWarn();
+async function refresh() {
+  showWarn("");
 
-  const vesselId = me.profile?.vessel_id;
-  if (!vesselId) {
-    showWarn("Your profile has no vessel_id. This vessel account cannot load questionnaires.");
-    return;
-  }
+  const R = AUTH.ROLES;
 
-  const vesselPosition = window.AUTH.deriveVesselPosition(me.profile?.username);
-  const isMaster = vesselPosition === "master";
-
-  const status = el("statusFilter").value;
-
-  const rows = await loadMyQuestionnaires({
-    vesselId,
-    vesselPosition,
-    isMaster,
-    status,
-  });
-
-  renderRows(rows);
-}
-
-async function init() {
-  // Vessel page must be vessel role only
-  const me = await window.AUTH.requireAuth(["vessel"], {
-    unauthorizedRedirect: "./q-dashboard.html",
+  // Allow vessel + super_admin + company_admin to enter this page
+  const me = await AUTH.requireAuth([R.VESSEL, R.SUPER_ADMIN, R.COMPANY_ADMIN], {
+    redirectTo: "./login.html",
+    unauthorizedRedirect: "./q-dashboard.html"
   });
   if (!me) return;
 
-  el("userBadge").textContent = `User: ${me.profile?.username || "(unknown)"} | Role: ${me.profile?.role || ""}`;
+  AUTH.fillUserBadge(me, "userBadge");
 
-  el("refreshBtn").addEventListener("click", () => refresh(me));
-  el("statusFilter").addEventListener("change", () => refresh(me));
+  const supabase = ensureSupabase();
+  const role = me.profile?.role;
+  const position = me.profile?.position || me.vesselPosition;
 
-  el("logoutBtn").addEventListener("click", async () => {
-    await sb.auth.signOut();
-    window.location.href = "./login.html";
-  });
+  // Vessel selection logic:
+  // - Vessel users: fixed to profile.vessel_id
+  // - Super/Admin: can pick a vessel from dropdown (and can also default to their profile.vessel_id if set)
+  let vesselId = me.profile?.vessel_id || null;
 
-  await refresh(me);
+  const isAdminViewer = (role === R.SUPER_ADMIN || role === R.COMPANY_ADMIN);
+
+  const pickerWrap = el("adminVesselPicker");
+  const picker = el("vesselPicker");
+
+  if (isAdminViewer) {
+    if (pickerWrap) pickerWrap.style.display = "flex";
+
+    const vessels = await loadVessels(supabase);
+    if (picker) {
+      picker.innerHTML = vessels.map(v => `<option value="${v.id}">${v.name}</option>`).join("");
+
+      // Default selection: profile vessel_id if present, else first vessel
+      if (vesselId && vessels.some(v => v.id === vesselId)) picker.value = vesselId;
+      else if (vessels.length) {
+        vesselId = vessels[0].id;
+        picker.value = vesselId;
+      }
+
+      // Changing the picker updates vesselId and refreshes
+      picker.onchange = () => refresh().catch(e => showWarn(String(e?.message || e)));
+      vesselId = picker.value || vesselId;
+    }
+  } else {
+    if (pickerWrap) pickerWrap.style.display = "none";
+  }
+
+  if (!vesselId) {
+    showWarn(
+      "This account has no vessel_id set and you are not in an admin role.\n" +
+      "Fix required: set public.profiles.vessel_id for this user."
+    );
+    render([]);
+    return;
+  }
+
+  const status = el("statusFilter")?.value || "";
+  const rows = await loadQuestionnairesForVessel(supabase, vesselId, status, role, position);
+  render(rows);
 }
 
-init().catch((e) => showWarn(String(e?.message || e)));
+function init() {
+  el("refreshBtn")?.addEventListener("click", () => refresh());
+  el("statusFilter")?.addEventListener("change", () => refresh());
+  refresh().catch(e => {
+    console.error(e);
+    showWarn(String(e?.message || e));
+  });
+}
+
+init();

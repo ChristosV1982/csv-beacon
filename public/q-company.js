@@ -501,7 +501,7 @@ function renderQuestionnairesTable() {
     );
   });
 
-  const isSuper = PROFILE?.role === "super_admin";
+  const isAdmin = (PROFILE?.role === "super_admin" || PROFILE?.role === "company_admin");
 
   if (!rows.length) {
     body.innerHTML = `<tr><td colspan="7" class="small">No questionnaires found.</td></tr>`;
@@ -570,7 +570,7 @@ let TEMPLATE_COUNTS = new Map();
 
 function renderTemplates() {
   const body = el("tplBody");
-  const isSuper = PROFILE?.role === "super_admin";
+  const isAdmin = (PROFILE?.role === "super_admin" || PROFILE?.role === "company_admin");
 
   if (!TEMPLATES.length) {
     body.innerHTML = `<tr><td colspan="5" class="small">No templates found.</td></tr>`;
