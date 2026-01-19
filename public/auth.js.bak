@@ -2,12 +2,15 @@
 (() => {
   "use strict";
 
+  // Build marker (helps you confirm the browser loaded the latest file)
   const AUTH_BUILD = "AUTH-2026-01-15A";
 
   const SUPABASE_URL = "https://bdidrcyufazskpuwmfca.supabase.co";
   const SUPABASE_ANON_KEY =
     "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJkaWRyY3l1ZmF6c2twdXdtZmNhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc5NDI4ODMsImV4cCI6MjA4MzUxODg4M30.Uqj4WCzoNS9wnlzI-xew6iTFzTUi77dcGeBjUgFjZbQ";
 
+  // Your username convention: if user enters "master_olympicfighter"
+  // we login as "master_olympicfighter@csvtest.local"
   const USERNAME_DOMAIN = "csvtest.local";
 
   const ROLES = {
@@ -33,7 +36,7 @@
   function qs(name) {
     try {
       return new URLSearchParams(window.location.search || "").get(name);
-    } catch (_) {
+    } catch {
       return null;
     }
   }
@@ -47,15 +50,6 @@
     return v;
   }
 
-  function currentRelativeUrl() {
-    try {
-      const u = new URL(window.location.href);
-      return u.pathname.split("/").pop() + (u.search || "");
-    } catch {
-      return "q-dashboard.html";
-    }
-  }
-
   function usernameToEmail(usernameOrEmail) {
     const v = String(usernameOrEmail || "").trim();
     if (!v) return "";
@@ -63,7 +57,7 @@
     return `${v}@${USERNAME_DOMAIN}`;
   }
 
-  function showPageMessage(msg) {
+  function pageMessage(msg) {
     const ids = ["warnBox", "errBox", "loginError"];
     for (const id of ids) {
       const el = document.getElementById(id);
@@ -73,28 +67,29 @@
         return;
       }
     }
-    try { alert(msg); } catch (_) {}
+    try { alert(msg); } catch {}
   }
 
   function ensureSupabase() {
+    // Backward-compatible singletons
+    if (window.__supabaseClient) return window.__supabaseClient;
     if (window.__SUPABASE_CLIENT) return window.__SUPABASE_CLIENT;
 
     if (!window.supabase?.createClient) {
-      showPageMessage("Supabase JS not loaded. Check @supabase/supabase-js script tag.");
+      pageMessage("Supabase JS not loaded. Check the @supabase/supabase-js <script> tag order.");
       throw new Error("Supabase JS not available");
     }
 
-    window.__SUPABASE_CLIENT = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
       auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
     });
 
-    // Compatibility: some pages/scripts expect this name
-    window.__supabaseClient = window.__SUPABASE_CLIENT;
-
-    return window.__SUPABASE_CLIENT;
+    window.__supabaseClient = client;
+    window.__SUPABASE_CLIENT = client;
+    return client;
   }
 
-  function deriveVesselPosition(username) {
+  function deriveVesselPositionFromUsername(username) {
     const u = String(username || "").trim().toLowerCase();
     if (u.startsWith("master_")) return "master";
     if (u.startsWith("chiefofficer_")) return "chief_officer";
@@ -112,7 +107,7 @@
   async function getSessionUserProfile() {
     const sb = ensureSupabase();
     const session = await getSession();
-    if (!session?.user) return { session: null, user: null, profile: null };
+    if (!session?.user) return { session: null, user: null, profile: null, vessel_name: "" };
 
     const user = session.user;
 
@@ -124,39 +119,17 @@
 
     if (error) throw error;
 
-    return { session, user, profile };
-  }
-
-  function fillUserBadge(bundleOrProfile, badgeId = "userBadge") {
-    const el = document.getElementById(badgeId);
-    if (!el) return;
-
-    // Accept either {profile,...} bundle or profile itself
-    const profile = bundleOrProfile?.profile ? bundleOrProfile.profile : bundleOrProfile;
-
-    if (!profile) {
-      el.textContent = "Logged out";
-      return;
+    let vessel_name = "";
+    if (profile?.vessel_id) {
+      const { data: v, error: vErr } = await sb
+        .from("vessels")
+        .select("name")
+        .eq("id", profile.vessel_id)
+        .maybeSingle();
+      if (!vErr) vessel_name = v?.name || "";
     }
 
-    const username = profile.username || "";
-    const role = roleToUi(profile.role);
-    const pos = profile.position ? ` | ${String(profile.position)}` : "";
-
-    el.textContent = `${username} — ${role}${pos}`;
-  }
-
-  function goLogin(returnTo = null) {
-    const rt = safePath(returnTo || currentRelativeUrl());
-    const url = rt ? `./login.html?returnTo=${encodeURIComponent(rt)}` : "./login.html";
-    window.location.href = url;
-  }
-
-  async function logoutAndGoLogin(returnTo = null) {
-    try {
-      await ensureSupabase().auth.signOut();
-    } catch (_) {}
-    goLogin(returnTo);
+    return { session, user, profile, vessel_name };
   }
 
   async function requireAuth(allowedRoles = null, opts = {}) {
@@ -167,7 +140,7 @@
     try {
       bundle = await getSessionUserProfile();
     } catch (e) {
-      showPageMessage(
+      pageMessage(
         "Profile missing or blocked by RLS.\n" +
         "Ensure a row exists in public.profiles for this user, and RLS allows select.\n\n" +
         "Error: " + String(e?.message || e)
@@ -175,7 +148,7 @@
       throw e;
     }
 
-    const { session, user, profile } = bundle;
+    const { session, user, profile, vessel_name } = bundle;
 
     if (!session?.user) {
       window.location.href = redirectTo;
@@ -183,7 +156,7 @@
     }
 
     if (profile && profile.is_active === false) {
-      showPageMessage("Your account is inactive. Please contact the administrator.");
+      pageMessage("Your account is inactive. Please contact the administrator.");
       await ensureSupabase().auth.signOut();
       window.location.href = redirectTo;
       return null;
@@ -192,7 +165,7 @@
     if (allowedRoles && Array.isArray(allowedRoles) && allowedRoles.length) {
       const ok = allowedRoles.includes(profile?.role);
       if (!ok) {
-        showPageMessage("Access denied for your role. Redirecting…");
+        pageMessage("Access denied for your role. Redirecting…");
         setTimeout(() => { window.location.href = unauthorizedRedirect; }, 600);
         return null;
       }
@@ -202,71 +175,82 @@
       session,
       user,
       profile,
+      vessel_name,
       uiRole: roleToUi(profile?.role),
-      vesselPosition: deriveVesselPosition(profile?.username),
+      vesselPosition: profile?.position || deriveVesselPositionFromUsername(profile?.username),
     };
   }
 
-  /**
-   * setupAuthButtons
-   * - Ensures session/profile is loaded (if possible)
-   * - Shows Login when logged out
-   * - Shows Logout when logged in
-   * - Switch User always available (signs out and goes to login)
-   * - Fills user badge when logged in
-   *
-   * Returns: { session, user, profile } bundle (or nulls if logged out)
-   */
-  async function setupAuthButtons(cfg = {}) {
-    const badgeId = cfg.badgeId || "userBadge";
-    const loginBtnId = cfg.loginBtnId || "loginBtn";
-    const logoutBtnId = cfg.logoutBtnId || "logoutBtn";
-    const switchBtnId = cfg.switchBtnId || "switchUserBtn";
-    const returnTo = cfg.returnTo || currentRelativeUrl();
+  function fillUserBadge(meOrBundle, elementId = "userBadge") {
+    const el = document.getElementById(elementId);
+    if (!el) return;
+
+    const profile = meOrBundle?.profile || meOrBundle?.profile === null ? meOrBundle.profile : meOrBundle;
+    const role = meOrBundle?.uiRole || roleToUi(profile?.role);
+    const username = profile?.username || meOrBundle?.user?.email || "(unknown)";
+    const vesselName = meOrBundle?.vessel_name || "";
+
+    const parts = [];
+    parts.push(username);
+    if (role) parts.push(`(${role})`);
+    if (vesselName) parts.push(`— ${vesselName}`);
+
+    el.textContent = parts.join(" ");
+  }
+
+  async function logoutAndGoLogin() {
+    try { await ensureSupabase().auth.signOut(); } catch {}
+    window.location.href = "./login.html";
+  }
+
+  async function logoutAndGoIndex() {
+    try { await ensureSupabase().auth.signOut(); } catch {}
+    window.location.href = "./index.html";
+  }
+
+  function goLogin() {
+    window.location.href = "./login.html";
+  }
+
+  async function setupAuthButtons(opts = {}) {
+    const loginBtnId = opts.loginBtnId || "loginBtn";
+    const logoutBtnId = opts.logoutBtnId || "logoutBtn";
+    const switchBtnId = opts.switchBtnId || "switchUserBtn";
+    const badgeId = opts.badgeId || "userBadge";
 
     const loginBtn = document.getElementById(loginBtnId);
     const logoutBtn = document.getElementById(logoutBtnId);
     const switchBtn = document.getElementById(switchBtnId);
 
-    // Always wire button clicks (even if hidden later)
-    if (loginBtn) {
-      loginBtn.onclick = () => goLogin(returnTo);
-    }
-    if (logoutBtn) {
-      logoutBtn.onclick = () => logoutAndGoLogin(returnTo);
-    }
-    if (switchBtn) {
-      // Switch user = force sign-out and go to login
-      switchBtn.onclick = () => logoutAndGoLogin(returnTo);
-    }
-
-    let bundle = { session: null, user: null, profile: null };
-
+    let bundle = null;
     try {
       bundle = await getSessionUserProfile();
     } catch (e) {
-      // If profile cannot be read due to RLS, we still may have a session.
-      // We will fall back to session-only.
-      try {
-        const session = await getSession();
-        bundle = { session, user: session?.user || null, profile: null };
-      } catch (_) {
-        bundle = { session: null, user: null, profile: null };
-      }
+      // If profile select is blocked, still show a safe UI state
+      if (loginBtn) loginBtn.style.display = "inline-block";
+      if (logoutBtn) logoutBtn.style.display = "none";
+      if (switchBtn) switchBtn.style.display = "inline-block";
+      return null;
     }
 
     const loggedIn = !!bundle?.session?.user;
 
-    // Visibility rules requested:
-    // - Login button when logged out
-    // - Logout button when logged in
-    // - Switch User button always visible
+    // Toggle Login/Logout
     if (loginBtn) loginBtn.style.display = loggedIn ? "none" : "inline-block";
     if (logoutBtn) logoutBtn.style.display = loggedIn ? "inline-block" : "none";
-    if (switchBtn) switchBtn.style.display = "inline-block";
+    if (switchBtn) switchBtn.style.display = "inline-block"; // always visible
 
+    // Badge
     if (loggedIn) fillUserBadge(bundle, badgeId);
-    else fillUserBadge(null, badgeId);
+    else {
+      const el = document.getElementById(badgeId);
+      if (el) el.textContent = "Logged out";
+    }
+
+    // Bind buttons
+    if (loginBtn) loginBtn.onclick = () => goLogin();
+    if (logoutBtn) logoutBtn.onclick = () => logoutAndGoLogin();
+    if (switchBtn) switchBtn.onclick = () => logoutAndGoLogin();
 
     return bundle;
   }
@@ -282,12 +266,12 @@
     safePath,
     usernameToEmail,
     ensureSupabase,
-    requireAuth,
     getSessionUserProfile,
-    deriveVesselPosition,
+    requireAuth,
     fillUserBadge,
     setupAuthButtons,
     logoutAndGoLogin,
-    goLogin,
+    logoutAndGoIndex,
+    deriveVesselPositionFromUsername,
   };
 })();
