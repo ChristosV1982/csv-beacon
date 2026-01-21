@@ -45,7 +45,7 @@
         <div class="title">Read-Only Library</div>
         <div class="muted">Open the locked SIRE 2.0 question library (no edits).</div>
         <div style="margin-top:12px;">
-          <button class="btn2" type="button" onclick="location.href='./library.html'">Open</button>
+          <button class="btn2" type="button" onclick="location.href='./library.html?mode=study'">Open</button>
         </div>
       </div>
 
@@ -184,13 +184,11 @@
       setVisible("vessel", true);
 
       if (isSuper) {
-        // Superuser sees everything
         ["company","assignments","post","poststats","reports","inspector","suadmin"].forEach(k => setVisible(k,true));
         return;
       }
 
       if (isVessel) {
-        // Vessel must NOT see company builder / admin modules
         setVisible("company", false);
         setVisible("assignments", false);
         setVisible("post", false);
@@ -208,7 +206,6 @@
       }
 
       if (isCompanySup) {
-        // Company superintendent should not build; but can do tasks, compare, post entry, reports if you want
         setVisible("company", false);
         setVisible("assignments", false);
         setVisible("post", true);

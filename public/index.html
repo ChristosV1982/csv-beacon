@@ -85,7 +85,7 @@
         <div class="title">Read-Only Library</div>
         <div class="muted">Open the locked question library.</div>
         <div style="margin-top:12px;">
-          <button class="btn2" type="button" onclick="location.href='./library.html'">Enter</button>
+          <button class="btn2" type="button" onclick="location.href='./library.html?mode=study'">Enter</button>
         </div>
       </div>
 
@@ -116,7 +116,6 @@
 
       if (!bundle?.session?.user) {
         showWarn("You are logged out. Login to use role-restricted modules.");
-        // If logged out, hide restricted cards but keep library
         ["company","post","tasks","vessel","inspector","suadmin"].forEach(k=>{
           const el=document.querySelector(`[data-card="${k}"]`);
           if (el) el.style.display = (k==="library") ? "block" : "none";
@@ -138,14 +137,12 @@
         if (el) el.style.display = visible ? "block" : "none";
       }
 
-      // Base visibility
       setVisible("library", true);
       setVisible("tasks", true);
       setVisible("vessel", true);
       setVisible("inspector", true);
       setVisible("post", true);
 
-      // Default: hide admin-only
       setVisible("company", false);
       setVisible("suadmin", false);
 
@@ -162,9 +159,8 @@
       }
 
       if (isVessel) {
-        // Vessel must NOT be offered Company Builder
         setVisible("company", false);
-        setVisible("post", false);     // vessel should not do post-inspection
+        setVisible("post", false);
         setVisible("inspector", false);
         return;
       }
@@ -178,7 +174,6 @@
       }
 
       if (isCompanySup) {
-        // Superintendent: no builder; can do post & inspector portal
         setVisible("company", false);
         return;
       }
