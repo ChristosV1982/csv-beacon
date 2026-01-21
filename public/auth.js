@@ -2,7 +2,8 @@
 (() => {
   "use strict";
 
-  const AUTH_BUILD = "AUTH-2026-01-15A";
+  // Bump when you change auth behavior (helps you confirm cache is cleared)
+  const AUTH_BUILD = "AUTH-2026-01-21A";
 
   const SUPABASE_URL = "https://bdidrcyufazskpuwmfca.supabase.co";
   const SUPABASE_ANON_KEY =
@@ -47,15 +48,6 @@
     return v;
   }
 
-  function currentRelativeUrl() {
-    try {
-      const u = new URL(window.location.href);
-      return u.pathname.split("/").pop() + (u.search || "");
-    } catch {
-      return "q-dashboard.html";
-    }
-  }
-
   function usernameToEmail(usernameOrEmail) {
     const v = String(usernameOrEmail || "").trim();
     if (!v) return "";
@@ -73,10 +65,13 @@
         return;
       }
     }
-    try { alert(msg); } catch (_) {}
+    try {
+      alert(msg);
+    } catch (_) {}
   }
 
   function ensureSupabase() {
+    // Prefer a single canonical instance
     if (window.__SUPABASE_CLIENT) return window.__SUPABASE_CLIENT;
 
     if (!window.supabase?.createClient) {
@@ -84,14 +79,15 @@
       throw new Error("Supabase JS not available");
     }
 
-    window.__SUPABASE_CLIENT = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
       auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
     });
 
-    // Compatibility: some pages/scripts expect this name
-    window.__supabaseClient = window.__SUPABASE_CLIENT;
+    // IMPORTANT: publish BOTH names because some modules use __supabaseClient
+    window.__SUPABASE_CLIENT = client;
+    window.__supabaseClient = client;
 
-    return window.__SUPABASE_CLIENT;
+    return client;
   }
 
   function deriveVesselPosition(username) {
@@ -127,38 +123,6 @@
     return { session, user, profile };
   }
 
-  function fillUserBadge(bundleOrProfile, badgeId = "userBadge") {
-    const el = document.getElementById(badgeId);
-    if (!el) return;
-
-    // Accept either {profile,...} bundle or profile itself
-    const profile = bundleOrProfile?.profile ? bundleOrProfile.profile : bundleOrProfile;
-
-    if (!profile) {
-      el.textContent = "Logged out";
-      return;
-    }
-
-    const username = profile.username || "";
-    const role = roleToUi(profile.role);
-    const pos = profile.position ? ` | ${String(profile.position)}` : "";
-
-    el.textContent = `${username} — ${role}${pos}`;
-  }
-
-  function goLogin(returnTo = null) {
-    const rt = safePath(returnTo || currentRelativeUrl());
-    const url = rt ? `./login.html?returnTo=${encodeURIComponent(rt)}` : "./login.html";
-    window.location.href = url;
-  }
-
-  async function logoutAndGoLogin(returnTo = null) {
-    try {
-      await ensureSupabase().auth.signOut();
-    } catch (_) {}
-    goLogin(returnTo);
-  }
-
   async function requireAuth(allowedRoles = null, opts = {}) {
     const redirectTo = opts.redirectTo || "./login.html";
     const unauthorizedRedirect = opts.unauthorizedRedirect || "./q-dashboard.html";
@@ -169,8 +133,9 @@
     } catch (e) {
       showPageMessage(
         "Profile missing or blocked by RLS.\n" +
-        "Ensure a row exists in public.profiles for this user, and RLS allows select.\n\n" +
-        "Error: " + String(e?.message || e)
+          "Ensure a row exists in public.profiles for this user, and RLS allows select.\n\n" +
+          "Error: " +
+          String(e?.message || e)
       );
       throw e;
     }
@@ -193,7 +158,9 @@
       const ok = allowedRoles.includes(profile?.role);
       if (!ok) {
         showPageMessage("Access denied for your role. Redirecting…");
-        setTimeout(() => { window.location.href = unauthorizedRedirect; }, 600);
+        setTimeout(() => {
+          window.location.href = unauthorizedRedirect;
+        }, 600);
         return null;
       }
     }
@@ -207,68 +174,85 @@
     };
   }
 
+  function fillUserBadge(meOrBundle, badgeId = "userBadge") {
+    const el = document.getElementById(badgeId);
+    if (!el) return;
+
+    const profile = meOrBundle?.profile || null;
+    const username = profile?.username || meOrBundle?.user?.email || "";
+    const uiRole = meOrBundle?.uiRole || roleToUi(profile?.role);
+
+    const parts = [];
+    if (username) parts.push(username);
+    if (uiRole) parts.push(uiRole);
+
+    el.textContent = parts.join(" • ");
+  }
+
+  async function logoutAndGoLogin(redirectTo = "./login.html") {
+    try {
+      await ensureSupabase().auth.signOut();
+    } catch (_) {}
+    window.location.href = redirectTo;
+  }
+
   /**
-   * setupAuthButtons
-   * - Ensures session/profile is loaded (if possible)
-   * - Shows Login when logged out
-   * - Shows Logout when logged in
-   * - Switch User always available (signs out and goes to login)
-   * - Fills user badge when logged in
-   *
-   * Returns: { session, user, profile } bundle (or nulls if logged out)
+   * Dashboard helper:
+   * - wires login/logout/switch buttons
+   * - fills badge
+   * - returns the same bundle as requireAuth() (without role restriction)
    */
   async function setupAuthButtons(cfg = {}) {
     const badgeId = cfg.badgeId || "userBadge";
     const loginBtnId = cfg.loginBtnId || "loginBtn";
     const logoutBtnId = cfg.logoutBtnId || "logoutBtn";
     const switchBtnId = cfg.switchBtnId || "switchUserBtn";
-    const returnTo = cfg.returnTo || currentRelativeUrl();
+    const loginPath = cfg.loginPath || "./login.html";
 
     const loginBtn = document.getElementById(loginBtnId);
     const logoutBtn = document.getElementById(logoutBtnId);
     const switchBtn = document.getElementById(switchBtnId);
 
-    // Always wire button clicks (even if hidden later)
-    if (loginBtn) {
-      loginBtn.onclick = () => goLogin(returnTo);
-    }
-    if (logoutBtn) {
-      logoutBtn.onclick = () => logoutAndGoLogin(returnTo);
-    }
-    if (switchBtn) {
-      // Switch user = force sign-out and go to login
-      switchBtn.onclick = () => logoutAndGoLogin(returnTo);
-    }
+    const me = await requireAuth([], { redirectTo: loginPath });
 
-    let bundle = { session: null, user: null, profile: null };
-
-    try {
-      bundle = await getSessionUserProfile();
-    } catch (e) {
-      // If profile cannot be read due to RLS, we still may have a session.
-      // We will fall back to session-only.
-      try {
-        const session = await getSession();
-        bundle = { session, user: session?.user || null, profile: null };
-      } catch (_) {
-        bundle = { session: null, user: null, profile: null };
-      }
-    }
+    // requireAuth redirects when not logged in; however some pages want "logged-out mode".
+    // So if not logged in, do NOT redirect; instead show login button.
+    // We detect "logged out" by checking session from getSessionUserProfile directly.
+    const bundle = await getSessionUserProfile();
 
     const loggedIn = !!bundle?.session?.user;
 
-    // Visibility rules requested:
-    // - Login button when logged out
-    // - Logout button when logged in
-    // - Switch User button always visible
-    if (loginBtn) loginBtn.style.display = loggedIn ? "none" : "inline-block";
-    if (logoutBtn) logoutBtn.style.display = loggedIn ? "inline-block" : "none";
-    if (switchBtn) switchBtn.style.display = "inline-block";
+    if (loginBtn) {
+      loginBtn.style.display = loggedIn ? "none" : "inline-block";
+      loginBtn.onclick = () => {
+        const next = safePath(window.location.pathname.split("/").pop()) || "q-dashboard.html";
+        window.location.href = `${loginPath}?next=${encodeURIComponent(next)}`;
+      };
+    }
 
-    if (loggedIn) fillUserBadge(bundle, badgeId);
-    else fillUserBadge(null, badgeId);
+    if (logoutBtn) {
+      logoutBtn.style.display = loggedIn ? "inline-block" : "none";
+      logoutBtn.onclick = () => logoutAndGoLogin(loginPath);
+    }
 
-    return bundle;
+    if (switchBtn) {
+      // Switch user = sign out and go login
+      switchBtn.style.display = "inline-block";
+      switchBtn.onclick = () => logoutAndGoLogin(loginPath);
+    }
+
+    const out = loggedIn
+      ? {
+          session: bundle.session,
+          user: bundle.user,
+          profile: bundle.profile,
+          uiRole: roleToUi(bundle.profile?.role),
+          vesselPosition: deriveVesselPosition(bundle.profile?.username),
+        }
+      : { session: null, user: null, profile: null };
+
+    fillUserBadge(out, badgeId);
+    return out;
   }
 
   window.AUTH = {
@@ -286,8 +270,7 @@
     getSessionUserProfile,
     deriveVesselPosition,
     fillUserBadge,
-    setupAuthButtons,
     logoutAndGoLogin,
-    goLogin,
+    setupAuthButtons,
   };
 })();

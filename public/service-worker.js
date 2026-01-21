@@ -1,75 +1,105 @@
 // public/service-worker.js
-// Dev-friendly strategy: network-first for HTML/JS/CSS so code updates appear immediately.
-// Still caches assets for performance/offline fallback.
+// Goal: stop “stale” pages/scripts forcing multiple hard refreshes.
+// Strategy:
+// - Network-first for HTML navigations (always try to fetch latest)
+// - Stale-while-revalidate for static assets (fast, but updates in background)
+// - Bump cache version + clean old caches on activate
 
-const CACHE_NAME = "sire-test-v2"; // IMPORTANT: bump this when you change caching logic
+const CACHE_PREFIX = "sire-test-";
+const CACHE_VERSION = "v2";              // <-- bump this if you change caching behavior again
+const CACHE_NAME = `${CACHE_PREFIX}${CACHE_VERSION}`;
 
-const PRECACHE_URLS = [
+const CORE_ASSETS = [
   "./",
   "./index.html",
   "./style.css",
-  "./sire_questions_all_columns_named.json",
-  "./print.js",
+  "./auth.js",
   "./icon-192.png",
   "./icon-512.png",
+  "./sire_questions_all_columns_named.json"
 ];
 
-// Install: pre-cache core assets
+// Install: pre-cache core assets (best effort) + activate immediately
 self.addEventListener("install", (event) => {
-  event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(PRECACHE_URLS)));
-  self.skipWaiting();
+  event.waitUntil(
+    (async () => {
+      try {
+        const cache = await caches.open(CACHE_NAME);
+        await cache.addAll(CORE_ASSETS);
+      } catch (e) {
+        // If any asset fails to cache, still proceed (do not block install)
+      } finally {
+        await self.skipWaiting();
+      }
+    })()
+  );
 });
 
-// Activate: remove old caches
+// Activate: remove old caches + take control immediately
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k.startsWith("sire-test-") && k !== CACHE_NAME).map((k) => caches.delete(k)))
-    )
+    (async () => {
+      const keys = await caches.keys();
+      await Promise.all(
+        keys
+          .filter((k) => k.startsWith(CACHE_PREFIX) && k !== CACHE_NAME)
+          .map((k) => caches.delete(k))
+      );
+      await self.clients.claim();
+    })()
   );
-  self.clients.claim();
 });
 
-function isNetworkFirst(url) {
-  // Always network-first for pages + code + styles (most likely to change)
-  return (
-    url.pathname.endsWith(".html") ||
-    url.pathname.endsWith(".js") ||
-    url.pathname.endsWith(".css") ||
-    url.pathname.endsWith(".json")
-  );
-}
-
+// Helpers
 async function networkFirst(request) {
   const cache = await caches.open(CACHE_NAME);
   try {
-    const fresh = await fetch(request);
-    cache.put(request, fresh.clone());
+    const fresh = await fetch(request, { cache: "no-store" });
+    // Cache only valid responses
+    if (fresh && fresh.ok) {
+      cache.put(request, fresh.clone());
+    }
     return fresh;
-  } catch {
+  } catch (e) {
     const cached = await cache.match(request);
     if (cached) return cached;
-    throw new Error("Offline and no cache available");
+    throw e;
   }
 }
 
-async function cacheFirst(request) {
-  const cached = await caches.match(request);
-  if (cached) return cached;
-  const fresh = await fetch(request);
+async function staleWhileRevalidate(request) {
   const cache = await caches.open(CACHE_NAME);
-  cache.put(request, fresh.clone());
-  return fresh;
+  const cached = await cache.match(request);
+
+  const fetchPromise = fetch(request)
+    .then((fresh) => {
+      if (fresh && fresh.ok) cache.put(request, fresh.clone());
+      return fresh;
+    })
+    .catch(() => null);
+
+  // If cached exists, return it immediately; otherwise wait for network
+  return cached || (await fetchPromise) || cached;
 }
 
+// Fetch handling
 self.addEventListener("fetch", (event) => {
   const req = event.request;
+
   if (req.method !== "GET") return;
 
   const url = new URL(req.url);
-
-  // Only handle same-origin requests
   if (url.origin !== self.location.origin) return;
 
-  event.respondWith(isNetworkFirst(url) ? networkFirst(req) : cacheFirst(req));
+  const accept = req.headers.get("accept") || "";
+  const isHTML =
+    req.mode === "navigate" ||
+    accept.includes("text/html") ||
+    url.pathname.endsWith(".html");
+
+  if (isHTML) {
+    event.respondWith(networkFirst(req));
+  } else {
+    event.respondWith(staleWhileRevalidate(req));
+  }
 });

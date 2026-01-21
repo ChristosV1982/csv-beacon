@@ -41,12 +41,9 @@
     <div><b>My Self-Assessment Tasks</b></div>
     <div class="row">
       <div id="userBadge" style="font-weight:800; opacity:0.95;"></div>
-      <button class="btn2" id="loginBtn" type="button" style="display:none;">Login</button>
-      <button class="btn2" id="switchUserBtn" type="button">Switch User</button>
-      <button class="btn" id="logoutBtn" type="button" style="display:none;">Logout</button>
-
       <button class="btn2" type="button" onclick="location.href='./q-dashboard.html'">Dashboard</button>
       <button class="btn2" type="button" onclick="location.href='./sa_compare.html'">Pre/Post Compare</button>
+      <button class="btn" id="logoutBtn" type="button">Logout</button>
     </div>
   </div>
 
@@ -72,29 +69,22 @@
         <table>
           <thead>
             <tr>
-              <th>Campaign</th>
-              <th>Vessel</th>
-              <th>Questionnaire</th>
-              <th>Status</th>
-              <th>Due</th>
-              <th>Updated</th>
-              <th>Action</th>
+              <th style="width:34%;">Title</th>
+              <th style="width:16%;">Vessel</th>
+              <th style="width:12%;">Due</th>
+              <th style="width:12%;">Status</th>
+              <th style="width:26%;">Actions</th>
             </tr>
           </thead>
-          <tbody id="rowsBody"></tbody>
+
+          <!-- sa_tasks.js uses rowsBody -->
+          <tbody id="rowsBody">
+            <tr><td colspan="5" class="muted">Loading...</td></tr>
+          </tbody>
         </table>
       </div>
     </div>
   </div>
-
-  <script>
-    AUTH.setupAuthButtons({
-      badgeId: "userBadge",
-      loginBtnId: "loginBtn",
-      logoutBtnId: "logoutBtn",
-      switchBtnId: "switchUserBtn"
-    });
-  </script>
 
   <script type="module" src="./sa_tasks.js"></script>
 </body>

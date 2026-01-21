@@ -31,17 +31,20 @@ function el(id) {
 }
 
 function setSubLine(text) {
-  el("subLine").textContent = text;
+  const s = el("subLine");
+  if (s) s.textContent = text;
 }
 
 function showWarn(msg) {
   const w = el("warnBox");
-  w.textContent = msg;
+  if (!w) return;
+  w.textContent = msg || "";
   w.style.display = "block";
 }
 
 function clearWarn() {
   const w = el("warnBox");
+  if (!w) return;
   w.textContent = "";
   w.style.display = "none";
 }
@@ -240,7 +243,9 @@ function getVesselTypeRaw(q) {
 }
 
 function getRankAllocRaw(q) {
-  return String(pick(q, ["Company Rank Allocation", "SPIS Rank Allocation", "Rank Allocation"])).trim();
+  return String(
+    pick(q, ["Company Rank Allocation", "SPIS Rank Allocation", "Rank Allocation"])
+  ).trim();
 }
 
 function hasResponse(q, kind) {
@@ -266,7 +271,12 @@ function hasResponse(q, kind) {
 function getTextBlob(q) {
   const a = pick(q, ["Question", "question", "question_text", "questionText"]);
   const b = pick(q, ["Expected Evidence", "expected_evidence", "expectedEvidence"]);
-  const c = pick(q, ["Inspection Guidance", "Inspector Guidance", "inspector_guidance", "inspectorGuidance"]);
+  const c = pick(q, [
+    "Inspection Guidance",
+    "Inspector Guidance",
+    "inspector_guidance",
+    "inspectorGuidance",
+  ]);
   return `${a} ${b} ${c}`.toLowerCase();
 }
 
@@ -303,6 +313,7 @@ function closeAllFilterMenus() {
 
 function renderFilterBar() {
   const row = el("filterRow");
+  if (!row) return;
   row.innerHTML = "";
 
   const makeDD = (key) => {
@@ -337,7 +348,9 @@ function renderFilterBar() {
           const checked = f.selected.has(String(v));
           return `
             <label class="fltItem">
-              <input type="checkbox" data-val="${escapeHtml(String(v))}" ${checked ? "checked" : ""}/>
+              <input type="checkbox" data-val="${escapeHtml(String(v))}" ${
+            checked ? "checked" : ""
+          }/>
               <span>${escapeHtml(String(v))}</span>
             </label>
           `;
@@ -386,7 +399,7 @@ function renderFilterBar() {
 }
 
 function applyFilters() {
-  const s = el("fltSearch").value.trim().toLowerCase();
+  const s = (el("fltSearch")?.value || "").trim().toLowerCase();
 
   FILTERED = LIB.filter((q) => {
     const qno = getQno(q);
@@ -438,18 +451,22 @@ function applyFilters() {
     }
 
     if (s) {
-      const blob = `${qno} ${getChapter(q)} ${getQType(q)} ${getVesselTypeRaw(q)} ${getRankAllocRaw(q)} ${getTextBlob(q)}`;
+      const blob = `${qno} ${getChapter(q)} ${getQType(q)} ${getVesselTypeRaw(
+        q
+      )} ${getRankAllocRaw(q)} ${getTextBlob(q)}`;
       if (!blob.toLowerCase().includes(s)) return false;
     }
 
     return true;
   });
 
-  el("fltCount").textContent = `${FILTERED.length} questions currently selected by filters`;
+  const c = el("fltCount");
+  if (c) c.textContent = `${FILTERED.length} questions currently selected by filters`;
 }
 
 function renderSelectedSummary() {
-  el("selectedCount").textContent = `${SELECTED_SET.size} questions selected for compile`;
+  const sc = el("selectedCount");
+  if (sc) sc.textContent = `${SELECTED_SET.size} questions selected for compile`;
 }
 
 function selectAllFiltered() {
@@ -472,8 +489,13 @@ let ALL_Q = [];
 let VESSELS = [];
 let PROFILE = null;
 
+// FIX: define isSuper in module scope (used in renderQuestionnairesTable/renderTemplates)
+let isSuper = false;
+
 function renderVesselSelect() {
   const sel = el("vesselSelect");
+  if (!sel) return;
+
   if (!VESSELS.length) {
     sel.innerHTML = `<option value="">(No vessels found)</option>`;
     return;
@@ -484,8 +506,9 @@ function renderVesselSelect() {
 }
 
 function renderQuestionnairesTable() {
-  const term = el("searchInput").value.trim().toLowerCase();
+  const term = (el("searchInput")?.value || "").trim().toLowerCase();
   const body = el("tableBody");
+  if (!body) return;
 
   const rows = ALL_Q.filter((q) => {
     if (!term) return true;
@@ -500,8 +523,6 @@ function renderQuestionnairesTable() {
       asg.toLowerCase().includes(term)
     );
   });
-
-  const isAdmin = (PROFILE?.role === "super_admin" || PROFILE?.role === "company_admin");
 
   if (!rows.length) {
     body.innerHTML = `<tr><td colspan="7" class="small">No questionnaires found.</td></tr>`;
@@ -529,7 +550,9 @@ function renderQuestionnairesTable() {
               <a class="btn btn-muted" href="./q-answer.html?qid=${encodeURIComponent(q.id)}">Open</a>
               ${
                 isSuper
-                  ? `<button class="btn btn-danger" type="button" data-del="1" data-id="${escapeHtml(q.id)}">Delete</button>`
+                  ? `<button class="btn btn-danger" type="button" data-del="1" data-id="${escapeHtml(
+                      q.id
+                    )}">Delete</button>`
                   : ``
               }
             </div>
@@ -570,7 +593,7 @@ let TEMPLATE_COUNTS = new Map();
 
 function renderTemplates() {
   const body = el("tplBody");
-  const isAdmin = (PROFILE?.role === "super_admin" || PROFILE?.role === "company_admin");
+  if (!body) return;
 
   if (!TEMPLATES.length) {
     body.innerHTML = `<tr><td colspan="5" class="small">No templates found.</td></tr>`;
@@ -590,12 +613,16 @@ function renderTemplates() {
             <div style="display:flex; gap:8px; flex-wrap:wrap;">
               ${
                 isSuper
-                  ? `<button class="btn btn-outline" data-tpl-compile="1" data-id="${escapeHtml(t.id)}">Compile (replace questions)</button>`
+                  ? `<button class="btn btn-outline" data-tpl-compile="1" data-id="${escapeHtml(
+                      t.id
+                    )}">Compile (replace questions)</button>`
                   : ``
               }
               ${
                 isSuper
-                  ? `<button class="btn btn-outline" data-tpl-createq="1" data-id="${escapeHtml(t.id)}">Create Questionnaire for Vessel</button>`
+                  ? `<button class="btn btn-outline" data-tpl-createq="1" data-id="${escapeHtml(
+                      t.id
+                    )}">Create Questionnaire for Vessel</button>`
                   : ``
               }
             </div>
@@ -609,7 +636,12 @@ function renderTemplates() {
     btn.addEventListener("click", async () => {
       const tid = btn.getAttribute("data-id");
       if (!tid) return;
-      if (!confirm("Replace template questions with the currently SELECTED set?\n\nThis overwrites the template question list.")) return;
+      if (
+        !confirm(
+          "Replace template questions with the currently SELECTED set?\n\nThis overwrites the template question list."
+        )
+      )
+        return;
       await compileTemplateQuestions(tid);
     });
   });
@@ -625,8 +657,8 @@ function renderTemplates() {
 
 async function createTemplate() {
   clearWarn();
-  const name = el("tplName").value.trim();
-  const desc = el("tplDesc").value.trim();
+  const name = (el("tplName")?.value || "").trim();
+  const desc = (el("tplDesc")?.value || "").trim();
 
   if (!name) {
     showWarn("Template name is required.");
@@ -644,8 +676,8 @@ async function createTemplate() {
     return;
   }
 
-  el("tplName").value = "";
-  el("tplDesc").value = "";
+  if (el("tplName")) el("tplName").value = "";
+  if (el("tplDesc")) el("tplDesc").value = "";
 
   if (confirm("Template created. Compile it now using the currently SELECTED questions?")) {
     await compileTemplateQuestions(data.id);
@@ -702,8 +734,8 @@ async function applyAssignedPositionToQuestionnaire(qid) {
 async function createQuestionnaireFromTemplateFlow(templateId) {
   clearWarn();
 
-  const vesselId = el("vesselSelect").value;
-  const title = el("titleInput").value.trim();
+  const vesselId = el("vesselSelect")?.value || "";
+  const title = (el("titleInput")?.value || "").trim();
 
   if (!vesselId) {
     showWarn("Select a vessel first (Vessel).");
@@ -733,7 +765,8 @@ async function createQuestionnaireFromTemplateFlow(templateId) {
     } catch (e) {
       showWarn(
         "Questionnaire created from template, but assignment update failed.\n\n" +
-        "Error: " + String(e?.message || e)
+          "Error: " +
+          String(e?.message || e)
       );
     }
   }
@@ -782,11 +815,11 @@ async function createQuestionnaireByCompile(userId) {
   clearWarn();
 
   const btn = el("createBtn");
-  btn.disabled = true;
+  if (btn) btn.disabled = true;
 
   try {
-    const vesselId = el("vesselSelect").value;
-    const title = el("titleInput").value.trim();
+    const vesselId = el("vesselSelect")?.value || "";
+    const title = (el("titleInput")?.value || "").trim();
     const assigned = getAssignedPositionFromUI();
 
     if (!vesselId) {
@@ -901,12 +934,12 @@ async function createQuestionnaireByCompile(userId) {
       showWarn("Questionnaire created, but PGNO row creation failed: " + String(e?.message || e));
     }
 
-    el("titleInput").value = "";
+    if (el("titleInput")) el("titleInput").value = "";
     await refreshAll();
 
     window.location.href = "./q-answer.html?qid=" + encodeURIComponent(qid);
   } finally {
-    btn.disabled = false;
+    if (btn) btn.disabled = false;
     setSubLine("Ready.");
   }
 }
@@ -935,7 +968,8 @@ async function refreshAll() {
 // ----------------------
 async function init() {
   clearWarn();
-  el("libraryLockLine").textContent = `Library locked to: ${LOCKED_LIBRARY_JSON}`;
+  const lockLine = el("libraryLockLine");
+  if (lockLine) lockLine.textContent = `Library locked to: ${LOCKED_LIBRARY_JSON}`;
 
   document.addEventListener("click", (e) => {
     const inside = e.target.closest(".fltDD");
@@ -957,11 +991,15 @@ async function init() {
     setSubLine("Logged in, but profile missing or blocked.");
     showWarn(
       "Profile missing or blocked by RLS.\n" +
-      "Ensure a row exists in public.profiles for this user, and RLS allows select.\n\n" +
-      "Error: " + String(e?.message || e)
+        "Ensure a row exists in public.profiles for this user, and RLS allows select.\n\n" +
+        "Error: " +
+        String(e?.message || e)
     );
     return;
   }
+
+  // FIX: set isSuper after profile is loaded (prevents isSuper ReferenceError)
+  isSuper = String(PROFILE?.role || "") === "super_admin";
 
   // (a) HARD ROLE GUARD: vessel users must not access Company view
   const allowedCompanyRoles = new Set(["super_admin", "company_admin", "company_superintendent"]);
@@ -975,8 +1013,10 @@ async function init() {
   const uiRole = roleToUi(PROFILE.role);
   const username = PROFILE.username || user.email || "(unknown)";
 
-  el("sessionLine").textContent = `Session: ${username}`;
-  el("roleLine").textContent = `Role: ${uiRole}`;
+  const sessionLine = el("sessionLine");
+  const roleLine = el("roleLine");
+  if (sessionLine) sessionLine.textContent = `Session: ${username}`;
+  if (roleLine) roleLine.textContent = `Role: ${uiRole}`;
 
   const vesselName = PROFILE?.vessels?.name || "";
   localStorage.setItem(
@@ -1031,26 +1071,27 @@ async function init() {
     setSubLine("Error loading data.");
   }
 
-  el("refreshBtn").addEventListener("click", refreshAll);
-  el("searchInput").addEventListener("input", renderQuestionnairesTable);
+  el("refreshBtn")?.addEventListener("click", refreshAll);
+  el("searchInput")?.addEventListener("input", renderQuestionnairesTable);
 
-  el("createBtn").addEventListener("click", () => createQuestionnaireByCompile(user.id));
-  el("clearBtn").addEventListener("click", () => {
-    el("titleInput").value = "";
+  el("createBtn")?.addEventListener("click", () => createQuestionnaireByCompile(user.id));
+  el("clearBtn")?.addEventListener("click", () => {
+    const t = el("titleInput");
+    if (t) t.value = "";
   });
 
-  el("fltSearch").addEventListener("input", applyFilters);
+  el("fltSearch")?.addEventListener("input", applyFilters);
 
-  el("btnSelectAllFiltered").addEventListener("click", () => {
+  el("btnSelectAllFiltered")?.addEventListener("click", () => {
     applyFilters();
     selectAllFiltered();
   });
 
-  el("btnClearSelected").addEventListener("click", clearSelected);
+  el("btnClearSelected")?.addEventListener("click", clearSelected);
 
-  el("btnCreateTemplate").addEventListener("click", createTemplate);
+  el("btnCreateTemplate")?.addEventListener("click", createTemplate);
 
-  el("logoutBtn").addEventListener("click", async () => {
+  el("logoutBtn")?.addEventListener("click", async () => {
     clearWarn();
     await supabaseClient.auth.signOut();
     localStorage.removeItem(SESSION_KEY_COMPAT);
