@@ -3,7 +3,7 @@ modules = ["nodejs-20", "web"]
 
 [nix]
 channel = "stable-25_05"
-packages = ["static-web-server"]
+packages = ["static-web-server", "supabase-cli"]
 
 [workflows]
 runButton = "Project"
