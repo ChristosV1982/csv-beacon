@@ -70,13 +70,12 @@ async function callSuAdmin(body) {
     body: JSON.stringify(body),
   });
 
-  const text = await res.text(); // capture raw body even on errors
+  const text = await res.text();
 
   if (!res.ok) {
     throw new Error(`HTTP ${res.status} ${res.statusText}\n\n${text || "(empty response body)"}`);
   }
 
-  // Try parse JSON, fallback to raw text
   try {
     const data = JSON.parse(text || "{}");
     if (data?.error) throw new Error(typeof data.error === "string" ? data.error : JSON.stringify(data.error));
@@ -91,13 +90,23 @@ const state = {
   vessels: [],
   users: [],
   roles: ["super_admin", "company_admin", "company_superintendent", "vessel", "inspector"],
+
+  // Rights Matrix
+  rm: {
+    loadedMeta: false,
+    modules: [],
+    permissions: [],
+    roles: [],
+    positions: [],
+    grants: [],
+  },
 };
 
 /* ------------------------ Tabs ------------------------ */
 function initTabs() {
   const tabs = document.querySelectorAll(".tab");
   tabs.forEach((btn) => {
-    btn.addEventListener("click", () => {
+    btn.addEventListener("click", async () => {
       tabs.forEach((b) => b.classList.remove("active"));
       btn.classList.add("active");
 
@@ -105,6 +114,15 @@ function initTabs() {
       document.getElementById("tab-users").style.display = t === "users" ? "" : "none";
       document.getElementById("tab-vessels").style.display = t === "vessels" ? "" : "none";
       document.getElementById("tab-rights").style.display = t === "rights" ? "" : "none";
+
+      // Lazy-load Rights Matrix when tab first opened
+      if (t === "rights") {
+        try {
+          await ensureRightsMatrixLoaded();
+        } catch (e) {
+          showWarn(String(e?.message || e));
+        }
+      }
     });
   });
 }
@@ -141,18 +159,11 @@ function renderUsers() {
 
   const q = (document.getElementById("u_search")?.value || "").trim().toLowerCase();
 
-  const rows = [];
   const users = Array.isArray(state.users) ? state.users : [];
 
   const filtered = users.filter((u) => {
     if (!q) return true;
-    const hay = [
-      u.username,
-      u.role,
-      u.position,
-      vesselNameById(u.vessel_id),
-      u.vessel_name,
-    ]
+    const hay = [u.username, u.role, u.position, vesselNameById(u.vessel_id), u.vessel_name]
       .filter(Boolean)
       .join(" ")
       .toLowerCase();
@@ -164,16 +175,15 @@ function renderUsers() {
     return;
   }
 
+  const rows = [];
   for (const u of filtered) {
     const disabled = !!u.is_disabled;
-    const active = u.is_active === false ? false : true; // default true if missing
-    const statusPill = disabled || !active
-      ? `<span class="pill bad">Disabled</span>`
-      : `<span class="pill ok">Active</span>`;
+    const active = u.is_active === false ? false : true;
+    const statusPill =
+      disabled || !active ? `<span class="pill bad">Disabled</span>` : `<span class="pill ok">Active</span>`;
 
     const forceReset = u.force_password_reset ? `<span class="pill bad">Yes</span>` : `<span class="pill ok">No</span>`;
 
-    // We assume the profile id is the auth user id (UUID) stored in profiles.id
     const uid = u.id;
 
     const actionBtns = [];
@@ -205,7 +215,6 @@ function renderUsers() {
 
   tbody.innerHTML = rows.join("");
 
-  // Row button handlers (event delegation)
   tbody.querySelectorAll("button[data-act]").forEach((btn) => {
     btn.addEventListener("click", async () => {
       clearWarn();
@@ -265,7 +274,6 @@ function renderVessels() {
     const active = v.is_active === false ? false : true;
     const statusPill = active ? `<span class="pill ok">Active</span>` : `<span class="pill bad">Inactive</span>`;
 
-    // We will use upsert_vessel for activate/deactivate, passing is_active toggle.
     const btn = active
       ? `<button class="btnSmall btnDanger" data-act="deactivate" data-id="${esc(v.id)}" type="button">Deactivate</button>`
       : `<button class="btnSmall btn" data-act="activate" data-id="${esc(v.id)}" type="button">Activate</button>`;
@@ -295,6 +303,8 @@ function renderVessels() {
         if (!v) throw new Error("Vessel not found in state.");
 
         const nextActive = act === "activate";
+
+        // Keep your existing request shape (since it already works in your setup)
         await callSuAdmin({
           action: "upsert_vessel",
           vessel: {
@@ -309,7 +319,7 @@ function renderVessels() {
 
         showOk(nextActive ? "Vessel activated." : "Vessel deactivated.");
         await refreshVessels();
-        renderVesselDropdown(); // keeps Create User dropdown up to date
+        renderVesselDropdown();
       } catch (e) {
         showWarn(String(e?.message || e));
       }
@@ -319,7 +329,6 @@ function renderVessels() {
 
 /* ------------------------ Refresh data ------------------------ */
 function normalizeListResponse(resp) {
-  // Allow different shapes: array, {data:[...]}, {users:[...]} etc.
   if (Array.isArray(resp)) return resp;
   if (Array.isArray(resp?.data)) return resp.data;
   if (Array.isArray(resp?.users)) return resp.users;
@@ -353,9 +362,8 @@ function initCreateUser() {
   if (posPick) {
     posPick.addEventListener("change", () => {
       const v = posPick.value || "";
-      if (v && document.getElementById("cu_position")) {
-        document.getElementById("cu_position").value = v;
-      }
+      const free = document.getElementById("cu_position");
+      if (v && free) free.value = v;
     });
   }
 
@@ -390,7 +398,6 @@ function initCreateUser() {
       if (!password) throw new Error("Password is required.");
       if (!role) throw new Error("Role is required.");
 
-      // Send exactly what the Edge Function needs. Username is WITHOUT domain by design.
       setStatus("Creating user…");
       const resp = await callSuAdmin({
         action: "create_user",
@@ -404,7 +411,6 @@ function initCreateUser() {
 
       showOk(`User created successfully.\n\nResponse:\n${JSON.stringify(resp, null, 2)}`);
 
-      // Refresh list
       await refreshUsers();
       setStatus("Ready");
     } catch (e) {
@@ -477,6 +483,208 @@ function initSearch() {
   if (v) v.addEventListener("input", () => renderVessels());
 }
 
+/* ------------------------ Rights Matrix ------------------------ */
+const RM_ACTIONS = ["view", "edit", "admin", "export"];
+const RM_SCOPES = [
+  { value: "", label: "No access" },
+  { value: "global", label: "global" },
+  { value: "company", label: "company" },
+  { value: "vessel_assigned", label: "vessel_assigned" },
+  { value: "vessel_any", label: "vessel_any" },
+];
+
+function rmSetStatus(msg) {
+  const el = document.getElementById("rmStatus");
+  if (el) el.textContent = msg || "—";
+}
+
+function rmBuildRoleOptions() {
+  const sel = document.getElementById("rmRole");
+  if (!sel) return;
+  const roles = state.rm.roles?.length ? state.rm.roles : state.roles;
+  sel.innerHTML = roles.map((r) => `<option value="${esc(r)}">${esc(r)}</option>`).join("");
+}
+
+function rmBuildPositionOptions() {
+  const sel = document.getElementById("rmPosition");
+  if (!sel) return;
+
+  const opts = [];
+  opts.push(`<option value="">(No position / NULL)</option>`);
+  for (const p of (state.rm.positions || [])) {
+    opts.push(`<option value="${esc(p)}">${esc(p)}</option>`);
+  }
+  sel.innerHTML = opts.join("");
+}
+
+function rmPermissionIdFor(module_id, action) {
+  const p = (state.rm.permissions || []).find((x) => String(x.module_id) === String(module_id) && String(x.action) === String(action));
+  return p ? p.id : null;
+}
+
+function rmGrantsMap(grants) {
+  const m = new Map();
+  (grants || []).forEach((g) => {
+    m.set(String(g.permission_id), { scope: g.scope, is_granted: !!g.is_granted });
+  });
+  return m;
+}
+
+function rmCellSelect(currentValue, permission_id) {
+  const sel = document.createElement("select");
+  sel.className = "rmCellSel";
+  sel.dataset.permissionId = String(permission_id);
+
+  RM_SCOPES.forEach((s) => {
+    const opt = document.createElement("option");
+    opt.value = s.value;
+    opt.textContent = s.label;
+    sel.appendChild(opt);
+  });
+
+  sel.value = currentValue || "";
+  return sel;
+}
+
+function rmRenderTable() {
+  const tbody = document.getElementById("rmTbody");
+  if (!tbody) return;
+
+  const grantsByPerm = rmGrantsMap(state.rm.grants);
+
+  const mods = state.rm.modules || [];
+  if (!mods.length) {
+    tbody.innerHTML = `<tr><td colspan="5" class="muted small" style="padding:14px;">No modules found.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = "";
+
+  for (const mod of mods) {
+    const tr = document.createElement("tr");
+
+    const tdName = document.createElement("td");
+    tdName.className = "rmSticky";
+    tdName.style.minWidth = "240px";
+    tdName.textContent = mod.name || mod.code || mod.id;
+    tr.appendChild(tdName);
+
+    for (const action of RM_ACTIONS) {
+      const td = document.createElement("td");
+
+      const permId = rmPermissionIdFor(mod.id, action);
+      if (!permId) {
+        td.textContent = "—";
+        tr.appendChild(td);
+        continue;
+      }
+
+      const g = grantsByPerm.get(String(permId));
+      const currentScope = g && g.is_granted ? g.scope : "";
+
+      const sel = rmCellSelect(currentScope, permId);
+      td.appendChild(sel);
+
+      tr.appendChild(td);
+    }
+
+    tbody.appendChild(tr);
+  }
+}
+
+async function rmLoadMeta() {
+  rmSetStatus("Loading meta…");
+
+  const mp = await callSuAdmin({ action: "list_modules_permissions" });
+  state.rm.modules = mp.modules || [];
+  state.rm.permissions = mp.permissions || [];
+
+  const rp = await callSuAdmin({ action: "list_roles_positions" });
+  state.rm.roles = rp.roles || [];
+  state.rm.positions = rp.positions || [];
+
+  // Also update create-user role dropdown to reflect DB roles (if provided)
+  if (state.rm.roles?.length) {
+    state.roles = state.rm.roles.slice();
+    renderRoleDropdown();
+  }
+
+  rmBuildRoleOptions();
+  rmBuildPositionOptions();
+
+  state.rm.loadedMeta = true;
+  rmSetStatus("Ready");
+}
+
+async function rmLoadGrants() {
+  const roleSel = document.getElementById("rmRole");
+  const posSel = document.getElementById("rmPosition");
+  if (!roleSel || !posSel) return;
+
+  const role = roleSel.value;
+  const position = posSel.value ? posSel.value : null;
+
+  rmSetStatus("Loading grants…");
+  const res = await callSuAdmin({ action: "get_role_permissions", role, position });
+  state.rm.grants = res.grants || [];
+
+  rmRenderTable();
+  rmSetStatus("Ready");
+}
+
+async function rmSaveGrants() {
+  const roleSel = document.getElementById("rmRole");
+  const posSel = document.getElementById("rmPosition");
+  const tbody = document.getElementById("rmTbody");
+  if (!roleSel || !posSel || !tbody) return;
+
+  const role = roleSel.value;
+  const position = posSel.value ? posSel.value : null;
+
+  const selects = tbody.querySelectorAll("select[data-permission-id]");
+  const grants = [];
+
+  selects.forEach((sel) => {
+    const permission_id = sel.dataset.permissionId;
+    const scope = sel.value;
+
+    if (!permission_id) return;
+
+    if (!scope) {
+      // "No access" — still send a valid scope but is_granted=false
+      grants.push({ permission_id, scope: "global", is_granted: false });
+    } else {
+      grants.push({ permission_id, scope, is_granted: true });
+    }
+  });
+
+  rmSetStatus("Saving…");
+  const res = await callSuAdmin({ action: "set_role_permissions", role, position, grants });
+
+  rmSetStatus(`Saved (${res.updated ?? "ok"})`);
+  await rmLoadGrants();
+}
+
+function initRightsMatrixHandlers() {
+  const reloadBtn = document.getElementById("rmReload");
+  const saveBtn = document.getElementById("rmSave");
+  const roleSel = document.getElementById("rmRole");
+  const posSel = document.getElementById("rmPosition");
+
+  if (reloadBtn) reloadBtn.addEventListener("click", rmLoadGrants);
+  if (saveBtn) saveBtn.addEventListener("click", rmSaveGrants);
+
+  if (roleSel) roleSel.addEventListener("change", rmLoadGrants);
+  if (posSel) posSel.addEventListener("change", rmLoadGrants);
+}
+
+async function ensureRightsMatrixLoaded() {
+  if (!state.rm.loadedMeta) {
+    await rmLoadMeta();
+    await rmLoadGrants();
+  }
+}
+
 /* ------------------------ Init ------------------------ */
 async function init() {
   clearWarn();
@@ -490,7 +698,6 @@ async function init() {
   });
   if (!me) return;
 
-  // Optional: show user badge
   const badge = document.getElementById("userBadge");
   if (badge) badge.textContent = `Logged in`;
 
@@ -499,7 +706,7 @@ async function init() {
     window.location.href = "./login.html";
   });
 
-  // Connectivity test (shows real error if Function missing)
+  // Connectivity test
   await callSuAdmin({ action: "ping" });
 
   // Initialize UI wiring
@@ -507,6 +714,7 @@ async function init() {
   initCreateUser();
   initAddVessel();
   initSearch();
+  initRightsMatrixHandlers();
 
   // Load data
   await refreshVessels();

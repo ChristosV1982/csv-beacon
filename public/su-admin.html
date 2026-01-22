@@ -44,6 +44,12 @@
     .btnSmall{padding:8px 10px;border-radius:10px;font-weight:900;cursor:pointer;}
     .inline{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
     .right{margin-left:auto;}
+
+    /* Rights matrix table tweaks */
+    .rmTable th, .rmTable td { white-space:nowrap; }
+    .rmCellSel { min-width: 170px; }
+    .rmSticky { position: sticky; left: 0; background: #fff; z-index: 2; }
+    .rmStickyHead { position: sticky; left: 0; z-index: 3; background:#f7faff; }
   </style>
 </head>
 
@@ -283,25 +289,59 @@
     <div class="card" id="tab-rights" style="display:none;">
       <div style="font-weight:950;font-size:1.05rem;">Rights Matrix</div>
       <div class="muted" style="margin-top:6px;">
-        Next phase: per-role / per-position permissions for modules (view/edit/admin). We will build the DB tables + UI after Users/Vessels are stable.
+        Configure per-role (and optional per-position) permissions by module + action.
       </div>
 
       <div style="height:12px;"></div>
 
       <div class="card" style="box-shadow:none;">
-        <div style="font-weight:950;">Planned modules</div>
-        <ul class="muted" style="margin-top:8px;">
-          <li>Dashboard</li>
-          <li>Mode Selection</li>
-          <li>Read-Only Library</li>
-          <li>Vessel View</li>
-          <li>Company Builder</li>
-          <li>Inspector / Third-Party</li>
-          <li>Self-Assessment Tasks</li>
-          <li>Post-Inspection</li>
-          <li>Reports</li>
-          <li>Superuser Administration</li>
-        </ul>
+        <div class="row" style="align-items:flex-end;">
+          <div style="min-width:240px;">
+            <label>Role</label>
+            <select id="rmRole"></select>
+          </div>
+
+          <div style="min-width:320px;">
+            <label>Position (optional)</label>
+            <select id="rmPosition"></select>
+          </div>
+
+          <div class="actions">
+            <button class="btn2" type="button" id="rmReload">Reload</button>
+            <button class="btn" type="button" id="rmSave">Save changes</button>
+          </div>
+
+          <div class="right muted small" id="rmStatus">—</div>
+        </div>
+
+        <div class="muted small" style="margin-top:10px;">
+          Each cell controls the <span class="mono">scope</span> for an action. Choosing “No access” sets <span class="mono">is_granted=false</span>.
+        </div>
+      </div>
+
+      <div style="height:12px;"></div>
+
+      <div class="card" style="box-shadow:none; padding:0;">
+        <div style="overflow:auto; max-height:640px;">
+          <table class="rmTable">
+            <thead>
+              <tr>
+                <th class="rmStickyHead" style="min-width:240px;">Module</th>
+                <th style="min-width:190px;">view</th>
+                <th style="min-width:190px;">edit</th>
+                <th style="min-width:190px;">admin</th>
+                <th style="min-width:190px;">export</th>
+              </tr>
+            </thead>
+            <tbody id="rmTbody">
+              <tr><td colspan="5" class="muted small" style="padding:14px;">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="muted small" style="margin-top:10px;">
+        Tip: start by configuring <b>super_admin</b> and <b>company_superintendent</b>, then <b>vessel</b>.
       </div>
     </div>
 
