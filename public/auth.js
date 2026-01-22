@@ -147,7 +147,7 @@
       return null;
     }
 
-    if (profile && profile.is_active === false) {
+    if (profile && (profile.is_active === false || profile.is_disabled === true)) {
       showPageMessage("Your account is inactive. Please contact the administrator.");
       await ensureSupabase().auth.signOut();
       window.location.href = redirectTo;
