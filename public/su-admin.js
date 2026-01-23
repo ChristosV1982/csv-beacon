@@ -43,7 +43,9 @@ function esc(s) {
     .replaceAll("'", "&#39;");
 }
 function isUUID(x) {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(x || ""));
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    String(x || "")
+  );
 }
 
 /* ------------------------ Supabase call ------------------------ */
@@ -239,7 +241,12 @@ function renderUsers() {
           const newPass = prompt("Enter new password for this user:");
           if (!newPass) return;
           const force = confirm("Force password change on next login?");
-          await callSuAdmin({ action: "reset_password", user_id: id, new_password: newPass, force_password_reset: force });
+          await callSuAdmin({
+            action: "reset_password",
+            user_id: id,
+            new_password: newPass,
+            force_password_reset: force,
+          });
           showOk("Password reset completed.");
           await refreshUsers();
         }
@@ -304,17 +311,15 @@ function renderVessels() {
 
         const nextActive = act === "activate";
 
-        // Keep your existing request shape (since it already works in your setup)
+        // FIX: Edge Function expects top-level fields, not { vessel: {...} }
         await callSuAdmin({
           action: "upsert_vessel",
-          vessel: {
-            id: v.id,
-            name: v.name,
-            hull_number: v.hull_number,
-            imo_number: v.imo_number,
-            call_sign: v.call_sign,
-            is_active: nextActive,
-          },
+          vessel_id: v.id,
+          name: v.name,
+          hull_number: v.hull_number ?? null,
+          imo_number: v.imo_number ?? null,
+          call_sign: v.call_sign ?? null,
+          is_active: nextActive,
         });
 
         showOk(nextActive ? "Vessel activated." : "Vessel deactivated.");
@@ -445,21 +450,27 @@ function initAddVessel() {
     try {
       const name = (document.getElementById("v_name").value || "").trim();
       const hull_number = (document.getElementById("v_hull").value || "").trim();
-      const imo_number = (document.getElementById("v_imo").value || "").trim();
+      const imo_number_raw = (document.getElementById("v_imo").value || "").trim();
       const call_sign = (document.getElementById("v_call").value || "").trim();
 
       if (!name) throw new Error("Vessel name is required.");
 
+      // IMO numeric normalization (optional but recommended)
+      const imo_number = imo_number_raw ? Number(imo_number_raw) : null;
+      if (imo_number_raw && !Number.isFinite(imo_number)) {
+        throw new Error("IMO number must be numeric.");
+      }
+
       setStatus("Adding vessel…");
+
+      // FIX: Edge Function expects top-level fields, not { vessel: {...} }
       const resp = await callSuAdmin({
         action: "upsert_vessel",
-        vessel: {
-          name,
-          hull_number: hull_number || null,
-          imo_number: imo_number || null,
-          call_sign: call_sign || null,
-          is_active: true,
-        },
+        name,
+        is_active: true,
+        hull_number: hull_number || null,
+        imo_number,
+        call_sign: call_sign || null,
       });
 
       showOk(`Vessel saved.\n\nResponse:\n${JSON.stringify(resp, null, 2)}`);
@@ -511,14 +522,16 @@ function rmBuildPositionOptions() {
 
   const opts = [];
   opts.push(`<option value="">(No position / NULL)</option>`);
-  for (const p of (state.rm.positions || [])) {
+  for (const p of state.rm.positions || []) {
     opts.push(`<option value="${esc(p)}">${esc(p)}</option>`);
   }
   sel.innerHTML = opts.join("");
 }
 
 function rmPermissionIdFor(module_id, action) {
-  const p = (state.rm.permissions || []).find((x) => String(x.module_id) === String(module_id) && String(x.action) === String(action));
+  const p = (state.rm.permissions || []).find(
+    (x) => String(x.module_id) === String(module_id) && String(x.action) === String(action)
+  );
   return p ? p.id : null;
 }
 
