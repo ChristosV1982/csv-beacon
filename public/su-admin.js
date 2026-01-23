@@ -1,7 +1,167 @@
 // public/su-admin.js
 const sb = window.AUTH.ensureSupabase();
 
-/* ------------------------ UI helpers ------------------------ */
+/* ======================== Debug Mode ======================== */
+const DEBUG = {
+  key: "SU_ADMIN_DEBUG",
+  enabled: false,
+  maxLines: 250,
+  lines: [],
+};
+
+function dbgInit() {
+  DEBUG.enabled = localStorage.getItem(DEBUG.key) === "1";
+
+  const toggle = document.getElementById("dbgToggle");
+  const wrap = document.getElementById("debugWrap");
+  const pill = document.getElementById("dbgStatePill");
+  const box = document.getElementById("debugBox");
+  const copyBtn = document.getElementById("dbgCopyBtn");
+  const clearBtn = document.getElementById("dbgClearBtn");
+  const collapseBtn = document.getElementById("dbgCollapseBtn");
+
+  function applyUI() {
+    if (toggle) toggle.checked = DEBUG.enabled;
+    if (wrap) wrap.style.display = DEBUG.enabled ? "block" : "none";
+    if (pill) {
+      pill.textContent = DEBUG.enabled ? "ON" : "OFF";
+      pill.classList.toggle("dbgOn", DEBUG.enabled);
+      pill.classList.toggle("dbgOff", !DEBUG.enabled);
+    }
+    dbgRender();
+  }
+
+  if (toggle) {
+    toggle.addEventListener("change", () => {
+      DEBUG.enabled = !!toggle.checked;
+      localStorage.setItem(DEBUG.key, DEBUG.enabled ? "1" : "0");
+      applyUI();
+    });
+  }
+
+  if (copyBtn) {
+    copyBtn.addEventListener("click", async () => {
+      try {
+        const text = dbgGetText();
+        await navigator.clipboard.writeText(text);
+        showOk("Debug log copied to clipboard.");
+      } catch (e) {
+        showWarn("Copy failed. Your browser may block clipboard access.\n\n" + String(e?.message || e));
+      }
+    });
+  }
+
+  if (clearBtn) {
+    clearBtn.addEventListener("click", () => {
+      DEBUG.lines = [];
+      dbgRender();
+      showOk("Debug log cleared.");
+    });
+  }
+
+  if (collapseBtn) {
+    collapseBtn.addEventListener("click", () => {
+      if (wrap) wrap.style.display = "none";
+      if (toggle) toggle.checked = false;
+      DEBUG.enabled = false;
+      localStorage.setItem(DEBUG.key, "0");
+      applyUI();
+    });
+  }
+
+  // Load stored (optional)
+  const stored = localStorage.getItem("SU_ADMIN_DEBUG_LOG");
+  if (stored) {
+    try {
+      const parsed = JSON.parse(stored);
+      if (Array.isArray(parsed)) DEBUG.lines = parsed.slice(0, DEBUG.maxLines);
+    } catch {}
+  }
+
+  applyUI();
+
+  // Expose helper for emergency
+  window.__SU_ADMIN_DEBUG__ = {
+    on() { DEBUG.enabled = true; localStorage.setItem(DEBUG.key, "1"); applyUI(); },
+    off() { DEBUG.enabled = false; localStorage.setItem(DEBUG.key, "0"); applyUI(); },
+    dump() { return dbgGetText(); },
+    clear() { DEBUG.lines = []; dbgRender(); },
+  };
+
+  function dbgPersist() {
+    try {
+      localStorage.setItem("SU_ADMIN_DEBUG_LOG", JSON.stringify(DEBUG.lines.slice(0, DEBUG.maxLines)));
+    } catch {}
+  }
+
+  function dbgRender() {
+    if (!box) return;
+    if (!DEBUG.enabled) return;
+
+    const text = dbgGetText();
+    box.textContent = text || "(no logs yet)";
+    dbgPersist();
+  }
+
+  function dbgGetText() {
+    // newest first
+    const arr = DEBUG.lines.slice(0, DEBUG.maxLines);
+    return arr.join("\n");
+  }
+}
+
+function dbgRedact(obj) {
+  // Deep clone with password redaction
+  const seen = new WeakSet();
+
+  function walk(x) {
+    if (x === null || x === undefined) return x;
+    if (typeof x !== "object") return x;
+    if (seen.has(x)) return "[Circular]";
+    seen.add(x);
+
+    if (Array.isArray(x)) return x.map(walk);
+
+    const out = {};
+    for (const [k, v] of Object.entries(x)) {
+      const lk = k.toLowerCase();
+      if (lk.includes("password")) {
+        out[k] = "***REDACTED***";
+      } else {
+        out[k] = walk(v);
+      }
+    }
+    return out;
+  }
+
+  try {
+    return walk(obj);
+  } catch {
+    return { _redact_error: true };
+  }
+}
+
+function dbgLog(entry) {
+  if (!DEBUG.enabled) return;
+
+  const ts = new Date().toISOString();
+  const line = `[${ts}] ${entry}`;
+  DEBUG.lines.unshift(line);
+  if (DEBUG.lines.length > DEBUG.maxLines) DEBUG.lines.length = DEBUG.maxLines;
+
+  const box = document.getElementById("debugBox");
+  if (box) {
+    box.textContent = DEBUG.lines.join("\n") || "(no logs yet)";
+    // Keep scrolled to top since newest is first
+    box.scrollTop = 0;
+  }
+
+  try {
+    localStorage.setItem("SU_ADMIN_DEBUG_LOG", JSON.stringify(DEBUG.lines.slice(0, DEBUG.maxLines)));
+  } catch {}
+}
+
+/* ======================== UI helpers ======================== */
 function showWarn(msg) {
   const w = document.getElementById("warnBox");
   const ok = document.getElementById("okBox");
@@ -43,12 +203,10 @@ function esc(s) {
     .replaceAll("'", "&#39;");
 }
 function isUUID(x) {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-    String(x || "")
-  );
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(x || ""));
 }
 
-/* ------------------------ Supabase call ------------------------ */
+/* ======================== Supabase call ======================== */
 async function getAccessToken() {
   const { data, error } = await sb.auth.getSession();
   if (error) throw error;
@@ -59,8 +217,10 @@ async function getAccessToken() {
 
 async function callSuAdmin(body) {
   const token = await getAccessToken();
-
   const url = `${window.AUTH.SUPABASE_URL}/functions/v1/su-admin`;
+
+  const safeBody = dbgRedact(body);
+  dbgLog(`REQ ${safeBody?.action || "unknown"}\nbody=${JSON.stringify(safeBody, null, 2)}`);
 
   const res = await fetch(url, {
     method: "POST",
@@ -73,21 +233,26 @@ async function callSuAdmin(body) {
   });
 
   const text = await res.text();
+  dbgLog(`RES ${safeBody?.action || "unknown"}\nstatus=${res.status} ${res.statusText}\nraw=${text || "(empty)"}`);
 
   if (!res.ok) {
     throw new Error(`HTTP ${res.status} ${res.statusText}\n\n${text || "(empty response body)"}`);
   }
 
+  // parse JSON when possible
   try {
     const data = JSON.parse(text || "{}");
-    if (data?.error) throw new Error(typeof data.error === "string" ? data.error : JSON.stringify(data.error));
+    if (data?.error) {
+      dbgLog(`ERR ${safeBody?.action || "unknown"}\n${typeof data.error === "string" ? data.error : JSON.stringify(data.error)}`);
+      throw new Error(typeof data.error === "string" ? data.error : JSON.stringify(data.error));
+    }
     return data;
   } catch {
     return { raw: text };
   }
 }
 
-/* ------------------------ State ------------------------ */
+/* ======================== State ======================== */
 const state = {
   vessels: [],
   users: [],
@@ -104,7 +269,7 @@ const state = {
   },
 };
 
-/* ------------------------ Tabs ------------------------ */
+/* ======================== Tabs ======================== */
 function initTabs() {
   const tabs = document.querySelectorAll(".tab");
   tabs.forEach((btn) => {
@@ -129,7 +294,7 @@ function initTabs() {
   });
 }
 
-/* ------------------------ Render: dropdowns ------------------------ */
+/* ======================== Render: dropdowns ======================== */
 function renderRoleDropdown() {
   const sel = document.getElementById("cu_role");
   if (!sel) return;
@@ -148,7 +313,7 @@ function renderVesselDropdown() {
   sel.innerHTML = opts.join("");
 }
 
-/* ------------------------ Render: users ------------------------ */
+/* ======================== Render: users ======================== */
 function vesselNameById(id) {
   if (!id) return "";
   const v = state.vessels.find((x) => String(x.id) === String(id));
@@ -160,7 +325,6 @@ function renderUsers() {
   if (!tbody) return;
 
   const q = (document.getElementById("u_search")?.value || "").trim().toLowerCase();
-
   const users = Array.isArray(state.users) ? state.users : [];
 
   const filtered = users.filter((u) => {
@@ -185,7 +349,6 @@ function renderUsers() {
       disabled || !active ? `<span class="pill bad">Disabled</span>` : `<span class="pill ok">Active</span>`;
 
     const forceReset = u.force_password_reset ? `<span class="pill bad">Yes</span>` : `<span class="pill ok">No</span>`;
-
     const uid = u.id;
 
     const actionBtns = [];
@@ -241,12 +404,7 @@ function renderUsers() {
           const newPass = prompt("Enter new password for this user:");
           if (!newPass) return;
           const force = confirm("Force password change on next login?");
-          await callSuAdmin({
-            action: "reset_password",
-            user_id: id,
-            new_password: newPass,
-            force_password_reset: force,
-          });
+          await callSuAdmin({ action: "reset_password", user_id: id, new_password: newPass, force_password_reset: force });
           showOk("Password reset completed.");
           await refreshUsers();
         }
@@ -257,7 +415,7 @@ function renderUsers() {
   });
 }
 
-/* ------------------------ Render: vessels ------------------------ */
+/* ======================== Render: vessels ======================== */
 function renderVessels() {
   const tbody = document.getElementById("vesselsBody");
   if (!tbody) return;
@@ -311,15 +469,15 @@ function renderVessels() {
 
         const nextActive = act === "activate";
 
-        // FIX: Edge Function expects top-level fields, not { vessel: {...} }
+        // IMPORTANT: your Edge Function expects top-level fields, not nested "vessel:{...}".
         await callSuAdmin({
           action: "upsert_vessel",
           vessel_id: v.id,
           name: v.name,
-          hull_number: v.hull_number ?? null,
-          imo_number: v.imo_number ?? null,
-          call_sign: v.call_sign ?? null,
           is_active: nextActive,
+          hull_number: v.hull_number ?? null,
+          call_sign: v.call_sign ?? null,
+          imo_number: v.imo_number ?? null,
         });
 
         showOk(nextActive ? "Vessel activated." : "Vessel deactivated.");
@@ -332,7 +490,7 @@ function renderVessels() {
   });
 }
 
-/* ------------------------ Refresh data ------------------------ */
+/* ======================== Refresh data ======================== */
 function normalizeListResponse(resp) {
   if (Array.isArray(resp)) return resp;
   if (Array.isArray(resp?.data)) return resp.data;
@@ -358,7 +516,7 @@ async function refreshVessels() {
   setStatus("Ready");
 }
 
-/* ------------------------ Create user ------------------------ */
+/* ======================== Create user ======================== */
 function initCreateUser() {
   const btn = document.getElementById("cu_createBtn");
   const clearBtn = document.getElementById("cu_clearBtn");
@@ -425,7 +583,7 @@ function initCreateUser() {
   });
 }
 
-/* ------------------------ Vessel create ------------------------ */
+/* ======================== Vessel create ======================== */
 function initAddVessel() {
   const btn = document.getElementById("v_addBtn");
   const clearBtn = document.getElementById("v_clearBtn");
@@ -455,22 +613,20 @@ function initAddVessel() {
 
       if (!name) throw new Error("Vessel name is required.");
 
-      // IMO numeric normalization (optional but recommended)
+      // Your Edge Function expects imo_number as number|null
       const imo_number = imo_number_raw ? Number(imo_number_raw) : null;
-      if (imo_number_raw && !Number.isFinite(imo_number)) {
-        throw new Error("IMO number must be numeric.");
+      if (imo_number_raw && (!Number.isFinite(imo_number) || imo_number <= 0)) {
+        throw new Error("IMO number must be a valid positive number (or blank).");
       }
 
       setStatus("Adding vessel…");
-
-      // FIX: Edge Function expects top-level fields, not { vessel: {...} }
       const resp = await callSuAdmin({
         action: "upsert_vessel",
         name,
         is_active: true,
         hull_number: hull_number || null,
-        imo_number,
         call_sign: call_sign || null,
+        imo_number,
       });
 
       showOk(`Vessel saved.\n\nResponse:\n${JSON.stringify(resp, null, 2)}`);
@@ -485,7 +641,7 @@ function initAddVessel() {
   });
 }
 
-/* ------------------------ Search inputs ------------------------ */
+/* ======================== Search inputs ======================== */
 function initSearch() {
   const u = document.getElementById("u_search");
   if (u) u.addEventListener("input", () => renderUsers());
@@ -494,7 +650,7 @@ function initSearch() {
   if (v) v.addEventListener("input", () => renderVessels());
 }
 
-/* ------------------------ Rights Matrix ------------------------ */
+/* ======================== Rights Matrix ======================== */
 const RM_ACTIONS = ["view", "edit", "admin", "export"];
 const RM_SCOPES = [
   { value: "", label: "No access" },
@@ -522,7 +678,7 @@ function rmBuildPositionOptions() {
 
   const opts = [];
   opts.push(`<option value="">(No position / NULL)</option>`);
-  for (const p of state.rm.positions || []) {
+  for (const p of (state.rm.positions || [])) {
     opts.push(`<option value="${esc(p)}">${esc(p)}</option>`);
   }
   sel.innerHTML = opts.join("");
@@ -564,8 +720,8 @@ function rmRenderTable() {
   if (!tbody) return;
 
   const grantsByPerm = rmGrantsMap(state.rm.grants);
-
   const mods = state.rm.modules || [];
+
   if (!mods.length) {
     tbody.innerHTML = `<tr><td colspan="5" class="muted small" style="padding:14px;">No modules found.</td></tr>`;
     return;
@@ -597,7 +753,6 @@ function rmRenderTable() {
 
       const sel = rmCellSelect(currentScope, permId);
       td.appendChild(sel);
-
       tr.appendChild(td);
     }
 
@@ -616,7 +771,7 @@ async function rmLoadMeta() {
   state.rm.roles = rp.roles || [];
   state.rm.positions = rp.positions || [];
 
-  // Also update create-user role dropdown to reflect DB roles (if provided)
+  // Sync create-user role dropdown with DB roles when provided
   if (state.rm.roles?.length) {
     state.roles = state.rm.roles.slice();
     renderRoleDropdown();
@@ -664,7 +819,6 @@ async function rmSaveGrants() {
     if (!permission_id) return;
 
     if (!scope) {
-      // "No access" — still send a valid scope but is_granted=false
       grants.push({ permission_id, scope: "global", is_granted: false });
     } else {
       grants.push({ permission_id, scope, is_granted: true });
@@ -698,12 +852,13 @@ async function ensureRightsMatrixLoaded() {
   }
 }
 
-/* ------------------------ Init ------------------------ */
+/* ======================== Init ======================== */
 async function init() {
   clearWarn();
   clearOk();
   setStatus("Loading…");
 
+  dbgInit();
   initTabs();
 
   const me = await window.AUTH.requireAuth(["super_admin"], {

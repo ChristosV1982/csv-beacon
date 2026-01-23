@@ -50,6 +50,27 @@
     .rmCellSel { min-width: 170px; }
     .rmSticky { position: sticky; left: 0; background: #fff; z-index: 2; }
     .rmStickyHead { position: sticky; left: 0; z-index: 3; background:#f7faff; }
+
+    /* Debug panel */
+    .debugWrap { display:none; margin-top:12px; }
+    .debugHead { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+    .debugBox {
+      margin-top:10px;
+      background:#0b1220;
+      color:#e6eefc;
+      border-radius:12px;
+      border:1px solid #1f2a44;
+      padding:12px;
+      max-height:360px;
+      overflow:auto;
+      white-space:pre-wrap;
+      font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono","Courier New", monospace;
+      font-size:.88rem;
+      line-height:1.35;
+    }
+    .dbgPill { display:inline-block; padding:4px 10px; border-radius:999px; font-weight:950; font-size:.85rem; }
+    .dbgOn { background:#e9fff0; border:1px solid #b8f0c9; color:#0d4f2a; }
+    .dbgOff { background:#ffeaea; border:1px solid #ffc7c7; color:#8b1d1d; }
   </style>
 </head>
 
@@ -69,13 +90,39 @@
     <div id="okBox" class="ok"></div>
 
     <div class="card">
-      <div class="row">
+      <div class="row" style="align-items:flex-start;">
         <div class="tabs">
           <button class="tab active" type="button" data-tab="users">Users</button>
           <button class="tab" type="button" data-tab="vessels">Vessels</button>
           <button class="tab" type="button" data-tab="rights">Rights Matrix</button>
         </div>
-        <div class="right muted small" id="statusLine">Loading…</div>
+
+        <div class="right" style="display:flex; flex-direction:column; gap:8px; align-items:flex-end;">
+          <div class="muted small" id="statusLine">Loading…</div>
+
+          <!-- Debug Toggle -->
+          <div class="inline" style="gap:10px;">
+            <label class="inline muted small" style="gap:8px; font-weight:900;">
+              <input id="dbgToggle" type="checkbox" />
+              Debug Mode
+            </label>
+            <span id="dbgStatePill" class="dbgPill dbgOff">OFF</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Debug Panel -->
+      <div id="debugWrap" class="debugWrap">
+        <div class="debugHead">
+          <div style="font-weight:950;">Debug Console</div>
+          <div class="muted small">Logs outgoing Edge Function calls + responses (passwords are redacted).</div>
+          <div class="right actions">
+            <button class="btn2 btnSmall" type="button" id="dbgCopyBtn">Copy log</button>
+            <button class="btn2 btnSmall" type="button" id="dbgClearBtn">Clear</button>
+            <button class="btn btnSmall" type="button" id="dbgCollapseBtn">Collapse</button>
+          </div>
+        </div>
+        <div id="debugBox" class="debugBox">(no logs yet)</div>
       </div>
     </div>
 
