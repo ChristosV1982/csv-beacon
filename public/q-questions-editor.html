@@ -21,7 +21,14 @@
     .title{font-weight:950;color:#1a4170;font-size:1.05rem;}
     .muted{color:#4d6283;font-weight:650;margin-top:6px;line-height:1.35;}
     .warn{display:none;margin-top:12px;color:#8b1d1d;background:#ffeaea;border:1px solid #ffc7c7;padding:10px 12px;border-radius:12px;font-weight:800;white-space:pre-wrap;}
+    .ok{display:none;margin-top:12px;color:#124d2a;background:#eafff0;border:1px solid #bff1cf;padding:10px 12px;border-radius:12px;font-weight:800;white-space:pre-wrap;}
     .grid{display:grid;grid-template-columns:1fr;gap:12px;margin-top:14px;}
+    .row2{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:12px;}
+    input{border:1px solid #c9d9f3;border-radius:10px;padding:10px 12px;font-weight:700;min-width:220px;}
+    .mono{font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;}
+    table{width:100%;border-collapse:collapse;margin-top:10px;}
+    td,th{border-bottom:1px solid #e6eefb;padding:8px 10px;text-align:left;font-weight:700;}
+    th{color:#1a4170;background:#f3f7ff;}
   </style>
 </head>
 
@@ -42,15 +49,40 @@
     </div>
 
     <div id="warnBox" class="warn"></div>
+    <div id="okBox" class="ok"></div>
 
     <div class="grid">
       <div class="card">
-        <div class="title">Questions Editor</div>
+        <div class="title">Module Gate</div>
         <div class="muted" id="modeLine">Loading…</div>
-        <div class="muted" style="margin-top:10px;">
-          This page is currently a scaffold. Next step: we connect it to your questions source table(s) and implement:
-          search/filter, open question, edit fields, save, and audit logging.
+      </div>
+
+      <div class="card">
+        <div class="title">Safe Import (Lossless)</div>
+        <div class="muted">
+          This importer reads your existing JSON file and inserts into <span class="mono">public.questions_master</span>
+          while preserving the full original object in <span class="mono">payload</span>.
+          <br><br>
+          Safety rules:
+          <ul>
+            <li>Import is allowed only for <span class="mono">super_admin</span>.</li>
+            <li>Import is blocked if <span class="mono">questions_master</span> already has rows.</li>
+            <li>Dry-run validates first (no inserts).</li>
+            <li>Commit runs in small batches.</li>
+          </ul>
         </div>
+
+        <div class="row2">
+          <label class="muted" style="margin:0;">Version tag to store in DB (required):</label>
+          <input id="versionTag" value="SIRE_2.0_QL" />
+        </div>
+
+        <div class="row2">
+          <button class="btn2" id="dryRunBtn" type="button">Dry Run (validate only)</button>
+          <button class="btn" id="commitBtn" type="button" disabled>Commit Import</button>
+        </div>
+
+        <div id="reportArea" class="muted" style="margin-top:12px;"></div>
       </div>
     </div>
   </div>
@@ -60,6 +92,76 @@
       const w=document.getElementById("warnBox");
       w.textContent=msg||"";
       w.style.display=msg?"block":"none";
+      document.getElementById("okBox").style.display="none";
+    }
+    function showOk(msg){
+      const o=document.getElementById("okBox");
+      o.textContent=msg||"";
+      o.style.display=msg?"block":"none";
+      document.getElementById("warnBox").style.display="none";
+    }
+    function setReport(html){
+      document.getElementById("reportArea").innerHTML = html || "";
+    }
+
+    async function loadQuestionsJson(){
+      const res = await fetch("./sire_questions_all_columns_named.json", { cache: "no-store" });
+      if (!res.ok) throw new Error("Cannot load sire_questions_all_columns_named.json (" + res.status + ")");
+      const data = await res.json();
+      if (!Array.isArray(data)) throw new Error("JSON root is not an array.");
+      return data;
+    }
+
+    function normalizeRow(obj, versionTag){
+      const no = (obj && (obj["No."] ?? obj["No"] ?? obj["number_full"] ?? obj["number"])) || "";
+      if (!no || typeof no !== "string") return { error: "Missing/invalid No." };
+
+      // Your dataset appears to have no suffix letters; keep suffix empty.
+      const number_base = no.trim();
+      const number_suffix = ""; // required NOT NULL
+      const number_full = number_base;
+
+      return {
+        row: {
+          id: crypto.randomUUID(),
+          number_base,
+          number_suffix,
+          number_full,
+          source_type: "SIRE",
+          status: "active",
+          version: String(versionTag || "SIRE_2.0_QL"),
+          change_reason: null,
+          created_by: null,
+          updated_by: null,
+          tags: null,
+          notes_internal: null,
+          spare_1: null,
+          spare_2: null,
+          spare_3: null,
+          payload: obj,       // lossless
+          is_custom: false
+        }
+      };
+    }
+
+    async function getCounts(sb){
+      const { count, error } = await sb
+        .from("questions_master")
+        .select("*", { count: "exact", head: true });
+      if (error) throw error;
+      return { questions_master: count ?? 0 };
+    }
+
+    async function insertBatches(sb, rows, batchSize){
+      let inserted = 0;
+      for (let i=0; i<rows.length; i+=batchSize){
+        const batch = rows.slice(i, i+batchSize);
+        const { error } = await sb.from("questions_master").insert(batch);
+        if (error) throw error;
+        inserted += batch.length;
+        setReport(`Inserted ${inserted} / ${rows.length}…`);
+      }
+      return inserted;
     }
 
     (async () => {
@@ -70,18 +172,12 @@
         switchBtnId: "switchUserBtn"
       });
 
-      // Must be logged in
       if (!bundle?.session?.user) {
         showWarn("You are logged out. Please Login.");
         document.getElementById("modeLine").textContent = "Access denied (not logged in).";
         return;
       }
 
-      // Role gate based on the permissions you seeded:
-      // super_admin: all true
-      // company_admin: view/edit true
-      // company_superintendent: view true
-      // vessel: all false
       const role = bundle.profile?.role;
       const R = AUTH.ROLES;
 
@@ -89,19 +185,129 @@
       const isCompanyAdmin = role === R.COMPANY_ADMIN;
       const isCompanySup = role === R.COMPANY_SUPERINTENDENT;
 
+      // Gate page access (view/edit permissions you seeded)
       if (!(isSuper || isCompanyAdmin || isCompanySup)) {
         showWarn("You do not have permission to access Questions Editor.");
         document.getElementById("modeLine").textContent = `Access denied for role: ${role || "(unknown)"}`;
         return;
       }
 
-      // Display mode hint (based on your DB seed)
+      // Display mode hint
       let mode = "View";
       if (isSuper || isCompanyAdmin) mode = "Edit";
       if (isSuper) mode = "Admin";
-
       document.getElementById("modeLine").textContent =
         `Role: ${role} • Mode: ${mode} • Module: QUESTIONS_EDITOR`;
+
+      // Import buttons: super_admin only
+      const dryBtn = document.getElementById("dryRunBtn");
+      const commitBtn = document.getElementById("commitBtn");
+
+      if (!isSuper) {
+        dryBtn.disabled = true;
+        commitBtn.disabled = true;
+        setReport(`<div class="muted">Import is restricted to <span class="mono">super_admin</span>.</div>`);
+        return;
+      }
+
+      let preparedRows = null;
+
+      dryBtn.addEventListener("click", async () => {
+        try{
+          showWarn("");
+          setReport("Running dry-run…");
+
+          const sb = window.AUTH.ensureSupabase();
+          const counts = await getCounts(sb);
+          if (counts.questions_master > 0) {
+            throw new Error("Import blocked: questions_master already has rows (" + counts.questions_master + ").");
+          }
+
+          const versionTag = document.getElementById("versionTag").value.trim();
+          if (!versionTag) throw new Error("Version tag is required.");
+
+          const data = await loadQuestionsJson();
+
+          const seen = new Set();
+          const rows = [];
+          const errors = [];
+
+          for (let idx=0; idx<data.length; idx++){
+            const obj = data[idx];
+            const norm = normalizeRow(obj, versionTag);
+            if (norm.error) {
+              errors.push({ idx, error: norm.error });
+              continue;
+            }
+            const no = norm.row.number_base;
+            if (seen.has(no)) {
+              errors.push({ idx, error: "Duplicate No.: " + no });
+              continue;
+            }
+            seen.add(no);
+            rows.push(norm.row);
+          }
+
+          if (errors.length) {
+            commitBtn.disabled = true;
+            preparedRows = null;
+            setReport(
+              `<div class="mono">Dry-run failed.</div>
+               <div class="muted">Errors: ${errors.length}</div>
+               <pre class="mono" style="white-space:pre-wrap;">${errors.slice(0,25).map(e=>`#${e.idx}: ${e.error}`).join("\n")}${errors.length>25 ? "\n… (more)" : ""}</pre>`
+            );
+            return;
+          }
+
+          preparedRows = rows;
+          commitBtn.disabled = false;
+
+          showOk("Dry-run OK. Ready to import.");
+          setReport(
+            `<table>
+              <tr><th>Check</th><th>Result</th></tr>
+              <tr><td>questions_master current rows</td><td class="mono">0</td></tr>
+              <tr><td>JSON rows</td><td class="mono">${data.length}</td></tr>
+              <tr><td>Prepared inserts</td><td class="mono">${rows.length}</td></tr>
+              <tr><td>Version tag</td><td class="mono">${versionTag}</td></tr>
+              <tr><td>source_type / status / suffix</td><td class="mono">SIRE / active / ''</td></tr>
+            </table>`
+          );
+        } catch(e){
+          showWarn(String(e?.message || e));
+          commitBtn.disabled = true;
+          preparedRows = null;
+        }
+      });
+
+      commitBtn.addEventListener("click", async () => {
+        try{
+          showWarn("");
+          if (!preparedRows || !preparedRows.length) throw new Error("Run Dry Run first.");
+
+          const sb = window.AUTH.ensureSupabase();
+
+          // Hard safety check again
+          const counts = await getCounts(sb);
+          if (counts.questions_master > 0) {
+            throw new Error("Import blocked: questions_master now has rows (" + counts.questions_master + ").");
+          }
+
+          commitBtn.disabled = true;
+          dryBtn.disabled = true;
+
+          setReport("Import started…");
+          const inserted = await insertBatches(sb, preparedRows, 50);
+
+          showOk("Import completed successfully.");
+          setReport(`<div class="mono">Inserted ${inserted} rows into public.questions_master.</div>`);
+        } catch(e){
+          showWarn(String(e?.message || e));
+          commitBtn.disabled = false;
+          dryBtn.disabled = false;
+        }
+      });
+
     })().catch(e => showWarn(String(e?.message || e)));
   </script>
 </body>
