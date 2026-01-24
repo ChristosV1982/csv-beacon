@@ -1,0 +1,108 @@
+<!-- public/q-questions-editor.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SIRE 2.0 – Questions Editor</title>
+
+  <link rel="stylesheet" href="./style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="./auth.js"></script>
+
+  <style>
+    body{margin:0;font-family:"Segoe UI",Arial,sans-serif;background:#f5f7fb;color:#14223a;}
+    .topbar{background:#1a4170;color:#fff;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;}
+    .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+    .wrap{padding:18px;max-width:1200px;margin:0 auto;}
+    .btn{background:#295eb0;color:#fff;border:none;border-radius:10px;padding:10px 14px;font-weight:900;cursor:pointer;}
+    .btn2{background:#eaf1fb;color:#1a4170;border:1px solid #c9d9f3;border-radius:10px;padding:10px 14px;font-weight:900;cursor:pointer;}
+    .card{background:#fff;border:1px solid #dbe6f6;border-radius:14px;padding:14px;box-shadow:0 10px 30px rgba(12,24,48,0.06);}
+    .title{font-weight:950;color:#1a4170;font-size:1.05rem;}
+    .muted{color:#4d6283;font-weight:650;margin-top:6px;line-height:1.35;}
+    .warn{display:none;margin-top:12px;color:#8b1d1d;background:#ffeaea;border:1px solid #ffc7c7;padding:10px 12px;border-radius:12px;font-weight:800;white-space:pre-wrap;}
+    .grid{display:grid;grid-template-columns:1fr;gap:12px;margin-top:14px;}
+  </style>
+</head>
+
+<body>
+  <div class="topbar">
+    <div style="font-weight:950;">SIRE 2.0 – Questions Editor</div>
+    <div class="row">
+      <div id="userBadge" style="font-weight:800;opacity:.95;"></div>
+      <button class="btn2" id="loginBtn" type="button" style="display:none;">Login</button>
+      <button class="btn2" id="switchUserBtn" type="button">Switch User</button>
+      <button class="btn" id="logoutBtn" type="button" style="display:none;">Logout</button>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <div style="margin-bottom:10px;">
+      <button class="btn2" type="button" onclick="location.href='./q-dashboard.html'">← Back to Dashboard</button>
+    </div>
+
+    <div id="warnBox" class="warn"></div>
+
+    <div class="grid">
+      <div class="card">
+        <div class="title">Questions Editor</div>
+        <div class="muted" id="modeLine">Loading…</div>
+        <div class="muted" style="margin-top:10px;">
+          This page is currently a scaffold. Next step: we connect it to your questions source table(s) and implement:
+          search/filter, open question, edit fields, save, and audit logging.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function showWarn(msg){
+      const w=document.getElementById("warnBox");
+      w.textContent=msg||"";
+      w.style.display=msg?"block":"none";
+    }
+
+    (async () => {
+      const bundle = await AUTH.setupAuthButtons({
+        badgeId: "userBadge",
+        loginBtnId: "loginBtn",
+        logoutBtnId: "logoutBtn",
+        switchBtnId: "switchUserBtn"
+      });
+
+      // Must be logged in
+      if (!bundle?.session?.user) {
+        showWarn("You are logged out. Please Login.");
+        document.getElementById("modeLine").textContent = "Access denied (not logged in).";
+        return;
+      }
+
+      // Role gate based on the permissions you seeded:
+      // super_admin: all true
+      // company_admin: view/edit true
+      // company_superintendent: view true
+      // vessel: all false
+      const role = bundle.profile?.role;
+      const R = AUTH.ROLES;
+
+      const isSuper = role === R.SUPER_ADMIN;
+      const isCompanyAdmin = role === R.COMPANY_ADMIN;
+      const isCompanySup = role === R.COMPANY_SUPERINTENDENT;
+
+      if (!(isSuper || isCompanyAdmin || isCompanySup)) {
+        showWarn("You do not have permission to access Questions Editor.");
+        document.getElementById("modeLine").textContent = `Access denied for role: ${role || "(unknown)"}`;
+        return;
+      }
+
+      // Display mode hint (based on your DB seed)
+      let mode = "View";
+      if (isSuper || isCompanyAdmin) mode = "Edit";
+      if (isSuper) mode = "Admin";
+
+      document.getElementById("modeLine").textContent =
+        `Role: ${role} • Mode: ${mode} • Module: QUESTIONS_EDITOR`;
+    })().catch(e => showWarn(String(e?.message || e)));
+  </script>
+</body>
+</html>

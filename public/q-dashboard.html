@@ -123,6 +123,15 @@
         </div>
       </div>
 
+      <!-- Questions Editor (role-based) -->
+      <div class="card" data-card="qeditor">
+        <div class="title">Questions Editor</div>
+        <div class="muted">Edit or review the question library (as permitted by your role).</div>
+        <div style="margin-top:12px;">
+          <button class="btn2" type="button" onclick="location.href='./q-questions-editor.html'">Open</button>
+        </div>
+      </div>
+
       <!-- Super Admin only -->
       <div class="card" data-card="suadmin">
         <div class="title">Superuser Administration</div>
@@ -176,15 +185,18 @@
       }
 
       // Defaults (start hidden)
-      ["company","assignments","post","poststats","reports","inspector","suadmin"].forEach(k => setVisible(k,false));
+      ["company","assignments","post","poststats","reports","inspector","qeditor","suadmin"].forEach(k => setVisible(k,false));
       // Always visible when logged-in:
       setVisible("library", true);
       setVisible("compare", true);
       setVisible("tasks", true);
       setVisible("vessel", true);
 
+      // Questions Editor visibility (matches your seeded permissions)
+      setVisible("qeditor", (isSuper || isCompanyAdmin || isCompanySup));
+
       if (isSuper) {
-        ["company","assignments","post","poststats","reports","inspector","suadmin"].forEach(k => setVisible(k,true));
+        ["company","assignments","post","poststats","reports","inspector","qeditor","suadmin"].forEach(k => setVisible(k,true));
         return;
       }
 
@@ -195,12 +207,13 @@
         setVisible("poststats", false);
         setVisible("reports", false);
         setVisible("inspector", false);
+        setVisible("qeditor", false);
         setVisible("suadmin", false);
         return;
       }
 
       if (isCompanyAdmin) {
-        ["company","assignments","post","poststats","reports","inspector"].forEach(k => setVisible(k,true));
+        ["company","assignments","post","poststats","reports","inspector","qeditor"].forEach(k => setVisible(k,true));
         setVisible("suadmin", false);
         return;
       }
@@ -212,6 +225,7 @@
         setVisible("poststats", true);
         setVisible("reports", true);
         setVisible("inspector", true);
+        setVisible("qeditor", true);
         return;
       }
 
@@ -219,6 +233,7 @@
         setVisible("tasks", false);
         setVisible("vessel", false);
         setVisible("inspector", true);
+        setVisible("qeditor", false);
         return;
       }
     })().catch(e => showWarn(String(e?.message || e)));
