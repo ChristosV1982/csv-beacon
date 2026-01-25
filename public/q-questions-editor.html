@@ -52,6 +52,9 @@
     .pill { display:inline-block; padding:4px 10px; border-radius:999px; background:#eaf1fb; border:1px solid #c9d9f3; color:#1a4170; font-weight:700; font-size:0.85em; }
   </style>
 
+  <!-- IMPORTANT: app-config must load BEFORE auth.js so AUTH can read APP_CONFIG -->
+  <script src="app-config.js"></script>
+
   <!-- Supabase v2 -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
@@ -257,6 +260,8 @@
   </div>
 
   <script>
+    // If app-config.js was not loaded or AUTH is missing, this will fail.
+    // With the corrected <head> ordering, it should succeed.
     const sb = window.AUTH.ensureSupabase();
 
     function showWarn(msg) {
@@ -311,7 +316,7 @@
 
     async function fetchJsonFile(filename){
       const res = await fetch(`./${filename}`, { cache: "no-store" });
-      if(!res.ok) throw new Error(\`Failed to fetch \${filename}: \${res.status} \${res.statusText}\`);
+      if(!res.ok) throw new Error(`Failed to fetch ${filename}: ${res.status} ${res.statusText}`);
       return await res.json();
     }
     function ensureArray(data){
@@ -332,7 +337,7 @@
       const raw = await fetchJsonFile(filename);
       const arr = ensureArray(raw);
 
-      setProgress(\`Dry run: validating \${arr.length} items…\`);
+      setProgress(`Dry run: validating ${arr.length} items…`);
       const errors = [];
       let okCount = 0;
       const MAX_ERR = 25;
@@ -340,7 +345,7 @@
       for(let i=0;i<arr.length;i++){
         const r = normalizeRow(arr[i], versionTag);
         if(!r.ok){
-          if(errors.length < MAX_ERR) errors.push(\`Index \${i}: \${r.error}\`);
+          if(errors.length < MAX_ERR) errors.push(`Index ${i}: ${r.error}`);
         } else {
           okCount++;
         }
@@ -352,14 +357,14 @@
       setProgress("Checking questions_master row count…");
       const existing = await getQuestionsMasterCount();
       if(existing > 0){
-        throw new Error(\`Import blocked: questions_master already has \${existing} rows. (Safety rule)\`);
+        throw new Error(`Import blocked: questions_master already has ${existing} rows. (Safety rule)`);
       }
 
       setProgress("Loading JSON…");
       const raw = await fetchJsonFile(filename);
       const arr = ensureArray(raw);
 
-      setProgress(\`Normalizing \${arr.length} items…\`);
+      setProgress(`Normalizing ${arr.length} items…`);
       const rows = [];
       const errors = [];
       const MAX_ERR = 25;
@@ -367,7 +372,7 @@
       for(let i=0;i<arr.length;i++){
         const r = normalizeRow(arr[i], versionTag);
         if(!r.ok){
-          if(errors.length < MAX_ERR) errors.push(\`Index \${i}: \${r.error}\`);
+          if(errors.length < MAX_ERR) errors.push(`Index ${i}: ${r.error}`);
           continue;
         }
         rows.push(r.row);
@@ -375,9 +380,9 @@
 
       if(errors.length){
         throw new Error(
-          "Validation failed.\\n\\n" +
-          errors.join("\\n") +
-          (arr.length > errors.length ? \`\\n\\n(Showing first \${MAX_ERR} errors.)\` : "")
+          "Validation failed.\n\n" +
+          errors.join("\n") +
+          (arr.length > errors.length ? `\n\n(Showing first ${MAX_ERR} errors.)` : "")
         );
       }
 
@@ -386,7 +391,7 @@
 
       let inserted = 0;
       for(let b=0;b<batches.length;b++){
-        setProgress(\`Committing: batch \${b+1}/\${batches.length} (\${inserted}/\${rows.length} inserted)…\`);
+        setProgress(`Committing: batch ${b+1}/${batches.length} (${inserted}/${rows.length} inserted)…`);
         const { error } = await sb.from("questions_master").insert(batches[b]);
         if(error) throw error;
         inserted += batches[b].length;
@@ -520,7 +525,7 @@
         return;
       }
 
-      // 2) Apply the common field editors back to payload (so user can edit either way)
+      // 2) Apply the common field editors back to payload
       payloadObj["Short Text"] = document.getElementById("pShortText").value;
       payloadObj["Question"] = document.getElementById("pQuestion").value;
       payloadObj["Inspection Guidance"] = document.getElementById("pGuidance").value;
@@ -580,14 +585,11 @@
           .select("id, number_full, number_base, number_suffix, status, version, tags, payload")
           .eq("source_type", "SIRE");
 
-        // server-side filters when provided
         if(statusFilter) q = q.eq("status", statusFilter);
         if(versionFilter) q = q.eq("version", versionFilter);
 
-        // order for stable list
         q = q.order("number_base", { ascending:true }).order("number_suffix", { ascending:true });
 
-        // pagination (safe)
         const pageSize = 1000;
         let from = 0;
         let out = [];
@@ -650,15 +652,11 @@
       document.getElementById("modeLine").textContent =
         `Role: ${role} • Mode: ${mode} • Module: QUESTIONS_EDITOR`;
 
-      // Show editor UI for all allowed roles
       document.getElementById("editorCard").style.display = "block";
-
-      // Import card only for super_admin (keeps your safety behavior)
       if(isSuper){
         document.getElementById("importCard").style.display = "block";
       }
 
-      // wire buttons
       document.getElementById("reloadBtn").onclick = loadQuestionsFromDb;
       document.getElementById("searchInput").oninput = applyLocalFilters;
       document.getElementById("statusFilter").onchange = () => { selected=null; loadQuestionsFromDb(); };
@@ -667,7 +665,6 @@
       document.getElementById("btnReset").onclick = resetSelected;
       document.getElementById("btnSave").onclick = saveSelected;
 
-      // If non-edit role, disable save controls
       const canSave = (isSuper || isCompanyAdmin);
       if(!canSave){
         document.getElementById("btnSave").disabled = true;
@@ -677,7 +674,6 @@
         document.getElementById("saveStatus").textContent = "Read-only access for your role.";
       }
 
-      // Import wiring if visible
       if(isSuper){
         const filename = "sire_questions_all_columns_named.json";
         document.getElementById("srcFile").textContent = filename;
@@ -738,7 +734,6 @@
             showOk(`Import completed.\nInserted: ${res.inserted} rows (from ${res.total} JSON items).`);
             setResult(`Inserted ${res.inserted} rows.`);
 
-            // refresh editor list after import
             await loadQuestionsFromDb();
 
           }catch(e){
@@ -750,7 +745,6 @@
         });
       }
 
-      // initial load
       await loadQuestionsFromDb();
 
     })().catch(e => showWarn(String(e?.message || e)));
