@@ -3,236 +3,323 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>SIRE 2.0 – Questions Editor</title>
-
-  <link rel="stylesheet" href="./style.css" />
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="./auth.js"></script>
-
+  <link rel="stylesheet" href="style.css" />
   <style>
-    body{margin:0;font-family:"Segoe UI",Arial,sans-serif;background:#f5f7fb;color:#14223a;}
-    .topbar{background:#1a4170;color:#fff;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;}
-    .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
-    .wrap{padding:18px;max-width:1100px;margin:0 auto;}
-    .btn{background:#295eb0;color:#fff;border:none;border-radius:10px;padding:10px 14px;font-weight:900;cursor:pointer;}
-    .btn:disabled{opacity:.5;cursor:not-allowed;}
-    .btn2{background:#eaf1fb;color:#1a4170;border:1px solid #c9d9f3;border-radius:10px;padding:10px 14px;font-weight:900;cursor:pointer;}
-    .card{background:#fff;border:1px solid #dbe6f6;border-radius:14px;padding:14px;box-shadow:0 10px 30px rgba(12,24,48,0.06);}
-    .title{font-weight:950;color:#1a4170;font-size:1.05rem;}
-    .muted{color:#4d6283;font-weight:650;margin-top:6px;line-height:1.35;}
-    .warn{display:none;margin-top:12px;color:#8b1d1d;background:#ffeaea;border:1px solid #ffc7c7;padding:10px 12px;border-radius:12px;font-weight:800;white-space:pre-wrap;}
-    .ok{display:none;margin-top:12px;color:#0e4a2a;background:#eafff0;border:1px solid #bfead0;padding:10px 12px;border-radius:12px;font-weight:800;white-space:pre-wrap;}
-    .grid{display:grid;grid-template-columns:1fr;gap:12px;margin-top:14px;}
-    .hr{height:1px;background:#e7eefb;margin:14px 0;}
-    .pill{display:inline-block;padding:4px 10px;border-radius:999px;font-weight:900;font-size:.85rem;border:1px solid #c9d9f3;background:#eaf1fb;color:#1a4170;}
-    label{font-weight:900;color:#1a4170;font-size:.92rem;}
-    input[type="text"]{padding:10px 12px;border-radius:10px;border:1px solid #c9d9f3;min-width:220px;font-weight:800;color:#14223a;background:#fff;}
-    .mono{font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;}
-    ul{margin:10px 0 0 20px;}
-    li{margin:6px 0;}
-    .small{font-size:.92rem;}
-    .row2{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:10px;}
-    .progress{margin-top:10px;color:#1a4170;font-weight:900;}
+    .page { max-width: 1200px; margin: 0 auto; padding: 20px 18px 60px 18px; }
+    .topbar { display:flex; justify-content:space-between; align-items:center; gap:14px; padding: 10px 18px; background:#1a4170; color:#fff; }
+    .topbar .right { display:flex; gap:10px; align-items:center; }
+    .btn { border:none; padding:8px 14px; border-radius:10px; cursor:pointer; font-weight:600; }
+    .btn.primary { background:#295eb0; color:#fff; }
+    .btn.light { background:#eaf1fb; color:#1a4170; border:1px solid #c9d9f3; }
+    .btn.danger { background:#b02a2a; color:#fff; }
+    .badge { opacity:0.95; font-weight:600; }
+    .card { background:#fff; border:1px solid #d7e3f4; border-radius:14px; box-shadow:0 2px 14px rgba(30,70,130,0.08); padding:16px 16px; margin: 14px 0; }
+    .card h2 { margin:0 0 12px 0; font-size: 1.15em; color:#173a6a; }
+    .muted { color:#6b7b90; }
+    .warn { background:#fde8e8; border:1px solid #f4bcbc; color:#8a1f1f; padding:12px 14px; border-radius:12px; white-space:pre-wrap; display:none; }
+    .ok { background:#e9fbef; border:1px solid #bfe7ca; color:#1f6d32; padding:12px 14px; border-radius:12px; white-space:pre-wrap; display:none; }
+    .row { display:flex; gap:14px; flex-wrap:wrap; align-items:center; }
+    .field { display:flex; flex-direction:column; gap:6px; min-width:240px; }
+    .field label { font-weight:700; color:#1a3261; font-size:0.93em; }
+    .field input, .field select, .field textarea {
+      font-size: 1em; padding:10px 10px; border-radius:10px; border:1px solid #c9d6ee;
+      outline:none;
+    }
+    .field textarea { min-height: 90px; resize: vertical; }
+    .hr { height:1px; background:#e3edf9; margin:14px 0; }
+
+    /* Editor layout */
+    .editorGrid { display:flex; gap:14px; }
+    .leftPane {
+      width: 360px; min-width: 280px; max-width: 520px;
+      border:1px solid #d7e3f4; border-radius:14px; overflow:hidden; background:#f7fbff;
+      display:flex; flex-direction:column;
+    }
+    .leftTop { padding:12px; background:#eef5ff; border-bottom:1px solid #d7e3f4; }
+    .list { overflow:auto; max-height: calc(100vh - 310px); background:#fff; }
+    .qitem { padding:10px 12px; border-bottom:1px solid #edf2fb; cursor:pointer; }
+    .qitem:hover { background:#f3f8ff; }
+    .qitem.active { background:#dfeeff; }
+    .qno { font-weight:800; color:#0f2f5e; }
+    .qsub { color:#4b5f7b; font-size:0.92em; margin-top:3px; }
+
+    .rightPane { flex:1; min-width: 0; border:1px solid #d7e3f4; border-radius:14px; background:#fff; padding:14px; }
+    .kv { display:grid; grid-template-columns: 180px 1fr; gap:8px 12px; align-items:center; }
+    .kv .k { color:#1a3261; font-weight:800; font-size:0.93em; }
+    .kv .v { color:#21324b; font-size:0.95em; word-break:break-word; }
+    .pill { display:inline-block; padding:4px 10px; border-radius:999px; background:#eaf1fb; border:1px solid #c9d9f3; color:#1a4170; font-weight:700; font-size:0.85em; }
   </style>
+
+  <!-- Supabase v2 -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <!-- Your auth helper -->
+  <script src="auth.js"></script>
 </head>
 
-<body>
+<body style="margin:0; background:#f5f8fd;">
   <div class="topbar">
-    <div style="font-weight:950;">SIRE 2.0 – Questions Editor</div>
-    <div class="row">
-      <div id="userBadge" style="font-weight:800;opacity:.95;"></div>
-      <button class="btn2" id="loginBtn" type="button" style="display:none;">Login</button>
-      <button class="btn2" id="switchUserBtn" type="button">Switch User</button>
-      <button class="btn" id="logoutBtn" type="button" style="display:none;">Logout</button>
+    <div><b>SIRE 2.0 – Questions Editor</b></div>
+    <div class="right">
+      <span id="userBadge" class="badge">—</span>
+      <button id="switchUserBtn" class="btn light">Switch User</button>
+      <button id="loginBtn" class="btn light">Login</button>
+      <button id="logoutBtn" class="btn primary">Logout</button>
     </div>
   </div>
 
-  <div class="wrap">
-    <div style="margin-bottom:10px;">
-      <button class="btn2" type="button" onclick="location.href='./q-dashboard.html'">← Back to Dashboard</button>
+  <div class="page">
+    <div class="row" style="justify-content:space-between;">
+      <button class="btn light" onclick="location.href='./q-dashboard.html'">← Back to Dashboard</button>
+      <div class="pill" id="modeLine">Checking access…</div>
     </div>
 
-    <div id="warnBox" class="warn"></div>
-    <div id="okBox" class="ok"></div>
+    <div id="warnBox" class="warn" style="margin-top:12px;"></div>
+    <div id="okBox" class="ok" style="margin-top:12px;"></div>
 
-    <div class="grid">
-      <div class="card">
-        <div class="title">Module Gate</div>
-        <div class="muted" id="modeLine">Loading…</div>
+    <!-- Import Card (kept exactly in spirit; still blocked when rows exist) -->
+    <div class="card" id="importCard" style="display:none;">
+      <h2>Safe Import (Lossless)</h2>
+      <div class="muted">
+        This importer reads your existing JSON file in <b>/public</b> and inserts into <b>public.questions_master</b>
+        while preserving the full original object in <b>payload</b>.
       </div>
+      <div class="hr"></div>
 
-      <div class="card" id="importCard" style="display:none;">
-        <div class="title">Safe Import (Lossless)</div>
-        <div class="muted small">
-          This importer reads your existing JSON file in <span class="mono">/public</span> and inserts into
-          <span class="mono">public.questions_master</span> while preserving the full original object in
-          <span class="mono">payload</span>.
+      <div class="row">
+        <div class="field">
+          <label>Version tag to store in DB (required)</label>
+          <input id="versionTag" value="SIRE_2.0_QL" />
         </div>
-
-        <div class="hr"></div>
-
-        <div class="muted"><span class="pill">Safety rules</span></div>
-        <ul class="muted small">
-          <li>Import is allowed only for <span class="mono">super_admin</span>.</li>
-          <li>Import is blocked if <span class="mono">questions_master</span> already has rows.</li>
-          <li>Dry-run validates first (no inserts).</li>
-          <li>Commit runs in small batches.</li>
-          <li><b>Critical:</b> we do <b>not</b> send <span class="mono">number_full</span> to the database (it is generated by DB).</li>
-          <li><b>Critical:</b> for <span class="mono">source_type='SIRE'</span>, we store <span class="mono">number_base</span> as <span class="mono">NN.NN.NN</span> (e.g. <span class="mono">02.01.01</span>), matching your DB check constraint.</li>
-        </ul>
-
-        <div class="hr"></div>
-
-        <div class="row2">
-          <div>
-            <label for="versionTag">Version tag to store in DB (required):</label><br />
-            <input id="versionTag" type="text" class="mono" value="SIRE_2.0_QL" />
+        <div style="flex:1"></div>
+        <div class="field" style="min-width:auto;">
+          <label>&nbsp;</label>
+          <div class="row">
+            <button class="btn light" id="dryRunBtn">Dry Run (validate only)</button>
+            <button class="btn primary" id="commitBtn">Commit Import</button>
           </div>
         </div>
+      </div>
 
-        <div class="row2">
-          <button class="btn2" id="dryRunBtn" type="button">Dry Run (validate only)</button>
-          <button class="btn" id="commitBtn" type="button">Commit Import</button>
-          <span class="muted small">Source JSON: <span class="mono" id="srcFile">sire_questions_all_columns_named.json</span></span>
+      <div class="muted" style="margin-top:10px;">
+        Source JSON: <b id="srcFile"></b>
+      </div>
+      <div class="muted" id="progressLine" style="margin-top:8px;"></div>
+      <div id="resultBox" class="muted" style="margin-top:10px; white-space:pre-wrap;"></div>
+    </div>
+
+    <!-- NEW: Browser + Editor UI -->
+    <div class="card" id="editorCard" style="display:none;">
+      <h2>Questions Browser & Editor (DB)</h2>
+      <div class="muted">
+        This loads questions from <b>public.questions_master</b> (the rows you already imported) and lets you view/edit.
+      </div>
+
+      <div class="hr"></div>
+
+      <div class="row">
+        <button class="btn primary" id="reloadBtn">Load / Refresh Questions</button>
+
+        <div class="field" style="min-width:320px; flex:1;">
+          <label>Search (number / short text / question)</label>
+          <input id="searchInput" placeholder="Type to filter…" />
         </div>
 
-        <div class="progress" id="progressLine" style="display:none;"></div>
-        <div class="muted small" id="resultLine" style="margin-top:8px;"></div>
+        <div class="field" style="min-width:220px;">
+          <label>Status filter</label>
+          <select id="statusFilter">
+            <option value="">(all)</option>
+            <option value="active" selected>active</option>
+            <option value="inactive">inactive</option>
+          </select>
+        </div>
+
+        <div class="field" style="min-width:260px;">
+          <label>Version filter</label>
+          <input id="versionFilter" placeholder="e.g. SIRE_2.0_QL (blank = all)" />
+        </div>
+      </div>
+
+      <div class="hr"></div>
+
+      <div class="editorGrid">
+        <!-- Left list -->
+        <div class="leftPane">
+          <div class="leftTop">
+            <div class="row" style="justify-content:space-between;">
+              <div><b id="countLine">0 questions</b></div>
+              <div class="muted" id="loadHint"></div>
+            </div>
+          </div>
+          <div class="list" id="qList"></div>
+        </div>
+
+        <!-- Right editor -->
+        <div class="rightPane">
+          <div id="emptyState" class="muted" style="padding:14px;">
+            Select a question from the left list.
+          </div>
+
+          <div id="editPanel" style="display:none;">
+            <div class="row" style="justify-content:space-between; align-items:flex-start;">
+              <div>
+                <div style="font-size:1.15em; font-weight:900; color:#0f2f5e;">
+                  <span id="hdrNumber">—</span>
+                </div>
+                <div class="muted" id="hdrId" style="margin-top:4px;"></div>
+              </div>
+              <div class="row">
+                <button class="btn light" id="btnReset">Reset changes</button>
+                <button class="btn primary" id="btnSave">Save to DB</button>
+              </div>
+            </div>
+
+            <div class="hr"></div>
+
+            <div class="kv" style="margin-bottom:12px;">
+              <div class="k">DB status</div>
+              <div class="v">
+                <select id="dbStatus">
+                  <option value="active">active</option>
+                  <option value="inactive">inactive</option>
+                </select>
+              </div>
+
+              <div class="k">DB version</div>
+              <div class="v"><input id="dbVersion" /></div>
+
+              <div class="k">DB tags</div>
+              <div class="v"><input id="dbTags" placeholder="comma-separated (optional)" /></div>
+
+              <div class="k">number_base</div>
+              <div class="v"><span id="dbNumberBase" class="pill"></span></div>
+
+              <div class="k">number_suffix</div>
+              <div class="v"><span id="dbNumberSuffix" class="pill"></span></div>
+            </div>
+
+            <div class="hr"></div>
+
+            <!-- Payload editing (common fields) -->
+            <div class="row">
+              <div class="field" style="flex:1; min-width:260px;">
+                <label>Payload: Short Text</label>
+                <textarea id="pShortText"></textarea>
+              </div>
+              <div class="field" style="flex:1; min-width:260px;">
+                <label>Payload: Question</label>
+                <textarea id="pQuestion"></textarea>
+              </div>
+            </div>
+
+            <div class="row">
+              <div class="field" style="flex:1; min-width:260px;">
+                <label>Payload: Inspection Guidance</label>
+                <textarea id="pGuidance"></textarea>
+              </div>
+              <div class="field" style="flex:1; min-width:260px;">
+                <label>Payload: Suggested Inspector Actions</label>
+                <textarea id="pActions"></textarea>
+              </div>
+            </div>
+
+            <div class="row">
+              <div class="field" style="flex:1; min-width:260px;">
+                <label>Payload: Expected Evidence</label>
+                <textarea id="pEvidence"></textarea>
+              </div>
+              <div class="field" style="flex:1; min-width:260px;">
+                <label>Payload: Potential Grounds for Negative Observations</label>
+                <textarea id="pNegObs"></textarea>
+              </div>
+            </div>
+
+            <div class="hr"></div>
+
+            <div class="field">
+              <label>Payload JSON (full object) – View/Advanced edit</label>
+              <textarea id="pRaw" style="min-height:240px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;"></textarea>
+              <div class="muted" style="margin-top:6px;">
+                You can edit the JSON directly here. If JSON is invalid, Save will be blocked.
+              </div>
+            </div>
+
+            <div class="row" style="margin-top:10px;">
+              <div class="muted" id="saveStatus"></div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
+
   </div>
 
   <script>
-    const sb = window.AUTH?.ensureSupabase?.();
+    const sb = window.AUTH.ensureSupabase();
 
-    function showWarn(msg){
-      const w=document.getElementById("warnBox");
-      w.textContent=msg||"";
-      w.style.display=msg?"block":"none";
+    function showWarn(msg) {
+      const w = document.getElementById("warnBox");
+      w.textContent = msg || "";
+      w.style.display = msg ? "block" : "none";
     }
-    function showOk(msg){
-      const o=document.getElementById("okBox");
-      o.textContent=msg||"";
-      o.style.display=msg?"block":"none";
+    function showOk(msg) {
+      const o = document.getElementById("okBox");
+      o.textContent = msg || "";
+      o.style.display = msg ? "block" : "none";
     }
-    function setProgress(msg){
-      const p=document.getElementById("progressLine");
-      p.textContent = msg || "";
-      p.style.display = msg ? "block" : "none";
-    }
-    function setResult(msg){
-      const r=document.getElementById("resultLine");
-      r.textContent = msg || "";
-    }
+    function setProgress(msg){ document.getElementById("progressLine").textContent = msg || ""; }
+    function setResult(msg){ document.getElementById("resultBox").textContent = msg || ""; }
 
+    // ---------- Importer utilities (unchanged logic) ----------
     function chunk(arr, size){
-      const out=[];
-      for(let i=0;i<arr.length;i+=size) out.push(arr.slice(i,i+size));
-      return out;
+      const out=[]; for(let i=0;i<arr.length;i+=size) out.push(arr.slice(i,i+size)); return out;
+    }
+    function pad2(n){ n = String(n||""); return n.padStart(2,"0"); }
+
+    function normalizeSireNumberBaseFromPayload(payload){
+      const no = payload && (payload["No."] || payload["No"]);
+      if(!no) return { ok:false, error:"Missing payload No./No." };
+      const parts = String(no).split(".").slice(0,3);
+      while(parts.length<3) parts.push("0");
+      const base = parts.slice(0,3).map(p => pad2(p)).join(".");
+      return { ok:true, base };
     }
 
-    function toIntSafe(v){
-      if (v === null || v === undefined) return null;
-      const n = parseInt(String(v).trim(), 10);
-      return Number.isFinite(n) ? n : null;
-    }
-
-    function pad2(n){
-      const i = toIntSafe(n);
-      if (i === null) return "";
-      return String(i).padStart(2, "0");
-    }
-
-    // Your DB constraint for SIRE:
-    // ^[0-9]{2}\.[0-9]{2}\.[0-9]{2}$
-    // So we must store e.g. "02.01.01"
-    const SIRE_BASE_RE = /^[0-9]{2}\.[0-9]{2}\.[0-9]{2}$/;
-
-    // Build SIRE number_base from JSON parts (preferred: Chap/Sect/#)
-    // fallback: parse "No." like "2.1.1" then pad to 2-digit parts
-    function buildSireBase(obj){
-      const chap = toIntSafe(obj?.Chap);
-      const sect = toIntSafe(obj?.Sect);
-      const qnum = toIntSafe(obj?.["#"]);
-
-      if (chap !== null && sect !== null && qnum !== null) {
-        const base = `${pad2(chap)}.${pad2(sect)}.${pad2(qnum)}`;
-        return base;
+    function normalizeRow(payload, versionTag){
+      try{
+        if(!payload || typeof payload !== "object") return { ok:false, error:"Payload is not an object" };
+        const nb = normalizeSireNumberBaseFromPayload(payload);
+        if(!nb.ok) return { ok:false, error: nb.error };
+        return {
+          ok:true,
+          row:{
+            source_type: "SIRE",
+            number_base: nb.base,
+            number_suffix: null,
+            status: "active",
+            version: versionTag,
+            tags: null,
+            payload: payload
+          }
+        };
+      }catch(e){
+        return { ok:false, error:String(e?.message || e) };
       }
-
-      const no = (obj?.["No."] ?? obj?.["No"] ?? "").toString().trim();
-      if (no) {
-        const m = no.match(/^(\d+)\.(\d+)\.(\d+)([A-Za-z]*)$/);
-        if (m) {
-          const base = `${pad2(m[1])}.${pad2(m[2])}.${pad2(m[3])}`;
-          return base;
-        }
-      }
-
-      return "";
-    }
-
-    // Split number suffix when present (rare for SIRE base).
-    // We store suffix separately, but your DB check only validates number_base.
-    function extractSuffix(obj){
-      const no = (obj?.["No."] ?? obj?.["No"] ?? "").toString().trim();
-      if (!no) return "";
-      const m = no.match(/^\d+\.\d+\.\d+([A-Za-z]*)$/);
-      return (m && m[1]) ? m[1] : "";
-    }
-
-    // Normalize one JSON object into a questions_master row.
-    // IMPORTANT: we DO NOT send "number_full" to the DB (generated)
-    // and we also do NOT send "id" (let DB default generate it).
-    function normalizeRow(obj, versionTag){
-      // SIRE number_base must be NN.NN.NN
-      const number_base = buildSireBase(obj);
-      const number_suffix = String(extractSuffix(obj) || "").trim(); // never null
-
-      if(!number_base) {
-        return { ok:false, error:`Missing number_base (cannot derive from Chap/Sect/# or No.).`, obj };
-      }
-      if(!SIRE_BASE_RE.test(number_base)){
-        return { ok:false, error:`Invalid SIRE number_base "${number_base}" (must be NN.NN.NN).`, obj };
-      }
-
-      const row = {
-        number_base,
-        number_suffix,
-
-        source_type: "SIRE",
-        status: "active",
-        version: String(versionTag || "SIRE_2.0_QL"),
-
-        change_reason: null,
-        tags: null,
-        notes_internal: null,
-        spare_1: null,
-        spare_2: null,
-        spare_3: null,
-
-        payload: obj,
-        is_custom: false
-      };
-
-      return { ok:true, row };
     }
 
     async function fetchJsonFile(filename){
       const res = await fetch(`./${filename}`, { cache: "no-store" });
-      if(!res.ok) throw new Error(`Failed to fetch ${filename}: ${res.status} ${res.statusText}`);
-      const data = await res.json();
-      return data;
+      if(!res.ok) throw new Error(\`Failed to fetch \${filename}: \${res.status} \${res.statusText}\`);
+      return await res.json();
     }
-
     function ensureArray(data){
       if(Array.isArray(data)) return data;
       if(data && Array.isArray(data.questions)) return data.questions;
       if(data && Array.isArray(data.items)) return data.items;
       throw new Error("JSON root is not an array, and no .questions/.items array found.");
     }
-
     async function getQuestionsMasterCount(){
       const { count, error } = await sb
         .from("questions_master")
@@ -240,43 +327,39 @@
       if(error) throw error;
       return count || 0;
     }
-
     async function dryRunImport(filename, versionTag){
       setProgress("Dry run: loading JSON…");
       const raw = await fetchJsonFile(filename);
       const arr = ensureArray(raw);
 
-      setProgress(`Dry run: validating ${arr.length} items…`);
+      setProgress(\`Dry run: validating \${arr.length} items…\`);
       const errors = [];
       let okCount = 0;
-
       const MAX_ERR = 25;
 
       for(let i=0;i<arr.length;i++){
         const r = normalizeRow(arr[i], versionTag);
         if(!r.ok){
-          if(errors.length < MAX_ERR) errors.push(`Index ${i}: ${r.error}`);
+          if(errors.length < MAX_ERR) errors.push(\`Index \${i}: \${r.error}\`);
         } else {
           okCount++;
         }
       }
-
       setProgress("");
       return { total: arr.length, okCount, errors };
     }
-
     async function commitImport(filename, versionTag){
       setProgress("Checking questions_master row count…");
       const existing = await getQuestionsMasterCount();
       if(existing > 0){
-        throw new Error(`Import blocked: questions_master already has ${existing} rows. (Safety rule)`);
+        throw new Error(\`Import blocked: questions_master already has \${existing} rows. (Safety rule)\`);
       }
 
       setProgress("Loading JSON…");
       const raw = await fetchJsonFile(filename);
       const arr = ensureArray(raw);
 
-      setProgress(`Normalizing ${arr.length} items…`);
+      setProgress(\`Normalizing \${arr.length} items…\`);
       const rows = [];
       const errors = [];
       const MAX_ERR = 25;
@@ -284,7 +367,7 @@
       for(let i=0;i<arr.length;i++){
         const r = normalizeRow(arr[i], versionTag);
         if(!r.ok){
-          if(errors.length < MAX_ERR) errors.push(`Index ${i}: ${r.error}`);
+          if(errors.length < MAX_ERR) errors.push(\`Index \${i}: \${r.error}\`);
           continue;
         }
         rows.push(r.row);
@@ -292,9 +375,9 @@
 
       if(errors.length){
         throw new Error(
-          `Validation failed. Fix the JSON mapping first.\n\n` +
-          errors.join("\n") +
-          (arr.length > errors.length ? `\n\n(Showing first ${MAX_ERR} errors.)` : "")
+          "Validation failed.\\n\\n" +
+          errors.join("\\n") +
+          (arr.length > errors.length ? \`\\n\\n(Showing first \${MAX_ERR} errors.)\` : "")
         );
       }
 
@@ -303,7 +386,7 @@
 
       let inserted = 0;
       for(let b=0;b<batches.length;b++){
-        setProgress(`Committing: batch ${b+1}/${batches.length} (${inserted}/${rows.length} inserted)…`);
+        setProgress(\`Committing: batch \${b+1}/\${batches.length} (\${inserted}/\${rows.length} inserted)…\`);
         const { error } = await sb.from("questions_master").insert(batches[b]);
         if(error) throw error;
         inserted += batches[b].length;
@@ -313,6 +396,226 @@
       return { total: arr.length, inserted };
     }
 
+    // ---------- NEW: Browser/Editor ----------
+    let allRows = [];
+    let filteredRows = [];
+    let selected = null;
+    let selectedOriginal = null;
+
+    function safeStr(v){ return (v===null||v===undefined) ? "" : String(v); }
+    function getPayloadNo(p){ return p && (p["No."] || p["No"]) ? String(p["No."] || p["No"]) : ""; }
+    function getPayloadShort(p){ return safeStr(p && p["Short Text"]); }
+    function getPayloadQuestion(p){ return safeStr(p && p["Question"]); }
+
+    function parseTags(str){
+      const s = safeStr(str).trim();
+      if(!s) return null;
+      const parts = s.split(",").map(x=>x.trim()).filter(Boolean);
+      return parts.length ? parts : null;
+    }
+
+    function applyLocalFilters(){
+      const s = safeStr(document.getElementById("searchInput").value).toLowerCase().trim();
+      const st = safeStr(document.getElementById("statusFilter").value).trim();
+      const vf = safeStr(document.getElementById("versionFilter").value).trim();
+
+      filteredRows = allRows.filter(r => {
+        if(st && safeStr(r.status) !== st) return false;
+        if(vf && safeStr(r.version) !== vf) return false;
+
+        if(!s) return true;
+        const p = r.payload || {};
+        const hay = [
+          safeStr(r.number_full),
+          safeStr(r.number_base),
+          getPayloadNo(p),
+          getPayloadShort(p),
+          getPayloadQuestion(p)
+        ].join(" ").toLowerCase();
+        return hay.includes(s);
+      });
+
+      renderList();
+      document.getElementById("countLine").textContent = `${filteredRows.length} questions`;
+    }
+
+    function renderList(){
+      const list = document.getElementById("qList");
+      list.innerHTML = "";
+      if(!filteredRows.length){
+        list.innerHTML = `<div class="muted" style="padding:12px;">No questions match the filters.</div>`;
+        return;
+      }
+
+      filteredRows.forEach((r) => {
+        const p = r.payload || {};
+        const no = safeStr(r.number_full) || getPayloadNo(p) || safeStr(r.number_base) || "(no number)";
+        const shortT = getPayloadShort(p) || "(no short text)";
+        const div = document.createElement("div");
+        div.className = "qitem" + (selected && selected.id === r.id ? " active" : "");
+        div.innerHTML = `
+          <div class="qno">${no}</div>
+          <div class="qsub">${shortT}</div>
+        `;
+        div.onclick = () => selectRow(r.id);
+        list.appendChild(div);
+      });
+    }
+
+    function selectRow(id){
+      const r = filteredRows.find(x => x.id === id) || allRows.find(x => x.id === id);
+      if(!r) return;
+
+      selected = JSON.parse(JSON.stringify(r));
+      selectedOriginal = JSON.parse(JSON.stringify(r));
+
+      document.getElementById("emptyState").style.display = "none";
+      document.getElementById("editPanel").style.display = "block";
+      document.getElementById("saveStatus").textContent = "";
+
+      const p = selected.payload || {};
+
+      document.getElementById("hdrNumber").textContent =
+        safeStr(selected.number_full) || getPayloadNo(p) || safeStr(selected.number_base) || "—";
+      document.getElementById("hdrId").textContent = `DB id: ${selected.id}`;
+
+      document.getElementById("dbStatus").value = safeStr(selected.status) || "active";
+      document.getElementById("dbVersion").value = safeStr(selected.version);
+      document.getElementById("dbTags").value = Array.isArray(selected.tags) ? selected.tags.join(", ") : "";
+
+      document.getElementById("dbNumberBase").textContent = safeStr(selected.number_base);
+      document.getElementById("dbNumberSuffix").textContent = safeStr(selected.number_suffix);
+
+      document.getElementById("pShortText").value = safeStr(p["Short Text"]);
+      document.getElementById("pQuestion").value = safeStr(p["Question"]);
+      document.getElementById("pGuidance").value = safeStr(p["Inspection Guidance"]);
+      document.getElementById("pActions").value = safeStr(p["Suggested Inspector Actions"]);
+      document.getElementById("pEvidence").value = safeStr(p["Expected Evidence"]);
+      document.getElementById("pNegObs").value = safeStr(p["Potential Grounds for Negative Observations"]);
+
+      document.getElementById("pRaw").value = JSON.stringify(p, null, 2);
+
+      renderList();
+    }
+
+    function resetSelected(){
+      if(!selectedOriginal) return;
+      selectRow(selectedOriginal.id);
+    }
+
+    async function saveSelected(){
+      if(!selected) return;
+
+      showWarn(""); showOk("");
+      const saveStatus = document.getElementById("saveStatus");
+      saveStatus.textContent = "Saving…";
+
+      // 1) Parse RAW payload JSON
+      let payloadObj = null;
+      try{
+        payloadObj = JSON.parse(document.getElementById("pRaw").value);
+      }catch(e){
+        saveStatus.textContent = "";
+        showWarn("Cannot save: Payload JSON is not valid.\n\n" + String(e?.message || e));
+        return;
+      }
+
+      // 2) Apply the common field editors back to payload (so user can edit either way)
+      payloadObj["Short Text"] = document.getElementById("pShortText").value;
+      payloadObj["Question"] = document.getElementById("pQuestion").value;
+      payloadObj["Inspection Guidance"] = document.getElementById("pGuidance").value;
+      payloadObj["Suggested Inspector Actions"] = document.getElementById("pActions").value;
+      payloadObj["Expected Evidence"] = document.getElementById("pEvidence").value;
+      payloadObj["Potential Grounds for Negative Observations"] = document.getElementById("pNegObs").value;
+
+      const newStatus = document.getElementById("dbStatus").value;
+      const newVersion = document.getElementById("dbVersion").value.trim();
+      const newTags = parseTags(document.getElementById("dbTags").value);
+
+      // 3) Update DB row
+      try{
+        const { error } = await sb
+          .from("questions_master")
+          .update({
+            status: newStatus,
+            version: newVersion || null,
+            tags: newTags,
+            payload: payloadObj
+          })
+          .eq("id", selected.id);
+
+        if(error) throw error;
+
+        showOk("Saved to DB.");
+        saveStatus.textContent = "Saved.";
+
+        // refresh local cache row
+        const idx = allRows.findIndex(x => x.id === selected.id);
+        if(idx >= 0){
+          allRows[idx].status = newStatus;
+          allRows[idx].version = newVersion || null;
+          allRows[idx].tags = newTags;
+          allRows[idx].payload = payloadObj;
+        }
+        applyLocalFilters();
+
+        // keep selection consistent
+        selectRow(selected.id);
+      }catch(e){
+        saveStatus.textContent = "";
+        showWarn("Save failed:\n\n" + String(e?.message || e));
+      }
+    }
+
+    async function loadQuestionsFromDb(){
+      showWarn(""); showOk("");
+      document.getElementById("loadHint").textContent = "Loading…";
+
+      const statusFilter = safeStr(document.getElementById("statusFilter").value).trim();
+      const versionFilter = safeStr(document.getElementById("versionFilter").value).trim();
+
+      try{
+        let q = sb
+          .from("questions_master")
+          .select("id, number_full, number_base, number_suffix, status, version, tags, payload")
+          .eq("source_type", "SIRE");
+
+        // server-side filters when provided
+        if(statusFilter) q = q.eq("status", statusFilter);
+        if(versionFilter) q = q.eq("version", versionFilter);
+
+        // order for stable list
+        q = q.order("number_base", { ascending:true }).order("number_suffix", { ascending:true });
+
+        // pagination (safe)
+        const pageSize = 1000;
+        let from = 0;
+        let out = [];
+        while(true){
+          const { data, error } = await q.range(from, from + pageSize - 1);
+          if(error) throw error;
+          const rows = data || [];
+          out.push(...rows);
+          if(rows.length < pageSize) break;
+          from += pageSize;
+        }
+
+        allRows = out;
+        document.getElementById("loadHint").textContent = `Loaded ${allRows.length}`;
+        document.getElementById("countLine").textContent = `${allRows.length} questions`;
+        applyLocalFilters();
+
+        if(allRows.length && !selected){
+          selectRow(allRows[0].id);
+        }
+
+      }catch(e){
+        document.getElementById("loadHint").textContent = "";
+        showWarn("Failed to load questions from DB:\n\n" + String(e?.message || e));
+      }
+    }
+
+    // ---------- Boot ----------
     (async () => {
       const bundle = await AUTH.setupAuthButtons({
         badgeId: "userBadge",
@@ -347,82 +650,108 @@
       document.getElementById("modeLine").textContent =
         `Role: ${role} • Mode: ${mode} • Module: QUESTIONS_EDITOR`;
 
+      // Show editor UI for all allowed roles
+      document.getElementById("editorCard").style.display = "block";
+
+      // Import card only for super_admin (keeps your safety behavior)
       if(isSuper){
         document.getElementById("importCard").style.display = "block";
       }
 
-      const filename = "sire_questions_all_columns_named.json";
-      document.getElementById("srcFile").textContent = filename;
+      // wire buttons
+      document.getElementById("reloadBtn").onclick = loadQuestionsFromDb;
+      document.getElementById("searchInput").oninput = applyLocalFilters;
+      document.getElementById("statusFilter").onchange = () => { selected=null; loadQuestionsFromDb(); };
+      document.getElementById("versionFilter").onchange = () => { selected=null; loadQuestionsFromDb(); };
 
-      const dryBtn = document.getElementById("dryRunBtn");
-      const commitBtn = document.getElementById("commitBtn");
-      const versionInput = document.getElementById("versionTag");
+      document.getElementById("btnReset").onclick = resetSelected;
+      document.getElementById("btnSave").onclick = saveSelected;
 
-      function setButtonsEnabled(on){
-        dryBtn.disabled = !on;
-        commitBtn.disabled = !on;
+      // If non-edit role, disable save controls
+      const canSave = (isSuper || isCompanyAdmin);
+      if(!canSave){
+        document.getElementById("btnSave").disabled = true;
+        document.getElementById("btnSave").classList.remove("primary");
+        document.getElementById("btnSave").classList.add("light");
+        document.getElementById("btnSave").title = "Read-only for your role";
+        document.getElementById("saveStatus").textContent = "Read-only access for your role.";
       }
 
-      if(!isSuper){
-        return;
+      // Import wiring if visible
+      if(isSuper){
+        const filename = "sire_questions_all_columns_named.json";
+        document.getElementById("srcFile").textContent = filename;
+
+        const dryBtn = document.getElementById("dryRunBtn");
+        const commitBtn = document.getElementById("commitBtn");
+        const versionInput = document.getElementById("versionTag");
+
+        function setButtonsEnabled(on){
+          dryBtn.disabled = !on;
+          commitBtn.disabled = !on;
+        }
+
+        dryBtn.addEventListener("click", async () => {
+          showWarn(""); showOk(""); setResult("");
+          setButtonsEnabled(false);
+          try{
+            const versionTag = versionInput.value?.trim();
+            if(!versionTag) throw new Error("Version tag is required.");
+
+            const check = await dryRunImport(filename, versionTag);
+            if(check.errors.length){
+              showWarn(
+                "Dry run completed with errors.\n\n" +
+                check.errors.join("\n") +
+                `\n\nValid rows: ${check.okCount}/${check.total}`
+              );
+              setResult(`Dry run: ${check.okCount}/${check.total} valid. Fix errors before commit.`);
+            } else {
+              showOk(`Dry run OK. Valid rows: ${check.okCount}/${check.total}`);
+              setResult(`Dry run OK: ${check.okCount} rows ready to import.`);
+            }
+          }catch(e){
+            showWarn(String(e?.message || e));
+          }finally{
+            setProgress("");
+            setButtonsEnabled(true);
+          }
+        });
+
+        commitBtn.addEventListener("click", async () => {
+          showWarn(""); showOk(""); setResult("");
+          setButtonsEnabled(false);
+          try{
+            const versionTag = versionInput.value?.trim();
+            if(!versionTag) throw new Error("Version tag is required.");
+
+            const check = await dryRunImport(filename, versionTag);
+            if(check.errors.length){
+              throw new Error(
+                "Commit blocked because validation failed.\n\n" +
+                check.errors.join("\n") +
+                `\n\nValid rows: ${check.okCount}/${check.total}`
+              );
+            }
+
+            const res = await commitImport(filename, versionTag);
+            showOk(`Import completed.\nInserted: ${res.inserted} rows (from ${res.total} JSON items).`);
+            setResult(`Inserted ${res.inserted} rows.`);
+
+            // refresh editor list after import
+            await loadQuestionsFromDb();
+
+          }catch(e){
+            showWarn(String(e?.message || e));
+          }finally{
+            setProgress("");
+            setButtonsEnabled(true);
+          }
+        });
       }
 
-      dryBtn.addEventListener("click", async () => {
-        showWarn("");
-        showOk("");
-        setResult("");
-        setButtonsEnabled(false);
-        try{
-          const versionTag = versionInput.value?.trim();
-          if(!versionTag) throw new Error("Version tag is required.");
-          const check = await dryRunImport(filename, versionTag);
-          if(check.errors.length){
-            showWarn(
-              `Dry run completed with errors.\n\n` +
-              check.errors.join("\n") +
-              `\n\nValid rows: ${check.okCount}/${check.total}`
-            );
-            setResult(`Dry run: ${check.okCount}/${check.total} valid. Fix errors before commit.`);
-          } else {
-            showOk(`Dry run OK. Valid rows: ${check.okCount}/${check.total}`);
-            setResult(`Dry run OK: ${check.okCount} rows ready to import.`);
-          }
-        }catch(e){
-          showWarn(String(e?.message || e));
-        }finally{
-          setProgress("");
-          setButtonsEnabled(true);
-        }
-      });
-
-      commitBtn.addEventListener("click", async () => {
-        showWarn("");
-        showOk("");
-        setResult("");
-        setButtonsEnabled(false);
-        try{
-          const versionTag = versionInput.value?.trim();
-          if(!versionTag) throw new Error("Version tag is required.");
-
-          const check = await dryRunImport(filename, versionTag);
-          if(check.errors.length){
-            throw new Error(
-              `Commit blocked because validation failed.\n\n` +
-              check.errors.join("\n") +
-              `\n\nValid rows: ${check.okCount}/${check.total}`
-            );
-          }
-
-          const res = await commitImport(filename, versionTag);
-          showOk(`Import completed.\nInserted: ${res.inserted} rows (from ${res.total} JSON items).`);
-          setResult(`Inserted ${res.inserted} rows.`);
-        }catch(e){
-          showWarn(String(e?.message || e));
-        }finally{
-          setProgress("");
-          setButtonsEnabled(true);
-        }
-      });
+      // initial load
+      await loadQuestionsFromDb();
 
     })().catch(e => showWarn(String(e?.message || e)));
   </script>
