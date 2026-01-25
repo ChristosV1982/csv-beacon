@@ -212,6 +212,12 @@
     <!-- Include JavaScript at the end of body for best loading performance.
          app.js handles all data loading, rendering, filtering, admin editing, etc.
          print.js handles all logic for printing answers and single questions. -->
+
+    <!-- ✅ ADDED: feature flag + data source loader (must be BEFORE app.js) -->
+    <script src="app-config.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="questions-source.js"></script>
+
     <script src="app.js"></script>
     <script src="print.js"></script>
 

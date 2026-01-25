@@ -1042,7 +1042,7 @@ function updateNegObs(qobj) {
 
 // --- DATA LOAD & INIT ---
 // Fetch data at page load, but don't render filters until mode is selected
-fetch('sire_questions_all_columns_named.json')
+  window.QUESTIONS_SOURCE.loadQuestions()
   .then(resp => resp.json())
   .then(data => {
     questionsData = data;
