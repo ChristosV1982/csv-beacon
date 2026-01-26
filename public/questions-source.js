@@ -32,10 +32,7 @@
     if (!res.ok) throw new Error(`Failed to fetch ${jsonFilename()}: ${res.status} ${res.statusText}`);
     const data = await res.json();
 
-    // expected: an array of question objects
     if (Array.isArray(data)) return data;
-
-    // optional fallback if shape ever changes
     if (data && Array.isArray(data.questions)) return data.questions;
     if (data && Array.isArray(data.items)) return data.items;
 
@@ -50,15 +47,25 @@
     const status = cfg.DB?.STATUS || "active";
     const version = String(cfg.DB?.VERSION ?? "").trim();
 
-    let q = sb
-      .from(table)
-      .select("payload")
-      .eq("source_type", sourceType)
-      .eq("status", status);
+    // Column mapping (so we don't need you to confirm schema now)
+    const C = cfg.DB?.COLS || {};
+    const colId = C.ID || "id";
+    const colPayload = C.PAYLOAD || "payload";
+    const colSource = C.SOURCE || "source_type";
+    const colStatus = C.STATUS || "status";
+    const colVersion = C.VERSION || "version";
 
-    if (version) q = q.eq("version", version);
+    // We always return only the payload objects for compatibility
+    const selectCols = `${colPayload}`;
 
-    // Pagination (safe)
+    let q = sb.from(table).select(selectCols);
+
+    // Apply filters only if the mapped columns exist in your DB
+    // (If a column name is wrong, Supabase will throw; then you adjust DB.COLS.* in app-config.js.)
+    q = q.eq(colSource, sourceType).eq(colStatus, status);
+    if (version) q = q.eq(colVersion, version);
+
+    // Pagination
     const pageSize = 1000;
     let from = 0;
     let out = [];
@@ -68,7 +75,7 @@
       if (error) throw error;
 
       const rows = data || [];
-      for (const r of rows) out.push(r.payload);
+      for (const r of rows) out.push(r[colPayload]);
 
       if (rows.length < pageSize) break;
       from += pageSize;
@@ -77,8 +84,6 @@
     return out;
   }
 
-  // Compatibility with your current app.js call:
-  // window.QUESTIONS_SOURCE.loadQuestions().then(resp=>resp.json()).then(data=>...)
   async function loadQuestions() {
     if (mode === "db") {
       const arr = await loadFromDbArray();
@@ -91,14 +96,12 @@
       };
     }
 
-    // default json mode returns a real Response
     return fetch(`./${jsonFilename()}`, { cache: "no-store" });
   }
 
   window.QUESTIONS_SOURCE = {
     mode,
     loadQuestions,
-    // optional direct array API (not required by your app.js)
     getAll: async function () {
       return mode === "db" ? loadFromDbArray() : loadFromJsonArray();
     }

@@ -18,8 +18,27 @@ window.APP_CONFIG = {
   // DB query settings used by public/questions-source.js in DB mode
   DB: {
     TABLE: "questions_master",
-    SOURCE_TYPE: "SIRE",
-    STATUS: "active",
-    VERSION: "SIRE_2.0_QL" // set to "" to disable version filtering
+
+    // Filters
+    SOURCE_TYPE: "SIRE",       // e.g. "SIRE" or "COMPANY"
+    STATUS: "active",          // e.g. "active" or "inactive"
+    VERSION: "SIRE_2.0_QL",    // set "" to disable version filtering
+
+    // ✅ COLUMN MAPPING (THIS REMOVES THE NEED FOR YOU TO “ANSWER #4”)
+    // If your real DB columns differ, you only change these values.
+    COLS: {
+      ID: "id",
+      PAYLOAD: "payload",
+      SOURCE: "source_type",
+      STATUS: "status",
+      VERSION: "version",
+      UPDATED_AT: "updated_at" // optional; can be "" if not present
+    }
+  },
+
+  // ✅ Photos (we will proceed with this now)
+  PHOTOS: {
+    BUCKET: "question-photos",   // create this bucket in Supabase Storage
+    PUBLIC: true                 // simplest to start; later we can switch to private + signed URLs
   }
 };

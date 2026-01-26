@@ -102,6 +102,30 @@ function padQuestionNumber(qn) {
   return parts.join('.');
 }
 
+function normalizeNumberBase(base) {
+  if (!base) return "";
+  const parts = String(base).split(".").map(p => p.trim()).filter(Boolean);
+
+  const a = (parts[0] || "0").padStart(2, "0");
+  const b = (parts[1] || "0").padStart(2, "0");
+
+  // third part: allow 3 digits if provided as 3 digits; otherwise 2 digits
+  const cRaw = parts[2] || "0";
+  const c = (cRaw.length >= 3) ? cRaw.padStart(3, "0") : cRaw.padStart(2, "0");
+
+  return [a, b, c].join(".");
+}
+
+function formatQuestionNumberFromDB(q) {
+  // If you are DB-backed: prefer number_base + number_suffix
+  const base = q.number_base || q["number_base"] || q["No."] || q["No"] || "";
+  const suffix = (q.number_suffix || q["number_suffix"] || "").trim();
+
+  const nb = normalizeNumberBase(base);
+  return suffix ? `${nb}-${suffix}` : nb;
+}
+
+
 function getCombinedResponseType(q) {
   let types = [];
   if (q["Hardware Response Type"] && !["false", "none", ""].includes(String(q["Hardware Response Type"]).trim().toLowerCase())) types.push("Hardware");
