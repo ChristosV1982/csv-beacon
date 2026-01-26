@@ -690,60 +690,106 @@ function renderDetailsPanel() {
                 </div>
               </div>`;
           }
-    else if (key === "Expected Evidence") {
-      if (!Array.isArray(q.ExpEv_Bullets)) {
-        let bullets = (q[key] || "").split(/\n?•/g).map(t => t.trim()).filter(Boolean);
-        q.ExpEv_Bullets = bullets.map(b => ({
-          text: b,
-          form: q["eSMS Form(s)"] || "",
-          ch: q["eSMS Ch. References"] || "",
-          remarks: q["Observation Remarks"] || ""
-        }));
-      }
-      let bulletHtml = "";
-      q.ExpEv_Bullets.forEach((bullet, idx) => {
-        let mainText = bullet.text || "";
-        let hit = searchText && (
-          mainText.toLowerCase().includes(searchText)
-          || (bullet.form && bullet.form.toLowerCase().includes(searchText))
-          || (bullet.ch && bullet.ch.toLowerCase().includes(searchText))
-          || (bullet.remarks && bullet.remarks.toLowerCase().includes(searchText))
-        );
-        if (hit) sectionExpanded = true;
-        mainText = highlightText(mainText, searchText);
-        let form = highlightTextSafe((bullet.form || ""), searchText);
-        let ch = highlightTextSafe((bullet.ch || ""), searchText);
-        let remarks = highlightTextSafe((bullet.remarks || ""), searchText);
-        bulletHtml += `
-        <div style="margin:10px 0 10px 0;padding:8px 10px 8px 10px;border-left:3px solid #b2d5ff;background:#f8fbff;border-radius:6px;">
-          ${adminMode
-            ? `<textarea class="ems-edit-input" id="expEvBullet_${selectedIdx}_${idx}" rows="2" style="width:99%;margin-bottom:2px;">${bullet.text}</textarea>`
-            : `<div style="margin-bottom:6px; white-space: pre-wrap;">• ${highlightTextSafe(mainText, searchText)}</div>`
-          }
-          ${bullet.image ? `<div style="margin:10px 0;">
-  <img src="${bullet.image}" alt="Evidence Photo" style="width:100%; height:auto; max-width:1000px; margin:10px 0; border-radius:10px;" loading="lazy">
-</div>` : ""}
-          <div style="font-size:0.96em;margin-left:14px;line-height:1.6;">
-            ${adminMode
-              ? `<b>eSMS Form:</b> <input type="text" class="ems-edit-input" id="expEvForm_${selectedIdx}_${idx}" value="${bullet.form || ""}" style="width:97%"><br>
-                 <b>eSMS Ch. Reference:</b> <input type="text" class="ems-edit-input" id="expEvCh_${selectedIdx}_${idx}" value="${bullet.ch || ""}" style="width:97%"><br>
-                 <b>Remarks:</b> <input type="text" class="ems-edit-input" id="expEvRem_${selectedIdx}_${idx}" value="${bullet.remarks || ""}" style="width:97%">`
-              : `<b>eSMS Form:</b> <span class="attr-val" style="white-space: pre-wrap;">${form || "-"}</span><br>
-                 <b>eSMS Ch. Reference:</b> <span class="attr-val" style="white-space: pre-wrap;">${ch || "-"}</span><br>
-                 <b>Remarks:</b> <span class="attr-val" style="white-space: pre-wrap;">${remarks || "-"}</span>`
+            else if (key === "Expected Evidence") {
+              // Build bullets array if not already present
+              if (!Array.isArray(q.ExpEv_Bullets)) {
+                let bullets = (q[key] || "")
+                  .split(/\n?•/g)
+                  .map(t => t.trim())
+                  .filter(Boolean);
+
+                q.ExpEv_Bullets = bullets.map(b => ({
+                  text: b,
+                  form: q["eSMS Form(s)"] || "",
+                  ch: q["eSMS Ch. References"] || "",
+                  remarks: q["Observation Remarks"] || ""
+                }));
+              }
+
+              let bulletHtml = "";
+
+              q.ExpEv_Bullets.forEach((bullet, idx) => {
+                const mainTextRaw = bullet.text || "";
+                const formRaw = bullet.form || "";
+                const chRaw = bullet.ch || "";
+                const remarksRaw = bullet.remarks || "";
+
+                const hit = searchText && (
+                  mainTextRaw.toLowerCase().includes(searchText)
+                  || (formRaw && formRaw.toLowerCase().includes(searchText))
+                  || (chRaw && chRaw.toLowerCase().includes(searchText))
+                  || (remarksRaw && remarksRaw.toLowerCase().includes(searchText))
+                );
+                if (hit) sectionExpanded = true;
+
+                const mainText = highlightTextSafe(mainTextRaw, searchText);
+                const form = highlightTextSafe(formRaw, searchText);
+                const ch = highlightTextSafe(chRaw, searchText);
+                const remarks = highlightTextSafe(remarksRaw, searchText);
+
+                const hasRemarks = (remarksRaw || "").trim() !== "";
+
+                bulletHtml += `
+                  <div style="margin:10px 0 10px 0;padding:8px 10px 8px 10px;border-left:3px solid #b2d5ff;background:#f8fbff;border-radius:6px;">
+
+                    ${
+                      adminMode
+                        ? `<textarea class="ems-edit-input" id="expEvBullet_${selectedIdx}_${idx}" rows="2" style="width:99%;margin-bottom:6px;">${escapeHtml(mainTextRaw)}</textarea>`
+                        : `<div style="margin-bottom:6px; white-space: pre-wrap;">• ${mainText}</div>`
+                    }
+
+                    ${bullet.image ? `
+                      <div style="margin:10px 0;">
+                        <img src="${bullet.image}" alt="Evidence Photo" style="width:100%; height:auto; max-width:1000px; margin:10px 0; border-radius:10px;" loading="lazy">
+                      </div>` : ""
+                    }
+
+                    <div style="font-size:0.96em;margin-left:14px;line-height:1.6;">
+                      ${
+                        adminMode
+                          ? `
+                            <b>eSMS Form:</b>
+                            <input type="text" class="ems-edit-input" id="expEvForm_${selectedIdx}_${idx}" value="${escapeHtml(formRaw)}" style="width:97%"><br>
+
+                            <b>eSMS Ch. Reference:</b>
+                            <input type="text" class="ems-edit-input" id="expEvCh_${selectedIdx}_${idx}" value="${escapeHtml(chRaw)}" style="width:97%"><br>
+
+                            <b>Remarks:</b>
+                            <input type="text" class="ems-edit-input" id="expEvRem_${selectedIdx}_${idx}" value="${escapeHtml(remarksRaw)}" style="width:97%">
+                          `
+                          : `
+                            <b>eSMS Form:</b>
+                            <span class="attr-val" style="white-space: pre-wrap;">${formRaw.trim() ? form : "-"}</span><br>
+
+                            <b>eSMS Ch. Reference:</b>
+                            <span class="attr-val" style="white-space: pre-wrap;">${chRaw.trim() ? ch : "-"}</span>
+
+                            ${hasRemarks ? `
+                              <br><b>Remarks:</b>
+                              <span class="attr-val" style="white-space: pre-wrap;">${remarks}</span>
+                            ` : ""}
+                          `
+                      }
+                    </div>
+                  </div>
+                `;
+              });
+
+              html += `
+                <div>
+                  <div class="collapsible-label${(window.collapsibleState[cid] || sectionExpanded) ? '' : ' collapsed'}"
+                       id="colLabel_${cid}"
+                       onclick="toggleCollapse('${cid}')">${key}</div>
+
+                  <div class="collapsible-content${(window.collapsibleState[cid] || sectionExpanded) ? ' open' : ''}"
+                       id="colContent_${cid}">
+                    ${bulletHtml}
+                    ${adminMode ? `<button type="button" id="addExpEvBulletBtn" style="margin:14px 0 0 0;display:block;padding:7px 20px;border-radius:5px;border:none;background:#235ea4;color:#fff;font-weight:bold;cursor:pointer;">+ Add Bullet</button>` : ""}
+                  </div>
+                </div>
+              `;
             }
-          </div>
-        </div>`;
-      });
-      html += `
-        <div>
-          <div class="collapsible-label${window.collapsibleState[cid] || sectionExpanded ? '' : ' collapsed'}" id="colLabel_${cid}" onclick="toggleCollapse('${cid}')">${key}</div>
-          <div class="collapsible-content${window.collapsibleState[cid] || sectionExpanded ? ' open' : ''}" id="colContent_${cid}">
-            ${bulletHtml}
-            ${adminMode ? `<button type="button" id="addExpEvBulletBtn" style="margin:14px 0 0 0;display:block;padding:7px 20px;border-radius:5px;border:none;background:#235ea4;color:#fff;font-weight:bold;cursor:pointer;">+ Add Bullet</button>` : ""}
-          </div>
-        </div>`;
-    }
+
     else if (key === "Potential Grounds for Negative Observations") {
       let bullets = Array.isArray(q.NegObs_Bullets)
         ? q.NegObs_Bullets
