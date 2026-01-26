@@ -7,53 +7,120 @@
   <title>SIRE 2.0 – Questions Editor</title>
   <link rel="stylesheet" href="style.css" />
   <style>
-    .page { max-width: 1200px; margin: 0 auto; padding: 20px 18px 60px 18px; }
-    .topbar { display:flex; justify-content:space-between; align-items:center; gap:14px; padding: 10px 18px; background:#1a4170; color:#fff; }
+    :root{
+      --nav:#1a4170;
+      --nav2:#295eb0;
+      --bg:#f5f8fd;
+      --card:#ffffff;
+      --line:#d7e3f4;
+      --muted:#6b7b90;
+      --text:#0f2f5e;
+      --chip:#eaf1fb;
+      --chipLine:#c9d9f3;
+    }
+
+    body { margin:0; background:var(--bg); }
+    .topbar{
+      display:flex; justify-content:space-between; align-items:center; gap:14px;
+      padding: 10px 18px; background:var(--nav); color:#fff;
+      position:sticky; top:0; z-index:10;
+      box-shadow:0 2px 14px rgba(0,0,0,0.12);
+    }
     .topbar .right { display:flex; gap:10px; align-items:center; }
-    .btn { border:none; padding:8px 14px; border-radius:10px; cursor:pointer; font-weight:600; }
-    .btn.primary { background:#295eb0; color:#fff; }
-    .btn.light { background:#eaf1fb; color:#1a4170; border:1px solid #c9d9f3; }
-    .btn.danger { background:#b02a2a; color:#fff; }
-    .badge { opacity:0.95; font-weight:600; }
-    .card { background:#fff; border:1px solid #d7e3f4; border-radius:14px; box-shadow:0 2px 14px rgba(30,70,130,0.08); padding:16px 16px; margin: 14px 0; }
-    .card h2 { margin:0 0 12px 0; font-size: 1.15em; color:#173a6a; }
-    .muted { color:#6b7b90; }
-    .warn { background:#fde8e8; border:1px solid #f4bcbc; color:#8a1f1f; padding:12px 14px; border-radius:12px; white-space:pre-wrap; display:none; }
-    .ok { background:#e9fbef; border:1px solid #bfe7ca; color:#1f6d32; padding:12px 14px; border-radius:12px; white-space:pre-wrap; display:none; }
+
+    .page { max-width: 1280px; margin: 0 auto; padding: 18px 18px 60px 18px; }
+    .btn{
+      border:none; padding:9px 14px; border-radius:10px; cursor:pointer;
+      font-weight:700; letter-spacing:0.1px;
+    }
+    .btn.primary{ background:var(--nav2); color:#fff; }
+    .btn.light{
+      background:var(--chip); color:var(--nav); border:1px solid var(--chipLine);
+    }
+    .btn:disabled{ opacity:0.6; cursor:not-allowed; }
+
+    .badge { opacity:0.95; font-weight:700; }
+    .pill{
+      display:inline-block; padding:6px 12px; border-radius:999px;
+      background:var(--chip); border:1px solid var(--chipLine);
+      color:var(--nav); font-weight:800; font-size:0.86em;
+    }
+
+    .card{
+      background:var(--card);
+      border:1px solid var(--line);
+      border-radius:16px;
+      box-shadow:0 2px 18px rgba(30,70,130,0.10);
+      padding:16px 16px;
+      margin: 14px 0;
+    }
+    .card h2 { margin:0 0 10px 0; font-size: 1.18em; color:#173a6a; }
+
+    .muted { color:var(--muted); }
+    .warn{
+      background:#fde8e8; border:1px solid #f4bcbc; color:#8a1f1f;
+      padding:12px 14px; border-radius:12px; white-space:pre-wrap; display:none;
+    }
+    .ok{
+      background:#e9fbef; border:1px solid #bfe7ca; color:#1f6d32;
+      padding:12px 14px; border-radius:12px; white-space:pre-wrap; display:none;
+    }
+
     .row { display:flex; gap:14px; flex-wrap:wrap; align-items:center; }
     .field { display:flex; flex-direction:column; gap:6px; min-width:240px; }
-    .field label { font-weight:700; color:#1a3261; font-size:0.93em; }
-    .field input, .field select, .field textarea {
+    .field label { font-weight:800; color:#1a3261; font-size:0.93em; }
+    .field input, .field select, .field textarea{
       font-size: 1em; padding:10px 10px; border-radius:10px; border:1px solid #c9d6ee;
-      outline:none;
+      outline:none; background:#fff;
     }
     .field textarea { min-height: 90px; resize: vertical; }
     .hr { height:1px; background:#e3edf9; margin:14px 0; }
 
     /* Editor layout */
-    .editorGrid { display:flex; gap:14px; }
-    .leftPane {
-      width: 360px; min-width: 280px; max-width: 520px;
-      border:1px solid #d7e3f4; border-radius:14px; overflow:hidden; background:#f7fbff;
-      display:flex; flex-direction:column;
+    .editorGrid { display:flex; gap:14px; align-items:stretch; }
+    .leftPane{
+      width: 380px; min-width: 280px; max-width: 560px;
+      border:1px solid var(--line); border-radius:16px; overflow:hidden;
+      background:#fff; display:flex; flex-direction:column;
     }
-    .leftTop { padding:12px; background:#eef5ff; border-bottom:1px solid #d7e3f4; }
-    .list { overflow:auto; max-height: calc(100vh - 310px); background:#fff; }
-    .qitem { padding:10px 12px; border-bottom:1px solid #edf2fb; cursor:pointer; }
+    .leftTop{
+      padding:12px 12px;
+      background:linear-gradient(180deg, #eef5ff 0%, #f8fbff 100%);
+      border-bottom:1px solid var(--line);
+    }
+    .list{
+      overflow:auto;
+      max-height: calc(100vh - 330px);
+      background:#fff;
+    }
+    .qitem{
+      padding:10px 12px;
+      border-bottom:1px solid #edf2fb;
+      cursor:pointer;
+    }
     .qitem:hover { background:#f3f8ff; }
     .qitem.active { background:#dfeeff; }
-    .qno { font-weight:800; color:#0f2f5e; }
-    .qsub { color:#4b5f7b; font-size:0.92em; margin-top:3px; }
+    .qno { font-weight:900; color:var(--text); }
+    .qsub { color:#4b5f7b; font-size:0.93em; margin-top:3px; }
 
-    .rightPane { flex:1; min-width: 0; border:1px solid #d7e3f4; border-radius:14px; background:#fff; padding:14px; }
-    .kv { display:grid; grid-template-columns: 180px 1fr; gap:8px 12px; align-items:center; }
-    .kv .k { color:#1a3261; font-weight:800; font-size:0.93em; }
-    .kv .v { color:#21324b; font-size:0.95em; word-break:break-word; }
-    .pill { display:inline-block; padding:4px 10px; border-radius:999px; background:#eaf1fb; border:1px solid #c9d9f3; color:#1a4170; font-weight:700; font-size:0.85em; }
+    .rightPane{
+      flex:1; min-width: 0;
+      border:1px solid var(--line); border-radius:16px;
+      background:#fff;
+      padding:14px 14px;
+    }
+
+    .kv{ display:grid; grid-template-columns: 180px 1fr; gap:8px 12px; align-items:center; }
+    .kv .k{ color:#1a3261; font-weight:900; font-size:0.93em; }
+    .kv .v{ color:#21324b; font-size:0.95em; word-break:break-word; }
+
+    /* Responsive */
+    @media (max-width: 980px){
+      .editorGrid{ flex-direction:column; }
+      .leftPane{ width:auto; max-width:none; }
+      .list{ max-height: 320px; }
+    }
   </style>
-
-  <!-- IMPORTANT: app-config must load BEFORE auth.js so AUTH can read APP_CONFIG -->
-  <script src="app-config.js"></script>
 
   <!-- Supabase v2 -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -62,7 +129,7 @@
   <script src="auth.js"></script>
 </head>
 
-<body style="margin:0; background:#f5f8fd;">
+<body>
   <div class="topbar">
     <div><b>SIRE 2.0 – Questions Editor</b></div>
     <div class="right">
@@ -82,7 +149,7 @@
     <div id="warnBox" class="warn" style="margin-top:12px;"></div>
     <div id="okBox" class="ok" style="margin-top:12px;"></div>
 
-    <!-- Import Card (kept exactly in spirit; still blocked when rows exist) -->
+    <!-- Import Card (super_admin only, still blocked when rows exist) -->
     <div class="card" id="importCard" style="display:none;">
       <h2>Safe Import (Lossless)</h2>
       <div class="muted">
@@ -113,11 +180,11 @@
       <div id="resultBox" class="muted" style="margin-top:10px; white-space:pre-wrap;"></div>
     </div>
 
-    <!-- NEW: Browser + Editor UI -->
+    <!-- Browser + Editor UI -->
     <div class="card" id="editorCard" style="display:none;">
       <h2>Questions Browser & Editor (DB)</h2>
       <div class="muted">
-        This loads questions from <b>public.questions_master</b> (the rows you already imported) and lets you view/edit.
+        Loads questions from <b>public.questions_master</b>. Phase 1 focuses on correct ordering + cleaner UI.
       </div>
 
       <div class="hr"></div>
@@ -125,13 +192,24 @@
       <div class="row">
         <button class="btn primary" id="reloadBtn">Load / Refresh Questions</button>
 
+        <div class="field" style="min-width:220px;">
+          <label>Source</label>
+          <select id="sourceFilter">
+            <option value="ALL" selected>All (SIRE + Company + Spare)</option>
+            <option value="SIRE">SIRE</option>
+            <option value="COMPANY">COMPANY</option>
+            <option value="SPARE1">SPARE1</option>
+            <option value="SPARE2">SPARE2</option>
+          </select>
+        </div>
+
         <div class="field" style="min-width:320px; flex:1;">
           <label>Search (number / short text / question)</label>
           <input id="searchInput" placeholder="Type to filter…" />
         </div>
 
         <div class="field" style="min-width:220px;">
-          <label>Status filter</label>
+          <label>Status</label>
           <select id="statusFilter">
             <option value="">(all)</option>
             <option value="active" selected>active</option>
@@ -140,7 +218,7 @@
         </div>
 
         <div class="field" style="min-width:260px;">
-          <label>Version filter</label>
+          <label>Version</label>
           <input id="versionFilter" placeholder="e.g. SIRE_2.0_QL (blank = all)" />
         </div>
       </div>
@@ -168,7 +246,7 @@
           <div id="editPanel" style="display:none;">
             <div class="row" style="justify-content:space-between; align-items:flex-start;">
               <div>
-                <div style="font-size:1.15em; font-weight:900; color:#0f2f5e;">
+                <div style="font-size:1.15em; font-weight:900; color:var(--text);">
                   <span id="hdrNumber">—</span>
                 </div>
                 <div class="muted" id="hdrId" style="margin-top:4px;"></div>
@@ -182,6 +260,9 @@
             <div class="hr"></div>
 
             <div class="kv" style="margin-bottom:12px;">
+              <div class="k">source_type</div>
+              <div class="v"><span id="dbSourceType" class="pill"></span></div>
+
               <div class="k">DB status</div>
               <div class="v">
                 <select id="dbStatus">
@@ -245,7 +326,7 @@
               <label>Payload JSON (full object) – View/Advanced edit</label>
               <textarea id="pRaw" style="min-height:240px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;"></textarea>
               <div class="muted" style="margin-top:6px;">
-                You can edit the JSON directly here. If JSON is invalid, Save will be blocked.
+                Phase 3/4 will introduce structured editors for Expected Evidence and PGNO. For now this remains safe and direct.
               </div>
             </div>
 
@@ -260,8 +341,6 @@
   </div>
 
   <script>
-    // If app-config.js was not loaded or AUTH is missing, this will fail.
-    // With the corrected <head> ordering, it should succeed.
     const sb = window.AUTH.ensureSupabase();
 
     function showWarn(msg) {
@@ -274,8 +353,8 @@
       o.textContent = msg || "";
       o.style.display = msg ? "block" : "none";
     }
-    function setProgress(msg){ document.getElementById("progressLine").textContent = msg || ""; }
-    function setResult(msg){ document.getElementById("resultBox").textContent = msg || ""; }
+    function setProgress(msg){ const el=document.getElementById("progressLine"); if(el) el.textContent = msg || ""; }
+    function setResult(msg){ const el=document.getElementById("resultBox"); if(el) el.textContent = msg || ""; }
 
     // ---------- Importer utilities (unchanged logic) ----------
     function chunk(arr, size){
@@ -401,7 +480,7 @@
       return { total: arr.length, inserted };
     }
 
-    // ---------- NEW: Browser/Editor ----------
+    // ---------- Editor ----------
     let allRows = [];
     let filteredRows = [];
     let selected = null;
@@ -419,14 +498,46 @@
       return parts.length ? parts : null;
     }
 
+    // ---- PHASE 1 FIX: numeric sort by number_base (NOT lexicographic) ----
+    function parseBaseParts(base){
+      const s = safeStr(base).trim();
+      if(!s) return [0,0,0];
+      const parts = s.split(".").map(x => parseInt(x,10));
+      const a = Number.isFinite(parts[0]) ? parts[0] : 0;
+      const b = Number.isFinite(parts[1]) ? parts[1] : 0;
+      const c = Number.isFinite(parts[2]) ? parts[2] : 0;
+      return [a,b,c];
+    }
+    function suffixSortVal(sfx){
+      const s = safeStr(sfx).trim().toUpperCase();
+      if(!s) return 0; // SIRE (no suffix) first
+      // A=1, B=2, ... Z=26, others after
+      const code = s.charCodeAt(0);
+      if(code>=65 && code<=90) return (code-64);
+      return 100;
+    }
+    function rowSortKey(r){
+      const [a,b,c] = parseBaseParts(r.number_base);
+      const s = suffixSortVal(r.number_suffix);
+      return {a,b,c,s};
+    }
+    function compareKeys(k1,k2){
+      if(k1.a!==k2.a) return k1.a-k2.a;
+      if(k1.b!==k2.b) return k1.b-k2.b;
+      if(k1.c!==k2.c) return k1.c-k2.c;
+      return k1.s-k2.s;
+    }
+
     function applyLocalFilters(){
       const s = safeStr(document.getElementById("searchInput").value).toLowerCase().trim();
       const st = safeStr(document.getElementById("statusFilter").value).trim();
       const vf = safeStr(document.getElementById("versionFilter").value).trim();
+      const src = safeStr(document.getElementById("sourceFilter").value).trim();
 
       filteredRows = allRows.filter(r => {
         if(st && safeStr(r.status) !== st) return false;
         if(vf && safeStr(r.version) !== vf) return false;
+        if(src && src !== "ALL" && safeStr(r.source_type) !== src) return false;
 
         if(!s) return true;
         const p = r.payload || {};
@@ -435,10 +546,14 @@
           safeStr(r.number_base),
           getPayloadNo(p),
           getPayloadShort(p),
-          getPayloadQuestion(p)
+          getPayloadQuestion(p),
+          safeStr(r.source_type)
         ].join(" ").toLowerCase();
         return hay.includes(s);
       });
+
+      // numeric ordering always
+      filteredRows.sort((x,y)=>compareKeys(rowSortKey(x), rowSortKey(y)));
 
       renderList();
       document.getElementById("countLine").textContent = `${filteredRows.length} questions`;
@@ -484,6 +599,8 @@
         safeStr(selected.number_full) || getPayloadNo(p) || safeStr(selected.number_base) || "—";
       document.getElementById("hdrId").textContent = `DB id: ${selected.id}`;
 
+      document.getElementById("dbSourceType").textContent = safeStr(selected.source_type) || "—";
+
       document.getElementById("dbStatus").value = safeStr(selected.status) || "active";
       document.getElementById("dbVersion").value = safeStr(selected.version);
       document.getElementById("dbTags").value = Array.isArray(selected.tags) ? selected.tags.join(", ") : "";
@@ -515,7 +632,6 @@
       const saveStatus = document.getElementById("saveStatus");
       saveStatus.textContent = "Saving…";
 
-      // 1) Parse RAW payload JSON
       let payloadObj = null;
       try{
         payloadObj = JSON.parse(document.getElementById("pRaw").value);
@@ -525,7 +641,6 @@
         return;
       }
 
-      // 2) Apply the common field editors back to payload
       payloadObj["Short Text"] = document.getElementById("pShortText").value;
       payloadObj["Question"] = document.getElementById("pQuestion").value;
       payloadObj["Inspection Guidance"] = document.getElementById("pGuidance").value;
@@ -537,7 +652,6 @@
       const newVersion = document.getElementById("dbVersion").value.trim();
       const newTags = parseTags(document.getElementById("dbTags").value);
 
-      // 3) Update DB row
       try{
         const { error } = await sb
           .from("questions_master")
@@ -554,7 +668,6 @@
         showOk("Saved to DB.");
         saveStatus.textContent = "Saved.";
 
-        // refresh local cache row
         const idx = allRows.findIndex(x => x.id === selected.id);
         if(idx >= 0){
           allRows[idx].status = newStatus;
@@ -562,10 +675,10 @@
           allRows[idx].tags = newTags;
           allRows[idx].payload = payloadObj;
         }
-        applyLocalFilters();
 
-        // keep selection consistent
+        applyLocalFilters();
         selectRow(selected.id);
+
       }catch(e){
         saveStatus.textContent = "";
         showWarn("Save failed:\n\n" + String(e?.message || e));
@@ -578,17 +691,20 @@
 
       const statusFilter = safeStr(document.getElementById("statusFilter").value).trim();
       const versionFilter = safeStr(document.getElementById("versionFilter").value).trim();
+      const sourceFilter = safeStr(document.getElementById("sourceFilter").value).trim();
 
       try{
         let q = sb
           .from("questions_master")
-          .select("id, number_full, number_base, number_suffix, status, version, tags, payload")
-          .eq("source_type", "SIRE");
+          .select("id, source_type, number_full, number_base, number_suffix, status, version, tags, payload");
 
+        // Server-side filters (optional)
         if(statusFilter) q = q.eq("status", statusFilter);
         if(versionFilter) q = q.eq("version", versionFilter);
+        if(sourceFilter && sourceFilter !== "ALL") q = q.eq("source_type", sourceFilter);
 
-        q = q.order("number_base", { ascending:true }).order("number_suffix", { ascending:true });
+        // IMPORTANT: do NOT rely on server ordering by text for number_base.
+        // We fetch then apply numeric ordering client-side.
 
         const pageSize = 1000;
         let from = 0;
@@ -603,8 +719,13 @@
         }
 
         allRows = out;
+
+        // Always keep a stable numeric sort for the base dataset too
+        allRows.sort((x,y)=>compareKeys(rowSortKey(x), rowSortKey(y)));
+
         document.getElementById("loadHint").textContent = `Loaded ${allRows.length}`;
         document.getElementById("countLine").textContent = `${allRows.length} questions`;
+
         applyLocalFilters();
 
         if(allRows.length && !selected){
@@ -657,14 +778,17 @@
         document.getElementById("importCard").style.display = "block";
       }
 
-      document.getElementById("reloadBtn").onclick = loadQuestionsFromDb;
+      // wire buttons
+      document.getElementById("reloadBtn").onclick = () => { selected=null; loadQuestionsFromDb(); };
       document.getElementById("searchInput").oninput = applyLocalFilters;
       document.getElementById("statusFilter").onchange = () => { selected=null; loadQuestionsFromDb(); };
       document.getElementById("versionFilter").onchange = () => { selected=null; loadQuestionsFromDb(); };
+      document.getElementById("sourceFilter").onchange = () => { selected=null; loadQuestionsFromDb(); };
 
       document.getElementById("btnReset").onclick = resetSelected;
       document.getElementById("btnSave").onclick = saveSelected;
 
+      // If non-edit role, disable save controls
       const canSave = (isSuper || isCompanyAdmin);
       if(!canSave){
         document.getElementById("btnSave").disabled = true;
@@ -674,6 +798,7 @@
         document.getElementById("saveStatus").textContent = "Read-only access for your role.";
       }
 
+      // Import wiring if visible
       if(isSuper){
         const filename = "sire_questions_all_columns_named.json";
         document.getElementById("srcFile").textContent = filename;
@@ -745,6 +870,7 @@
         });
       }
 
+      // initial load
       await loadQuestionsFromDb();
 
     })().catch(e => showWarn(String(e?.message || e)));
