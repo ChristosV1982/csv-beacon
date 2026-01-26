@@ -190,12 +190,6 @@
       .list{ max-height: 320px; }
     }
   </style>
-
-  <!-- Supabase v2 -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
-  <!-- Your auth helper (must load BEFORE q-questions-editor.js) -->
-  <script src="auth.js"></script>
 </head>
 
 <body>
@@ -441,7 +435,9 @@
 
   </div>
 
-  <!-- IMPORTANT: this replaces the old 1000+ lines inline script -->
+  <!-- IMPORTANT: scripts at end so DOM exists before JS runs -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="./auth.js"></script>
   <script src="./q-questions-editor.js"></script>
 </body>
 </html>
