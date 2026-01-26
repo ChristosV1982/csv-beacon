@@ -889,7 +889,9 @@ async function createQuestionnaireByCompile(userId) {
     const qqBatches = chunk(qqRows, 50);
     for (let i = 0; i < qqBatches.length; i++) {
       setSubLine(`Compiling questions... (${i + 1}/${qqBatches.length})`);
-      const { error: insErr } = await supabaseClient.from("questionnaire_questions").insert(qqBatches[i]);
+      const { error: insErr } = await supabaseClient
+        .from("questionnaire_questions")
+        .insert(qqBatches[i]);
       if (insErr) {
         await supabaseClient.from("questionnaires").delete().eq("id", qid);
         showWarn("Created questionnaire, but failed to compile questions:\n" + insErr.message);
@@ -925,7 +927,8 @@ async function createQuestionnaireByCompile(userId) {
           showWarn(
             "Questionnaire created and questions compiled, but PGNO answer rows could not be created.\n" +
               "This usually means RLS or table constraints on answers_pgno.\n\n" +
-              "Error: " + apErr.message
+              "Error: " +
+              apErr.message
           );
           break;
         }
