@@ -677,10 +677,10 @@
             source_type: "SIRE",
             number_base: nb.base,
             number_suffix: "",
+            is_custom: false,          // <<< add this
             status: "active",
             version: versionTag,
             tags: null,
-            is_custom: false,          // <-- ADD THIS
             payload: payload
           }
         };
@@ -1277,10 +1277,10 @@
             source_type: info.src,
             number_base: info.base,
             number_suffix: info.suffix ?? "",
+            is_custom: info.src !== "SIRE",   // <<< add this
             status,
             version,
             tags,
-            is_custom: true,             // <-- ADD THIS (COMPANY/SPARE questions are “custom”)
             payload: { ...payloadObj, "No.": info.full }
           };
 
