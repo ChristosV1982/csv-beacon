@@ -327,7 +327,8 @@
               </div>
             </div>
 
-            
+            <div class="hr"></div>
+
             <!-- New Question controls (only visible in create mode) -->
             <div id="newQuestionPanel" class="card" style="display:none; margin:0 0 12px 0; padding:12px; border-radius:14px; border:1px solid #e3edf9; box-shadow:none;">
               <div class="row" style="justify-content:space-between; align-items:flex-end;">
@@ -364,8 +365,6 @@
 
               <div class="muted" id="newNumberHint" style="margin-top:8px;"></div>
             </div>
-
-<div class="hr"></div>
 
             <div class="kv" style="margin-bottom:12px;">
               <div class="k">source_type</div>
@@ -640,53 +639,15 @@
 
     // New-question (create mode) state
     window.createMode = false;
+    window.newDraft = null;
 
-    // We keep DB column source_type as enum (currently only "SIRE" in your DB).
-    // The "question set" (SIRE/COMPANY/SPARE1/SPARE2) is represented by number_suffix:
-    //   SIRE    -> NULL/"" (no suffix)
-    //   COMPANY -> "C"
-    //   SPARE1  -> "A"
-    //   SPARE2  -> "B"
-    const SUFFIX_BY_SET = { SIRE: "", COMPANY: "C", SPARE1: "A", SPARE2: "B" };
-
-    function suffixForSet(setName){
-      const s = String(setName || "").trim().toUpperCase();
-      return SUFFIX_BY_SET[s] ?? "";
-    }
-
-    function setForSuffix(sfx){
-      const s = String(sfx || "").trim().toUpperCase();
-      if(!s) return "SIRE";
-      if(s === "C") return "COMPANY";
-      if(s === "A") return "SPARE1";
-      if(s === "B") return "SPARE2";
-      return "SIRE";
-    }
-
-    function padN(num, width){
-      const n = Number(num);
-      if(!Number.isFinite(n)) return "";
-      return String(Math.trunc(n)).padStart(width, "0");
-    }
-
-    function makeNumberBase(setName, ch, sec, item){
-      const a = Number(ch), b = Number(sec), c = Number(item);
-      if(!Number.isFinite(a) || !Number.isFinite(b) || !Number.isFinite(c)) return "";
-      const aa = padN(a, 2);
-      const bb = padN(b, 2);
-      const isSire = String(setName || "").toUpperCase() === "SIRE";
-      const w = isSire ? 2 : (c >= 100 ? 3 : 2);
-      const cc = padN(c, w);
-      return `${aa}.${bb}.${cc}`;
-    }
-
-    function makeNumberFull(numberBase, suffix){
-      const base = String(numberBase || "").trim();
-      const suf = String(suffix || "").trim();
-      if(!base) return "";
-      return suf ? `${base}-${suf}` : base;
-    }
-
+    // Suffix letters for non-SIRE sets
+    const SUFFIX_BY_SOURCE = {
+      SIRE: "",
+      COMPANY: "C",
+      SPARE1: "A",
+      SPARE2: "B",
+    };
 
     // Role capabilities (set at boot) - MUST be on window for q-questions-editor.js override
     window.CAN_SAVE = false;
@@ -735,6 +696,55 @@
       return k1.s-k2.s;
     }
 
+    // ===== Number formatting + next-number helper (create mode) =====
+    function padN(num, width){
+      const n = Number(num);
+      if(!Number.isFinite(n)) return "";
+      return String(Math.trunc(n)).padStart(width, "0");
+    }
+
+    function suffixForSource(sourceType){
+      return SUFFIX_BY_SOURCE[sourceType] ?? "";
+    }
+
+    function makeNumberBase(sourceType, a, b, c){
+      const aa = padN(a, 2);
+      const bb = padN(b, 2);
+      const nn = Number(c);
+      if(!Number.isFinite(nn)) return "";
+      const cWidth = (sourceType === "SIRE") ? 2 : (nn >= 100 ? 3 : 2);
+      const cc = padN(nn, cWidth);
+      return `${aa}.${bb}.${cc}`;
+    }
+
+    function makeNumberFull(numberBase, suffix){
+      const base = String(numberBase || "").trim();
+      const suf = String(suffix || "").trim();
+      if(!base) return "";
+      return suf ? `${base}-${suf}` : base;
+    }
+
+    function maxThirdForPrefix(sourceType, a, b){
+      const aa = Number(a);
+      const bb = Number(b);
+      if(!Number.isFinite(aa) || !Number.isFinite(bb)) return 0;
+      const suf = suffixForSource(sourceType);
+      let max = 0;
+      for(const r of (window.allRows || [])){
+        if(String(r?.source_type || "") !== String(sourceType)) continue;
+        if(String(r?.number_suffix || "") !== String(suf)) continue;
+        const key = parseBaseParts(r.number_base);
+        if(!key) continue;
+        if(key.a === aa && key.b === bb && key.c > max) max = key.c;
+      }
+      return max;
+    }
+
+    function nextThirdForPrefix(sourceType, a, b){
+      const max = maxThirdForPrefix(sourceType, a, b);
+      return (max || 0) + 1;
+    }
+
     function applyLocalFilters(){
       const s = safeStr(document.getElementById("searchInput").value).toLowerCase().trim();
       const st = safeStr(document.getElementById("statusFilter").value).trim();
@@ -744,7 +754,7 @@
       window.filteredRows = window.allRows.filter(r => {
         if(st && safeStr(r.status) !== st) return false;
         if(vf && safeStr(r.version) !== vf) return false;
-        if(src && src !== "ALL" && setForSuffix(r.number_suffix) !== src) return false;
+        if(src && src !== "ALL" && setFromSuffix(r.number_suffix) !== src) return false;
 
         if(!s) return true;
         const p = r.payload || {};
@@ -754,7 +764,7 @@
           getPayloadNo(p),
           getPayloadShort(p),
           getPayloadQuestion(p),
-          setForSuffix(r.number_suffix)
+          setFromSuffix(r.number_suffix)
         ].join(" ").toLowerCase();
         return hay.includes(s);
       });
@@ -980,8 +990,10 @@
     window.deletePhotoRowAndFile = deletePhotoRowAndFile;
 
     function selectRow(id){
-      if(window.createMode){ exitCreateMode(); }
-
+      if(window.createMode){
+        // Selecting an existing question exits create mode
+        exitCreateMode();
+      }
       const r =
         window.filteredRows.find(x => x.id === id) ||
         window.allRows.find(x => x.id === id);
@@ -1000,7 +1012,7 @@
         safeStr(window.selected.number_full) || getPayloadNo(p) || safeStr(window.selected.number_base) || "—";
       document.getElementById("hdrId").textContent = `DB id: ${window.selected.id}`;
 
-      document.getElementById("dbSourceType").textContent = setForSuffix(window.selected.number_suffix) || "—";
+      document.getElementById("dbSourceType").textContent = setFromSuffix(window.selected.number_suffix) || "—";
 
       document.getElementById("dbStatus").value = safeStr(window.selected.status) || "active";
       document.getElementById("dbVersion").value = safeStr(window.selected.version);
@@ -1015,6 +1027,9 @@
       document.getElementById("pActions").value = safeStr(p["Suggested Inspector Actions"]);
       document.getElementById("pEvidence").value = safeStr(p["Expected Evidence"]);
       document.getElementById("pNegObs").value = safeStr(p["Potential Grounds for Negative Observations"]);
+
+      // sync structured PGNO editor
+      loadPgnoFromTextarea();
 
       document.getElementById("pRaw").value = JSON.stringify(p, null, 2);
 
@@ -1033,46 +1048,56 @@
     }
 
     
+    // ---------------- NEW QUESTION (CREATE MODE) ----------------
+    // NOTE: In DB, questions_master.source_type is an enum that currently accepts only "SIRE".
+    // We therefore keep source_type="SIRE" for all rows, and distinguish sets by number_suffix:
+    //   SIRE   -> number_suffix NULL
+    //   COMPANY-> "C"
+    //   SPARE1 -> "A"
+    //   SPARE2 -> "B"
+    const SUFFIX_BY_SET = { SIRE:"", COMPANY:"C", SPARE1:"A", SPARE2:"B" };
+    function setFromSuffix(sfx){
+      const s = safeStr(sfx).trim().toUpperCase();
+      if(!s) return "SIRE";
+      if(s === "C") return "COMPANY";
+      if(s === "A") return "SPARE1";
+      if(s === "B") return "SPARE2";
+      return "SIRE";
+    }
+    function suffixFromSet(set){
+      return SUFFIX_BY_SET[set] ?? "";
+    }
+
     function showNewQuestionPanel(show){
       const pnl = document.getElementById("newQuestionPanel");
       if(pnl) pnl.style.display = show ? "block" : "none";
-      const saveBtn = document.getElementById("btnSave");
-      if(saveBtn) saveBtn.textContent = show ? "Create in DB" : "Save to DB";
 
-      // Photos disabled until the new row exists (needs question_id)
+      // Photo controls disabled for unsaved questions (need question_id)
       const disable = !!show;
       const file = document.getElementById("photoFile");
       const upBtn = document.getElementById("btnUploadPhotos");
       const rfBtn = document.getElementById("btnRefreshPhotos");
-      if(file) file.disabled = disable || !window.CAN_MANAGE_PHOTOS;
-      if(upBtn) upBtn.disabled = disable || !window.CAN_MANAGE_PHOTOS;
+      if(file) file.disabled = disable;
+      if(upBtn) upBtn.disabled = disable;
       if(rfBtn) rfBtn.disabled = disable;
 
       if(disable){
+        const st = document.getElementById("photoStatus");
+        if(st) st.textContent = "Save the new question first to enable photo upload.";
         const grid = document.getElementById("photoGrid");
-        const cnt = document.getElementById("photoCountLine");
         if(grid) grid.innerHTML = "";
-        if(cnt) cnt.textContent = "Save the new question first, then you can upload photos.";
-        window.setPhotoStatus("Save the new question first to enable photo upload.");
+        const cnt = document.getElementById("photoCountLine");
+        if(cnt) cnt.textContent = "";
       }
+
+      // Save button label
+      const saveBtn = document.getElementById("btnSave");
+      if(saveBtn) saveBtn.textContent = show ? "Create in DB" : "Save to DB";
     }
 
-    function parse2or3(v){
-      const n = Number(String(v||"").trim());
-      if(!Number.isInteger(n)) return null;
-      return n;
-    }
-
-    function nextItemFor(setName, ch, sec){
-      const suf = suffixForSet(setName);
-      let max = 0;
-      for(const r of (window.allRows || [])){
-        const rSet = setForSuffix(r.number_suffix);
-        if(rSet !== setName) continue;
-        const [a,b,c] = parseBaseParts(r.number_base);
-        if(a === ch && b === sec && c > max) max = c;
-      }
-      return max + 1;
+    function currentSelectedNumberFull(){
+      const el = document.getElementById("hdrNumber");
+      return safeStr(el?.textContent).trim();
     }
 
     function buildBlankPayload(numberFull){
@@ -1083,100 +1108,60 @@
         "Inspection Guidance": "",
         "Suggested Inspector Actions": "",
         "Expected Evidence": "",
-        "Potential Grounds for Negative Observations": ""
+        "Potential Grounds for Negative Observations": "",
       };
     }
 
-    function updateNewNumberUI(autoFixItem){
-      const setName = String(document.getElementById("newSourceType")?.value || "COMPANY").trim();
-      const ch = parse2or3(document.getElementById("newChap")?.value);
-      const sec = parse2or3(document.getElementById("newSec")?.value);
-      let item = parse2or3(document.getElementById("newItem")?.value);
-
-      if(ch === null || ch < 0 || ch > 99){ showWarn("Chapter (xx) must be 0–99"); return null; }
-      if(sec === null || sec < 0 || sec > 99){ showWarn("Section (yy) must be 0–99"); return null; }
-
-      if(autoFixItem || item === null){
-        item = nextItemFor(setName, ch, sec);
-        document.getElementById("newItem").value = String(item);
+    function nextThirdForSetPrefix(set, a, b){
+      const suffix = suffixFromSet(set);
+      let max = 0;
+      for(const r of (window.allRows || [])){
+        const rs = setFromSuffix(r?.number_suffix);
+        if(rs !== set) continue;
+        const [ra, rb, rc] = parseBaseParts(r?.number_base);
+        if(ra === a && rb === b && rc > max) max = rc;
       }
-      if(item < 0 || item > 999){ showWarn("Item (zz/zzz) must be 0–999"); return null; }
+      return (max || 0) + 1;
+    }
 
-      const suffix = suffixForSet(setName);
-      const number_base = makeNumberBase(setName, ch, sec, item);
+    // Syncs create inputs => number pills/header + payload No.
+    // Returns { question_set, suffix, number_base, number_full } or null if invalid.
+    function syncNewNumberFromInputs(showHint=true){
+      const set = safeStr(document.getElementById("newSourceType")?.value).trim() || "COMPANY";
+      const ch = safeStr(document.getElementById("newChap")?.value).trim();
+      const se = safeStr(document.getElementById("newSec")?.value).trim();
+      const it = safeStr(document.getElementById("newItem")?.value).trim();
+
+      const a = Number(ch), b = Number(se), c = Number(it);
+      if(!Number.isInteger(a) || a < 0 || a > 99) { showWarn("Chapter (xx) must be 0-99"); return null; }
+      if(!Number.isInteger(b) || b < 0 || b > 99) { showWarn("Section (yy) must be 0-99"); return null; }
+      if(!Number.isInteger(c) || c < 0 || c > 999){ showWarn("Item (zz/zzz) must be 0-999"); return null; }
+
+      const suffix = suffixFromSet(set); // "" for SIRE
+      const thirdWidth = (set === "SIRE") ? 2 : (c >= 100 ? 3 : 2);
+      const number_base = `${padN(a,2)}.${padN(b,2)}.${padN(c,thirdWidth)}`;
       const number_full = makeNumberFull(number_base, suffix);
 
-      // header + pills
-      document.getElementById("hdrNumber").textContent = number_full || "—";
+      document.getElementById("hdrNumber").textContent = number_full;
       document.getElementById("hdrId").textContent = "New question (not saved yet)";
-      document.getElementById("dbSourceType").textContent = setName;
+      document.getElementById("dbSourceType").textContent = set;
       document.getElementById("dbNumberBase").textContent = number_base;
-      document.getElementById("dbNumberSuffix").textContent = suffix || "";
+      document.getElementById("dbNumberSuffix").textContent = suffix || "(none)";
 
       const hint = document.getElementById("newNumberHint");
-      if(hint) hint.textContent = `Will be created as: ${number_full}`;
+      if(hint && showHint){
+        hint.textContent = `Will be created as: ${number_full}`;
+      }
 
       // keep payload No. consistent
       try{
         const rawEl = document.getElementById("pRaw");
-        const obj = JSON.parse(rawEl.value || "{}");
-        if(obj && typeof obj === "object"){
-          obj["No."] = number_full;
-          rawEl.value = JSON.stringify(obj, null, 2);
-        }
-      }catch(_e){/* ignore */}
+        const obj = JSON.parse(rawEl.value || "{}") || {};
+        obj["No."] = number_full;
+        rawEl.value = JSON.stringify(obj, null, 2);
+      }catch(_e){ /* ignore */ }
 
-      showWarn("");
-      return { setName, suffix, number_base, number_full };
-    }
-
-    async function startNewQuestion(){
-      if(!window.CAN_SAVE){
-        showWarn("Create blocked: your role is read-only in this module.");
-        return;
-      }
-      showWarn(""); showOk("");
-
-      window.createMode = true;
-      window.selected = null;
-      window.selectedOriginal = null;
-
-      document.getElementById("emptyState").style.display = "none";
-      document.getElementById("editPanel").style.display = "block";
-      showNewQuestionPanel(true);
-
-      // defaults: use current filter if not ALL, else COMPANY
-      const currentSet = String(document.getElementById("sourceFilter")?.value || "ALL").trim();
-      const defaultSet = (currentSet && currentSet !== "ALL") ? currentSet : "COMPANY";
-      document.getElementById("newSourceType").value = defaultSet;
-
-      // default prefix: if an existing row is selected, reuse its chapter/section; else 1/1
-      let ch = 1, sec = 1;
-      if(window.filteredRows && window.filteredRows.length){
-        const [a,b] = parseBaseParts(window.filteredRows[0].number_base);
-        ch = a || 1; sec = b || 1;
-      }
-      document.getElementById("newChap").value = String(ch);
-      document.getElementById("newSec").value = String(sec);
-      document.getElementById("newItem").value = "";
-
-      // DB meta defaults
-      document.getElementById("dbStatus").value = "active";
-      const v = String(document.getElementById("versionFilter")?.value || "").trim() || "SIRE_2.0_QL";
-      document.getElementById("dbVersion").value = v;
-      document.getElementById("dbTags").value = "";
-
-      // blank payload (No. will be set by updateNewNumberUI)
-      const blank = buildBlankPayload("");
-      document.getElementById("pShortText").value = "";
-      document.getElementById("pQuestion").value = "";
-      document.getElementById("pGuidance").value = "";
-      document.getElementById("pActions").value = "";
-      document.getElementById("pEvidence").value = "";
-      document.getElementById("pNegObs").value = "";
-      document.getElementById("pRaw").value = JSON.stringify(blank, null, 2);
-
-      updateNewNumberUI(true);
+      return { question_set: set, suffix, number_base, number_full };
     }
 
     function exitCreateMode(){
@@ -1186,7 +1171,165 @@
       if(hint) hint.textContent = "";
     }
 
+    async function startNewQuestion(){
+      if(!window.CAN_SAVE){
+        showWarn("Create blocked: your role is read-only in this module.");
+        return;
+      }
+
+      showWarn(""); showOk("");
+
+      window.createMode = true;
+      window.selected = null;
+      window.selectedOriginal = null;
+
+      document.getElementById("emptyState").style.display = "none";
+      document.getElementById("editPanel").style.display = "block";
+      document.getElementById("saveStatus").textContent = "";
+
+      // Default set: based on filter (if not ALL)
+      const f = safeStr(document.getElementById("sourceFilter")?.value).trim();
+      const defaultSet = (f && f !== "ALL") ? f : "COMPANY";
+
+      document.getElementById("newSourceType").value = defaultSet;
+
+      // Default prefix: use current selected (if any), else 1.1
+      let a = 1, b = 1;
+      if(window.allRows && window.allRows.length){
+        const first = window.allRows[0];
+        const parts = parseBaseParts(first?.number_base);
+        a = parts[0] || 1;
+        b = parts[1] || 1;
+      }
+
+      document.getElementById("newChap").value = String(a);
+      document.getElementById("newSec").value = String(b);
+      document.getElementById("newItem").value = String(nextThirdForSetPrefix(defaultSet, a, b));
+
+      // DB meta defaults
+      document.getElementById("dbStatus").value = "active";
+      const v = safeStr(document.getElementById("versionFilter")?.value).trim() || "SIRE_2.0_QL";
+      document.getElementById("dbVersion").value = v;
+      document.getElementById("dbTags").value = "";
+
+      // blank payload + clear UI fields
+      const info = syncNewNumberFromInputs(true);
+      const blank = buildBlankPayload(info?.number_full || "");
+      document.getElementById("pShortText").value = "";
+      document.getElementById("pQuestion").value = "";
+      document.getElementById("pGuidance").value = "";
+      document.getElementById("pActions").value = "";
+      document.getElementById("pEvidence").value = "";
+      document.getElementById("pNegObs").value = "";
+      document.getElementById("pRaw").value = JSON.stringify(blank, null, 2);
+
+      // PGNO structured editor sync
+      loadPgnoFromTextarea();
+
+      showNewQuestionPanel(true);
+    }
+
+    // Auto-next button: increments item for current (set, chapter, section)
+    function autoNext(){
+      const set = safeStr(document.getElementById("newSourceType")?.value).trim() || "COMPANY";
+      const a = Number(document.getElementById("newChap")?.value);
+      const b = Number(document.getElementById("newSec")?.value);
+      if(!Number.isInteger(a) || !Number.isInteger(b)) return;
+      document.getElementById("newItem").value = String(nextThirdForSetPrefix(set, a, b));
+      syncNewNumberFromInputs(true);
+    }
+
+    // Cancel create
+    function cancelNew(){
+      exitCreateMode();
+      document.getElementById("emptyState").style.display = "block";
+      document.getElementById("editPanel").style.display = "none";
+      showWarn(""); showOk("");
+    }
+
+    // ---------------- PGNO STRUCTURED EDITOR ----------------
+    window.pgnoItems = [];
+
+    function baseNumberForPgno(){
+      const full = currentSelectedNumberFull();
+      // full is like 12.01.01-C or 12.01.01
+      const parts = full.split("-");
+      return { base: parts[0] || "", suffix: (parts[1] || "") };
+    }
+
+    function loadPgnoFromTextarea(){
+      const t = safeStr(document.getElementById("pNegObs")?.value);
+      const lines = t.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
+      // if it looks like bullets, strip leading bullets
+      const cleaned = lines.map(x => x.replace(/^[-•\u2022]+\s*/,"").trim()).filter(Boolean);
+      window.pgnoItems = cleaned.map(x => ({ text: x }));
+      renderPgnoList();
+    }
+
+    function syncPgnoToTextarea(){
+      const out = (window.pgnoItems || []).map(x => safeStr(x.text).trim()).filter(Boolean);
+      document.getElementById("pNegObs").value = out.join("\n");
+      // also reflect into raw JSON if parsable
+      try{
+        const rawEl = document.getElementById("pRaw");
+        const obj = JSON.parse(rawEl.value || "{}") || {};
+        obj["Potential Grounds for Negative Observations"] = document.getElementById("pNegObs").value;
+        rawEl.value = JSON.stringify(obj, null, 2);
+      }catch(_e){}
+    }
+
+    function renderPgnoList(){
+      const list = document.getElementById("pgnoList");
+      if(!list) return;
+      list.innerHTML = "";
+
+      const { base, suffix } = baseNumberForPgno();
+      const suf = suffix ? `-${suffix}` : "";
+
+      if(!window.pgnoItems.length){
+        list.innerHTML = `<div class="muted">No PGNO items yet. Use “Add PGNO”.</div>`;
+        return;
+      }
+
+      for(let i=0;i<window.pgnoItems.length;i++){
+        const pp = String(i+1).padStart(2,"0");
+        const no = base ? `${base}.${pp}${suf}` : `PGNO ${pp}${suf}`;
+
+        const row = document.createElement("div");
+        row.className = "pgnoRow";
+        row.innerHTML = `
+          <div class="pgnoNo">${no}</div>
+          <textarea data-pgno-idx="${i}">${safeStr(window.pgnoItems[i].text)}</textarea>
+          <button class="btn danger" type="button" data-pgno-del="${i}">Remove</button>
+        `;
+        const ta = row.querySelector("textarea");
+        ta.addEventListener("input", (e) => {
+          const idx = Number(e.target.getAttribute("data-pgno-idx"));
+          if(Number.isInteger(idx) && window.pgnoItems[idx]) window.pgnoItems[idx].text = e.target.value;
+          syncPgnoToTextarea();
+        });
+
+        const del = row.querySelector("button[data-pgno-del]");
+        del.addEventListener("click", () => {
+          window.pgnoItems.splice(i,1);
+          renderPgnoList();
+          syncPgnoToTextarea();
+        });
+
+        list.appendChild(row);
+      }
+    }
+
+    function addPgnoItem(){
+      window.pgnoItems.push({ text: "" });
+      renderPgnoList();
+      syncPgnoToTextarea();
+    }
+    // ---------------------------------------------------------
+
     async function saveSelected(){
+      if(!window.selected && !window.createMode) return;
+
       if(!window.CAN_SAVE){
         showWarn("Save blocked: your role is read-only in this module.");
         return;
@@ -1205,7 +1348,7 @@
         return;
       }
 
-      // normalize from textareas
+      // Normalize common fields from textareas into payload
       payloadObj["Short Text"] = document.getElementById("pShortText").value;
       payloadObj["Question"] = document.getElementById("pQuestion").value;
       payloadObj["Inspection Guidance"] = document.getElementById("pGuidance").value;
@@ -1214,18 +1357,21 @@
       payloadObj["Potential Grounds for Negative Observations"] = document.getElementById("pNegObs").value;
 
       const newStatus = document.getElementById("dbStatus").value;
-      const newVersion = document.getElementById("dbVersion").value.trim() || "SIRE_2.0_QL";
+      const newVersion = document.getElementById("dbVersion").value.trim();
       const newTags = parseTags(document.getElementById("dbTags").value);
 
       try{
         if(window.createMode){
-          const info = updateNewNumberUI(false);
+          const info = syncNewNumberFromInputs();
           if(!info){
             saveStatus.textContent = "";
             return;
           }
 
-          // duplicate protection on number_full
+          const safeVersion = newVersion || "SIRE_2.0_QL";
+          payloadObj["No."] = info.number_full;
+
+          // Check for duplicates by number_full
           const { data: dup, error: dupErr } = await sb
             .from("questions_master")
             .select("id")
@@ -1238,17 +1384,15 @@
             return;
           }
 
-          payloadObj["No."] = info.number_full;
-
           const insertRow = {
-            source_type: "SIRE", // DB enum (do NOT set to COMPANY/SPARE here)
+            // DB enum allows only "SIRE" currently
+            source_type: "SIRE",
             number_base: info.number_base,
             number_suffix: info.suffix || null,
-            number_full: info.number_full,
             status: newStatus,
-            version: newVersion,
+            version: safeVersion,
             tags: newTags,
-            payload: payloadObj
+            payload: payloadObj,
           };
 
           const { data: created, error: insErr } = await sb
@@ -1261,6 +1405,7 @@
           showOk("Created in DB.");
           saveStatus.textContent = "Created.";
 
+          // Add to local cache and re-render
           window.allRows.unshift(created);
           exitCreateMode();
           applyLocalFilters();
@@ -1268,18 +1413,13 @@
           return;
         }
 
-        // edit existing
-        if(!window.selected?.id){
-          saveStatus.textContent = "";
-          showWarn("No question selected.");
-          return;
-        }
-
+        // ===== EDIT MODE: update existing question =====
+        const safeVersion = newVersion || window.selected.version || "SIRE_2.0_QL";
         const { error } = await sb
           .from("questions_master")
           .update({
             status: newStatus,
-            version: newVersion,
+            version: safeVersion,
             tags: newTags,
             payload: payloadObj
           })
@@ -1293,7 +1433,7 @@
         const idx = window.allRows.findIndex(x => x.id === window.selected.id);
         if(idx >= 0){
           window.allRows[idx].status = newStatus;
-          window.allRows[idx].version = newVersion;
+          window.allRows[idx].version = safeVersion;
           window.allRows[idx].tags = newTags;
           window.allRows[idx].payload = payloadObj;
         }
@@ -1307,8 +1447,7 @@
       }
     }
 
-
-async function loadQuestionsFromDb(){
+    async function loadQuestionsFromDb(){
       showWarn(""); showOk("");
       document.getElementById("loadHint").textContent = "Loading…";
 
@@ -1323,12 +1462,13 @@ async function loadQuestionsFromDb(){
 
         if(statusFilter) q = q.eq("status", statusFilter);
         if(versionFilter) q = q.eq("version", versionFilter);
-        if(sourceFilter && sourceFilter !== "ALL"){
-          if(sourceFilter === "SIRE"){
-            q = q.is("number_suffix", null);
-          }else{
-            q = q.eq("number_suffix", suffixForSet(sourceFilter));
-          }
+        // IMPORTANT: source_type is an enum and currently accepts only "SIRE".
+        // We filter question sets by number_suffix instead.
+        if(sourceFilter && sourceFilter !== "ALL") {
+          if(sourceFilter === "SIRE") q = q.is("number_suffix", null);
+          else if(sourceFilter === "COMPANY") q = q.eq("number_suffix", "C");
+          else if(sourceFilter === "SPARE1") q = q.eq("number_suffix", "A");
+          else if(sourceFilter === "SPARE2") q = q.eq("number_suffix", "B");
         }
 
         const pageSize = 1000;
@@ -1347,6 +1487,10 @@ async function loadQuestionsFromDb(){
         window.allRows.sort((x,y)=>compareKeys(rowSortKey(x), rowSortKey(y)));
 
         document.getElementById("loadHint").textContent = `Loaded ${window.allRows.length}`;
+
+        // Hide Safe Import panel once DB already contains questions (keeps UI clean)
+        const imp = document.getElementById("importCard");
+        if(imp && window.allRows.length > 0) imp.style.display = "none";
         document.getElementById("countLine").textContent = `${window.allRows.length} questions`;
 
         applyLocalFilters();
@@ -1400,59 +1544,47 @@ async function loadQuestionsFromDb(){
         `Role: ${role} • Mode: ${mode} • Module: QUESTIONS_EDITOR`;
 
       document.getElementById("editorCard").style.display = "block";
-
-      // Import panel is useful only when DB is empty.
       if(isSuper){
-        try{
-          const cnt = await getQuestionsMasterCount();
-          if((cnt || 0) === 0){
-            document.getElementById("importCard").style.display = "block";
-          }else{
-            document.getElementById("importCard").style.display = "none";
-          }
-        }catch(_e){
-          // If count fails, keep import hidden (safer)
-          document.getElementById("importCard").style.display = "none";
-        }
+        document.getElementById("importCard").style.display = "block";
       }
 
       document.getElementById("reloadBtn").onclick = () => { window.selected=null; loadQuestionsFromDb(); };
-
-      // New question
+      // Create new question
       const newBtn = document.getElementById("newBtn");
       if(newBtn){
         newBtn.style.display = window.CAN_SAVE ? "inline-block" : "none";
         newBtn.onclick = startNewQuestion;
       }
 
-      document.getElementById("searchInput").oninput = applyLocalFilters;
-      document.getElementById("statusFilter").onchange = () => { window.selected=null; loadQuestionsFromDb(); };
-      document.getElementById("versionFilter").onchange = () => { window.selected=null; loadQuestionsFromDb(); };
-      document.getElementById("sourceFilter").onchange = () => { window.selected=null; loadQuestionsFromDb(); };
-
-      // Create-mode inputs
       const newSourceType = document.getElementById("newSourceType");
-      const newChap = document.getElementById("newChap");
-      const newSec = document.getElementById("newSec");
-      const newItem = document.getElementById("newItem");
+      const newChapter = document.getElementById("newChap");
+      const newSection = document.getElementById("newSec");
+      const newThird = document.getElementById("newItem");
       const btnAutoNext = document.getElementById("btnAutoNext");
       const btnCancelNew = document.getElementById("btnCancelNew");
 
       function bind(el, ev, fn){ if(el) el.addEventListener(ev, fn); }
-      bind(newSourceType, "change", () => updateNewNumberUI(true));
-      bind(newChap, "input", () => updateNewNumberUI(false));
-      bind(newSec, "input", () => updateNewNumberUI(false));
-      bind(newItem, "input", () => updateNewNumberUI(false));
-      bind(btnAutoNext, "click", () => updateNewNumberUI(true));
-      bind(btnCancelNew, "click", () => { exitCreateMode(); document.getElementById("emptyState").style.display = "block"; document.getElementById("editPanel").style.display = "none"; });
-
-
+      bind(newSourceType, "change", () => syncNewNumberFromInputs(true));
+      bind(newChapter, "input", () => syncNewNumberFromInputs(false));
+      bind(newSection, "input", () => syncNewNumberFromInputs(false));
+      bind(newThird, "input", () => syncNewNumberFromInputs(false));
+      bind(btnAutoNext, "click", () => { autoNext(); });
+      bind(btnCancelNew, "click", () => { cancelNew(); });
+      document.getElementById("searchInput").oninput = applyLocalFilters;
+      document.getElementById("statusFilter").onchange = () => { window.selected=null; loadQuestionsFromDb(); };
+      document.getElementById("versionFilter").onchange = () => { window.selected=null; loadQuestionsFromDb(); };
+      document.getElementById("sourceFilter").onchange = () => { window.selected=null; loadQuestionsFromDb(); };
 
       document.getElementById("btnReset").onclick = resetSelected;
       document.getElementById("btnSave").onclick = saveSelected;
 
       document.getElementById("btnRefreshPhotos").onclick = window.loadPhotosForSelected;
       document.getElementById("btnUploadPhotos").onclick = window.uploadSelectedPhotos;
+      // PGNO structured editor buttons
+      const pgSync = document.getElementById("btnPgnoSync");
+      const pgAdd = document.getElementById("btnPgnoAdd");
+      if(pgSync) pgSync.onclick = loadPgnoFromTextarea;
+      if(pgAdd) pgAdd.onclick = addPgnoItem;
 
       if(!window.CAN_SAVE){
         const b = document.getElementById("btnSave");
