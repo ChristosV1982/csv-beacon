@@ -260,6 +260,7 @@
 
       <div class="row">
         <button class="btn primary" id="reloadBtn">Load / Refresh Questions</button>
+        <button class="btn light" id="newBtn" title="Create a new question">New Question</button>
 
         <div class="field" style="min-width:220px;">
           <label>Source</label>
@@ -327,6 +328,43 @@
             </div>
 
             <div class="hr"></div>
+
+            <!-- New Question controls (only visible in create mode) -->
+            <div id="newQuestionPanel" class="card" style="display:none; margin:0 0 12px 0; padding:12px; border-radius:14px; border:1px solid #e3edf9; box-shadow:none;">
+              <div class="row" style="justify-content:space-between; align-items:flex-end;">
+                <div class="field" style="min-width:220px;">
+                  <label>Create: Question Set</label>
+                  <select id="newSourceType">
+                    <option value="SIRE">SIRE</option>
+                    <option value="COMPANY">COMPANY</option>
+                    <option value="SPARE1">SPARE1</option>
+                    <option value="SPARE2">SPARE2</option>
+                  </select>
+                </div>
+
+                <div class="field" style="min-width:140px;">
+                  <label>Chapter (xx)</label>
+                  <input id="newChap" inputmode="numeric" placeholder="e.g. 04" />
+                </div>
+
+                <div class="field" style="min-width:140px;">
+                  <label>Section (yy)</label>
+                  <input id="newSec" inputmode="numeric" placeholder="e.g. 01" />
+                </div>
+
+                <div class="field" style="min-width:160px;">
+                  <label>Item (zz / zzz)</label>
+                  <input id="newItem" inputmode="numeric" placeholder="auto" />
+                </div>
+
+                <div class="row">
+                  <button class="btn light" id="btnAutoNext" type="button">Auto Next</button>
+                  <button class="btn light" id="btnCancelNew" type="button">Cancel</button>
+                </div>
+              </div>
+
+              <div class="muted" id="newNumberHint" style="margin-top:8px;"></div>
+            </div>
 
             <div class="kv" style="margin-bottom:12px;">
               <div class="k">source_type</div>
@@ -599,6 +637,18 @@
     window.selected = null;
     window.selectedOriginal = null;
 
+    // New-question (create mode) state
+    window.createMode = false;
+    window.newDraft = null;
+
+    // Suffix letters for non-SIRE sets
+    const SUFFIX_BY_SOURCE = {
+      SIRE: "",
+      COMPANY: "C",
+      SPARE1: "A",
+      SPARE2: "B",
+    };
+
     // Role capabilities (set at boot) - MUST be on window for q-questions-editor.js override
     window.CAN_SAVE = false;
     window.CAN_MANAGE_PHOTOS = false;
@@ -644,6 +694,55 @@
       if(k1.b!==k2.b) return k1.b-k2.b;
       if(k1.c!==k2.c) return k1.c-k2.c;
       return k1.s-k2.s;
+    }
+
+    // ===== Number formatting + next-number helper (create mode) =====
+    function padN(num, width){
+      const n = Number(num);
+      if(!Number.isFinite(n)) return "";
+      return String(Math.trunc(n)).padStart(width, "0");
+    }
+
+    function suffixForSource(sourceType){
+      return SUFFIX_BY_SOURCE[sourceType] ?? "";
+    }
+
+    function makeNumberBase(sourceType, a, b, c){
+      const aa = padN(a, 2);
+      const bb = padN(b, 2);
+      const nn = Number(c);
+      if(!Number.isFinite(nn)) return "";
+      const cWidth = (sourceType === "SIRE") ? 2 : (nn >= 100 ? 3 : 2);
+      const cc = padN(nn, cWidth);
+      return `${aa}.${bb}.${cc}`;
+    }
+
+    function makeNumberFull(numberBase, suffix){
+      const base = String(numberBase || "").trim();
+      const suf = String(suffix || "").trim();
+      if(!base) return "";
+      return suf ? `${base}-${suf}` : base;
+    }
+
+    function maxThirdForPrefix(sourceType, a, b){
+      const aa = Number(a);
+      const bb = Number(b);
+      if(!Number.isFinite(aa) || !Number.isFinite(bb)) return 0;
+      const suf = suffixForSource(sourceType);
+      let max = 0;
+      for(const r of (window.allRows || [])){
+        if(String(r?.source_type || "") !== String(sourceType)) continue;
+        if(String(r?.number_suffix || "") !== String(suf)) continue;
+        const key = parseBaseParts(r.number_base);
+        if(!key) continue;
+        if(key.a === aa && key.b === bb && key.c > max) max = key.c;
+      }
+      return max;
+    }
+
+    function nextThirdForPrefix(sourceType, a, b){
+      const max = maxThirdForPrefix(sourceType, a, b);
+      return (max || 0) + 1;
     }
 
     function applyLocalFilters(){
@@ -891,6 +990,10 @@
     window.deletePhotoRowAndFile = deletePhotoRowAndFile;
 
     function selectRow(id){
+      if(window.createMode){
+        // Selecting an existing question exits create mode
+        exitCreateMode();
+      }
       const r =
         window.filteredRows.find(x => x.id === id) ||
         window.allRows.find(x => x.id === id);
@@ -941,8 +1044,244 @@
       selectRow(window.selectedOriginal.id);
     }
 
+    function showNewQuestionPanel(show){
+      const pnl = document.getElementById("newQuestionPanel");
+      if(pnl) pnl.style.display = show ? "block" : "none";
+      const saveBtn = document.getElementById("btnSave");
+      if(saveBtn) saveBtn.textContent = show ? "Create in DB" : "Save to DB";
+    }
+
+    function buildBlankPayload(numberFull){
+      return {
+        "No.": numberFull || "",
+        "Short Text": "",
+        "Question": "",
+        "Inspection Guidance": "",
+        "Suggested Inspector Actions": "",
+        "Expected Evidence": "",
+        "Potential Grounds for Negative Observations": "",
+      };
+    }
+
+    function syncNewNumberFromInputs(){
+      const src = safeStr(document.getElementById("newSourceType")?.value).trim() || "COMPANY";
+      const a = safeInt(document.getElementById("newChapter")?.value, null);
+      const b = safeInt(document.getElementById("newSection")?.value, null);
+      const c = safeInt(document.getElementById("newThird")?.value, null);
+      if(a===null || b===null || c===null) return null;
+
+      const suffix = suffixForSource(src);
+      const base = makeNumberBase(a,b,c, thirdWidthForValue(src,c));
+      const full = makeNumberFull(base, suffix);
+
+      // Update header + pills
+      document.getElementById("hdrNumber").textContent = full;
+      document.getElementById("dbSourceType").textContent = src;
+      document.getElementById("dbNumberBase").textContent = base;
+      document.getElementById("dbNumberSuffix").textContent = suffix;
+
+      // Ensure payload No. matches
+      let payloadObj = null;
+      try{ payloadObj = JSON.parse(document.getElementById("pRaw").value); }catch(_){ payloadObj = null; }
+      if(!payloadObj || typeof payloadObj !== "object") payloadObj = buildBlankPayload(full);
+      payloadObj["No."] = full;
+      document.getElementById("pRaw").value = JSON.stringify(payloadObj, null, 2);
+
+      return { src, a, b, c, base, suffix, full };
+    }
+
+    async function startNewQuestion(){
+      if(!window.CAN_SAVE){
+        showWarn("Create blocked: your role is read-only in this module.");
+        return;
+      }
+
+      showWarn(""); showOk("");
+
+      // Enter create mode
+      window.createMode = true;
+      window.selected = null;
+      window.selectedOriginal = null;
+
+      document.getElementById("emptyState").style.display = "none";
+      document.getElementById("editPanel").style.display = "block";
+      document.getElementById("hdrId").textContent = "New question (not saved yet)";
+      document.getElementById("saveStatus").textContent = "";
+
+      // Defaults
+      const srcFilter = safeStr(document.getElementById("sourceFilter")?.value).trim();
+      const defaultSrc = (srcFilter && srcFilter !== "ALL") ? srcFilter : "COMPANY";
+
+      const srcEl = document.getElementById("newSourceType");
+      const aEl = document.getElementById("newChapter");
+      const bEl = document.getElementById("newSection");
+      const cEl = document.getElementById("newThird");
+
+      if(srcEl) srcEl.value = defaultSrc;
+
+      // Use last selected prefix if available, otherwise 1.1
+      let a = 1, b = 1;
+      if(window.filteredRows && window.filteredRows.length){
+        const first = window.filteredRows[0];
+        const parts = parseBaseParts(first?.number_base);
+        if(parts) { a = parts.a; b = parts.b; }
+      }
+
+      if(aEl) aEl.value = a;
+      if(bEl) bEl.value = b;
+
+      const nextC = nextThirdFor(defaultSrc, a, b);
+      if(cEl) cEl.value = nextC;
+
+      // Set DB meta defaults
+      document.getElementById("dbStatus").value = "active";
+      const v = safeStr(document.getElementById("versionFilter")?.value).trim() || "SIRE_2.0_QL";
+      document.getElementById("dbVersion").value = v;
+      document.getElementById("dbTags").value = "";
+
+      // Blank payload
+      const n = syncNewNumberFromInputs();
+      const blank = buildBlankPayload(n?.full || "");
+      document.getElementById("pShortText").value = "";
+      document.getElementById("pQuestion").value = "";
+      document.getElementById("pGuidance").value = "";
+      document.getElementById("pActions").value = "";
+      document.getElementById("pEvidence").value = "";
+      document.getElementById("pNegObs").value = "";
+      document.getElementById("pRaw").value = JSON.stringify(blank, null, 2);
+
+      // Photos disabled until saved (needs question_id)
+      document.getElementById("btnUploadPhotos").disabled = true;
+      document.getElementById("photoFile").disabled = true;
+      document.getElementById("photoGrid").innerHTML = "";
+      document.getElementById("photoCountLine").textContent = "Save the new question first, then you can upload photos.";
+
+      showNewQuestionPanel(true);
+    }
+
+    // Reads the Create Mode inputs and updates the visible pills/header.
+    // Returns { source_type, suffix, number_base, number_full } on success; null on validation failure.
+    function syncNewNumberFromInputs(){
+      const src = safeStr(document.getElementById("newSourceType")?.value).trim() || "COMPANY";
+      const ch = safeStr(document.getElementById("newChapter")?.value).trim();
+      const se = safeStr(document.getElementById("newSection")?.value).trim();
+      const th = safeStr(document.getElementById("newThird")?.value).trim();
+
+      const a = Number(ch), b = Number(se), c = Number(th);
+      if(!Number.isInteger(a) || a < 0 || a > 99) { showWarn("Chapter (xx) must be 0-99"); return null; }
+      if(!Number.isInteger(b) || b < 0 || b > 99) { showWarn("Section (yy) must be 0-99"); return null; }
+      if(!Number.isInteger(c) || c < 0 || c > 999) { showWarn("Third segment (zz/zzz) must be 0-999"); return null; }
+
+      const suffix = suffixForSourceType(src);
+      const thirdWidth = (src === "SIRE") ? 2 : (c >= 100 ? 3 : 2);
+
+      const number_base = `${padN(a,2)}.${padN(b,2)}.${padN(c,thirdWidth)}`;
+      const number_full = makeNumberFull(number_base, suffix);
+
+      // update header + pills
+      document.getElementById("hdrNumber").textContent = number_full;
+      document.getElementById("hdrId").textContent = "(new) Not saved yet";
+      document.getElementById("dbSourceType").textContent = src;
+      document.getElementById("dbNumberBase").textContent = number_base;
+      document.getElementById("dbNumberSuffix").textContent = suffix || "(none)";
+
+      // keep payload "No." consistent if raw JSON parses
+      try{
+        const rawEl = document.getElementById("pRaw");
+        const obj = JSON.parse(rawEl.value || "{}") || {};
+        obj["No."] = number_full;
+        rawEl.value = JSON.stringify(obj, null, 2);
+      }catch(_e){/* ignore */}
+
+      return { source_type: src, suffix, number_base, number_full };
+    }
+
+    function showNewQuestionPanel(show){
+      const pnl = document.getElementById("newQuestionPanel");
+      if(pnl) pnl.style.display = show ? "block" : "none";
+
+      // Photo controls disabled for unsaved questions
+      const disable = !!show;
+      const file = document.getElementById("photoFile");
+      const upBtn = document.getElementById("btnUploadPhotos");
+      const rfBtn = document.getElementById("btnRefreshPhotos");
+      if(file) file.disabled = disable;
+      if(upBtn) upBtn.disabled = disable;
+      if(rfBtn) rfBtn.disabled = disable;
+
+      const photoStatus = document.getElementById("photoStatus");
+      if(photoStatus && disable) photoStatus.textContent = "Save the new question first to enable photo upload.";
+      const grid = document.getElementById("photoGrid");
+      if(grid && disable) grid.innerHTML = "";
+      const cnt = document.getElementById("photoCountLine");
+      if(cnt && disable) cnt.textContent = "";
+
+      // Save button label
+      const saveBtn = document.getElementById("btnSave");
+      if(saveBtn) saveBtn.textContent = show ? "Create in DB" : "Save to DB";
+    }
+
+    function enterCreateMode(defaultSource){
+      window.createMode = true;
+      window.selected = null;
+      window.selectedOriginal = null;
+
+      document.getElementById("emptyState").style.display = "none";
+      document.getElementById("editPanel").style.display = "block";
+      showNewQuestionPanel(true);
+
+      showWarn(""); showOk("");
+      document.getElementById("saveStatus").textContent = "";
+
+      // base defaults
+      const src = defaultSource && defaultSource !== "ALL" ? defaultSource : "COMPANY";
+      const srcEl = document.getElementById("newSourceType");
+      if(srcEl) srcEl.value = src;
+
+      const aEl = document.getElementById("newChapter");
+      const bEl = document.getElementById("newSection");
+      const cEl = document.getElementById("newThird");
+      if(aEl) aEl.value = "1";
+      if(bEl) bEl.value = "1";
+      if(cEl) cEl.value = String(nextThirdFor(window.allRows, src, 1, 1));
+
+      // version: prefer filter value, else existing field, else default
+      const vFilter = safeStr(document.getElementById("versionFilter").value).trim();
+      const vEl = document.getElementById("dbVersion");
+      if(vEl) vEl.value = vFilter || "SIRE_2.0_QL";
+      document.getElementById("dbStatus").value = "active";
+      document.getElementById("dbTags").value = "";
+
+      // seed payload
+      const raw = {
+        "No.": "",
+        "Short Text": "",
+        "Question": "",
+        "Inspection Guidance": "",
+        "Suggested Inspector Actions": "",
+        "Expected Evidence": "",
+        "Potential Grounds for Negative Observations": ""
+      };
+      document.getElementById("pRaw").value = JSON.stringify(raw, null, 2);
+      document.getElementById("pShortText").value = "";
+      document.getElementById("pQuestion").value = "";
+      document.getElementById("pGuidance").value = "";
+      document.getElementById("pActions").value = "";
+      document.getElementById("pEvidence").value = "";
+      document.getElementById("pNegObs").value = "";
+
+      // initial number sync
+      showWarn("");
+      syncNewNumberFromInputs();
+    }
+
+    function exitCreateMode(){
+      window.createMode = false;
+      showNewQuestionPanel(false);
+    }
+
     async function saveSelected(){
-      if(!window.selected) return;
+      if(!window.selected && !window.createMode) return;
 
       if(!window.CAN_SAVE){
         showWarn("Save blocked: your role is read-only in this module.");
@@ -955,13 +1294,14 @@
 
       let payloadObj = null;
       try{
-        payloadObj = JSON.parse(document.getElementById("pRaw").value);
+        payloadObj = JSON.parse(document.getElementById("pRaw").value || "{}");
       }catch(e){
         saveStatus.textContent = "";
         showWarn("Cannot save: Payload JSON is not valid.\n\n" + String(e?.message || e));
         return;
       }
 
+      // Normalize common fields from textareas into payload
       payloadObj["Short Text"] = document.getElementById("pShortText").value;
       payloadObj["Question"] = document.getElementById("pQuestion").value;
       payloadObj["Inspection Guidance"] = document.getElementById("pGuidance").value;
@@ -974,11 +1314,65 @@
       const newTags = parseTags(document.getElementById("dbTags").value);
 
       try{
+        if(window.createMode){
+          const info = syncNewNumberFromInputs();
+          if(!info){
+            saveStatus.textContent = "";
+            return;
+          }
+
+          const safeVersion = newVersion || "SIRE_2.0_QL";
+          payloadObj["No."] = info.number_full;
+
+          // Check for duplicates by number_full
+          const { data: dup, error: dupErr } = await sb
+            .from("questions_master")
+            .select("id")
+            .eq("number_full", info.number_full)
+            .limit(1);
+          if(dupErr) throw dupErr;
+          if(dup && dup.length){
+            saveStatus.textContent = "";
+            showWarn(`Cannot create: a question with this number already exists (${info.number_full}).`);
+            return;
+          }
+
+          const insertRow = {
+            source_type: info.source_type,
+            number_base: info.number_base,
+            number_suffix: info.suffix,
+            number_full: info.number_full,
+            status: newStatus,
+            version: safeVersion,
+            tags: newTags,
+            payload: payloadObj,
+          };
+
+          const { data: created, error: insErr } = await sb
+            .from("questions_master")
+            .insert(insertRow)
+            .select("id, source_type, number_full, number_base, number_suffix, status, version, tags, payload")
+            .single();
+          if(insErr) throw insErr;
+
+          showOk("Created in DB.");
+          saveStatus.textContent = "Created.";
+
+          // Add to local cache and re-render
+          window.allRows.unshift(created);
+          exitCreateMode();
+          applyLocalFilters();
+          selectRow(created.id);
+          return;
+        }
+
+        // ===== EDIT MODE: update existing question =====
+        const safeVersion = newVersion || window.selected.version || "SIRE_2.0_QL";
         const { error } = await sb
           .from("questions_master")
           .update({
             status: newStatus,
-            version: newVersion || null,
+            version: safeVersion,
             tags: newTags,
             payload: payloadObj
           })
@@ -992,7 +1386,7 @@
         const idx = window.allRows.findIndex(x => x.id === window.selected.id);
         if(idx >= 0){
           window.allRows[idx].status = newStatus;
-          window.allRows[idx].version = newVersion || null;
+          window.allRows[idx].version = safeVersion;
           window.allRows[idx].tags = newTags;
           window.allRows[idx].payload = payloadObj;
         }
@@ -1097,6 +1491,27 @@
       }
 
       document.getElementById("reloadBtn").onclick = () => { window.selected=null; loadQuestionsFromDb(); };
+      // Create new question
+      const newBtn = document.getElementById("newBtn");
+      if(newBtn){
+        newBtn.style.display = window.CAN_SAVE ? "inline-block" : "none";
+        newBtn.onclick = startNewQuestion;
+      }
+
+      const newSourceType = document.getElementById("newSourceType");
+      const newChapter = document.getElementById("newChapter");
+      const newSection = document.getElementById("newSection");
+      const newThird = document.getElementById("newThird");
+      const btnAutoNext = document.getElementById("btnAutoNext");
+      const btnCancelNew = document.getElementById("btnCancelNew");
+
+      function bind(el, ev, fn){ if(el) el.addEventListener(ev, fn); }
+      bind(newSourceType, "change", () => syncNewNumberFromInputs(true));
+      bind(newChapter, "input", () => syncNewNumberFromInputs(false));
+      bind(newSection, "input", () => syncNewNumberFromInputs(false));
+      bind(newThird, "input", () => syncNewNumberFromInputs(false));
+      bind(btnAutoNext, "click", () => { syncNewNumberFromInputs(true); });
+      bind(btnCancelNew, "click", () => { exitCreateMode(); });
       document.getElementById("searchInput").oninput = applyLocalFilters;
       document.getElementById("statusFilter").onchange = () => { window.selected=null; loadQuestionsFromDb(); };
       document.getElementById("versionFilter").onchange = () => { window.selected=null; loadQuestionsFromDb(); };
