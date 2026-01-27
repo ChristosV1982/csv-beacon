@@ -327,8 +327,7 @@
               </div>
             </div>
 
-            <div class="hr"></div>
-
+            
             <!-- New Question controls (only visible in create mode) -->
             <div id="newQuestionPanel" class="card" style="display:none; margin:0 0 12px 0; padding:12px; border-radius:14px; border:1px solid #e3edf9; box-shadow:none;">
               <div class="row" style="justify-content:space-between; align-items:flex-end;">
@@ -365,6 +364,8 @@
 
               <div class="muted" id="newNumberHint" style="margin-top:8px;"></div>
             </div>
+
+<div class="hr"></div>
 
             <div class="kv" style="margin-bottom:12px;">
               <div class="k">source_type</div>
@@ -639,15 +640,53 @@
 
     // New-question (create mode) state
     window.createMode = false;
-    window.newDraft = null;
 
-    // Suffix letters for non-SIRE sets
-    const SUFFIX_BY_SOURCE = {
-      SIRE: "",
-      COMPANY: "C",
-      SPARE1: "A",
-      SPARE2: "B",
-    };
+    // We keep DB column source_type as enum (currently only "SIRE" in your DB).
+    // The "question set" (SIRE/COMPANY/SPARE1/SPARE2) is represented by number_suffix:
+    //   SIRE    -> NULL/"" (no suffix)
+    //   COMPANY -> "C"
+    //   SPARE1  -> "A"
+    //   SPARE2  -> "B"
+    const SUFFIX_BY_SET = { SIRE: "", COMPANY: "C", SPARE1: "A", SPARE2: "B" };
+
+    function suffixForSet(setName){
+      const s = String(setName || "").trim().toUpperCase();
+      return SUFFIX_BY_SET[s] ?? "";
+    }
+
+    function setForSuffix(sfx){
+      const s = String(sfx || "").trim().toUpperCase();
+      if(!s) return "SIRE";
+      if(s === "C") return "COMPANY";
+      if(s === "A") return "SPARE1";
+      if(s === "B") return "SPARE2";
+      return "SIRE";
+    }
+
+    function padN(num, width){
+      const n = Number(num);
+      if(!Number.isFinite(n)) return "";
+      return String(Math.trunc(n)).padStart(width, "0");
+    }
+
+    function makeNumberBase(setName, ch, sec, item){
+      const a = Number(ch), b = Number(sec), c = Number(item);
+      if(!Number.isFinite(a) || !Number.isFinite(b) || !Number.isFinite(c)) return "";
+      const aa = padN(a, 2);
+      const bb = padN(b, 2);
+      const isSire = String(setName || "").toUpperCase() === "SIRE";
+      const w = isSire ? 2 : (c >= 100 ? 3 : 2);
+      const cc = padN(c, w);
+      return `${aa}.${bb}.${cc}`;
+    }
+
+    function makeNumberFull(numberBase, suffix){
+      const base = String(numberBase || "").trim();
+      const suf = String(suffix || "").trim();
+      if(!base) return "";
+      return suf ? `${base}-${suf}` : base;
+    }
+
 
     // Role capabilities (set at boot) - MUST be on window for q-questions-editor.js override
     window.CAN_SAVE = false;
@@ -696,55 +735,6 @@
       return k1.s-k2.s;
     }
 
-    // ===== Number formatting + next-number helper (create mode) =====
-    function padN(num, width){
-      const n = Number(num);
-      if(!Number.isFinite(n)) return "";
-      return String(Math.trunc(n)).padStart(width, "0");
-    }
-
-    function suffixForSource(sourceType){
-      return SUFFIX_BY_SOURCE[sourceType] ?? "";
-    }
-
-    function makeNumberBase(sourceType, a, b, c){
-      const aa = padN(a, 2);
-      const bb = padN(b, 2);
-      const nn = Number(c);
-      if(!Number.isFinite(nn)) return "";
-      const cWidth = (sourceType === "SIRE") ? 2 : (nn >= 100 ? 3 : 2);
-      const cc = padN(nn, cWidth);
-      return `${aa}.${bb}.${cc}`;
-    }
-
-    function makeNumberFull(numberBase, suffix){
-      const base = String(numberBase || "").trim();
-      const suf = String(suffix || "").trim();
-      if(!base) return "";
-      return suf ? `${base}-${suf}` : base;
-    }
-
-    function maxThirdForPrefix(sourceType, a, b){
-      const aa = Number(a);
-      const bb = Number(b);
-      if(!Number.isFinite(aa) || !Number.isFinite(bb)) return 0;
-      const suf = suffixForSource(sourceType);
-      let max = 0;
-      for(const r of (window.allRows || [])){
-        if(String(r?.source_type || "") !== String(sourceType)) continue;
-        if(String(r?.number_suffix || "") !== String(suf)) continue;
-        const key = parseBaseParts(r.number_base);
-        if(!key) continue;
-        if(key.a === aa && key.b === bb && key.c > max) max = key.c;
-      }
-      return max;
-    }
-
-    function nextThirdForPrefix(sourceType, a, b){
-      const max = maxThirdForPrefix(sourceType, a, b);
-      return (max || 0) + 1;
-    }
-
     function applyLocalFilters(){
       const s = safeStr(document.getElementById("searchInput").value).toLowerCase().trim();
       const st = safeStr(document.getElementById("statusFilter").value).trim();
@@ -754,7 +744,7 @@
       window.filteredRows = window.allRows.filter(r => {
         if(st && safeStr(r.status) !== st) return false;
         if(vf && safeStr(r.version) !== vf) return false;
-        if(src && src !== "ALL" && safeStr(r.source_type) !== src) return false;
+        if(src && src !== "ALL" && setForSuffix(r.number_suffix) !== src) return false;
 
         if(!s) return true;
         const p = r.payload || {};
@@ -764,7 +754,7 @@
           getPayloadNo(p),
           getPayloadShort(p),
           getPayloadQuestion(p),
-          safeStr(r.source_type)
+          setForSuffix(r.number_suffix)
         ].join(" ").toLowerCase();
         return hay.includes(s);
       });
@@ -990,10 +980,8 @@
     window.deletePhotoRowAndFile = deletePhotoRowAndFile;
 
     function selectRow(id){
-      if(window.createMode){
-        // Selecting an existing question exits create mode
-        exitCreateMode();
-      }
+      if(window.createMode){ exitCreateMode(); }
+
       const r =
         window.filteredRows.find(x => x.id === id) ||
         window.allRows.find(x => x.id === id);
@@ -1012,7 +1000,7 @@
         safeStr(window.selected.number_full) || getPayloadNo(p) || safeStr(window.selected.number_base) || "—";
       document.getElementById("hdrId").textContent = `DB id: ${window.selected.id}`;
 
-      document.getElementById("dbSourceType").textContent = safeStr(window.selected.source_type) || "—";
+      document.getElementById("dbSourceType").textContent = setForSuffix(window.selected.number_suffix) || "—";
 
       document.getElementById("dbStatus").value = safeStr(window.selected.status) || "active";
       document.getElementById("dbVersion").value = safeStr(window.selected.version);
@@ -1044,11 +1032,47 @@
       selectRow(window.selectedOriginal.id);
     }
 
+    
     function showNewQuestionPanel(show){
       const pnl = document.getElementById("newQuestionPanel");
       if(pnl) pnl.style.display = show ? "block" : "none";
       const saveBtn = document.getElementById("btnSave");
       if(saveBtn) saveBtn.textContent = show ? "Create in DB" : "Save to DB";
+
+      // Photos disabled until the new row exists (needs question_id)
+      const disable = !!show;
+      const file = document.getElementById("photoFile");
+      const upBtn = document.getElementById("btnUploadPhotos");
+      const rfBtn = document.getElementById("btnRefreshPhotos");
+      if(file) file.disabled = disable || !window.CAN_MANAGE_PHOTOS;
+      if(upBtn) upBtn.disabled = disable || !window.CAN_MANAGE_PHOTOS;
+      if(rfBtn) rfBtn.disabled = disable;
+
+      if(disable){
+        const grid = document.getElementById("photoGrid");
+        const cnt = document.getElementById("photoCountLine");
+        if(grid) grid.innerHTML = "";
+        if(cnt) cnt.textContent = "Save the new question first, then you can upload photos.";
+        window.setPhotoStatus("Save the new question first to enable photo upload.");
+      }
+    }
+
+    function parse2or3(v){
+      const n = Number(String(v||"").trim());
+      if(!Number.isInteger(n)) return null;
+      return n;
+    }
+
+    function nextItemFor(setName, ch, sec){
+      const suf = suffixForSet(setName);
+      let max = 0;
+      for(const r of (window.allRows || [])){
+        const rSet = setForSuffix(r.number_suffix);
+        if(rSet !== setName) continue;
+        const [a,b,c] = parseBaseParts(r.number_base);
+        if(a === ch && b === sec && c > max) max = c;
+      }
+      return max + 1;
     }
 
     function buildBlankPayload(numberFull){
@@ -1059,35 +1083,51 @@
         "Inspection Guidance": "",
         "Suggested Inspector Actions": "",
         "Expected Evidence": "",
-        "Potential Grounds for Negative Observations": "",
+        "Potential Grounds for Negative Observations": ""
       };
     }
 
-    function syncNewNumberFromInputs(){
-      const src = safeStr(document.getElementById("newSourceType")?.value).trim() || "COMPANY";
-      const a = safeInt(document.getElementById("newChapter")?.value, null);
-      const b = safeInt(document.getElementById("newSection")?.value, null);
-      const c = safeInt(document.getElementById("newThird")?.value, null);
-      if(a===null || b===null || c===null) return null;
+    function updateNewNumberUI(autoFixItem){
+      const setName = String(document.getElementById("newSourceType")?.value || "COMPANY").trim();
+      const ch = parse2or3(document.getElementById("newChap")?.value);
+      const sec = parse2or3(document.getElementById("newSec")?.value);
+      let item = parse2or3(document.getElementById("newItem")?.value);
 
-      const suffix = suffixForSource(src);
-      const base = makeNumberBase(a,b,c, thirdWidthForValue(src,c));
-      const full = makeNumberFull(base, suffix);
+      if(ch === null || ch < 0 || ch > 99){ showWarn("Chapter (xx) must be 0–99"); return null; }
+      if(sec === null || sec < 0 || sec > 99){ showWarn("Section (yy) must be 0–99"); return null; }
 
-      // Update header + pills
-      document.getElementById("hdrNumber").textContent = full;
-      document.getElementById("dbSourceType").textContent = src;
-      document.getElementById("dbNumberBase").textContent = base;
-      document.getElementById("dbNumberSuffix").textContent = suffix;
+      if(autoFixItem || item === null){
+        item = nextItemFor(setName, ch, sec);
+        document.getElementById("newItem").value = String(item);
+      }
+      if(item < 0 || item > 999){ showWarn("Item (zz/zzz) must be 0–999"); return null; }
 
-      // Ensure payload No. matches
-      let payloadObj = null;
-      try{ payloadObj = JSON.parse(document.getElementById("pRaw").value); }catch(_){ payloadObj = null; }
-      if(!payloadObj || typeof payloadObj !== "object") payloadObj = buildBlankPayload(full);
-      payloadObj["No."] = full;
-      document.getElementById("pRaw").value = JSON.stringify(payloadObj, null, 2);
+      const suffix = suffixForSet(setName);
+      const number_base = makeNumberBase(setName, ch, sec, item);
+      const number_full = makeNumberFull(number_base, suffix);
 
-      return { src, a, b, c, base, suffix, full };
+      // header + pills
+      document.getElementById("hdrNumber").textContent = number_full || "—";
+      document.getElementById("hdrId").textContent = "New question (not saved yet)";
+      document.getElementById("dbSourceType").textContent = setName;
+      document.getElementById("dbNumberBase").textContent = number_base;
+      document.getElementById("dbNumberSuffix").textContent = suffix || "";
+
+      const hint = document.getElementById("newNumberHint");
+      if(hint) hint.textContent = `Will be created as: ${number_full}`;
+
+      // keep payload No. consistent
+      try{
+        const rawEl = document.getElementById("pRaw");
+        const obj = JSON.parse(rawEl.value || "{}");
+        if(obj && typeof obj === "object"){
+          obj["No."] = number_full;
+          rawEl.value = JSON.stringify(obj, null, 2);
+        }
+      }catch(_e){/* ignore */}
+
+      showWarn("");
+      return { setName, suffix, number_base, number_full };
     }
 
     async function startNewQuestion(){
@@ -1095,53 +1135,39 @@
         showWarn("Create blocked: your role is read-only in this module.");
         return;
       }
-
       showWarn(""); showOk("");
 
-      // Enter create mode
       window.createMode = true;
       window.selected = null;
       window.selectedOriginal = null;
 
       document.getElementById("emptyState").style.display = "none";
       document.getElementById("editPanel").style.display = "block";
-      document.getElementById("hdrId").textContent = "New question (not saved yet)";
-      document.getElementById("saveStatus").textContent = "";
+      showNewQuestionPanel(true);
 
-      // Defaults
-      const srcFilter = safeStr(document.getElementById("sourceFilter")?.value).trim();
-      const defaultSrc = (srcFilter && srcFilter !== "ALL") ? srcFilter : "COMPANY";
+      // defaults: use current filter if not ALL, else COMPANY
+      const currentSet = String(document.getElementById("sourceFilter")?.value || "ALL").trim();
+      const defaultSet = (currentSet && currentSet !== "ALL") ? currentSet : "COMPANY";
+      document.getElementById("newSourceType").value = defaultSet;
 
-      const srcEl = document.getElementById("newSourceType");
-      const aEl = document.getElementById("newChapter");
-      const bEl = document.getElementById("newSection");
-      const cEl = document.getElementById("newThird");
-
-      if(srcEl) srcEl.value = defaultSrc;
-
-      // Use last selected prefix if available, otherwise 1.1
-      let a = 1, b = 1;
+      // default prefix: if an existing row is selected, reuse its chapter/section; else 1/1
+      let ch = 1, sec = 1;
       if(window.filteredRows && window.filteredRows.length){
-        const first = window.filteredRows[0];
-        const parts = parseBaseParts(first?.number_base);
-        if(parts) { a = parts.a; b = parts.b; }
+        const [a,b] = parseBaseParts(window.filteredRows[0].number_base);
+        ch = a || 1; sec = b || 1;
       }
+      document.getElementById("newChap").value = String(ch);
+      document.getElementById("newSec").value = String(sec);
+      document.getElementById("newItem").value = "";
 
-      if(aEl) aEl.value = a;
-      if(bEl) bEl.value = b;
-
-      const nextC = nextThirdFor(defaultSrc, a, b);
-      if(cEl) cEl.value = nextC;
-
-      // Set DB meta defaults
+      // DB meta defaults
       document.getElementById("dbStatus").value = "active";
-      const v = safeStr(document.getElementById("versionFilter")?.value).trim() || "SIRE_2.0_QL";
+      const v = String(document.getElementById("versionFilter")?.value || "").trim() || "SIRE_2.0_QL";
       document.getElementById("dbVersion").value = v;
       document.getElementById("dbTags").value = "";
 
-      // Blank payload
-      const n = syncNewNumberFromInputs();
-      const blank = buildBlankPayload(n?.full || "");
+      // blank payload (No. will be set by updateNewNumberUI)
+      const blank = buildBlankPayload("");
       document.getElementById("pShortText").value = "";
       document.getElementById("pQuestion").value = "";
       document.getElementById("pGuidance").value = "";
@@ -1150,139 +1176,17 @@
       document.getElementById("pNegObs").value = "";
       document.getElementById("pRaw").value = JSON.stringify(blank, null, 2);
 
-      // Photos disabled until saved (needs question_id)
-      document.getElementById("btnUploadPhotos").disabled = true;
-      document.getElementById("photoFile").disabled = true;
-      document.getElementById("photoGrid").innerHTML = "";
-      document.getElementById("photoCountLine").textContent = "Save the new question first, then you can upload photos.";
-
-      showNewQuestionPanel(true);
-    }
-
-    // Reads the Create Mode inputs and updates the visible pills/header.
-    // Returns { source_type, suffix, number_base, number_full } on success; null on validation failure.
-    function syncNewNumberFromInputs(){
-      const src = safeStr(document.getElementById("newSourceType")?.value).trim() || "COMPANY";
-      const ch = safeStr(document.getElementById("newChapter")?.value).trim();
-      const se = safeStr(document.getElementById("newSection")?.value).trim();
-      const th = safeStr(document.getElementById("newThird")?.value).trim();
-
-      const a = Number(ch), b = Number(se), c = Number(th);
-      if(!Number.isInteger(a) || a < 0 || a > 99) { showWarn("Chapter (xx) must be 0-99"); return null; }
-      if(!Number.isInteger(b) || b < 0 || b > 99) { showWarn("Section (yy) must be 0-99"); return null; }
-      if(!Number.isInteger(c) || c < 0 || c > 999) { showWarn("Third segment (zz/zzz) must be 0-999"); return null; }
-
-      const suffix = suffixForSourceType(src);
-      const thirdWidth = (src === "SIRE") ? 2 : (c >= 100 ? 3 : 2);
-
-      const number_base = `${padN(a,2)}.${padN(b,2)}.${padN(c,thirdWidth)}`;
-      const number_full = makeNumberFull(number_base, suffix);
-
-      // update header + pills
-      document.getElementById("hdrNumber").textContent = number_full;
-      document.getElementById("hdrId").textContent = "(new) Not saved yet";
-      document.getElementById("dbSourceType").textContent = src;
-      document.getElementById("dbNumberBase").textContent = number_base;
-      document.getElementById("dbNumberSuffix").textContent = suffix || "(none)";
-
-      // keep payload "No." consistent if raw JSON parses
-      try{
-        const rawEl = document.getElementById("pRaw");
-        const obj = JSON.parse(rawEl.value || "{}") || {};
-        obj["No."] = number_full;
-        rawEl.value = JSON.stringify(obj, null, 2);
-      }catch(_e){/* ignore */}
-
-      return { source_type: src, suffix, number_base, number_full };
-    }
-
-    function showNewQuestionPanel(show){
-      const pnl = document.getElementById("newQuestionPanel");
-      if(pnl) pnl.style.display = show ? "block" : "none";
-
-      // Photo controls disabled for unsaved questions
-      const disable = !!show;
-      const file = document.getElementById("photoFile");
-      const upBtn = document.getElementById("btnUploadPhotos");
-      const rfBtn = document.getElementById("btnRefreshPhotos");
-      if(file) file.disabled = disable;
-      if(upBtn) upBtn.disabled = disable;
-      if(rfBtn) rfBtn.disabled = disable;
-
-      const photoStatus = document.getElementById("photoStatus");
-      if(photoStatus && disable) photoStatus.textContent = "Save the new question first to enable photo upload.";
-      const grid = document.getElementById("photoGrid");
-      if(grid && disable) grid.innerHTML = "";
-      const cnt = document.getElementById("photoCountLine");
-      if(cnt && disable) cnt.textContent = "";
-
-      // Save button label
-      const saveBtn = document.getElementById("btnSave");
-      if(saveBtn) saveBtn.textContent = show ? "Create in DB" : "Save to DB";
-    }
-
-    function enterCreateMode(defaultSource){
-      window.createMode = true;
-      window.selected = null;
-      window.selectedOriginal = null;
-
-      document.getElementById("emptyState").style.display = "none";
-      document.getElementById("editPanel").style.display = "block";
-      showNewQuestionPanel(true);
-
-      showWarn(""); showOk("");
-      document.getElementById("saveStatus").textContent = "";
-
-      // base defaults
-      const src = defaultSource && defaultSource !== "ALL" ? defaultSource : "COMPANY";
-      const srcEl = document.getElementById("newSourceType");
-      if(srcEl) srcEl.value = src;
-
-      const aEl = document.getElementById("newChapter");
-      const bEl = document.getElementById("newSection");
-      const cEl = document.getElementById("newThird");
-      if(aEl) aEl.value = "1";
-      if(bEl) bEl.value = "1";
-      if(cEl) cEl.value = String(nextThirdFor(window.allRows, src, 1, 1));
-
-      // version: prefer filter value, else existing field, else default
-      const vFilter = safeStr(document.getElementById("versionFilter").value).trim();
-      const vEl = document.getElementById("dbVersion");
-      if(vEl) vEl.value = vFilter || "SIRE_2.0_QL";
-      document.getElementById("dbStatus").value = "active";
-      document.getElementById("dbTags").value = "";
-
-      // seed payload
-      const raw = {
-        "No.": "",
-        "Short Text": "",
-        "Question": "",
-        "Inspection Guidance": "",
-        "Suggested Inspector Actions": "",
-        "Expected Evidence": "",
-        "Potential Grounds for Negative Observations": ""
-      };
-      document.getElementById("pRaw").value = JSON.stringify(raw, null, 2);
-      document.getElementById("pShortText").value = "";
-      document.getElementById("pQuestion").value = "";
-      document.getElementById("pGuidance").value = "";
-      document.getElementById("pActions").value = "";
-      document.getElementById("pEvidence").value = "";
-      document.getElementById("pNegObs").value = "";
-
-      // initial number sync
-      showWarn("");
-      syncNewNumberFromInputs();
+      updateNewNumberUI(true);
     }
 
     function exitCreateMode(){
       window.createMode = false;
       showNewQuestionPanel(false);
+      const hint = document.getElementById("newNumberHint");
+      if(hint) hint.textContent = "";
     }
 
     async function saveSelected(){
-      if(!window.selected && !window.createMode) return;
-
       if(!window.CAN_SAVE){
         showWarn("Save blocked: your role is read-only in this module.");
         return;
@@ -1301,7 +1205,7 @@
         return;
       }
 
-      // Normalize common fields from textareas into payload
+      // normalize from textareas
       payloadObj["Short Text"] = document.getElementById("pShortText").value;
       payloadObj["Question"] = document.getElementById("pQuestion").value;
       payloadObj["Inspection Guidance"] = document.getElementById("pGuidance").value;
@@ -1310,21 +1214,18 @@
       payloadObj["Potential Grounds for Negative Observations"] = document.getElementById("pNegObs").value;
 
       const newStatus = document.getElementById("dbStatus").value;
-      const newVersion = document.getElementById("dbVersion").value.trim();
+      const newVersion = document.getElementById("dbVersion").value.trim() || "SIRE_2.0_QL";
       const newTags = parseTags(document.getElementById("dbTags").value);
 
       try{
         if(window.createMode){
-          const info = syncNewNumberFromInputs();
+          const info = updateNewNumberUI(false);
           if(!info){
             saveStatus.textContent = "";
             return;
           }
 
-          const safeVersion = newVersion || "SIRE_2.0_QL";
-          payloadObj["No."] = info.number_full;
-
-          // Check for duplicates by number_full
+          // duplicate protection on number_full
           const { data: dup, error: dupErr } = await sb
             .from("questions_master")
             .select("id")
@@ -1337,15 +1238,17 @@
             return;
           }
 
+          payloadObj["No."] = info.number_full;
+
           const insertRow = {
-            source_type: info.source_type,
+            source_type: "SIRE", // DB enum (do NOT set to COMPANY/SPARE here)
             number_base: info.number_base,
-            number_suffix: info.suffix,
+            number_suffix: info.suffix || null,
             number_full: info.number_full,
             status: newStatus,
-            version: safeVersion,
+            version: newVersion,
             tags: newTags,
-            payload: payloadObj,
+            payload: payloadObj
           };
 
           const { data: created, error: insErr } = await sb
@@ -1358,7 +1261,6 @@
           showOk("Created in DB.");
           saveStatus.textContent = "Created.";
 
-          // Add to local cache and re-render
           window.allRows.unshift(created);
           exitCreateMode();
           applyLocalFilters();
@@ -1366,13 +1268,18 @@
           return;
         }
 
-        // ===== EDIT MODE: update existing question =====
-        const safeVersion = newVersion || window.selected.version || "SIRE_2.0_QL";
+        // edit existing
+        if(!window.selected?.id){
+          saveStatus.textContent = "";
+          showWarn("No question selected.");
+          return;
+        }
+
         const { error } = await sb
           .from("questions_master")
           .update({
             status: newStatus,
-            version: safeVersion,
+            version: newVersion,
             tags: newTags,
             payload: payloadObj
           })
@@ -1386,7 +1293,7 @@
         const idx = window.allRows.findIndex(x => x.id === window.selected.id);
         if(idx >= 0){
           window.allRows[idx].status = newStatus;
-          window.allRows[idx].version = safeVersion;
+          window.allRows[idx].version = newVersion;
           window.allRows[idx].tags = newTags;
           window.allRows[idx].payload = payloadObj;
         }
@@ -1400,7 +1307,8 @@
       }
     }
 
-    async function loadQuestionsFromDb(){
+
+async function loadQuestionsFromDb(){
       showWarn(""); showOk("");
       document.getElementById("loadHint").textContent = "Loading…";
 
@@ -1415,7 +1323,13 @@
 
         if(statusFilter) q = q.eq("status", statusFilter);
         if(versionFilter) q = q.eq("version", versionFilter);
-        if(sourceFilter && sourceFilter !== "ALL") q = q.eq("source_type", sourceFilter);
+        if(sourceFilter && sourceFilter !== "ALL"){
+          if(sourceFilter === "SIRE"){
+            q = q.is("number_suffix", null);
+          }else{
+            q = q.eq("number_suffix", suffixForSet(sourceFilter));
+          }
+        }
 
         const pageSize = 1000;
         let from = 0;
@@ -1486,36 +1400,53 @@
         `Role: ${role} • Mode: ${mode} • Module: QUESTIONS_EDITOR`;
 
       document.getElementById("editorCard").style.display = "block";
+
+      // Import panel is useful only when DB is empty.
       if(isSuper){
-        document.getElementById("importCard").style.display = "block";
+        try{
+          const cnt = await getQuestionsMasterCount();
+          if((cnt || 0) === 0){
+            document.getElementById("importCard").style.display = "block";
+          }else{
+            document.getElementById("importCard").style.display = "none";
+          }
+        }catch(_e){
+          // If count fails, keep import hidden (safer)
+          document.getElementById("importCard").style.display = "none";
+        }
       }
 
       document.getElementById("reloadBtn").onclick = () => { window.selected=null; loadQuestionsFromDb(); };
-      // Create new question
+
+      // New question
       const newBtn = document.getElementById("newBtn");
       if(newBtn){
         newBtn.style.display = window.CAN_SAVE ? "inline-block" : "none";
         newBtn.onclick = startNewQuestion;
       }
 
-      const newSourceType = document.getElementById("newSourceType");
-      const newChapter = document.getElementById("newChapter");
-      const newSection = document.getElementById("newSection");
-      const newThird = document.getElementById("newThird");
-      const btnAutoNext = document.getElementById("btnAutoNext");
-      const btnCancelNew = document.getElementById("btnCancelNew");
-
-      function bind(el, ev, fn){ if(el) el.addEventListener(ev, fn); }
-      bind(newSourceType, "change", () => syncNewNumberFromInputs(true));
-      bind(newChapter, "input", () => syncNewNumberFromInputs(false));
-      bind(newSection, "input", () => syncNewNumberFromInputs(false));
-      bind(newThird, "input", () => syncNewNumberFromInputs(false));
-      bind(btnAutoNext, "click", () => { syncNewNumberFromInputs(true); });
-      bind(btnCancelNew, "click", () => { exitCreateMode(); });
       document.getElementById("searchInput").oninput = applyLocalFilters;
       document.getElementById("statusFilter").onchange = () => { window.selected=null; loadQuestionsFromDb(); };
       document.getElementById("versionFilter").onchange = () => { window.selected=null; loadQuestionsFromDb(); };
       document.getElementById("sourceFilter").onchange = () => { window.selected=null; loadQuestionsFromDb(); };
+
+      // Create-mode inputs
+      const newSourceType = document.getElementById("newSourceType");
+      const newChap = document.getElementById("newChap");
+      const newSec = document.getElementById("newSec");
+      const newItem = document.getElementById("newItem");
+      const btnAutoNext = document.getElementById("btnAutoNext");
+      const btnCancelNew = document.getElementById("btnCancelNew");
+
+      function bind(el, ev, fn){ if(el) el.addEventListener(ev, fn); }
+      bind(newSourceType, "change", () => updateNewNumberUI(true));
+      bind(newChap, "input", () => updateNewNumberUI(false));
+      bind(newSec, "input", () => updateNewNumberUI(false));
+      bind(newItem, "input", () => updateNewNumberUI(false));
+      bind(btnAutoNext, "click", () => updateNewNumberUI(true));
+      bind(btnCancelNew, "click", () => { exitCreateMode(); document.getElementById("emptyState").style.display = "block"; document.getElementById("editPanel").style.display = "none"; });
+
+
 
       document.getElementById("btnReset").onclick = resetSelected;
       document.getElementById("btnSave").onclick = saveSelected;
