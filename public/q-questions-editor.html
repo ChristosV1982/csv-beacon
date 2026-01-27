@@ -680,6 +680,7 @@
             status: "active",
             version: versionTag,
             tags: null,
+            is_custom: false,
             payload: payload
           }
         };
@@ -1279,6 +1280,7 @@
             status,
             version,
             tags,
+            is_custom: true,
             payload: { ...payloadObj, "No.": info.full }
           };
 
