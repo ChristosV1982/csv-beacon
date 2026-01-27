@@ -671,16 +671,16 @@
         const nb = normalizeSireNumberBaseFromPayload(payload);
         if(!nb.ok) return { ok:false, error: nb.error };
         return {
+        return {
           ok:true,
           row:{
             source_type: "SIRE",
             number_base: nb.base,
-            // IMPORTANT: DB column is NOT NULL. For SIRE store empty string.
             number_suffix: "",
             status: "active",
             version: versionTag,
             tags: null,
-            is_custom: false,
+            is_custom: false,          // <-- ADD THIS
             payload: payload
           }
         };
@@ -1280,7 +1280,7 @@
             status,
             version,
             tags,
-            is_custom: true,
+            is_custom: true,             // <-- ADD THIS (COMPANY/SPARE questions are “custom”)
             payload: { ...payloadObj, "No.": info.full }
           };
 
