@@ -723,6 +723,29 @@
       if(!base) return "";
       return suf ? `${base}-${suf}` : base;
     }
+    function formatDisplayNumber(row){
+      // Always show padded xx.yy.zz (or xx.yy.zzz) + optional -suffix
+      const base = String(row?.number_base || "").trim() || String(row?.number_full || "").trim();
+      if(!base) return "—";
+      // If number_full already includes suffix, split it
+      let main = base;
+      let suf = String(row?.number_suffix || "").trim();
+      if(base.includes("-")){
+        const parts = base.split("-");
+        main = parts[0];
+        if(!suf && parts[1]) suf = parts[1];
+      }
+      const seg = main.split(".");
+      const a = seg[0] ? seg[0].padStart(2,"0") : "00";
+      const b = seg[1] ? seg[1].padStart(2,"0") : "00";
+      let c = seg[2] || "00";
+      // keep 3-digit if already 3, else 2
+      const width = c.length>=3 ? 3 : 2;
+      c = c.padStart(width,"0");
+      const nb = `${a}.${b}.${c}`;
+      return suf ? `${nb}-${suf}` : nb;
+    }
+
 
     function maxThirdForPrefix(sourceType, a, b){
       const aa = Number(a);
@@ -750,6 +773,11 @@
       const st = safeStr(document.getElementById("statusFilter").value).trim();
       const vf = safeStr(document.getElementById("versionFilter").value).trim();
       const src = safeStr(document.getElementById("sourceFilter").value).trim();
+
+      // Note: if your DB enum question_source_type does not include COMPANY/SPARE yet,
+      // we still load all rows and filter locally. To actually STORE company/spare rows,
+      // you MUST add those enum values in Postgres (see SQL patch in chat).
+
 
       window.filteredRows = window.allRows.filter(r => {
         if(st && safeStr(r.status) !== st) return false;
@@ -785,7 +813,7 @@
 
       window.filteredRows.forEach((r) => {
         const p = r.payload || {};
-        const no = safeStr(r.number_full) || getPayloadNo(p) || safeStr(r.number_base) || "(no number)";
+        const no = formatDisplayNumber(r);
         const shortT = getPayloadShort(p) || "(no short text)";
         const div = document.createElement("div");
         div.className = "qitem" + (window.selected && window.selected.id === r.id ? " active" : "");
@@ -1453,7 +1481,7 @@
 
       const statusFilter = safeStr(document.getElementById("statusFilter").value).trim();
       const versionFilter = safeStr(document.getElementById("versionFilter").value).trim();
-      const sourceFilter = safeStr(document.getElementById("sourceFilter").value).trim();
+      const sourceFilter = safeStr(document.getElementById("sourceFilter").value).trim(); // local filter only
 
       try{
         let q = sb
@@ -1548,12 +1576,15 @@
         document.getElementById("importCard").style.display = "block";
       }
 
-      document.getElementById("reloadBtn").onclick = () => { window.selected=null; loadQuestionsFromDb(); };
+      const reloadBtn = document.getElementById("reloadBtn");
+      if (reloadBtn) reloadBtn.onclick = () => { window.selected=null; loadQuestionsFromDb(); };
+      // Create new question
       // Create new question
       const newBtn = document.getElementById("newBtn");
-      if(newBtn){
+      if (newBtn){
         newBtn.style.display = window.CAN_SAVE ? "inline-block" : "none";
         newBtn.onclick = startNewQuestion;
+      }
       }
 
       const newSourceType = document.getElementById("newSourceType");
@@ -1575,11 +1606,15 @@
       document.getElementById("versionFilter").onchange = () => { window.selected=null; loadQuestionsFromDb(); };
       document.getElementById("sourceFilter").onchange = () => { window.selected=null; loadQuestionsFromDb(); };
 
-      document.getElementById("btnReset").onclick = resetSelected;
-      document.getElementById("btnSave").onclick = saveSelected;
+      const btnReset = document.getElementById("btnReset");
+      if (btnReset) btnReset.onclick = resetSelected;
+      const btnSave = document.getElementById("btnSave");
+      if (btnSave) btnSave.onclick = saveSelected;
 
-      document.getElementById("btnRefreshPhotos").onclick = window.loadPhotosForSelected;
-      document.getElementById("btnUploadPhotos").onclick = window.uploadSelectedPhotos;
+      const btnRefreshPhotos = document.getElementById("btnRefreshPhotos");
+      if (btnRefreshPhotos) btnRefreshPhotos.onclick = window.loadPhotosForSelected;
+      const btnUploadPhotos = document.getElementById("btnUploadPhotos");
+      if (btnUploadPhotos) btnUploadPhotos.onclick = window.uploadSelectedPhotos;
       // PGNO structured editor buttons
       const pgSync = document.getElementById("btnPgnoSync");
       const pgAdd = document.getElementById("btnPgnoAdd");
