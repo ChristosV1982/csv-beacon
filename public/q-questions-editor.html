@@ -1,240 +1,354 @@
-<!-- public/q-questions-editor.html -->
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>SIRE 2.0 – Questions Editor</title>
 
-  <!-- Keep your global style if you have it -->
   <link rel="stylesheet" href="style.css" />
-  <!-- Module-specific styling (so this page never looks “cheap” even if style.css changes) -->
-  <link rel="stylesheet" href="q-questions-editor.css" />
+
+  <style>
+    /* Minimal safety styling in case style.css is not applied for any reason */
+    .qe-wrap{ max-width: 1400px; margin: 0 auto; padding: 18px; }
+    .qe-top{ display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; }
+    .qe-pill{ background:#eef5ff; border:1px solid #cfe2ff; padding:6px 10px; border-radius:999px; font-size:13px; }
+    .qe-card{ background:#fff; border:1px solid #d9e2ef; border-radius:14px; padding:16px; box-shadow: 0 2px 10px rgba(0,0,0,.04); }
+    .qe-row{ display:flex; gap:14px; flex-wrap:wrap; align-items:end; }
+    .qe-row > div{ display:flex; flex-direction:column; gap:6px; }
+    label{ font-size:12px; color:#334; }
+    input, select, textarea{ padding:10px 12px; border-radius:10px; border:1px solid #cfd9e8; outline:none; }
+    textarea{ min-height: 90px; resize: vertical; }
+    .btn{ padding:10px 14px; border-radius:10px; border:1px solid #cfd9e8; background:#f7fbff; cursor:pointer; }
+    .btn.primary{ background:#1f66c2; color:#fff; border-color:#1f66c2; }
+    .btn.light{ background:#fff; }
+    .btn.danger{ background:#fff; border-color:#ffb6b6; color:#b00020; }
+    .qe-main{ display:grid; grid-template-columns: 360px 1fr; gap:14px; margin-top:14px; }
+    .qe-list{ border:1px solid #d9e2ef; border-radius:12px; overflow:hidden; }
+    .qe-list-head{ padding:10px 12px; background:#f3f7ff; display:flex; justify-content:space-between; font-size:13px; }
+    #qList{ max-height: 650px; overflow:auto; }
+    .qitem{ padding:10px 12px; border-top:1px solid #eef2f8; cursor:pointer; }
+    .qitem:hover{ background:#f8fbff; }
+    .qitem.active{ background:#eaf2ff; }
+    .qno{ font-weight:700; }
+    .qsub{ font-size:12px; color:#334; margin-top:4px; }
+    .muted{ color:#6b778c; font-size:12px; }
+    .warn{ background:#fff1f1; border:1px solid #ffc9c9; padding:10px 12px; border-radius:12px; margin-bottom:12px; display:none; white-space:pre-wrap; }
+    .ok{ background:#f1fff4; border:1px solid #bfeccc; padding:10px 12px; border-radius:12px; margin-bottom:12px; display:none; white-space:pre-wrap; }
+    .qe-right h2{ margin:0; font-size:18px; }
+    .qe-actions{ display:flex; gap:10px; justify-content:flex-end; align-items:center; }
+    .qe-split3{ display:grid; grid-template-columns: 1fr 1fr 1fr; gap:12px; }
+    .qe-split2{ display:grid; grid-template-columns: 1fr 1fr; gap:12px; }
+    .adv{ display:none; margin-top:12px; padding-top:12px; border-top:1px dashed #d9e2ef; }
+    .small{ font-size:12px; }
+    .kv{ display:flex; gap:10px; flex-wrap:wrap; }
+    .kv .qe-pill{ font-weight:600; }
+  </style>
 </head>
 
 <body>
-  <div class="qwrap">
-
-    <div class="qtopbar">
-      <a class="qbtn qbtn-light" href="./dashboard.html">← Back to Dashboard</a>
-      <div id="modeLine" class="qbadge">Role: — • Mode: Admin • Module: QUESTIONS_EDITOR</div>
+  <div class="qe-wrap">
+    <div class="qe-top">
+      <button class="btn light" onclick="location.href='./dashboard.html'">← Back to Dashboard</button>
+      <div id="modeLine" class="qe-pill">Role: — • Mode: Admin • Module: QUESTIONS_EDITOR</div>
     </div>
 
-    <div id="warnBox" class="qalert qalert-warn" style="display:none"></div>
-    <div id="okBox" class="qalert qalert-ok" style="display:none"></div>
+    <div id="warnBox" class="warn"></div>
+    <div id="okBox" class="ok"></div>
 
-    <div class="qcard">
-      <div class="qcard-h">
-        <h2>Questions Browser & Viewer / Editor (DB)</h2>
-        <div class="qmuted">
-          Left side = list. Right side = viewer by default. Click <b>Edit</b> to change to edit mode.
+    <div class="qe-card">
+      <h1 style="margin:0 0 8px 0;">Questions Browser & Viewer / Editor (DB)</h1>
+      <div class="muted">Left side = list. Right side = viewer by default. Click <b>Edit</b> to switch to edit mode for the selected question.</div>
+
+      <div style="height:10px;"></div>
+
+      <div class="qe-row">
+        <div style="flex-direction:row; gap:10px;">
+          <button id="reloadBtn" class="btn primary" type="button">Load / Refresh Questions</button>
+          <button id="newQuestionBtn" class="btn" type="button">Add New Question</button>
         </div>
-      </div>
 
-      <div class="qtoolbar">
-        <button id="reloadBtn" class="qbtn qbtn-primary" type="button">Load / Refresh Questions</button>
-        <button id="newQuestionBtn" class="qbtn qbtn-light" type="button">Add New Question</button>
-
-        <div class="qfield">
+        <div style="min-width:260px;">
           <label>Source</label>
           <select id="sourceFilter">
             <option value="ALL">All (SIRE + Company + Spare)</option>
             <option value="SIRE">SIRE</option>
             <option value="COMPANY_CUSTOM">Company (custom)</option>
-            <option value="SPARE1">Spare A</option>
-            <option value="SPARE2">Spare B</option>
+            <option value="SPARE_X">Spare X</option>
+            <option value="SPARE_Z">Spare Z</option>
           </select>
         </div>
 
-        <div class="qfield qgrow">
+        <div style="min-width:360px; flex:1;">
           <label>Search (number / short text / question)</label>
-          <input id="searchInput" type="text" placeholder="Type to filter..." />
+          <input id="searchInput" type="text" placeholder="Type to filter ..." />
         </div>
 
-        <div class="qfield">
+        <div style="min-width:160px;">
           <label>Status</label>
           <select id="statusFilter">
-            <option value="">(all)</option>
             <option value="active" selected>active</option>
             <option value="inactive">inactive</option>
           </select>
         </div>
-      </div>
 
-      <div class="qtoolbar qtoolbar-2">
-        <div class="qfield qgrow">
+        <div style="min-width:260px; flex:1;">
           <label>Version (optional filter)</label>
           <input id="versionFilter" type="text" placeholder="Leave blank to show all" />
         </div>
-        <div class="qmuted" id="loadHint"></div>
+
+        <div style="min-width:140px;">
+          <label>&nbsp;</label>
+          <div id="loadHint" class="muted"></div>
+        </div>
       </div>
 
-      <div class="qsplit">
-        <!-- LEFT: list -->
-        <div class="qleft">
-          <div class="qleft-h">
-            <div id="countLine" class="qcount">0 questions</div>
-            <div class="qmuted" id="loadedLine"></div>
+      <div class="qe-main">
+        <!-- LEFT LIST -->
+        <div class="qe-list">
+          <div class="qe-list-head">
+            <div id="countLine"><b>0</b> questions</div>
+            <div class="muted" id="loadedLine">Loaded 0</div>
           </div>
-          <div id="qList" class="qlist"></div>
+          <div id="qList"></div>
         </div>
 
-        <!-- RIGHT: viewer/editor -->
-        <div class="qright">
+        <!-- RIGHT PANEL -->
+        <div class="qe-right qe-card" style="border-radius:12px; box-shadow:none;">
+          <div id="emptyState" class="muted">Select a question from the list.</div>
 
-          <div id="emptyState" class="qemptystate">
-            Select a question from the list.
-          </div>
-
-          <div id="editPanel" style="display:none">
-            <div class="qright-top">
+          <!-- VIEW PANEL -->
+          <div id="viewPanel" style="display:none;">
+            <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px;">
               <div>
-                <div class="qtitleline">
-                  <div id="hdrNumber" class="qhdrnum">—</div>
-                  <span id="newBanner" class="qnew" style="display:none">NEW</span>
-                </div>
-                <div id="hdrId" class="qmuted">DB id: —</div>
-
-                <div class="qchips">
-                  <span class="qchip" id="chipSource">source: —</span>
-                  <span class="qchip" id="chipStatus">status: —</span>
-                  <span class="qchip" id="chipSuffix">suffix: —</span>
-                  <span class="qchip" id="chipMode">mode: VIEW</span>
-                </div>
+                <h2 id="vhdrNumber">—</h2>
+                <div id="vhdrId" class="muted small"></div>
               </div>
-
-              <div class="qactions">
-                <button id="btnEdit" class="qbtn qbtn-light" type="button">Edit</button>
-                <button id="btnView" class="qbtn qbtn-light" type="button" style="display:none">View</button>
-                <button id="btnSave" class="qbtn qbtn-primary" type="button" style="display:none">Save</button>
-                <button id="btnReset" class="qbtn qbtn-light" type="button">Reset</button>
+              <div class="qe-actions">
+                <button id="btnEdit" class="btn primary" type="button">Edit</button>
               </div>
             </div>
 
-            <div id="saveStatus" class="qmuted"></div>
+            <div style="height:10px;"></div>
+            <div class="kv">
+              <div class="qe-pill" id="vSourcePill">source: —</div>
+              <div class="qe-pill" id="vStatusPill">status: —</div>
+              <div class="qe-pill" id="vSuffixPill">suffix: —</div>
+            </div>
 
-            <div class="qgrid2">
-              <div class="qfield">
+            <div style="height:14px;"></div>
+
+            <div class="qe-split2">
+              <div>
+                <label>Short Text</label>
+                <div id="vShortText" class="small" style="white-space:pre-wrap;"></div>
+              </div>
+              <div>
+                <label>Question</label>
+                <div id="vQuestion" class="small" style="white-space:pre-wrap;"></div>
+              </div>
+            </div>
+
+            <div style="height:12px;"></div>
+
+            <div class="qe-split2">
+              <div>
+                <label>Inspection guidance</label>
+                <div id="vGuidance" class="small" style="white-space:pre-wrap;"></div>
+              </div>
+              <div>
+                <label>Suggested inspector actions</label>
+                <div id="vActions" class="small" style="white-space:pre-wrap;"></div>
+              </div>
+            </div>
+
+            <div style="height:12px;"></div>
+
+            <div class="qe-split2">
+              <div>
+                <label>Expected evidence</label>
+                <div id="vEvidence" class="small" style="white-space:pre-wrap;"></div>
+              </div>
+              <div>
+                <label>Potential grounds for negative observations</label>
+                <div id="vNegObs" class="small" style="white-space:pre-wrap;"></div>
+              </div>
+            </div>
+
+            <div class="adv" id="viewAdvanced">
+              <div class="qe-split2">
+                <div>
+                  <label>Tags</label>
+                  <div id="vTags" class="small" style="white-space:pre-wrap;"></div>
+                </div>
+                <div>
+                  <label>Version</label>
+                  <div id="vVersion" class="small"></div>
+                </div>
+              </div>
+
+              <div style="height:10px;"></div>
+              <div>
+                <label>Raw JSON</label>
+                <pre id="vRaw" class="small" style="white-space:pre-wrap; background:#f7fbff; border:1px solid #d9e2ef; padding:10px; border-radius:10px; overflow:auto; max-height:280px;"></pre>
+              </div>
+            </div>
+
+            <div style="height:10px;"></div>
+            <button id="btnToggleAdvancedView" class="btn" type="button">Advanced</button>
+          </div>
+
+          <!-- EDIT PANEL -->
+          <div id="editPanel" style="display:none;">
+            <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px;">
+              <div>
+                <h2 id="hdrNumber">—</h2>
+                <div id="hdrId" class="muted small"></div>
+              </div>
+              <div class="qe-actions">
+                <button id="btnView" class="btn light" type="button">View</button>
+                <button id="btnSave" class="btn primary" type="button">Save</button>
+                <button id="btnReset" class="btn" type="button">Reset</button>
+              </div>
+            </div>
+
+            <div style="height:10px;"></div>
+            <div class="kv">
+              <div class="qe-pill" id="pillSource">source: —</div>
+              <div class="qe-pill" id="pillStatus">status: —</div>
+              <div class="qe-pill" id="pillSuffix">suffix: —</div>
+              <div class="qe-pill" id="pillMode">mode: EDIT</div>
+            </div>
+
+            <div style="height:14px;"></div>
+
+            <div class="qe-split2">
+              <div>
                 <label>Source Type</label>
                 <select id="dbSourceType">
                   <option value="SIRE">SIRE</option>
                   <option value="COMPANY_CUSTOM">Company (custom)</option>
-                  <option value="SPARE1">Spare A</option>
-                  <option value="SPARE2">Spare B</option>
+                  <option value="SPARE_X">Spare X</option>
+                  <option value="SPARE_Z">Spare Z</option>
                 </select>
-                <div class="qmuted small">
-                  New questions should use <b>Company (custom)</b> (or Spare). SIRE is the official library.
-                </div>
+                <div class="muted small">New questions should be <b>Company (custom)</b> (or Spare). SIRE is the official library.</div>
               </div>
 
-              <div class="qfield">
+              <div>
                 <label>Status</label>
                 <select id="dbStatus">
-                  <option value="active">active</option>
+                  <option value="active" selected>active</option>
                   <option value="inactive">inactive</option>
                 </select>
               </div>
             </div>
 
-            <!-- Version hidden from main UI (Advanced only) per your D1 -->
-            <details class="qadv">
-              <summary>Advanced (Version / Tags / Raw JSON)</summary>
+            <div style="height:10px;"></div>
 
-              <div class="qgrid2">
-                <div class="qfield">
-                  <label>Version (your tag)</label>
-                  <input id="dbVersion" type="text" placeholder="e.g. SIRE_2_0_QL" />
-                  <div class="qmuted small">
-                    This is only a label used for filtering/exports. Same table, same database.
-                  </div>
-                </div>
-
-                <div class="qfield">
-                  <label>Tags (comma separated)</label>
-                  <input id="dbTags" type="text" placeholder="tag1, tag2" />
-                </div>
-              </div>
-
-              <div class="qfield">
-                <label>Raw JSON payload</label>
-                <textarea id="pRaw" rows="10" placeholder="{ ... }"></textarea>
-              </div>
-            </details>
-
-            <hr class="qhr" />
-
-            <!-- Numbering inputs (xx / yy / zz or zzz) -->
-            <div class="qgrid3">
-              <div class="qfield">
+            <!-- Numbering: separate fields -->
+            <div class="qe-split3">
+              <div>
                 <label>Chapter (xx)</label>
-                <input id="dbChapter" type="number" min="0" step="1" placeholder="e.g. 4" />
+                <input id="numChapter" type="number" min="0" step="1" />
               </div>
-              <div class="qfield">
+              <div>
                 <label>Section (yy)</label>
-                <input id="dbSection" type="number" min="0" step="1" placeholder="e.g. 4" />
+                <input id="numSection" type="number" min="0" step="1" />
               </div>
-              <div class="qfield">
+              <div>
                 <label>Item (zz / zzz)</label>
-                <input id="dbItem" type="number" min="0" step="1" placeholder="e.g. 4" />
+                <input id="numItem" type="number" min="0" step="1" />
               </div>
             </div>
 
-            <div class="qgrid2">
-              <div class="qfield">
+            <div style="height:10px;"></div>
+
+            <div class="qe-split2">
+              <div>
                 <label>Number Suffix</label>
-                <input id="dbNumberSuffix" type="text" placeholder="C / A / B or blank for SIRE" />
-                <div class="qmuted small">
-                  Number base is built automatically as <b>xx.yy.zz</b> for SIRE and <b>xx.yy.zzz</b> for custom/spares.
+                <input id="dbNumberSuffix" type="text" placeholder="C / (blank for SIRE)" />
+                <div class="muted small">DB will enforce: SIRE = xx.yy.zz, Custom/Spare = xx.yy.zzz.</div>
+              </div>
+
+              <div>
+                <label>Tags (comma separated)</label>
+                <input id="dbTags" type="text" placeholder="tag1, tag2, tag3" />
+              </div>
+            </div>
+
+            <div class="adv" id="editAdvanced">
+              <div class="qe-split2">
+                <div>
+                  <label>Version (your tag)</label>
+                  <input id="dbVersion" type="text" />
+                </div>
+                <div>
+                  <label>Change reason (optional)</label>
+                  <input id="dbChangeReason" type="text" placeholder="Why was this changed?" />
                 </div>
               </div>
 
-              <div class="qfield">
-                <label>Computed Number Base (read-only)</label>
-                <input id="dbNumberBase" type="text" readonly />
+              <div style="height:10px;"></div>
+              <div>
+                <label>Raw JSON (advanced)</label>
+                <textarea id="pRaw"></textarea>
               </div>
             </div>
 
-            <hr class="qhr" />
+            <div style="height:10px;"></div>
+            <button id="btnToggleAdvancedEdit" class="btn" type="button">Advanced (Version / Raw JSON)</button>
 
-            <!-- Canonical fields -->
-            <div class="qfield">
-              <label>Short Text</label>
-              <textarea id="pShortText" rows="2"></textarea>
+            <div style="height:14px;"></div>
+
+            <div class="qe-split2">
+              <div>
+                <label>Short Text</label>
+                <textarea id="pShortText"></textarea>
+              </div>
+              <div>
+                <label>Question</label>
+                <textarea id="pQuestion"></textarea>
+              </div>
             </div>
 
-            <div class="qfield">
-              <label>Question</label>
-              <textarea id="pQuestion" rows="4"></textarea>
+            <div style="height:12px;"></div>
+
+            <div class="qe-split2">
+              <div>
+                <label>Inspection guidance</label>
+                <textarea id="pGuidance"></textarea>
+              </div>
+              <div>
+                <label>Suggested inspector actions</label>
+                <textarea id="pActions"></textarea>
+              </div>
             </div>
 
-            <div class="qfield">
-              <label>Inspection Guidance</label>
-              <textarea id="pGuidance" rows="6"></textarea>
+            <div style="height:12px;"></div>
+
+            <div class="qe-split2">
+              <div>
+                <label>Expected evidence</label>
+                <textarea id="pEvidence"></textarea>
+                <div class="muted small">If the DB currently stores an array, this will save as an array (one line = one item).</div>
+              </div>
+              <div>
+                <label>Potential grounds for negative observations</label>
+                <textarea id="pNegObs"></textarea>
+                <div class="muted small">If the DB currently stores an array, this will save as an array (one line = one item).</div>
+              </div>
             </div>
 
-            <div class="qfield">
-              <label>Suggested Inspector Actions</label>
-              <textarea id="pActions" rows="6"></textarea>
-            </div>
-
-            <div class="qfield">
-              <label>Expected Evidence</label>
-              <textarea id="pEvidence" rows="6"></textarea>
-            </div>
-
-            <div class="qfield">
-              <label>Potential Grounds for Negative Observations</label>
-              <textarea id="pNegObs" rows="6"></textarea>
-            </div>
-
+            <div style="height:10px;"></div>
+            <div class="muted small" id="saveStatus"></div>
           </div>
         </div>
       </div>
-
     </div>
   </div>
 
-  <script src="./auth.js"></script>
-  <script src="./q-questions-editor.js"></script>
+  <!-- IMPORTANT: Supabase JS must load BEFORE auth.js and your module JS -->
+  <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script defer src="./auth.js"></script>
+  <script defer src="./q-questions-editor.js"></script>
 </body>
 </html>
