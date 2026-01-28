@@ -1,4 +1,3 @@
-<!-- public/q-questions-editor.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -6,423 +5,254 @@
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>SIRE 2.0 – Questions Editor</title>
   <link rel="stylesheet" href="style.css" />
-
   <style>
-    :root{
-      --nav:#1a4170;
-      --nav2:#295eb0;
-      --bg:#f5f8fd;
-      --card:#ffffff;
-      --line:#d7e3f4;
-      --muted:#6b7b90;
-      --text:#0f2f5e;
-      --chip:#eaf1fb;
-      --chipLine:#c9d9f3;
-      --danger:#b03939;
-      --ok:#1f6d32;
-    }
-    body { margin:0; background:var(--bg); color:#132a4b; }
-    .topbar{
-      display:flex; justify-content:space-between; align-items:center; gap:14px;
-      padding: 10px 18px; background:var(--nav); color:#fff;
-      position:sticky; top:0; z-index:10;
-      box-shadow:0 2px 14px rgba(0,0,0,0.12);
-    }
-    .topbar .right { display:flex; gap:10px; align-items:center; }
-
-    .page { max-width: 1320px; margin: 0 auto; padding: 18px 18px 60px 18px; }
-
-    .btn{
-      border:none; padding:9px 14px; border-radius:10px; cursor:pointer;
-      font-weight:700; letter-spacing:0.1px;
-      border:1px solid transparent;
-    }
-    .btn.primary{ background:var(--nav2); color:#fff; }
-    .btn.light{
-      background:var(--chip); color:var(--nav); border:1px solid var(--chipLine);
-    }
-    .btn.danger{ background: var(--danger); color:#fff; }
-    .btn:disabled{ opacity:0.6; cursor:not-allowed; }
-
-    .badge { opacity:0.95; font-weight:700; }
-    .pill{
-      display:inline-block; padding:6px 12px; border-radius:999px;
-      background:var(--chip); border:1px solid var(--chipLine);
-      color:var(--nav); font-weight:800; font-size:0.86em;
-    }
-
-    .card{
-      background:var(--card);
-      border:1px solid var(--line);
-      border-radius:16px;
-      box-shadow:0 2px 18px rgba(30,70,130,0.10);
-      padding:16px 16px;
-      margin: 14px 0;
-    }
-    .card h2 { margin:0 0 10px 0; font-size: 1.18em; color:#173a6a; }
-
-    .muted { color:var(--muted); }
-    .warn{
-      background:#fde8e8; border:1px solid #f4bcbc; color:#8a1f1f;
-      padding:12px 14px; border-radius:12px; white-space:pre-wrap; display:none;
-    }
-    .ok{
-      background:#e9fbef; border:1px solid #bfe7ca; color:var(--ok);
-      padding:12px 14px; border-radius:12px; white-space:pre-wrap; display:none;
-    }
-
-    .row { display:flex; gap:14px; flex-wrap:wrap; align-items:center; }
-    .field { display:flex; flex-direction:column; gap:6px; min-width:220px; }
-    .field label { font-weight:800; color:#1a3261; font-size:0.93em; }
-    .field input, .field select, .field textarea{
-      font-size: 1em; padding:10px 10px; border-radius:10px; border:1px solid #c9d6ee;
-      outline:none; background:#fff;
-    }
-    .field textarea { min-height: 120px; resize: vertical; }
-    .hr { height:1px; background:#e3edf9; margin:14px 0; }
-
-    .editorGrid { display:flex; gap:14px; align-items:stretch; }
-    .leftPane{
-      width: 420px; min-width: 280px; max-width: 620px;
-      border:1px solid var(--line); border-radius:16px; overflow:hidden;
-      background:#fff; display:flex; flex-direction:column;
-    }
-    .leftTop{
-      padding:12px 12px;
-      background:linear-gradient(180deg, #eef5ff 0%, #f8fbff 100%);
-      border-bottom:1px solid var(--line);
-    }
-    .list{
-      overflow:auto;
-      max-height: calc(100vh - 330px);
-      background:#fff;
-    }
-    .qitem{
-      padding:12px 12px;
-      border-bottom:1px solid #edf2fb;
-      cursor:pointer;
-    }
-    .qitem:hover { background:#f3f8ff; }
-    .qitem.active { background:#dfeeff; }
-    .qno { font-weight:900; color:var(--text); }
-    .qsub { color:#4b5f7b; font-size:0.93em; margin-top:4px; line-height:1.25; }
-
-    .rightPane{
-      flex:1; min-width: 0;
-      border:1px solid var(--line); border-radius:16px;
-      background:#fff;
-      padding:14px 14px;
-    }
-
-    .photoBar{
-      display:flex;
-      gap:10px;
-      flex-wrap:wrap;
-      align-items:center;
-      justify-content:space-between;
-      margin: 10px 0 6px 0;
-      padding: 10px;
-      border:1px solid #e3edf9;
-      border-radius:12px;
-      background:#f8fbff;
-    }
-    .photoGrid{
-      display:grid;
-      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-      gap:12px;
-      margin-top:10px;
-    }
-    .photoCard{
-      border:1px solid #d7e3f4;
-      border-radius:14px;
-      overflow:hidden;
-      background:#fff;
-      box-shadow:0 2px 14px rgba(30,70,130,0.08);
-      display:flex;
-      flex-direction:column;
-      min-height: 220px;
-    }
-    .photoThumb{
-      height:150px;
-      background:#eef5ff;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      overflow:hidden;
-    }
-    .photoThumb img{
-      width:100%;
-      height:100%;
-      object-fit:cover;
-      display:block;
-    }
-    .photoMeta{
-      padding:10px;
-      display:flex;
-      flex-direction:column;
-      gap:8px;
-    }
-    .photoMeta .small{
-      font-size:0.88em;
-      color:#4b5f7b;
-      word-break:break-word;
-    }
-    .photoBtns{
-      display:flex;
-      gap:8px;
-      flex-wrap:wrap;
-    }
-
-    @media (max-width: 980px){
-      .editorGrid{ flex-direction:column; }
-      .leftPane{ width:auto; max-width:none; }
-      .list{ max-height: 340px; }
-    }
+    /* Minimal local layout helpers (kept small; your style.css stays in control) */
+    .qwrap { display:flex; gap:16px; }
+    .qleft { width: 420px; min-width: 320px; }
+    .qright { flex:1; min-width: 520px; }
+    .row { display:flex; gap:12px; align-items:center; flex-wrap:wrap; }
+    .row > * { flex: 0 0 auto; }
+    .grow { flex: 1 1 280px; }
+    .panel { border:1px solid #d6e3f3; border-radius:14px; padding:14px; background:#fff; }
+    .muted { color:#6b7280; font-size:13px; }
+    .pill { display:inline-block; padding:6px 10px; border:1px solid #d6e3f3; border-radius:999px; background:#f4f8ff; font-size:12px; }
+    .divider { height:1px; background:#e7effb; margin:12px 0; }
+    .btnrow { display:flex; gap:10px; align-items:center; justify-content:flex-end; flex-wrap:wrap; }
+    .grid2 { display:grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .grid3 { display:grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+    .field label { display:block; font-weight:600; font-size:13px; margin-bottom:6px; }
+    .field input, .field select, .field textarea { width:100%; box-sizing:border-box; }
+    .field textarea { min-height: 90px; }
+    .small { font-size: 12px; }
+    .qListBox { border:1px solid #d6e3f3; border-radius:12px; overflow:hidden; background:#fff; }
+    .qListHead { padding:10px 12px; background:#f4f8ff; display:flex; justify-content:space-between; align-items:center; gap:10px; }
+    .qList { max-height: 560px; overflow:auto; }
+    .qitem { padding:10px 12px; border-top:1px solid #eef4ff; cursor:pointer; }
+    .qitem:hover { background:#f7fbff; }
+    .qitem.active { background:#e9f2ff; }
+    .qno { font-weight:800; }
+    .qsub { font-size:13px; color:#1f2937; margin-top:3px; }
+    .warn { background:#ffecec; border:1px solid #ffb7b7; color:#8a1c1c; padding:10px 12px; border-radius:12px; margin-bottom:10px; display:none; white-space:pre-wrap; }
+    .ok { background:#ecfff1; border:1px solid #9be7b1; color:#165c2e; padding:10px 12px; border-radius:12px; margin-bottom:10px; display:none; white-space:pre-wrap; }
+    .adv { display:none; margin-top:10px; padding-top:10px; border-top:1px dashed #d6e3f3; }
   </style>
-
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="auth.js"></script>
 </head>
 
 <body>
-  <div class="topbar">
-    <div><b>SIRE 2.0 – Questions Editor</b></div>
-    <div class="right">
-      <span id="userBadge" class="badge">—</span>
-      <button id="switchUserBtn" class="btn light">Switch User</button>
-      <button id="loginBtn" class="btn light">Login</button>
-      <button id="logoutBtn" class="btn primary">Logout</button>
-    </div>
+  <div class="row" style="justify-content:space-between; margin: 10px 0 12px;">
+    <a class="btn light" href="./dashboard.html">← Back to Dashboard</a>
+    <div id="modeLine" class="pill">Role: — • Mode: Admin • Module: QUESTIONS_EDITOR</div>
   </div>
 
-  <div class="page">
-    <div class="row" style="justify-content:space-between;">
-      <button class="btn light" id="backBtn" type="button">← Back to Dashboard</button>
-      <div class="pill" id="modeLine">Checking access…</div>
+  <div id="warnBox" class="warn"></div>
+  <div id="okBox" class="ok"></div>
+
+  <div class="panel">
+    <h2 style="margin:0 0 6px;">Questions Browser & Viewer / Editor (DB)</h2>
+    <div class="muted" style="margin-bottom:12px;">
+      Left side = list. Right side = viewer by default. Click <b>Edit</b> to switch to edit mode for the selected question.
     </div>
 
-    <div id="warnBox" class="warn" style="margin-top:12px;"></div>
-    <div id="okBox" class="ok" style="margin-top:12px;"></div>
+    <div class="row" style="margin-bottom:10px;">
+      <button id="reloadBtn" class="btn primary" type="button">Load / Refresh Questions</button>
+      <button id="newQuestionBtn" class="btn light" type="button">Add New Question</button>
 
-    <div class="card" id="editorCard" style="display:none;">
-      <h2>Questions Browser & Viewer / Editor (DB)</h2>
-      <div class="muted">
-        Left side = list. Right side = editor for selected question.
+      <div class="grow"></div>
+
+      <div class="field" style="min-width:220px;">
+        <label>Source</label>
+        <select id="sourceFilter">
+          <option value="ALL">All (SIRE + Company + Spare)</option>
+          <option value="SIRE">SIRE</option>
+          <option value="COMPANY_CUSTOM">Company (custom)</option>
+          <option value="SPARE_X">Spare X</option>
+          <option value="SPARE_Z">Spare Z</option>
+        </select>
       </div>
 
-      <div class="hr"></div>
+      <div class="field grow" style="min-width:280px;">
+        <label>Search (number / short text / question)</label>
+        <input id="searchInput" type="text" placeholder="Type to filter …" />
+      </div>
 
-      <div class="row">
-        <button class="btn primary" id="reloadBtn" type="button">Load / Refresh Questions</button>
-        <button class="btn light" id="addNewBtn" type="button">Add New Question</button>
+      <div class="field" style="min-width:160px;">
+        <label>Status</label>
+        <select id="statusFilter">
+          <option value="active" selected>active</option>
+          <option value="inactive">inactive</option>
+        </select>
+      </div>
+    </div>
 
-        <div class="field" style="min-width:240px;">
-          <label>Source</label>
-          <select id="sourceFilter">
-            <option value="ALL" selected>All (SIRE + Company + Spare)</option>
-            <option value="SIRE">SIRE</option>
-            <option value="COMPANY">COMPANY</option>
-            <option value="SPARE1">SPARE1</option>
-            <option value="SPARE2">SPARE2</option>
-          </select>
-        </div>
+    <div class="row" style="margin-bottom:12px;">
+      <div class="field grow" style="min-width:280px; max-width:520px;">
+        <label>Version (optional filter)</label>
+        <input id="versionFilter" type="text" placeholder="Leave blank to show all" />
+      </div>
+      <div class="muted" id="loadHint" style="margin-left:auto;"></div>
+    </div>
 
-        <div class="field" style="min-width:320px; flex:1;">
-          <label>Search (number / short text / question)</label>
-          <input id="searchInput" placeholder="Type to filter…" />
-        </div>
-
-        <div class="field" style="min-width:220px;">
-          <label>Status</label>
-          <select id="statusFilter">
-            <option value="">(all)</option>
-            <option value="active" selected>active</option>
-            <option value="inactive">inactive</option>
-          </select>
-        </div>
-
-        <div class="field" style="min-width:260px;">
-          <label>Version (optional filter)</label>
-          <input id="versionFilter" placeholder="Leave blank to show all" />
+    <div class="qwrap">
+      <!-- LEFT -->
+      <div class="qleft">
+        <div class="qListBox">
+          <div class="qListHead">
+            <div id="countLine"><b>0 questions</b></div>
+            <div class="muted" id="loadedLine">Loaded 0</div>
+          </div>
+          <div id="qList" class="qList"></div>
         </div>
       </div>
 
-      <div class="hr"></div>
-
-      <div class="editorGrid">
-        <div class="leftPane">
-          <div class="leftTop">
-            <div class="row" style="justify-content:space-between;">
-              <div><b id="countLine">0 questions</b></div>
-              <div class="muted" id="loadHint"></div>
-            </div>
-          </div>
-          <div class="list" id="qList"></div>
+      <!-- RIGHT -->
+      <div class="qright">
+        <div id="emptyState" class="panel" style="background:#f9fbff;">
+          <div class="muted">Select a question from the list.</div>
         </div>
 
-        <div class="rightPane">
-          <div id="emptyState" class="muted" style="padding:14px;">
-            Select a question from the left list.
-          </div>
-
-          <div id="panel" style="display:none;">
-            <div class="row" style="justify-content:space-between; align-items:flex-start;">
-              <div>
-                <div style="font-size:1.2em; font-weight:900; color:var(--text);">
-                  <span id="hdrNumber">—</span>
-                </div>
-                <div class="muted" id="hdrId" style="margin-top:4px;"></div>
-              </div>
-              <div class="row">
-                <button class="btn primary" id="btnSave" type="button">Save</button>
-                <button class="btn light" id="btnReset" type="button">Reset</button>
+        <div id="editPanel" class="panel" style="display:none;">
+          <div class="row" style="justify-content:space-between; align-items:flex-start;">
+            <div>
+              <div style="font-size:22px; font-weight:800;" id="hdrNumber">—</div>
+              <div class="muted" id="hdrId">DB id: —</div>
+              <div style="margin-top:8px; display:flex; gap:8px; flex-wrap:wrap;">
+                <span class="pill" id="pillSource">source: —</span>
+                <span class="pill" id="pillStatus">status: —</span>
+                <span class="pill" id="pillSuffix">suffix: —</span>
+                <span class="pill" id="pillMode">mode: VIEW</span>
+                <span class="pill" id="newBanner" style="display:none; background:#fff6e5; border-color:#ffd494;">NEW</span>
               </div>
             </div>
 
-            <div class="hr"></div>
+            <div class="btnrow">
+              <button id="btnEdit" class="btn light" type="button">Edit</button>
+              <button id="btnView" class="btn light" type="button" style="display:none;">View</button>
+              <button id="btnSave" class="btn primary" type="button" style="display:none;">Save</button>
+              <button id="btnReset" class="btn light" type="button" style="display:none;">Reset</button>
+            </div>
+          </div>
 
-            <div class="row" style="gap:10px; align-items:flex-end;">
-              <div class="field" style="min-width:260px;">
-                <label>Source Type</label>
-                <select id="dbSourceType">
-                  <option value="SIRE">SIRE</option>
-                  <option value="COMPANY">COMPANY</option>
-                  <option value="SPARE1">SPARE1</option>
-                  <option value="SPARE2">SPARE2</option>
-                </select>
+          <div class="divider"></div>
+
+          <div class="grid2">
+            <div class="field">
+              <label>Source Type</label>
+              <select id="dbSourceType">
+                <option value="SIRE">SIRE</option>
+                <option value="COMPANY_CUSTOM">Company (custom)</option>
+                <option value="SPARE_X">Spare X</option>
+                <option value="SPARE_Z">Spare Z</option>
+              </select>
+              <div class="muted small" style="margin-top:6px;">
+                New questions should use <b>Company (custom)</b> (or Spare). SIRE is for the official library.
               </div>
+            </div>
 
-              <div class="field" style="min-width:200px;">
-                <label>Status</label>
-                <select id="dbStatus">
-                  <option value="active" selected>active</option>
-                  <option value="inactive">inactive</option>
-                </select>
+            <div class="field">
+              <label>Status</label>
+              <select id="dbStatus">
+                <option value="active">active</option>
+                <option value="inactive">inactive</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Numbering split -->
+          <div class="divider"></div>
+          <div class="grid3">
+            <div class="field">
+              <label>Chapter (xx)</label>
+              <input id="numChapter" type="number" min="0" step="1" placeholder="e.g. 4" />
+            </div>
+            <div class="field">
+              <label>Section (yy)</label>
+              <input id="numSection" type="number" min="0" step="1" placeholder="e.g. 1" />
+            </div>
+            <div class="field">
+              <label>Item (zz / zzz)</label>
+              <input id="numItem" type="number" min="0" step="1" placeholder="e.g. 1 or 105" />
+            </div>
+          </div>
+
+          <div class="grid2" style="margin-top:12px;">
+            <div class="field">
+              <label>Number Suffix</label>
+              <input id="dbNumberSuffix" type="text" placeholder="C / A / B or blank for SIRE" />
+              <div class="muted small" style="margin-top:6px;">
+                Number base is built automatically as <b>xx.yy.zz</b> (or <b>xx.yy.zzz</b> for items ≥ 100).
               </div>
+            </div>
 
-              <div class="field" style="min-width:260px; flex:1;">
+            <div class="field">
+              <label>&nbsp;</label>
+              <button id="btnAdvanced" class="btn light" type="button" style="width:100%;">Advanced (Version / Tags / Raw JSON)</button>
+            </div>
+          </div>
+
+          <!-- Advanced -->
+          <div id="advPanel" class="adv">
+            <div class="grid2">
+              <div class="field">
                 <label>Version (your tag)</label>
-                <input id="dbVersion" placeholder="e.g. SIRE_2_0_QL, COMPANY_QL, etc" />
+                <input id="dbVersion" type="text" placeholder="e.g. SIRE_2_0_QL or COMPANY_2026" />
               </div>
-
-              <div class="field" style="min-width:320px; flex:1;">
+              <div class="field">
                 <label>Tags (comma separated)</label>
-                <input id="dbTags" placeholder="tag1, tag2, tag3" />
+                <input id="dbTags" type="text" placeholder="tag1, tag2, tag3" />
               </div>
             </div>
 
-            <div class="hr"></div>
-
-            <div class="row">
-              <!-- Create-friendly numbering -->
-              <div class="field" style="min-width:140px;">
-                <label>Chapter (xx)</label>
-                <input id="nbChap" inputmode="numeric" placeholder="e.g. 04" />
+            <div class="field" style="margin-top:12px;">
+              <label>Raw payload JSON (optional)</label>
+              <textarea id="pRaw" spellcheck="false" placeholder="{ ... }"></textarea>
+              <div class="muted small" style="margin-top:6px;">
+                If you edit raw JSON, it must remain valid JSON.
               </div>
-              <div class="field" style="min-width:140px;">
-                <label>Section (yy)</label>
-                <input id="nbSec" inputmode="numeric" placeholder="e.g. 01" />
-              </div>
-              <div class="field" style="min-width:160px;">
-                <label>Item (zz / zzz)</label>
-                <input id="nbItem" inputmode="numeric" placeholder="e.g. 01 or 105" />
-              </div>
-
-              <div class="field" style="min-width:200px;">
-                <label>Number Suffix</label>
-                <input id="dbNumberSuffix" placeholder="C / A / B or blank for SIRE" />
-              </div>
-
-              <!-- Hidden actual DB field (built by JS) -->
-              <input id="dbNumberBase" type="hidden" />
             </div>
-
-            <div class="muted" style="margin-top:8px;">
-              Number base is built automatically as <b>xx.yy.zz</b> (or <b>xx.yy.zzz</b> for custom items ≥ 100).
-            </div>
-
-            <div class="hr"></div>
-
-            <div class="field">
-              <label>Short Text</label>
-              <textarea id="pShortText"></textarea>
-            </div>
-
-            <div class="field">
-              <label>Question</label>
-              <textarea id="pQuestion" style="min-height:200px;"></textarea>
-            </div>
-
-            <div class="field">
-              <label>Inspection Guidance</label>
-              <textarea id="pGuidance" style="min-height:160px;"></textarea>
-            </div>
-
-            <div class="field">
-              <label>Suggested Inspector Actions</label>
-              <textarea id="pActions" style="min-height:160px;"></textarea>
-            </div>
-
-            <div class="field">
-              <label>Expected Evidence</label>
-              <textarea id="pEvidence" style="min-height:140px;"></textarea>
-            </div>
-
-            <div class="field">
-              <label>Potential Grounds for Negative Observations</label>
-              <textarea id="pNegObs" style="min-height:140px;"></textarea>
-            </div>
-
-            <div class="field">
-              <label>Raw Payload JSON (advanced)</label>
-              <textarea id="pRaw" style="min-height:220px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;"></textarea>
-            </div>
-
-            <div class="muted" id="saveStatus"></div>
-
-            <div class="hr"></div>
-
-            <!-- Photos -->
-            <div class="card" style="margin:0; padding:14px; border-radius:14px; border:1px solid #e3edf9; box-shadow:none;">
-              <h2 style="margin:0 0 6px 0; font-size:1.05em;">Question Photos</h2>
-              <div class="muted">
-                Storage bucket: <b>question-photos</b> • Table: <b>public.question_photos</b>
-              </div>
-
-              <div class="photoBar">
-                <div class="row" style="gap:10px;">
-                  <button class="btn light" id="btnRefreshPhotos" type="button">Refresh Photos</button>
-
-                  <div class="field" style="min-width:260px; margin:0;">
-                    <label style="margin:0; font-weight:800;">Upload (images)</label>
-                    <input id="photoFile" type="file" accept="image/*" multiple />
-                  </div>
-
-                  <button class="btn primary" id="btnUploadPhotos" type="button">Upload</button>
-                </div>
-
-                <div class="muted" id="photoStatus" style="min-width:240px; text-align:right;"></div>
-              </div>
-
-              <div id="photoWarn" class="warn" style="display:none; margin-top:10px;"></div>
-              <div class="photoGrid" id="photoGrid"></div>
-              <div class="muted" id="photoCountLine" style="margin-top:10px;"></div>
-            </div>
-
           </div>
+
+          <!-- Payload fields -->
+          <div class="divider"></div>
+
+          <div class="field">
+            <label>Short Text</label>
+            <textarea id="pShortText"></textarea>
+          </div>
+
+          <div class="field">
+            <label>Question</label>
+            <textarea id="pQuestion"></textarea>
+          </div>
+
+          <div class="field">
+            <label>Inspection Guidance</label>
+            <textarea id="pGuidance"></textarea>
+          </div>
+
+          <div class="field">
+            <label>Suggested Inspector Actions</label>
+            <textarea id="pActions"></textarea>
+          </div>
+
+          <div class="field">
+            <label>Expected Evidence</label>
+            <textarea id="pEvidence"></textarea>
+          </div>
+
+          <div class="field">
+            <label>Potential Grounds for Negative Observations</label>
+            <textarea id="pNegObs"></textarea>
+          </div>
+
+          <div class="muted small" id="saveStatus" style="margin-top:10px;"></div>
         </div>
       </div>
-
     </div>
   </div>
 
-  <script>
-    // back button
-    document.getElementById("backBtn")?.addEventListener("click", () => {
-      location.href = "./q-dashboard.html";
-    });
-  </script>
-
+  <!-- your project scripts -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="./auth.js"></script>
   <script src="./q-questions-editor.js"></script>
 </body>
 </html>

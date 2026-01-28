@@ -1,26 +1,21 @@
-// public/q-questions-editor.js
 (() => {
   "use strict";
 
-  // ====== helpers ======
-  const PHOTO_BUCKET = "question-photos";
-
-  // Map source_type -> suffix letter
-  const SUFFIX_BY_SOURCE = {
-    SIRE: "",
-    COMPANY: "C",
-    SPARE1: "A",
-    SPARE2: "B",
+  // ====== DB enum values (MUST match your Supabase types) ======
+  const SOURCE = {
+    SIRE: "SIRE",
+    COMPANY_CUSTOM: "COMPANY_CUSTOM",
+    SPARE_X: "SPARE_X",
+    SPARE_Z: "SPARE_Z",
   };
 
-  // This helper tries multiple ids and returns the first element found.
-  function $any(...ids) {
-    for (const id of ids) {
-      const el = document.getElementById(id);
-      if (el) return el;
-    }
-    return null;
-  }
+  // Suffix suggestions per source
+  const SUFFIX_BY_SOURCE = {
+    [SOURCE.SIRE]: "",
+    [SOURCE.COMPANY_CUSTOM]: "C",
+    [SOURCE.SPARE_X]: "A",
+    [SOURCE.SPARE_Z]: "B",
+  };
 
   function $(id) { return document.getElementById(id); }
 
@@ -29,121 +24,166 @@
   }
 
   function showWarn(msg) {
-    const w = $any("warnBox");
+    const w = $("warnBox");
     if (!w) return msg ? alert(msg) : undefined;
     w.textContent = msg || "";
     w.style.display = msg ? "block" : "none";
   }
 
   function showOk(msg) {
-    const w = $any("okBox");
+    const w = $("okBox");
     if (!w) return;
     w.textContent = msg || "";
     w.style.display = msg ? "block" : "none";
   }
 
   function setModeLine(txt) {
-    const el = $any("modeLine");
+    const el = $("modeLine");
     if (el) el.textContent = txt || "";
   }
 
-  function setText(idOrEl, txt) {
-    const el = typeof idOrEl === "string" ? $(idOrEl) : idOrEl;
+  function setText(id, txt) {
+    const el = $(id);
     if (el) el.textContent = txt || "";
   }
 
-  function setValue(idOrEl, val) {
-    const el = typeof idOrEl === "string" ? $(idOrEl) : idOrEl;
+  function setValue(id, val) {
+    const el = $(id);
     if (!el) return;
     el.value = val ?? "";
   }
 
-  function sanitizeFileName(name) {
-    const n = safeStr(name).trim();
-    if (!n) return "file";
-    return (
-      n.replaceAll("\\", "_")
-       .replaceAll("/", "_")
-       .replaceAll("..", "_")
-       .replace(/[^\w.\-() ]+/g, "_")
-       .trim() || "file"
-    );
-  }
-
-  // ===== numbering =====
+  // ===== numbering helpers =====
   function pad2(n) { return String(n).padStart(2, "0"); }
-  function pad3(n) { return String(n).padStart(3, "0"); }
 
-  // Normalize base to digits+dots, allow xx.yy.zz or xx.yy.zzz.
-  function normalizeNumberBase(v) {
-    const s = safeStr(v).trim();
-    if (!s) return "";
-    return s.replace(/[^0-9.]/g, "");
-  }
+  function buildNumberBaseFromParts(ch, sec, item) {
+    const a = Number(ch);
+    const b = Number(sec);
+    const c = Number(item);
 
-  function formatNumberBaseForDisplay(nb) {
-    const s = normalizeNumberBase(nb);
-    if (!s) return "";
-    const parts = s.split(".").filter(Boolean);
-    const a = parts[0] ?? "";
-    const b = parts[1] ?? "";
-    const c = parts[2] ?? "";
-    if (!a || !b || !c) return s;
+    if (!Number.isFinite(a) || !Number.isFinite(b) || !Number.isFinite(c)) return "";
 
-    const aa = pad2(parseInt(a, 10) || 0);
-    const bb = pad2(parseInt(b, 10) || 0);
+    const aa = pad2(a);
+    const bb = pad2(b);
 
-    const cNum = parseInt(c, 10);
-    const cWidth = (c.length >= 3 || cNum >= 100) ? 3 : 2;
-    const cc = String(cNum || 0).padStart(cWidth, "0");
+    // item: 2 digits unless >=100 (or user typed 3+ digits)
+    const cWidth = (String(item).trim().length >= 3 || c >= 100) ? 3 : 2;
+    const cc = String(c).padStart(cWidth, "0");
 
     return `${aa}.${bb}.${cc}`;
   }
 
+  function parseNumberBaseParts(nb) {
+    // Accept "2.1.1" or "02.01.01" or "04.01.105"
+    const s = safeStr(nb).trim();
+    const parts = s.split(".").filter(Boolean);
+    const ch = parts[0] ? parseInt(parts[0], 10) : NaN;
+    const sec = parts[1] ? parseInt(parts[1], 10) : NaN;
+    const item = parts[2] ? parseInt(parts[2], 10) : NaN;
+    return { ch, sec, item };
+  }
+
   function computeNumberFull(numberBase, suffix) {
-    const nb = formatNumberBaseForDisplay(numberBase);
+    const nb = safeStr(numberBase).trim();
     const sx = safeStr(suffix).trim();
     if (!nb) return "";
-    if (!sx) return nb;
-    return `${nb}-${sx}`;
+    return sx ? `${nb}-${sx}` : nb;
   }
 
-  function parseBaseToParts(number_base) {
-    const s = normalizeNumberBase(number_base);
-    const parts = s.split(".").filter(Boolean);
-    return {
-      chap: parts[0] ? String(parseInt(parts[0], 10) || 0) : "",
-      sec:  parts[1] ? String(parseInt(parts[1], 10) || 0) : "",
-      item: parts[2] ? String(parseInt(parts[2], 10) || 0) : "",
-      itemRaw: parts[2] ? String(parts[2]) : ""
-    };
+  function displayNumberFull(row) {
+    // Ensure display padded based on numeric parts
+    const { ch, sec, item } = parseNumberBaseParts(row.number_base);
+    const base = (Number.isFinite(ch) && Number.isFinite(sec) && Number.isFinite(item))
+      ? buildNumberBaseFromParts(ch, sec, item)
+      : safeStr(row.number_base);
+
+    return computeNumberFull(base, row.number_suffix);
   }
 
-  function buildNumberBaseFromParts(sourceType, chap, sec, item) {
-    const st = safeStr(sourceType).toUpperCase();
-    const c = parseInt(chap, 10);
-    const s = parseInt(sec, 10);
-    const i = parseInt(item, 10);
+  // Client-side numeric sort (fixes 10… coming before 2…)
+  function sortRowsByNumber(rows) {
+    rows.sort((r1, r2) => {
+      const a = parseNumberBaseParts(r1.number_base);
+      const b = parseNumberBaseParts(r2.number_base);
 
-    if (!Number.isFinite(c) || !Number.isFinite(s) || !Number.isFinite(i)) return "";
+      const ax = Number.isFinite(a.ch) ? a.ch : 999999;
+      const bx = Number.isFinite(b.ch) ? b.ch : 999999;
+      if (ax !== bx) return ax - bx;
 
-    const aa = pad2(c);
-    const bb = pad2(s);
+      const ay = Number.isFinite(a.sec) ? a.sec : 999999;
+      const by = Number.isFinite(b.sec) ? b.sec : 999999;
+      if (ay !== by) return ay - by;
 
-    // SIRE: zz is typically 2 digits
-    // Custom (COMPANY/SPARE): allow 3 digits if >=100
-    if (st === "SIRE") {
-      return `${aa}.${bb}.${pad2(i)}`;
-    }
-    return `${aa}.${bb}.${i >= 100 ? pad3(i) : pad2(i)}`;
+      const az = Number.isFinite(a.item) ? a.item : 999999;
+      const bz = Number.isFinite(b.item) ? b.item : 999999;
+      if (az !== bz) return az - bz;
+
+      // suffix: SIRE blank first, then A/B/C…
+      const as = safeStr(r1.number_suffix).trim();
+      const bs = safeStr(r2.number_suffix).trim();
+      return as.localeCompare(bs);
+    });
+    return rows;
   }
 
-  // ====== state ======
+  // ===== state =====
   let sb = null;
   let me = null;
 
   let allRows = [];
   let selected = null;
+
+  let isEditMode = false;
+  let advOpen = false;
+
+  // ====== UI mode controls ======
+  function setEditMode(on) {
+    isEditMode = !!on;
+
+    const btnEdit = $("btnEdit");
+    const btnView = $("btnView");
+    const btnSave = $("btnSave");
+    const btnReset = $("btnReset");
+
+    if (btnEdit) btnEdit.style.display = isEditMode ? "none" : "inline-block";
+    if (btnView) btnView.style.display = isEditMode ? "inline-block" : "none";
+    if (btnSave) btnSave.style.display = isEditMode ? "inline-block" : "none";
+    if (btnReset) btnReset.style.display = isEditMode ? "inline-block" : "none";
+
+    setText("pillMode", `mode: ${isEditMode ? "EDIT" : "VIEW"}`);
+
+    // Disable/enable inputs
+    const ids = [
+      "dbSourceType","dbStatus",
+      "numChapter","numSection","numItem","dbNumberSuffix",
+      "dbVersion","dbTags",
+      "pShortText","pQuestion","pGuidance","pActions","pEvidence","pNegObs","pRaw"
+    ];
+    for (const id of ids) {
+      const el = $(id);
+      if (!el) continue;
+
+      // Advanced fields should stay disabled in VIEW; in EDIT enabled only if adv open (for version/tags/raw)
+      if (id === "dbVersion" || id === "dbTags" || id === "pRaw") {
+        el.disabled = !isEditMode || !advOpen;
+        continue;
+      }
+
+      el.disabled = !isEditMode;
+    }
+  }
+
+  function setAdvanced(on) {
+    advOpen = !!on;
+    const panel = $("advPanel");
+    if (panel) panel.style.display = advOpen ? "block" : "none";
+
+    // Only enable advanced inputs when in edit mode
+    for (const id of ["dbVersion","dbTags","pRaw"]) {
+      const el = $(id);
+      if (el) el.disabled = !isEditMode || !advOpen;
+    }
+  }
 
   // ====== boot ======
   async function boot() {
@@ -166,11 +206,10 @@
 
       setModeLine(`Role: ${me.profile?.role || "—"} • Mode: Admin • Module: QUESTIONS_EDITOR`);
 
-      const editorCard = $any("editorCard");
-      if (editorCard) editorCard.style.display = "block";
-
       wireUI();
-      await toggleImportPanel();
+      setAdvanced(false);
+      setEditMode(false);
+
       await loadQuestions();
     } catch (e) {
       showWarn("Boot failed:\n\n" + (e?.message || String(e)));
@@ -178,26 +217,47 @@
   }
 
   function wireUI() {
-    const reloadBtn = $any("reloadBtn");
+    const reloadBtn = $("reloadBtn");
     if (reloadBtn) reloadBtn.onclick = () => loadQuestions();
 
-    const sourceFilter = $any("sourceFilter");
+    const sourceFilter = $("sourceFilter");
     if (sourceFilter) sourceFilter.onchange = () => renderList();
 
-    const statusFilter = $any("statusFilter");
-    if (statusFilter) statusFilter.onchange = () => renderList();
+    const statusFilter = $("statusFilter");
+    if (statusFilter) statusFilter.onchange = () => loadQuestions(); // status affects query
 
-    const versionFilter = $any("versionFilter");
+    const versionFilter = $("versionFilter");
     if (versionFilter) versionFilter.oninput = () => renderList();
 
-    const searchInput = $any("searchInput");
+    const searchInput = $("searchInput");
     if (searchInput) searchInput.oninput = () => renderList();
 
-    // Buttons
-    const newBtn = $any("addNewBtn", "addNewQuestionBtn", "newQuestionBtn", "newBtn");
+    const newBtn = $("newQuestionBtn");
     if (newBtn) newBtn.onclick = () => newQuestion();
 
-    const btnReset = $any("btnReset", "btnCancelEdit", "btnCancel");
+    const btnEdit = $("btnEdit");
+    if (btnEdit) {
+      btnEdit.onclick = () => {
+        if (!selected) return;
+        const ok = confirm("Enter EDIT mode for this question?");
+        if (!ok) return;
+        setEditMode(true);
+      };
+    }
+
+    const btnView = $("btnView");
+    if (btnView) {
+      btnView.onclick = () => {
+        setEditMode(false);
+        // revert changes by re-selecting current DB row
+        if (selected && !selected.__isNew) {
+          const r = allRows.find(x => x.id === selected.id);
+          if (r) selectRow(r);
+        }
+      };
+    }
+
+    const btnReset = $("btnReset");
     if (btnReset) {
       btnReset.onclick = () => {
         if (!selected) return;
@@ -209,189 +269,144 @@
       };
     }
 
-    const btnSave = $any("btnSave");
+    const btnSave = $("btnSave");
     if (btnSave) btnSave.onclick = () => saveSelected();
 
-    // Create numbering fields (xx/yy/zz) if present
-    const chapEl = $any("nbChap");
-    const secEl  = $any("nbSec");
-    const itemEl = $any("nbItem");
-    if (chapEl) chapEl.oninput = () => syncNumberBaseFromParts();
-    if (secEl)  secEl.oninput  = () => syncNumberBaseFromParts();
-    if (itemEl) itemEl.oninput = () => syncNumberBaseFromParts();
+    const btnAdvanced = $("btnAdvanced");
+    if (btnAdvanced) btnAdvanced.onclick = () => setAdvanced(!advOpen);
 
-    // If user changes source type while creating, update suffix auto and rebuild number_base
-    const dbSourceType = $any("dbSourceType");
-    if (dbSourceType && dbSourceType.tagName === "SELECT") {
+    // Auto-suffix behavior when creating new
+    const dbSourceType = $("dbSourceType");
+    if (dbSourceType) {
       dbSourceType.onchange = () => {
+        if (!selected) return;
         const st = dbSourceType.value;
         const auto = SUFFIX_BY_SOURCE[st] ?? "";
-        const sfxEl = $any("dbNumberSuffix");
-        if (sfxEl) {
-          if (!safeStr(sfxEl.value).trim() || sfxEl.dataset.auto === "1") {
-            sfxEl.value = auto;
-            sfxEl.dataset.auto = "1";
-          }
+        const sfxEl = $("dbNumberSuffix");
+        if (!sfxEl) return;
+
+        if (selected.__isNew) {
+          sfxEl.value = auto;
         }
-        syncNumberBaseFromParts();
-        refreshHeaderNumber();
+        refreshHeaderPills();
       };
     }
 
-    const dbNumberBase = $any("dbNumberBase");
-    if (dbNumberBase) dbNumberBase.oninput = () => refreshHeaderNumber();
-
-    const dbNumberSuffix = $any("dbNumberSuffix");
-    if (dbNumberSuffix) {
-      dbNumberSuffix.oninput = () => {
-        dbNumberSuffix.dataset.auto = "0";
-        refreshHeaderNumber();
-      };
-    }
-
-    // photos
-    const btnRefreshPhotos = $any("btnRefreshPhotos");
-    if (btnRefreshPhotos) btnRefreshPhotos.onclick = () => loadPhotosForSelected();
-
-    const btnUploadPhotos = $any("btnUploadPhotos");
-    if (btnUploadPhotos) btnUploadPhotos.onclick = () => uploadSelectedPhotos();
-  }
-
-  function syncNumberBaseFromParts() {
-    // Only meaningful in create mode, but harmless otherwise
-    const chapEl = $any("nbChap");
-    const secEl  = $any("nbSec");
-    const itemEl = $any("nbItem");
-    const nbEl   = $any("dbNumberBase");
-    if (!chapEl || !secEl || !itemEl || !nbEl) return;
-
-    const srcEl = $any("dbSourceType");
-    const src =
-      srcEl
-        ? (srcEl.tagName === "SELECT" ? srcEl.value : safeStr(srcEl.textContent).trim())
-        : "COMPANY";
-
-    const nb = buildNumberBaseFromParts(src, chapEl.value, secEl.value, itemEl.value);
-    if (nb) nbEl.value = nb;
-    refreshHeaderNumber();
-  }
-
-  async function toggleImportPanel() {
-    const importCard = $any("importCard");
-    if (!importCard) return;
-
-    try {
-      const { count, error } = await sb
-        .from("questions_master")
-        .select("id", { count: "exact", head: true });
-
-      if (error) throw error;
-
-      const isSuperAdmin = me?.profile?.role === "super_admin";
-      importCard.style.display = (isSuperAdmin && (count || 0) === 0) ? "block" : "none";
-    } catch (_e) {
-      importCard.style.display = "none";
+    // Update header number when parts change (even in view; harmless)
+    for (const id of ["numChapter","numSection","numItem","dbNumberSuffix"]) {
+      const el = $(id);
+      if (el) el.oninput = () => refreshHeaderNumber();
     }
   }
 
-  // ====== DB load + list ======
+  // ====== DB load ======
   async function loadQuestions() {
     showWarn("");
     showOk("");
+
     setText("loadHint", "Loading…");
 
     try {
-      const status = safeStr($any("statusFilter")?.value || "");
-      const version = safeStr($any("versionFilter")?.value).trim();
-      const src = safeStr($any("sourceFilter")?.value || "");
+      const status = safeStr($("statusFilter")?.value || "active");
+      const version = safeStr($("versionFilter")?.value || "").trim();
+      const src = safeStr($("sourceFilter")?.value || "ALL");
 
       let q = sb
         .from("questions_master")
-        .select("id, number_base, number_suffix, number_full, source_type, status, version, tags, payload, updated_at, created_at")
-        .order("number_base", { ascending: true });
+        .select("id, number_base, number_suffix, number_full, source_type, is_custom, status, version, tags, payload, updated_at, created_at")
+        .eq("status", status);
 
-      if (status) q = q.eq("status", status);
       if (version) q = q.eq("version", version);
       if (src && src !== "ALL") q = q.eq("source_type", src);
 
       const { data, error } = await q;
       if (error) throw error;
 
-      allRows = data || [];
-      setText("loadHint", `Loaded ${allRows.length}`);
+      allRows = sortRowsByNumber(data || []);
+
+      setText("loadedLine", `Loaded ${allRows.length}`);
+      setText("loadHint", "");
+
       renderList();
 
-      if (allRows.length) selectRow(allRows[0]);
-      else {
+      if (allRows.length) {
+        selectRow(allRows[0]);
+      } else {
         selected = null;
-        setEditorVisible(false);
+        $("editPanel").style.display = "none";
+        $("emptyState").style.display = "block";
       }
-
-      await toggleImportPanel();
     } catch (e) {
       setText("loadHint", "");
       showWarn("Failed to load questions from DB:\n\n" + (e?.message || String(e)));
     }
   }
 
+  // ====== list rendering ======
   function passesSearch(r, term) {
     if (!term) return true;
     const t = term.toLowerCase();
-    const n = safeStr(r.number_full || computeNumberFull(r.number_base, r.number_suffix)).toLowerCase();
+
+    const n = safeStr(displayNumberFull(r)).toLowerCase();
     const p = r.payload || {};
-    const st = safeStr(p.short_text || p.ShortText || p.shortText || p["Short Text"]).toLowerCase();
-    const qu = safeStr(p.question || p.Question || p["Question"]).toLowerCase();
+
+    const st =
+      safeStr(p.short_text ?? p.ShortText ?? p.shortText ?? p["Short Text"]).toLowerCase();
+    const qu =
+      safeStr(p.question ?? p.Question ?? p["Question"]).toLowerCase();
+
     return n.includes(t) || st.includes(t) || qu.includes(t);
   }
 
   function renderList() {
-    const list = $any("qList");
+    const list = $("qList");
     if (!list) return;
 
     list.innerHTML = "";
 
-    const term = safeStr($any("searchInput")?.value).trim();
+    const term = safeStr($("searchInput")?.value).trim();
     const filtered = allRows.filter(r => passesSearch(r, term));
 
-    const countLine = $any("countLine");
-    if (countLine) countLine.textContent = `${filtered.length} questions`;
+    setText("countLine", `${filtered.length} questions`);
 
     for (const r of filtered) {
       const div = document.createElement("div");
       div.className = "qitem" + (selected && !selected.__isNew && selected.id === r.id ? " active" : "");
 
-      const nfullRaw = r.number_full || computeNumberFull(r.number_base, r.number_suffix);
-      const sx = safeStr(r.number_suffix).trim();
-      const nfullDisplay = computeNumberFull(r.number_base, sx);
-
       const p = r.payload || {};
       const sub =
-        safeStr(p.short_text || p.ShortText || p.shortText || p["Short Text"]) ||
-        safeStr(p.question || p.Question || p["Question"]);
+        safeStr(p.short_text ?? p.ShortText ?? p.shortText ?? p["Short Text"]) ||
+        safeStr(p.question ?? p.Question ?? p["Question"]);
 
-      div.innerHTML = `<div class="qno">${nfullDisplay || safeStr(nfullRaw)}</div><div class="qsub">${sub}</div>`;
+      div.innerHTML = `<div class="qno">${displayNumberFull(r)}</div><div class="qsub">${safeStr(sub)}</div>`;
       div.onclick = () => selectRow(r);
       list.appendChild(div);
     }
   }
 
-  // ====== select / populate editor ======
-  function setEditorVisible(on) {
-    const emptyState = $any("emptyState");
-    const editPanel = $any("panel", "editPanel");
-    if (emptyState) emptyState.style.display = on ? "none" : "block";
-    if (editPanel) editPanel.style.display = on ? "block" : "none";
+  // ====== editor fill ======
+  function refreshHeaderNumber() {
+    if (!selected) return;
+
+    const ch = safeStr($("numChapter")?.value).trim();
+    const sec = safeStr($("numSection")?.value).trim();
+    const item = safeStr($("numItem")?.value).trim();
+
+    const base = buildNumberBaseFromParts(ch, sec, item);
+    const sx = safeStr($("dbNumberSuffix")?.value).trim();
+
+    setText("hdrNumber", computeNumberFull(base || "—", sx));
+    refreshHeaderPills();
   }
 
-  function refreshHeaderNumber() {
-    const nbEl = $any("dbNumberBase");
-    const sxEl = $any("dbNumberSuffix");
+  function refreshHeaderPills() {
+    const src = safeStr($("dbSourceType")?.value || selected?.source_type || "—");
+    const st = safeStr($("dbStatus")?.value || selected?.status || "—");
+    const sx = safeStr($("dbNumberSuffix")?.value || selected?.number_suffix || "");
 
-    const nb = nbEl ? (nbEl.value ?? "") : "";
-    const sx = sxEl ? (sxEl.value ?? "") : "";
-
-    const hdr = $any("hdrNumber");
-    if (hdr) hdr.textContent = computeNumberFull(nb, sx) || "—";
+    setText("pillSource", `source: ${src || "—"}`);
+    setText("pillStatus", `status: ${st || "—"}`);
+    setText("pillSuffix", `suffix: ${sx || "—"}`);
   }
 
   function fillPayloadFields(payload) {
@@ -403,35 +418,28 @@
     setValue("pEvidence", safeStr(p.expected_evidence ?? p.evidence ?? p.ExpectedEvidence ?? p["Expected Evidence"]));
     setValue("pNegObs", safeStr(p.potential_grounds_for_negative_observations ?? p.neg_obs ?? p.NegativeObservations ?? p["Potential Grounds for Negative Observations"]));
 
-    const rawEl = $any("pRaw");
+    // Raw JSON stays in advanced, but we still keep it updated
+    const rawEl = $("pRaw");
     if (rawEl) {
       try { rawEl.value = JSON.stringify(p, null, 2); }
-      catch (_e) { rawEl.value = ""; }
+      catch { rawEl.value = ""; }
     }
   }
 
   function readPayloadFromFields() {
     let p = {};
-    const rawEl = $any("pRaw");
-    const raw = safeStr(rawEl?.value).trim();
+    const raw = safeStr($("pRaw")?.value).trim();
     if (raw) {
-      try { p = JSON.parse(raw); }
-      catch (_e) { p = {}; }
+      try { p = JSON.parse(raw); } catch { p = {}; }
     }
 
-    const st = $any("pShortText");
-    const qu = $any("pQuestion");
-    const gd = $any("pGuidance");
-    const ac = $any("pActions");
-    const ev = $any("pEvidence");
-    const ng = $any("pNegObs");
-
-    p.short_text = st ? st.value : (p.short_text ?? "");
-    p.question = qu ? qu.value : (p.question ?? "");
-    p.inspection_guidance = gd ? gd.value : (p.inspection_guidance ?? "");
-    p.suggested_inspector_actions = ac ? ac.value : (p.suggested_inspector_actions ?? "");
-    p.expected_evidence = ev ? ev.value : (p.expected_evidence ?? "");
-    p.potential_grounds_for_negative_observations = ng ? ng.value : (p.potential_grounds_for_negative_observations ?? "");
+    // canonical snake_case keys
+    p.short_text = $("pShortText")?.value ?? (p.short_text ?? "");
+    p.question = $("pQuestion")?.value ?? (p.question ?? "");
+    p.inspection_guidance = $("pGuidance")?.value ?? (p.inspection_guidance ?? "");
+    p.suggested_inspector_actions = $("pActions")?.value ?? (p.suggested_inspector_actions ?? "");
+    p.expected_evidence = $("pEvidence")?.value ?? (p.expected_evidence ?? "");
+    p.potential_grounds_for_negative_observations = $("pNegObs")?.value ?? (p.potential_grounds_for_negative_observations ?? "");
 
     return p;
   }
@@ -440,64 +448,58 @@
     selected = JSON.parse(JSON.stringify(r));
     selected.__isNew = false;
 
-    setEditorVisible(true);
+    // show panel
+    $("emptyState").style.display = "none";
+    $("editPanel").style.display = "block";
+
+    setText("newBanner", "");
+    $("newBanner").style.display = "none";
 
     setText("hdrId", `DB id: ${r.id}`);
 
-    const dbSourceType = $any("dbSourceType");
-    if (dbSourceType) {
-      if (dbSourceType.tagName === "SELECT") dbSourceType.value = r.source_type;
-      else dbSourceType.textContent = r.source_type;
-    }
+    // Default = VIEW mode when selecting
+    setEditMode(false);
 
+    // Fill basic
+    setValue("dbSourceType", r.source_type);
     setValue("dbStatus", r.status);
-    setValue("dbVersion", r.version || "");
+
+    // Split number parts
+    const { ch, sec, item } = parseNumberBaseParts(r.number_base);
+    setValue("numChapter", Number.isFinite(ch) ? ch : "");
+    setValue("numSection", Number.isFinite(sec) ? sec : "");
+    setValue("numItem", Number.isFinite(item) ? item : "");
+
+    setValue("dbNumberSuffix", safeStr(r.number_suffix));
+
+    // Advanced fields (hidden by default)
+    setValue("dbVersion", safeStr(r.version));
     setValue("dbTags", Array.isArray(r.tags) ? r.tags.join(", ") : safeStr(r.tags));
 
-    const nbEl = $any("dbNumberBase");
-    if (nbEl) nbEl.value = safeStr(r.number_base);
-
-    const sxEl = $any("dbNumberSuffix");
-    if (sxEl) {
-      sxEl.value = safeStr(r.number_suffix);
-      sxEl.dataset.auto = "0";
-    }
-
-    // Populate xx/yy/zz fields from existing number_base (if present in HTML)
-    const parts = parseBaseToParts(r.number_base);
-    const chapEl = $any("nbChap");
-    const secEl  = $any("nbSec");
-    const itemEl = $any("nbItem");
-    if (chapEl) chapEl.value = parts.chap;
-    if (secEl)  secEl.value  = parts.sec;
-    if (itemEl) itemEl.value = parts.itemRaw || parts.item;
-
-    const hdr = $any("hdrNumber");
-    if (hdr) hdr.textContent = computeNumberFull(r.number_base, r.number_suffix) || "—";
-
     fillPayloadFields(r.payload || {});
-    setText("saveStatus", "");
+    refreshHeaderNumber();
 
+    setText("saveStatus", "");
     renderList();
-    loadPhotosForSelected();
   }
 
-  // ====== new question ======
+  // ====== New question ======
   function newQuestion() {
     showWarn("");
     showOk("");
 
-    const versionFromFilter = safeStr($any("versionFilter")?.value).trim();
+    const versionFromFilter = safeStr($("versionFilter")?.value).trim();
 
     selected = {
       __isNew: true,
       id: null,
-      source_type: "COMPANY",
+      source_type: SOURCE.COMPANY_CUSTOM,
+      is_custom: true,
       status: "active",
-      version: versionFromFilter || "COMPANY_QL",
+      version: versionFromFilter || "SIRE_2_0_QL",
       tags: [],
       number_base: "",
-      number_suffix: "C",
+      number_suffix: SUFFIX_BY_SOURCE[SOURCE.COMPANY_CUSTOM] || "C",
       payload: {
         short_text: "",
         question: "",
@@ -508,49 +510,36 @@
       },
     };
 
-    setEditorVisible(true);
+    $("emptyState").style.display = "none";
+    $("editPanel").style.display = "block";
+
+    $("newBanner").style.display = "inline-block";
     setText("hdrId", "Not saved yet");
 
-    const dbSourceType = $any("dbSourceType");
-    if (dbSourceType) dbSourceType.value = selected.source_type;
+    // Start in EDIT mode for a new question
+    setAdvanced(false);
+    setEditMode(true);
 
+    setValue("dbSourceType", selected.source_type);
     setValue("dbStatus", selected.status);
+
+    setValue("numChapter", "");
+    setValue("numSection", "");
+    setValue("numItem", "");
+
+    setValue("dbNumberSuffix", selected.number_suffix);
+
+    // advanced hidden but pre-filled
     setValue("dbVersion", selected.version);
     setValue("dbTags", "");
 
-    // Set xx/yy/zz defaults
-    const chapEl = $any("nbChap");
-    const secEl  = $any("nbSec");
-    const itemEl = $any("nbItem");
-    if (chapEl) chapEl.value = "1";
-    if (secEl)  secEl.value  = "1";
-    if (itemEl) itemEl.value = "1";
-
-    // Ensure suffix auto
-    const sxEl = $any("dbNumberSuffix");
-    if (sxEl) {
-      const auto = SUFFIX_BY_SOURCE[selected.source_type] || "";
-      sxEl.value = auto;
-      sxEl.dataset.auto = "1";
-    }
-
-    // Build number_base from parts into hidden dbNumberBase
-    const nbEl = $any("dbNumberBase");
-    if (nbEl) {
-      nbEl.value = buildNumberBaseFromParts(selected.source_type, chapEl?.value, secEl?.value, itemEl?.value) || "";
-    }
-
-    refreshHeaderNumber();
     fillPayloadFields(selected.payload);
-    setText("saveStatus", "");
+    refreshHeaderNumber();
 
-    const grid = $any("photoGrid");
-    if (grid) grid.innerHTML = "";
-    setText("photoCountLine", "Save the question first to attach photos.");
-    setText("photoStatus", "");
+    setText("saveStatus", "");
   }
 
-  // ====== save ======
+  // ====== Save ======
   async function saveSelected() {
     if (!selected) return;
 
@@ -559,67 +548,53 @@
     setText("saveStatus", "Saving…");
 
     try {
-      const srcEl = $any("dbSourceType");
-      const src = srcEl ? srcEl.value : "COMPANY";
+      const src = safeStr($("dbSourceType")?.value).trim();
+      const status = safeStr($("dbStatus")?.value).trim() || "active";
 
-      const status = safeStr($any("dbStatus")?.value || "active");
-      const version = safeStr($any("dbVersion")?.value).trim() || "COMPANY_QL";
+      const ch = safeStr($("numChapter")?.value).trim();
+      const sec = safeStr($("numSection")?.value).trim();
+      const item = safeStr($("numItem")?.value).trim();
 
-      // Build number_base from xx/yy/zz if those exist, otherwise from dbNumberBase
-      const chapEl = $any("nbChap");
-      const secEl  = $any("nbSec");
-      const itemEl = $any("nbItem");
-
-      let nb = "";
-      if (chapEl && secEl && itemEl) {
-        nb = buildNumberBaseFromParts(src, chapEl.value, secEl.value, itemEl.value);
-      }
-
-      const nbEl = $any("dbNumberBase");
-      if (!nb && nbEl) nb = normalizeNumberBase(nbEl.value);
-
-      if (!nb) {
+      const number_base = buildNumberBaseFromParts(ch, sec, item);
+      if (!number_base) {
         setText("saveStatus", "");
-        showWarn("Numbering is required. Fill Chapter (xx), Section (yy), Item (zz).");
+        showWarn("Numbering is required. Fill Chapter (xx), Section (yy), Item (zz/zzz).");
         return;
       }
 
-      // Keep dbNumberBase in sync (if present)
-      if (nbEl) nbEl.value = nb;
+      const number_suffix = safeStr($("dbNumberSuffix")?.value).trim();
 
-      const sxEl = $any("dbNumberSuffix");
-      const sx = sxEl ? sxEl.value : "";
+      // DB constraint requires correct is_custom + source_type match
+      const is_custom = (src !== SOURCE.SIRE);
 
-      // tags
-      const tagsCsv = safeStr($any("dbTags")?.value).trim();
+      // Version + tags are only editable in Advanced mode,
+      // but still read from fields (they are disabled when not advanced).
+      const version = safeStr($("dbVersion")?.value).trim() || "SIRE_2_0_QL";
+
+      const tagsCsv = safeStr($("dbTags")?.value).trim();
       const tags = tagsCsv ? tagsCsv.split(",").map(s => s.trim()).filter(Boolean) : [];
 
       const payload = readPayloadFromFields();
 
-      // ✅ CRITICAL FIX for your constraint:
-      // If source_type != 'SIRE' => is_custom must be true
-      // If source_type == 'SIRE' => is_custom must be false
-      const isCustom = String(src).toUpperCase() !== "SIRE";
-
       const row = {
         source_type: src,
+        is_custom,
         status,
         version,
         tags,
-        number_base: nb,
-        number_suffix: safeStr(sx).trim(),
+        number_base,
+        number_suffix: number_suffix, // NOT NULL in DB; blank is allowed for SIRE
         payload,
-        is_custom: isCustom,
-        updated_by: me?.user?.id || null,
+        updated_by: me?.session?.user?.id || null,
       };
 
       if (selected.__isNew) {
-        row.created_by = me?.user?.id || null;
+        row.created_by = me?.session?.user?.id || null;
 
         const { data, error } = await sb
           .from("questions_master")
           .insert(row)
-          .select("id, number_base, number_suffix, number_full, source_type, status, version, tags, payload, updated_at, created_at")
+          .select("id, number_base, number_suffix, number_full, source_type, is_custom, status, version, tags, payload, updated_at, created_at")
           .single();
 
         if (error) throw error;
@@ -630,6 +605,8 @@
         await loadQuestions();
         const newRow = allRows.find(x => x.id === data.id);
         if (newRow) selectRow(newRow);
+        setEditMode(false);
+
       } else {
         const { error } = await sb
           .from("questions_master")
@@ -644,6 +621,7 @@
         await loadQuestions();
         const updated = allRows.find(x => x.id === selected.id);
         if (updated) selectRow(updated);
+        setEditMode(false);
       }
     } catch (e) {
       setText("saveStatus", "");
@@ -651,198 +629,8 @@
     }
   }
 
-  // ====== photos ======
-  function canManagePhotos() {
-    const role = me?.profile?.role || "";
-    return role === "super_admin" || role === "company_admin";
-  }
-
-  function showPhotoWarn(msg) {
-    const w = $any("photoWarn");
-    if (!w) return;
-    w.textContent = msg || "";
-    w.style.display = msg ? "block" : "none";
-  }
-
-  function setPhotoStatus(msg) {
-    const el = $any("photoStatus");
-    if (el) el.textContent = msg || "";
-  }
-
-  function storagePathFor(questionId, file) {
-    const safe = sanitizeFileName(file?.name || "image.jpg");
-    const ts = new Date().toISOString().replace(/[:.]/g, "-");
-    return `questions/${questionId}/${ts}_${safe}`;
-  }
-
-  async function uploadSelectedPhotos() {
-    showPhotoWarn("");
-
-    if (!selected || selected.__isNew || !selected.id) {
-      showPhotoWarn("Save the question first, then upload photos.");
-      return;
-    }
-    if (!canManagePhotos()) {
-      showPhotoWarn("Upload not allowed for your role (admins only).");
-      return;
-    }
-
-    const fileEl = $any("photoFile");
-    const files = fileEl?.files ? Array.from(fileEl.files) : [];
-    if (!files.length) {
-      showPhotoWarn("Please choose one or more image files first.");
-      return;
-    }
-
-    const MAX_MB = 10;
-    for (const f of files) {
-      if (f.size > MAX_MB * 1024 * 1024) {
-        showPhotoWarn(`File too large: ${f.name}\nMax allowed: ${MAX_MB}MB.`);
-        return;
-      }
-    }
-
-    setPhotoStatus(`Uploading ${files.length} file(s)…`);
-
-    try {
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        setPhotoStatus(`Uploading ${i + 1}/${files.length}: ${file.name}`);
-
-        const path = storagePathFor(selected.id, file);
-
-        const up = await sb.storage.from(PHOTO_BUCKET).upload(path, file, {
-          upsert: false,
-          contentType: file.type || "application/octet-stream",
-        });
-        if (up.error) throw up.error;
-
-        const ins = await sb.from("question_photos").insert({
-          question_id: selected.id,
-          file_path: path,
-          file_name: sanitizeFileName(file.name),
-          mime_type: file.type || null,
-          size_bytes: typeof file.size === "number" ? file.size : null,
-          caption: "",
-          uploaded_by: me?.user?.id || null,
-        });
-        if (ins.error) throw ins.error;
-      }
-
-      setPhotoStatus("Upload completed.");
-      if (fileEl) fileEl.value = "";
-      await loadPhotosForSelected();
-    } catch (e) {
-      setPhotoStatus("");
-      showPhotoWarn("Upload failed:\n\n" + (e?.message || String(e)));
-    }
-  }
-
-  async function loadPhotosForSelected() {
-    showPhotoWarn("");
-
-    const grid = $any("photoGrid");
-    const cntLine = $any("photoCountLine");
-    if (!grid || !cntLine) return;
-
-    grid.innerHTML = "";
-    cntLine.textContent = "";
-
-    if (!selected || selected.__isNew || !selected.id) {
-      cntLine.textContent = "Save the question first to attach photos.";
-      setPhotoStatus("");
-      return;
-    }
-
-    setPhotoStatus("Loading photos…");
-
-    try {
-      const { data, error } = await sb
-        .from("question_photos")
-        .select("id, file_path, file_name, mime_type, size_bytes, caption, created_at")
-        .eq("question_id", selected.id)
-        .order("created_at", { ascending: false });
-
-      if (error) throw error;
-
-      const rows = data || [];
-      if (!rows.length) {
-        cntLine.textContent = "No photos attached to this question yet.";
-        setPhotoStatus("");
-        return;
-      }
-
-      for (const r of rows) {
-        const publicUrl = sb.storage.from(PHOTO_BUCKET).getPublicUrl(r.file_path).data?.publicUrl || "";
-
-        const card = document.createElement("div");
-        card.className = "photoCard";
-
-        const niceName = safeStr(r.file_name) || "(unnamed)";
-        const niceSize =
-          typeof r.size_bytes === "number" && r.size_bytes >= 0
-            ? `${Math.round(r.size_bytes / 1024)} KB`
-            : "";
-
-        card.innerHTML = `
-          <div class="photoThumb">
-            ${publicUrl ? `<img src="${publicUrl}" alt="photo"/>` : `<div class="muted">No preview</div>`}
-          </div>
-          <div class="photoMeta">
-            <div class="small"><b>File:</b> ${niceName} ${niceSize ? `(${niceSize})` : ""}</div>
-            <div class="small"><b>Uploaded:</b> ${new Date(r.created_at).toLocaleString()}</div>
-            <div class="small"><b>Path:</b> ${r.file_path}</div>
-            <div class="photoBtns">
-              <a class="btn light" href="${publicUrl}" target="_blank" rel="noopener">Open</a>
-              <button class="btn danger" type="button" data-photo-id="${r.id}" data-path="${r.file_path}">Delete</button>
-            </div>
-          </div>
-        `;
-
-        const delBtn = card.querySelector("button[data-photo-id]");
-        if (delBtn) {
-          if (!canManagePhotos()) {
-            delBtn.disabled = true;
-            delBtn.title = "Not allowed (admins only).";
-            delBtn.classList.remove("danger");
-            delBtn.classList.add("light");
-          } else {
-            delBtn.onclick = async () => deletePhotoRowAndFile(delBtn.dataset.photoId, delBtn.dataset.path);
-          }
-        }
-
-        grid.appendChild(card);
-      }
-
-      cntLine.textContent = `${rows.length} photo(s) attached to this question.`;
-      setPhotoStatus("");
-    } catch (e) {
-      setPhotoStatus("");
-      showPhotoWarn("Failed to load photos:\n\n" + (e?.message || String(e)));
-    }
-  }
-
-  async function deletePhotoRowAndFile(photoId, filePath) {
-    if (!confirm("Delete this photo?\n\nThis removes it from Storage and DB.")) return;
-
-    try {
-      setPhotoStatus("Deleting…");
-
-      const rm = await sb.storage.from(PHOTO_BUCKET).remove([filePath]);
-      if (rm.error) throw rm.error;
-
-      const del = await sb.from("question_photos").delete().eq("id", photoId);
-      if (del.error) throw del.error;
-
-      setPhotoStatus("");
-      await loadPhotosForSelected();
-      showOk("Photo deleted.");
-    } catch (e) {
-      setPhotoStatus("");
-      showPhotoWarn("Delete failed:\n\n" + (e?.message || String(e)));
-    }
-  }
-
+  // expose for debugging
   window.__QEDIT = { loadQuestions, newQuestion };
+
   boot();
 })();
