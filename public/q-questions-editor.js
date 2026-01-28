@@ -1,22 +1,10 @@
+// public/q-questions-editor.js
 (() => {
   "use strict";
 
-  // ====== DB enum values (MUST match your Supabase types) ======
-  const SOURCE = {
-    SIRE: "SIRE",
-    COMPANY_CUSTOM: "COMPANY_CUSTOM",
-    SPARE_X: "SPARE_X",
-    SPARE_Z: "SPARE_Z",
-  };
-
-  // Suffix suggestions per source
-  const SUFFIX_BY_SOURCE = {
-    [SOURCE.SIRE]: "",
-    [SOURCE.COMPANY_CUSTOM]: "C",
-    [SOURCE.SPARE_X]: "A",
-    [SOURCE.SPARE_Z]: "B",
-  };
-
+  // ======================
+  // Helpers
+  // ======================
   function $(id) { return document.getElementById(id); }
 
   function safeStr(v) {
@@ -25,7 +13,7 @@
 
   function showWarn(msg) {
     const w = $("warnBox");
-    if (!w) return msg ? alert(msg) : undefined;
+    if (!w) return;
     w.textContent = msg || "";
     w.style.display = msg ? "block" : "none";
   }
@@ -37,161 +25,106 @@
     w.style.display = msg ? "block" : "none";
   }
 
-  function setModeLine(txt) {
-    const el = $("modeLine");
-    if (el) el.textContent = txt || "";
-  }
-
   function setText(id, txt) {
     const el = $(id);
     if (el) el.textContent = txt || "";
   }
 
-  function setValue(id, val) {
-    const el = $(id);
-    if (!el) return;
-    el.value = val ?? "";
+  function setModeLine(txt) {
+    const el = $("modeLine");
+    if (el) el.textContent = txt || "";
   }
 
-  // ===== numbering helpers =====
-  function pad2(n) { return String(n).padStart(2, "0"); }
+  function pad2(n) {
+    const x = Number.isFinite(n) ? n : parseInt(String(n || "0"), 10) || 0;
+    return String(x).padStart(2, "0");
+  }
 
-  function buildNumberBaseFromParts(ch, sec, item) {
-    const a = Number(ch);
-    const b = Number(sec);
-    const c = Number(item);
+  function pad3(n) {
+    const x = Number.isFinite(n) ? n : parseInt(String(n || "0"), 10) || 0;
+    return String(x).padStart(3, "0");
+  }
+
+  function parseNumberBase(nb) {
+    const s = safeStr(nb).trim();
+    if (!s) return { xx: "", yy: "", zz: "" };
+
+    const parts = s.split(".").filter(Boolean);
+    const xx = parts[0] ?? "";
+    const yy = parts[1] ?? "";
+    const zz = parts[2] ?? "";
+    return { xx, yy, zz };
+  }
+
+  // Numeric comparator for correct chapter ordering
+  function numberBaseToTuple(nb) {
+    const { xx, yy, zz } = parseNumberBase(nb);
+    const a = parseInt(xx, 10); // chapter
+    const b = parseInt(yy, 10); // section
+    const c = parseInt(zz, 10); // item (2 or 3 digits)
+    return [
+      Number.isFinite(a) ? a : 999999,
+      Number.isFinite(b) ? b : 999999,
+      Number.isFinite(c) ? c : 999999,
+    ];
+  }
+
+  function computeNumberBase({ xx, yy, item }, isSire) {
+    const a = parseInt(safeStr(xx), 10);
+    const b = parseInt(safeStr(yy), 10);
+    const c = parseInt(safeStr(item), 10);
 
     if (!Number.isFinite(a) || !Number.isFinite(b) || !Number.isFinite(c)) return "";
 
-    const aa = pad2(a);
-    const bb = pad2(b);
-
-    // item: 2 digits unless >=100 (or user typed 3+ digits)
-    const cWidth = (String(item).trim().length >= 3 || c >= 100) ? 3 : 2;
-    const cc = String(c).padStart(cWidth, "0");
-
-    return `${aa}.${bb}.${cc}`;
-  }
-
-  function parseNumberBaseParts(nb) {
-    // Accept "2.1.1" or "02.01.01" or "04.01.105"
-    const s = safeStr(nb).trim();
-    const parts = s.split(".").filter(Boolean);
-    const ch = parts[0] ? parseInt(parts[0], 10) : NaN;
-    const sec = parts[1] ? parseInt(parts[1], 10) : NaN;
-    const item = parts[2] ? parseInt(parts[2], 10) : NaN;
-    return { ch, sec, item };
+    // IMPORTANT:
+    // - SIRE typically uses xx.yy.zz (2-digit item)
+    // - Custom/spare often uses xx.yy.zzz (3-digit item) to satisfy DB constraints
+    const left = `${pad2(a)}.${pad2(b)}.`;
+    const right = isSire ? String(c).padStart(2, "0") : String(c).padStart(3, "0");
+    return left + right;
   }
 
   function computeNumberFull(numberBase, suffix) {
     const nb = safeStr(numberBase).trim();
     const sx = safeStr(suffix).trim();
     if (!nb) return "";
-    return sx ? `${nb}-${sx}` : nb;
+    if (!sx) return nb;
+    return `${nb}-${sx}`;
   }
 
-  function displayNumberFull(row) {
-    // Ensure display padded based on numeric parts
-    const { ch, sec, item } = parseNumberBaseParts(row.number_base);
-    const base = (Number.isFinite(ch) && Number.isFinite(sec) && Number.isFinite(item))
-      ? buildNumberBaseFromParts(ch, sec, item)
-      : safeStr(row.number_base);
-
-    return computeNumberFull(base, row.number_suffix);
+  function payloadGet(p, keys) {
+    for (const k of keys) {
+      if (p && Object.prototype.hasOwnProperty.call(p, k)) return p[k];
+    }
+    return "";
   }
 
-  // Client-side numeric sort (fixes 10… coming before 2…)
-  function sortRowsByNumber(rows) {
-    rows.sort((r1, r2) => {
-      const a = parseNumberBaseParts(r1.number_base);
-      const b = parseNumberBaseParts(r2.number_base);
-
-      const ax = Number.isFinite(a.ch) ? a.ch : 999999;
-      const bx = Number.isFinite(b.ch) ? b.ch : 999999;
-      if (ax !== bx) return ax - bx;
-
-      const ay = Number.isFinite(a.sec) ? a.sec : 999999;
-      const by = Number.isFinite(b.sec) ? b.sec : 999999;
-      if (ay !== by) return ay - by;
-
-      const az = Number.isFinite(a.item) ? a.item : 999999;
-      const bz = Number.isFinite(b.item) ? b.item : 999999;
-      if (az !== bz) return az - bz;
-
-      // suffix: SIRE blank first, then A/B/C…
-      const as = safeStr(r1.number_suffix).trim();
-      const bs = safeStr(r2.number_suffix).trim();
-      return as.localeCompare(bs);
-    });
-    return rows;
+  function payloadSetCanonical(p, key, val) {
+    if (!p || typeof p !== "object") p = {};
+    p[key] = val;
+    return p;
   }
 
-  // ===== state =====
+  // ======================
+  // State
+  // ======================
   let sb = null;
   let me = null;
 
   let allRows = [];
-  let selected = null;
+  let selected = null; // cloned selected row
+  let mode = "view";   // "view" | "edit"
 
-  let isEditMode = false;
-  let advOpen = false;
-
-  // ====== UI mode controls ======
-  function setEditMode(on) {
-    isEditMode = !!on;
-
-    const btnEdit = $("btnEdit");
-    const btnView = $("btnView");
-    const btnSave = $("btnSave");
-    const btnReset = $("btnReset");
-
-    if (btnEdit) btnEdit.style.display = isEditMode ? "none" : "inline-block";
-    if (btnView) btnView.style.display = isEditMode ? "inline-block" : "none";
-    if (btnSave) btnSave.style.display = isEditMode ? "inline-block" : "none";
-    if (btnReset) btnReset.style.display = isEditMode ? "inline-block" : "none";
-
-    setText("pillMode", `mode: ${isEditMode ? "EDIT" : "VIEW"}`);
-
-    // Disable/enable inputs
-    const ids = [
-      "dbSourceType","dbStatus",
-      "numChapter","numSection","numItem","dbNumberSuffix",
-      "dbVersion","dbTags",
-      "pShortText","pQuestion","pGuidance","pActions","pEvidence","pNegObs","pRaw"
-    ];
-    for (const id of ids) {
-      const el = $(id);
-      if (!el) continue;
-
-      // Advanced fields should stay disabled in VIEW; in EDIT enabled only if adv open (for version/tags/raw)
-      if (id === "dbVersion" || id === "dbTags" || id === "pRaw") {
-        el.disabled = !isEditMode || !advOpen;
-        continue;
-      }
-
-      el.disabled = !isEditMode;
-    }
-  }
-
-  function setAdvanced(on) {
-    advOpen = !!on;
-    const panel = $("advPanel");
-    if (panel) panel.style.display = advOpen ? "block" : "none";
-
-    // Only enable advanced inputs when in edit mode
-    for (const id of ["dbVersion","dbTags","pRaw"]) {
-      const el = $(id);
-      if (el) el.disabled = !isEditMode || !advOpen;
-    }
-  }
-
-  // ====== boot ======
+  // ======================
+  // Boot
+  // ======================
   async function boot() {
     try {
       if (!window.AUTH) {
         showWarn("AUTH helper not loaded (auth.js).");
         return;
       }
+
       sb = window.AUTH.ensureSupabase();
 
       me = await window.AUTH.setupAuthButtons({
@@ -207,9 +140,6 @@
       setModeLine(`Role: ${me.profile?.role || "—"} • Mode: Admin • Module: QUESTIONS_EDITOR`);
 
       wireUI();
-      setAdvanced(false);
-      setEditMode(false);
-
       await loadQuestions();
     } catch (e) {
       showWarn("Boot failed:\n\n" + (e?.message || String(e)));
@@ -217,115 +147,78 @@
   }
 
   function wireUI() {
-    const reloadBtn = $("reloadBtn");
-    if (reloadBtn) reloadBtn.onclick = () => loadQuestions();
+    $("reloadBtn").onclick = () => loadQuestions();
+    $("newQuestionBtn").onclick = () => newQuestion();
 
-    const sourceFilter = $("sourceFilter");
-    if (sourceFilter) sourceFilter.onchange = () => renderList();
+    $("sourceFilter").onchange = () => renderList();
+    $("statusFilter").onchange = () => renderList();
+    $("versionFilter").oninput = () => renderList();
+    $("searchInput").oninput = () => renderList();
 
-    const statusFilter = $("statusFilter");
-    if (statusFilter) statusFilter.onchange = () => loadQuestions(); // status affects query
+    $("btnEdit").onclick = () => setMode("edit");
+    $("btnView").onclick = () => setMode("view");
+    $("btnSave").onclick = () => saveSelected();
+    $("btnReset").onclick = () => resetSelected();
 
-    const versionFilter = $("versionFilter");
-    if (versionFilter) versionFilter.oninput = () => renderList();
-
-    const searchInput = $("searchInput");
-    if (searchInput) searchInput.oninput = () => renderList();
-
-    const newBtn = $("newQuestionBtn");
-    if (newBtn) newBtn.onclick = () => newQuestion();
-
-    const btnEdit = $("btnEdit");
-    if (btnEdit) {
-      btnEdit.onclick = () => {
-        if (!selected) return;
-        const ok = confirm("Enter EDIT mode for this question?");
-        if (!ok) return;
-        setEditMode(true);
-      };
-    }
-
-    const btnView = $("btnView");
-    if (btnView) {
-      btnView.onclick = () => {
-        setEditMode(false);
-        // revert changes by re-selecting current DB row
-        if (selected && !selected.__isNew) {
-          const r = allRows.find(x => x.id === selected.id);
-          if (r) selectRow(r);
-        }
-      };
-    }
-
-    const btnReset = $("btnReset");
-    if (btnReset) {
-      btnReset.onclick = () => {
-        if (!selected) return;
-        if (selected.__isNew) newQuestion();
-        else {
-          const r = allRows.find(x => x.id === selected.id);
-          if (r) selectRow(r);
-        }
-      };
-    }
-
-    const btnSave = $("btnSave");
-    if (btnSave) btnSave.onclick = () => saveSelected();
-
-    const btnAdvanced = $("btnAdvanced");
-    if (btnAdvanced) btnAdvanced.onclick = () => setAdvanced(!advOpen);
-
-    // Auto-suffix behavior when creating new
-    const dbSourceType = $("dbSourceType");
-    if (dbSourceType) {
-      dbSourceType.onchange = () => {
-        if (!selected) return;
-        const st = dbSourceType.value;
-        const auto = SUFFIX_BY_SOURCE[st] ?? "";
-        const sfxEl = $("dbNumberSuffix");
-        if (!sfxEl) return;
-
-        if (selected.__isNew) {
-          sfxEl.value = auto;
-        }
-        refreshHeaderPills();
-      };
-    }
-
-    // Update header number when parts change (even in view; harmless)
-    for (const id of ["numChapter","numSection","numItem","dbNumberSuffix"]) {
+    // Numbering inputs: rebuild number_base + header
+    for (const id of ["dbChapter", "dbSection", "dbItem", "dbSourceType", "dbNumberSuffix"]) {
       const el = $(id);
-      if (el) el.oninput = () => refreshHeaderNumber();
+      if (!el) continue;
+      el.oninput = () => refreshNumbering();
+      el.onchange = () => refreshNumbering();
+    }
+
+    // Canonical payload textareas -> keep raw in sync only in edit mode
+    for (const id of ["pShortText", "pQuestion", "pGuidance", "pActions", "pEvidence", "pNegObs"]) {
+      const el = $(id);
+      if (!el) continue;
+      el.oninput = () => {
+        if (mode === "edit") refreshRawPayloadPreview();
+      };
     }
   }
 
-  // ====== DB load ======
+  // ======================
+  // Load + list
+  // ======================
   async function loadQuestions() {
     showWarn("");
     showOk("");
-
     setText("loadHint", "Loading…");
+    setText("loadedLine", "");
 
     try {
-      const status = safeStr($("statusFilter")?.value || "active");
-      const version = safeStr($("versionFilter")?.value || "").trim();
-      const src = safeStr($("sourceFilter")?.value || "ALL");
+      const status = safeStr($("statusFilter").value).trim();
+      const version = safeStr($("versionFilter").value).trim();
+      const src = safeStr($("sourceFilter").value).trim();
 
       let q = sb
         .from("questions_master")
         .select("id, number_base, number_suffix, number_full, source_type, is_custom, status, version, tags, payload, updated_at, created_at")
-        .eq("status", status);
+        .order("number_base", { ascending: true }); // still fetched, but we will sort correctly client-side
 
+      if (status) q = q.eq("status", status);
       if (version) q = q.eq("version", version);
       if (src && src !== "ALL") q = q.eq("source_type", src);
 
       const { data, error } = await q;
       if (error) throw error;
 
-      allRows = sortRowsByNumber(data || []);
+      allRows = (data || []);
 
-      setText("loadedLine", `Loaded ${allRows.length}`);
+      // FIX A: correct numeric ordering (xx,yy,zz/zzz) even though column is text
+      allRows.sort((r1, r2) => {
+        const t1 = numberBaseToTuple(r1.number_base);
+        const t2 = numberBaseToTuple(r2.number_base);
+        if (t1[0] !== t2[0]) return t1[0] - t2[0];
+        if (t1[1] !== t2[1]) return t1[1] - t2[1];
+        if (t1[2] !== t2[2]) return t1[2] - t2[2];
+        // tie-breaker: suffix
+        return safeStr(r1.number_suffix).localeCompare(safeStr(r2.number_suffix));
+      });
+
       setText("loadHint", "");
+      setText("loadedLine", `Loaded ${allRows.length}`);
 
       renderList();
 
@@ -342,29 +235,24 @@
     }
   }
 
-  // ====== list rendering ======
   function passesSearch(r, term) {
     if (!term) return true;
     const t = term.toLowerCase();
 
-    const n = safeStr(displayNumberFull(r)).toLowerCase();
+    const n = safeStr(r.number_full || computeNumberFull(r.number_base, r.number_suffix)).toLowerCase();
     const p = r.payload || {};
 
-    const st =
-      safeStr(p.short_text ?? p.ShortText ?? p.shortText ?? p["Short Text"]).toLowerCase();
-    const qu =
-      safeStr(p.question ?? p.Question ?? p["Question"]).toLowerCase();
+    const st = safeStr(payloadGet(p, ["short_text", "ShortText", "shortText", "Short Text"])).toLowerCase();
+    const qu = safeStr(payloadGet(p, ["question", "Question"])).toLowerCase();
 
     return n.includes(t) || st.includes(t) || qu.includes(t);
   }
 
   function renderList() {
     const list = $("qList");
-    if (!list) return;
-
     list.innerHTML = "";
 
-    const term = safeStr($("searchInput")?.value).trim();
+    const term = safeStr($("searchInput").value).trim();
     const filtered = allRows.filter(r => passesSearch(r, term));
 
     setText("countLine", `${filtered.length} questions`);
@@ -373,133 +261,170 @@
       const div = document.createElement("div");
       div.className = "qitem" + (selected && !selected.__isNew && selected.id === r.id ? " active" : "");
 
+      const nfull = r.number_full || computeNumberFull(r.number_base, r.number_suffix);
+
       const p = r.payload || {};
       const sub =
-        safeStr(p.short_text ?? p.ShortText ?? p.shortText ?? p["Short Text"]) ||
-        safeStr(p.question ?? p.Question ?? p["Question"]);
+        safeStr(payloadGet(p, ["short_text", "ShortText", "shortText", "Short Text"])) ||
+        safeStr(payloadGet(p, ["question", "Question"]));
 
-      div.innerHTML = `<div class="qno">${displayNumberFull(r)}</div><div class="qsub">${safeStr(sub)}</div>`;
+      div.innerHTML = `
+        <div class="qno">${nfull}</div>
+        <div class="qsub">${escapeHtml(sub)}</div>
+        <div class="qmeta">${escapeHtml(safeStr(r.source_type))} • ${escapeHtml(safeStr(r.status))}${r.version ? ` • ${escapeHtml(r.version)}` : ""}</div>
+      `;
+
       div.onclick = () => selectRow(r);
       list.appendChild(div);
     }
   }
 
-  // ====== editor fill ======
-  function refreshHeaderNumber() {
-    if (!selected) return;
-
-    const ch = safeStr($("numChapter")?.value).trim();
-    const sec = safeStr($("numSection")?.value).trim();
-    const item = safeStr($("numItem")?.value).trim();
-
-    const base = buildNumberBaseFromParts(ch, sec, item);
-    const sx = safeStr($("dbNumberSuffix")?.value).trim();
-
-    setText("hdrNumber", computeNumberFull(base || "—", sx));
-    refreshHeaderPills();
+  function escapeHtml(s) {
+    return safeStr(s)
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
   }
 
-  function refreshHeaderPills() {
-    const src = safeStr($("dbSourceType")?.value || selected?.source_type || "—");
-    const st = safeStr($("dbStatus")?.value || selected?.status || "—");
-    const sx = safeStr($("dbNumberSuffix")?.value || selected?.number_suffix || "");
-
-    setText("pillSource", `source: ${src || "—"}`);
-    setText("pillStatus", `status: ${st || "—"}`);
-    setText("pillSuffix", `suffix: ${sx || "—"}`);
-  }
-
-  function fillPayloadFields(payload) {
-    const p = payload || {};
-    setValue("pShortText", safeStr(p.short_text ?? p.ShortText ?? p.shortText ?? p["Short Text"]));
-    setValue("pQuestion", safeStr(p.question ?? p.Question ?? p["Question"]));
-    setValue("pGuidance", safeStr(p.inspection_guidance ?? p.guidance ?? p.InspectionGuidance ?? p["Inspection Guidance"]));
-    setValue("pActions", safeStr(p.suggested_inspector_actions ?? p.actions ?? p.SuggestedInspectorActions ?? p["Suggested Inspector Actions"]));
-    setValue("pEvidence", safeStr(p.expected_evidence ?? p.evidence ?? p.ExpectedEvidence ?? p["Expected Evidence"]));
-    setValue("pNegObs", safeStr(p.potential_grounds_for_negative_observations ?? p.neg_obs ?? p.NegativeObservations ?? p["Potential Grounds for Negative Observations"]));
-
-    // Raw JSON stays in advanced, but we still keep it updated
-    const rawEl = $("pRaw");
-    if (rawEl) {
-      try { rawEl.value = JSON.stringify(p, null, 2); }
-      catch { rawEl.value = ""; }
-    }
-  }
-
-  function readPayloadFromFields() {
-    let p = {};
-    const raw = safeStr($("pRaw")?.value).trim();
-    if (raw) {
-      try { p = JSON.parse(raw); } catch { p = {}; }
-    }
-
-    // canonical snake_case keys
-    p.short_text = $("pShortText")?.value ?? (p.short_text ?? "");
-    p.question = $("pQuestion")?.value ?? (p.question ?? "");
-    p.inspection_guidance = $("pGuidance")?.value ?? (p.inspection_guidance ?? "");
-    p.suggested_inspector_actions = $("pActions")?.value ?? (p.suggested_inspector_actions ?? "");
-    p.expected_evidence = $("pEvidence")?.value ?? (p.expected_evidence ?? "");
-    p.potential_grounds_for_negative_observations = $("pNegObs")?.value ?? (p.potential_grounds_for_negative_observations ?? "");
-
-    return p;
-  }
-
+  // ======================
+  // Select / populate
+  // ======================
   function selectRow(r) {
     selected = JSON.parse(JSON.stringify(r));
     selected.__isNew = false;
 
-    // show panel
     $("emptyState").style.display = "none";
     $("editPanel").style.display = "block";
 
-    setText("newBanner", "");
     $("newBanner").style.display = "none";
 
     setText("hdrId", `DB id: ${r.id}`);
+    setMode("view"); // FIX B: default view-only
 
-    // Default = VIEW mode when selecting
-    setEditMode(false);
+    // Source/status
+    $("dbSourceType").value = safeStr(r.source_type);
+    $("dbStatus").value = safeStr(r.status) || "active";
 
-    // Fill basic
-    setValue("dbSourceType", r.source_type);
-    setValue("dbStatus", r.status);
+    // Advanced fields
+    $("dbVersion").value = safeStr(r.version);
+    $("dbTags").value = Array.isArray(r.tags) ? r.tags.join(", ") : safeStr(r.tags);
 
-    // Split number parts
-    const { ch, sec, item } = parseNumberBaseParts(r.number_base);
-    setValue("numChapter", Number.isFinite(ch) ? ch : "");
-    setValue("numSection", Number.isFinite(sec) ? sec : "");
-    setValue("numItem", Number.isFinite(item) ? item : "");
+    // Number parts
+    const nb = safeStr(r.number_base);
+    const parts = parseNumberBase(nb);
+    $("dbChapter").value = parts.xx ? String(parseInt(parts.xx, 10) || "") : "";
+    $("dbSection").value = parts.yy ? String(parseInt(parts.yy, 10) || "") : "";
+    $("dbItem").value = parts.zz ? String(parseInt(parts.zz, 10) || "") : "";
 
-    setValue("dbNumberSuffix", safeStr(r.number_suffix));
+    $("dbNumberSuffix").value = safeStr(r.number_suffix);
 
-    // Advanced fields (hidden by default)
-    setValue("dbVersion", safeStr(r.version));
-    setValue("dbTags", Array.isArray(r.tags) ? r.tags.join(", ") : safeStr(r.tags));
-
+    refreshNumbering(false); // do not overwrite parts, just recompute display
     fillPayloadFields(r.payload || {});
-    refreshHeaderNumber();
+    refreshRawPayloadPreview();
 
-    setText("saveStatus", "");
+    updateChips();
     renderList();
   }
 
-  // ====== New question ======
+  function fillPayloadFields(payload) {
+    const p = payload || {};
+
+    $("pShortText").value = safeStr(payloadGet(p, ["short_text", "ShortText", "shortText", "Short Text"]));
+    $("pQuestion").value = safeStr(payloadGet(p, ["question", "Question"]));
+    $("pGuidance").value = safeStr(payloadGet(p, ["inspection_guidance", "guidance", "InspectionGuidance", "Inspection Guidance"]));
+    $("pActions").value = safeStr(payloadGet(p, ["suggested_inspector_actions", "actions", "SuggestedInspectorActions", "Suggested Inspector Actions"]));
+    $("pEvidence").value = safeStr(payloadGet(p, ["expected_evidence", "evidence", "ExpectedEvidence", "Expected Evidence"]));
+    $("pNegObs").value = safeStr(payloadGet(p, ["potential_grounds_for_negative_observations", "neg_obs", "NegativeObservations", "Potential Grounds for Negative Observations"]));
+  }
+
+  function readPayloadFromFields() {
+    // Start from raw JSON (advanced), but do not require it
+    let p = {};
+    const raw = safeStr($("pRaw").value).trim();
+    if (raw) {
+      try { p = JSON.parse(raw); } catch { p = {}; }
+    }
+
+    p = payloadSetCanonical(p, "short_text", safeStr($("pShortText").value));
+    p = payloadSetCanonical(p, "question", safeStr($("pQuestion").value));
+    p = payloadSetCanonical(p, "inspection_guidance", safeStr($("pGuidance").value));
+    p = payloadSetCanonical(p, "suggested_inspector_actions", safeStr($("pActions").value));
+    p = payloadSetCanonical(p, "expected_evidence", safeStr($("pEvidence").value));
+    p = payloadSetCanonical(p, "potential_grounds_for_negative_observations", safeStr($("pNegObs").value));
+
+    return p;
+  }
+
+  function refreshRawPayloadPreview() {
+    // keep raw JSON updated for visibility (advanced panel)
+    const p = readPayloadFromFields();
+    try { $("pRaw").value = JSON.stringify(p, null, 2); } catch { /* ignore */ }
+  }
+
+  // ======================
+  // Mode (View/Edit)
+  // ======================
+  function setMode(next) {
+    mode = next === "edit" ? "edit" : "view";
+
+    $("btnEdit").style.display = (mode === "view") ? "inline-flex" : "none";
+    $("btnView").style.display = (mode === "edit") ? "inline-flex" : "none";
+    $("btnSave").style.display = (mode === "edit") ? "inline-flex" : "none";
+
+    // Disable/enable inputs in view mode
+    const editableIds = [
+      "dbSourceType","dbStatus",
+      "dbChapter","dbSection","dbItem","dbNumberSuffix",
+      "pShortText","pQuestion","pGuidance","pActions","pEvidence","pNegObs",
+      // advanced:
+      "dbVersion","dbTags","pRaw",
+    ];
+
+    for (const id of editableIds) {
+      const el = $(id);
+      if (!el) continue;
+      // allow advanced fields to remain read-only unless in edit mode
+      el.disabled = (mode === "view");
+      el.readOnly = (mode === "view") && (el.tagName === "INPUT" || el.tagName === "TEXTAREA");
+    }
+
+    // Computed number_base is always readonly
+    $("dbNumberBase").readOnly = true;
+
+    updateChips();
+  }
+
+  function updateChips() {
+    const src = safeStr($("dbSourceType").value || selected?.source_type);
+    const st = safeStr($("dbStatus").value || selected?.status);
+    const sx = safeStr($("dbNumberSuffix").value || selected?.number_suffix);
+
+    $("chipSource").textContent = `source: ${src || "—"}`;
+    $("chipStatus").textContent = `status: ${st || "—"}`;
+    $("chipSuffix").textContent = `suffix: ${sx || "—"}`;
+    $("chipMode").textContent = `mode: ${mode.toUpperCase()}`;
+    $("hdrNumber").textContent = computeNumberFull(safeStr($("dbNumberBase").value), safeStr($("dbNumberSuffix").value)) || "—";
+  }
+
+  // ======================
+  // New question
+  // ======================
   function newQuestion() {
     showWarn("");
     showOk("");
 
-    const versionFromFilter = safeStr($("versionFilter")?.value).trim();
-
     selected = {
       __isNew: true,
       id: null,
-      source_type: SOURCE.COMPANY_CUSTOM,
+      source_type: "COMPANY_CUSTOM",
       is_custom: true,
       status: "active",
-      version: versionFromFilter || "SIRE_2_0_QL",
+      version: safeStr($("versionFilter").value).trim() || "SIRE_2_0_QL",
       tags: [],
       number_base: "",
-      number_suffix: SUFFIX_BY_SOURCE[SOURCE.COMPANY_CUSTOM] || "C",
+      number_suffix: "C",
       payload: {
         short_text: "",
         question: "",
@@ -512,34 +437,91 @@
 
     $("emptyState").style.display = "none";
     $("editPanel").style.display = "block";
-
     $("newBanner").style.display = "inline-block";
+
     setText("hdrId", "Not saved yet");
 
-    // Start in EDIT mode for a new question
-    setAdvanced(false);
-    setEditMode(true);
+    $("dbSourceType").value = selected.source_type;
+    $("dbStatus").value = selected.status;
 
-    setValue("dbSourceType", selected.source_type);
-    setValue("dbStatus", selected.status);
+    // Advanced defaults
+    $("dbVersion").value = selected.version;
+    $("dbTags").value = "";
 
-    setValue("numChapter", "");
-    setValue("numSection", "");
-    setValue("numItem", "");
+    // Empty number parts
+    $("dbChapter").value = "";
+    $("dbSection").value = "";
+    $("dbItem").value = "";
 
-    setValue("dbNumberSuffix", selected.number_suffix);
+    // suffix default for company custom
+    $("dbNumberSuffix").value = "C";
 
-    // advanced hidden but pre-filled
-    setValue("dbVersion", selected.version);
-    setValue("dbTags", "");
-
+    // clear payload fields
     fillPayloadFields(selected.payload);
-    refreshHeaderNumber();
+    refreshNumbering(true);
+    refreshRawPayloadPreview();
 
-    setText("saveStatus", "");
+    // new question should open in EDIT mode
+    setMode("edit");
+    updateChips();
+    renderList();
   }
 
-  // ====== Save ======
+  function resetSelected() {
+    showWarn("");
+    showOk("");
+    setText("saveStatus", "");
+
+    if (!selected) return;
+
+    if (selected.__isNew) {
+      newQuestion();
+      return;
+    }
+
+    const r = allRows.find(x => x.id === selected.id);
+    if (r) selectRow(r);
+  }
+
+  // ======================
+  // Numbering logic
+  // ======================
+  function refreshNumbering(overwriteSelected = false) {
+    const src = safeStr($("dbSourceType").value).trim();
+    const isSire = (src === "SIRE");
+
+    // Auto-rules for suffix:
+    if (isSire) {
+      // SIRE must be blank suffix
+      if ($("dbNumberSuffix").value.trim() !== "") {
+        $("dbNumberSuffix").value = "";
+      }
+    } else {
+      // custom/spare must have suffix (C/A/B) – do not force, but default if empty
+      if (!$("dbNumberSuffix").value.trim()) {
+        $("dbNumberSuffix").value = (src === "SPARE1") ? "A" : (src === "SPARE2") ? "B" : "C";
+      }
+    }
+
+    const nb = computeNumberBase({
+      xx: $("dbChapter").value,
+      yy: $("dbSection").value,
+      item: $("dbItem").value,
+    }, isSire);
+
+    $("dbNumberBase").value = nb;
+
+    if (overwriteSelected && selected) {
+      selected.number_base = nb;
+      selected.number_suffix = $("dbNumberSuffix").value.trim();
+    }
+
+    updateChips();
+  }
+
+  // ======================
+  // Save
+  // ======================
   async function saveSelected() {
     if (!selected) return;
 
@@ -548,48 +530,56 @@
     setText("saveStatus", "Saving…");
 
     try {
-      const src = safeStr($("dbSourceType")?.value).trim();
-      const status = safeStr($("dbStatus")?.value).trim() || "active";
+      const src = safeStr($("dbSourceType").value).trim() || "COMPANY_CUSTOM";
+      const status = safeStr($("dbStatus").value).trim() || "active";
 
-      const ch = safeStr($("numChapter")?.value).trim();
-      const sec = safeStr($("numSection")?.value).trim();
-      const item = safeStr($("numItem")?.value).trim();
+      const isSire = (src === "SIRE");
 
-      const number_base = buildNumberBaseFromParts(ch, sec, item);
-      if (!number_base) {
+      const nb = safeStr($("dbNumberBase").value).trim();
+      const sx = safeStr($("dbNumberSuffix").value).trim();
+
+      if (!nb) {
         setText("saveStatus", "");
-        showWarn("Numbering is required. Fill Chapter (xx), Section (yy), Item (zz/zzz).");
+        showWarn("Number is required. Fill Chapter/Section/Item.");
         return;
       }
 
-      const number_suffix = safeStr($("dbNumberSuffix")?.value).trim();
+      if (isSire && sx) {
+        setText("saveStatus", "");
+        showWarn("SIRE questions must have blank suffix.");
+        return;
+      }
 
-      // DB constraint requires correct is_custom + source_type match
-      const is_custom = (src !== SOURCE.SIRE);
+      if (!isSire && !sx) {
+        setText("saveStatus", "");
+        showWarn("Company/Spare questions must have a suffix (C/A/B).");
+        return;
+      }
 
-      // Version + tags are only editable in Advanced mode,
-      // but still read from fields (they are disabled when not advanced).
-      const version = safeStr($("dbVersion")?.value).trim() || "SIRE_2_0_QL";
-
-      const tagsCsv = safeStr($("dbTags")?.value).trim();
+      // Advanced fields
+      const version = safeStr($("dbVersion").value).trim() || "SIRE_2_0_QL";
+      const tagsCsv = safeStr($("dbTags").value).trim();
       const tags = tagsCsv ? tagsCsv.split(",").map(s => s.trim()).filter(Boolean) : [];
 
       const payload = readPayloadFromFields();
 
+      // IMPORTANT:
+      // - Do NOT send number_full (generated in DB)
+      // - Send is_custom to satisfy chk_questions_master_custom_source_match
       const row = {
         source_type: src,
-        is_custom,
+        is_custom: !isSire,
         status,
         version,
         tags,
-        number_base,
-        number_suffix: number_suffix, // NOT NULL in DB; blank is allowed for SIRE
+        number_base: nb,
+        number_suffix: isSire ? "" : sx,
         payload,
-        updated_by: me?.session?.user?.id || null,
+        updated_by: me?.user?.id || null,
       };
 
       if (selected.__isNew) {
-        row.created_by = me?.session?.user?.id || null;
+        row.created_by = me?.user?.id || null;
 
         const { data, error } = await sb
           .from("questions_master")
@@ -605,7 +595,6 @@
         await loadQuestions();
         const newRow = allRows.find(x => x.id === data.id);
         if (newRow) selectRow(newRow);
-        setEditMode(false);
 
       } else {
         const { error } = await sb
@@ -621,16 +610,18 @@
         await loadQuestions();
         const updated = allRows.find(x => x.id === selected.id);
         if (updated) selectRow(updated);
-        setEditMode(false);
       }
+
     } catch (e) {
       setText("saveStatus", "");
       showWarn("Save failed:\n\n" + (e?.message || String(e)));
     }
   }
 
-  // expose for debugging
-  window.__QEDIT = { loadQuestions, newQuestion };
+  // ======================
+  // Expose for debugging
+  // ======================
+  window.__QEDIT = { loadQuestions, newQuestion, saveSelected };
 
   boot();
 })();
