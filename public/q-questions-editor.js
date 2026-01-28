@@ -41,11 +41,9 @@
     const p2 = (n) => String(n).padStart(2, "0");
 
     if (isSire) {
-      // zz must be 0..99 in 2-digit form (DB allows 1-2 digits, we store padded 2)
       return `${p2(a)}.${p2(b)}.${p2(c)}`;
     }
 
-    // Custom/spare: force 3 digits for last segment
     const p3 = (n) => String(n).padStart(3, "0");
     return `${p2(a)}.${p2(b)}.${p3(c)}`;
   }
@@ -65,13 +63,10 @@
   }
 
   // Preserve arrays for these fields:
-  // If current DB value is array -> textarea lines -> array on save.
-  // If current DB value is string -> save string.
   function toMultiline(v) {
     if (Array.isArray(v)) return v.map(x => safeStr(x)).join("\n");
     if (typeof v === "string") return v;
     if (v === null || v === undefined) return "";
-    // For unexpected objects: show JSON but do not auto-overwrite unless user edits raw JSON
     try { return JSON.stringify(v, null, 2); } catch { return ""; }
   }
 
@@ -84,11 +79,10 @@
         .filter(Boolean);
       return;
     }
-    // default to string
     obj[key] = safeStr(textValue);
   }
 
-  // Sort correctly by chapter/section/item numerically (NOT text sort)
+  // Sort correctly by chapter/section/item numerically
   function numberKey(row) {
     const nb = safeStr(row.number_base).trim();
     const m = nb.match(/^(\d+)\.(\d+)\.(\d+)$/);
@@ -155,7 +149,6 @@
     setText("vGuidance", safeStr(p.inspection_guidance ?? p.guidance ?? p.InspectionGuidance ?? p["Inspection Guidance"]));
     setText("vActions", safeStr(p.suggested_inspector_actions ?? p.actions ?? p.SuggestedInspectorActions ?? p["Suggested Inspector Actions"]));
 
-    // show multiline nicely even if array
     const ev = p.expected_evidence ?? p.evidence ?? p.ExpectedEvidence ?? p["Expected Evidence"];
     const ng = p.potential_grounds_for_negative_observations ?? p.neg_obs ?? p.NegativeObservations ?? p["Potential Grounds for Negative Observations"];
 
@@ -181,40 +174,29 @@
     $("dbNumberSuffix").value = safeStr(r.number_suffix);
     $("dbTags").value = Array.isArray(r.tags) ? r.tags.join(", ") : safeStr(r.tags || "");
 
-    // version hidden by default (advanced)
     $("dbVersion").value = safeStr(r.version || "");
     $("dbChangeReason").value = safeStr(r.change_reason || "");
 
-    // numbering fields
     const parts = parseNumberBase(r.number_base);
     $("numChapter").value = parts.xx;
     $("numSection").value = parts.yy;
     $("numItem").value = parts.zz;
 
-    // header
     setText("hdrId", r.id ? `DB id: ${r.id}` : "Not saved yet");
     setText("hdrNumber", computeNumberFull(r.number_base, r.number_suffix) || "—");
 
-    // payload fields
     const p = r.payload || {};
     $("pShortText").value = safeStr(p.short_text ?? p.ShortText ?? p.shortText ?? p["Short Text"]);
     $("pQuestion").value = safeStr(p.question ?? p.Question ?? p["Question"]);
     $("pGuidance").value = safeStr(p.inspection_guidance ?? p.guidance ?? p.InspectionGuidance ?? p["Inspection Guidance"]);
     $("pActions").value = safeStr(p.suggested_inspector_actions ?? p.actions ?? p.SuggestedInspectorActions ?? p["Suggested Inspector Actions"]);
 
-    // expected evidence / neg obs preserve arrays if they exist
-    const evKey = "expected_evidence";
-    const ngKey = "potential_grounds_for_negative_observations";
-
-    // Make sure the canonical keys exist in selected.payload if possible, without destroying originals:
-    // If the existing data is stored in alt keys, we just display them.
     const ev = p.expected_evidence ?? p.evidence ?? p.ExpectedEvidence ?? p["Expected Evidence"];
     const ng = p.potential_grounds_for_negative_observations ?? p.neg_obs ?? p.NegativeObservations ?? p["Potential Grounds for Negative Observations"];
 
     $("pEvidence").value = toMultiline(ev);
     $("pNegObs").value = toMultiline(ng);
 
-    // raw json advanced
     try { $("pRaw").value = JSON.stringify(p, null, 2); }
     catch { $("pRaw").value = ""; }
 
@@ -253,7 +235,6 @@
     const term = safeStr($("searchInput").value).trim();
     const filtered = allRows.filter(r => passesSearch(r, term));
 
-    // correct chapter sequence sort
     filtered.sort((a, b) => {
       const ka = numberKey(a);
       const kb = numberKey(b);
@@ -297,7 +278,7 @@
       let q = sb
         .from("questions_master")
         .select("id, number_base, number_suffix, number_full, source_type, is_custom, status, version, tags, payload, change_reason, updated_at, created_at")
-        .order("created_at", { ascending: true }); // we sort client-side anyway
+        .order("created_at", { ascending: true });
 
       if (status) q = q.eq("status", status);
       if (version) q = q.eq("version", version);
@@ -326,7 +307,6 @@
     selected = JSON.parse(JSON.stringify(row));
     selected.__isNew = false;
 
-    // DEFAULT panel mode = VIEW (per your instruction)
     fillViewPanel(selected);
     fillEditPanel(selected);
     setMode("VIEW");
@@ -356,15 +336,14 @@
         question: "",
         inspection_guidance: "",
         suggested_inspector_actions: "",
-        expected_evidence: [], // start as array to avoid “one text” problem
-        potential_grounds_for_negative_observations: [], // start as array
+        expected_evidence: [],
+        potential_grounds_for_negative_observations: [],
       },
     };
 
     fillViewPanel(selected);
     fillEditPanel(selected);
 
-    // Go to EDIT only for new question
     setMode("EDIT");
     setPillsFromSelected();
     refreshHeaderFromNumberInputs();
@@ -381,8 +360,6 @@
     try {
       const src = $("dbSourceType").value;
       const status = safeStr($("dbStatus").value || "active");
-
-      // version hidden, but still stored (advanced-only edit)
       const version = safeStr($("dbVersion").value).trim() || safeStr(selected.version || "SIRE_2_0_QL");
 
       const xx = $("numChapter").value;
@@ -404,11 +381,9 @@
 
       const number_suffix = safeStr($("dbNumberSuffix").value).trim();
 
-      // tags
       const tagsCsv = safeStr($("dbTags").value).trim();
       const tags = tagsCsv ? tagsCsv.split(",").map(s => s.trim()).filter(Boolean) : [];
 
-      // payload
       let payload = {};
       const raw = safeStr($("pRaw").value).trim();
       if (raw) {
@@ -418,13 +393,11 @@
         payload = selected.payload || {};
       }
 
-      // Apply form fields
       payload.short_text = safeStr($("pShortText").value);
       payload.question = safeStr($("pQuestion").value);
       payload.inspection_guidance = safeStr($("pGuidance").value);
       payload.suggested_inspector_actions = safeStr($("pActions").value);
 
-      // Preserve arrays if currently arrays on the object
       if (payload.expected_evidence === undefined && selected.payload?.expected_evidence !== undefined) {
         payload.expected_evidence = selected.payload.expected_evidence;
       }
@@ -432,7 +405,6 @@
         payload.potential_grounds_for_negative_observations = selected.payload.potential_grounds_for_negative_observations;
       }
 
-      // If they are arrays -> split lines into array, else store string
       applyTextAreaPreservingType(payload, "expected_evidence", $("pEvidence").value);
       applyTextAreaPreservingType(payload, "potential_grounds_for_negative_observations", $("pNegObs").value);
 
@@ -500,21 +472,31 @@
 
   // ====== wiring ======
   function wireUI() {
+    // DB-reload filters
     $("reloadBtn").onclick = () => loadQuestions();
-    $("sourceFilter").onchange = () => renderList();
     $("statusFilter").onchange = () => loadQuestions();
-    $("versionFilter").oninput = () => renderList();
+    $("sourceFilter").onchange = () => loadQuestions();
+
+    // Version filter: debounce reload to avoid hammering DB while typing
+    let vTimer = null;
+    $("versionFilter").oninput = () => {
+      if (vTimer) clearTimeout(vTimer);
+      vTimer = setTimeout(() => loadQuestions(), 450);
+    };
+
+    // Search is client-side
     $("searchInput").oninput = () => renderList();
+
     $("newQuestionBtn").onclick = () => newQuestion();
 
     $("btnEdit").onclick = () => {
-      // Confirm edit mode (per your instruction)
       const ok = confirm("Enter edit mode for this question?");
       if (!ok) return;
       setMode("EDIT");
     };
 
     $("btnView").onclick = () => setMode("VIEW");
+
     $("btnReset").onclick = () => {
       if (!selected) return;
       if (selected.__isNew) newQuestion();
@@ -523,10 +505,10 @@
         if (r) selectRow(r);
       }
     };
+
     $("btnSave").onclick = () => saveSelected();
 
     $("dbSourceType").onchange = () => {
-      // For SIRE: suffix should be blank (DB style)
       const st = $("dbSourceType").value;
       if (st === "SIRE") $("dbNumberSuffix").value = "";
       if (st !== "SIRE" && !safeStr($("dbNumberSuffix").value).trim()) $("dbNumberSuffix").value = "C";
@@ -548,7 +530,6 @@
     showOk("");
 
     try {
-      // This error is exactly what you saw: Supabase library not loaded
       if (!window.supabase) {
         showWarn("Boot failed:\n\nSupabase JS not available\n\nFix: ensure the Supabase CDN script is included BEFORE auth.js and q-questions-editor.js.");
         return;

@@ -5,10 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>SIRE 2.0 – Questions Editor</title>
 
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="./style.css" />
+  <link rel="stylesheet" href="./q-questions-editor.css" />
 
   <style>
-    /* Minimal safety styling in case style.css is not applied for any reason */
+    /* Minimal safety styling in case CSS is not applied */
     .qe-wrap{ max-width: 1400px; margin: 0 auto; padding: 18px; }
     .qe-top{ display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; }
     .qe-pill{ background:#eef5ff; border:1px solid #cfe2ff; padding:6px 10px; border-radius:999px; font-size:13px; }
@@ -18,10 +19,9 @@
     label{ font-size:12px; color:#334; }
     input, select, textarea{ padding:10px 12px; border-radius:10px; border:1px solid #cfd9e8; outline:none; }
     textarea{ min-height: 90px; resize: vertical; }
-    .btn{ padding:10px 14px; border-radius:10px; border:1px solid #cfd9e8; background:#f7fbff; cursor:pointer; }
+    .btn{ padding:10px 14px; border-radius:10px; border:1px solid #cfd9e8; background:#f7fbff; cursor:pointer; font-weight:800; }
     .btn.primary{ background:#1f66c2; color:#fff; border-color:#1f66c2; }
     .btn.light{ background:#fff; }
-    .btn.danger{ background:#fff; border-color:#ffb6b6; color:#b00020; }
     .qe-main{ display:grid; grid-template-columns: 360px 1fr; gap:14px; margin-top:14px; }
     .qe-list{ border:1px solid #d9e2ef; border-radius:12px; overflow:hidden; }
     .qe-list-head{ padding:10px 12px; background:#f3f7ff; display:flex; justify-content:space-between; font-size:13px; }
@@ -29,26 +29,40 @@
     .qitem{ padding:10px 12px; border-top:1px solid #eef2f8; cursor:pointer; }
     .qitem:hover{ background:#f8fbff; }
     .qitem.active{ background:#eaf2ff; }
-    .qno{ font-weight:700; }
+    .qno{ font-weight:900; }
     .qsub{ font-size:12px; color:#334; margin-top:4px; }
     .muted{ color:#6b778c; font-size:12px; }
-    .warn{ background:#fff1f1; border:1px solid #ffc9c9; padding:10px 12px; border-radius:12px; margin-bottom:12px; display:none; white-space:pre-wrap; }
-    .ok{ background:#f1fff4; border:1px solid #bfeccc; padding:10px 12px; border-radius:12px; margin-bottom:12px; display:none; white-space:pre-wrap; }
+    .warn{ background:#fff1f1; border:1px solid #ffc9c9; padding:10px 12px; border-radius:12px; margin:12px 0; display:none; white-space:pre-wrap; }
+    .ok{ background:#f1fff4; border:1px solid #bfeccc; padding:10px 12px; border-radius:12px; margin:12px 0; display:none; white-space:pre-wrap; }
     .qe-right h2{ margin:0; font-size:18px; }
-    .qe-actions{ display:flex; gap:10px; justify-content:flex-end; align-items:center; }
+    .qe-actions{ display:flex; gap:10px; justify-content:flex-end; align-items:center; flex-wrap:wrap; }
     .qe-split3{ display:grid; grid-template-columns: 1fr 1fr 1fr; gap:12px; }
     .qe-split2{ display:grid; grid-template-columns: 1fr 1fr; gap:12px; }
     .adv{ display:none; margin-top:12px; padding-top:12px; border-top:1px dashed #d9e2ef; }
     .small{ font-size:12px; }
     .kv{ display:flex; gap:10px; flex-wrap:wrap; }
-    .kv .qe-pill{ font-weight:600; }
+    .kv .qe-pill{ font-weight:800; }
+    .topbar{background:#1a4170;color:#fff;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;}
+    .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+    .btn2{background:#eaf1fb;color:#1a4170;border:1px solid #c9d9f3;border-radius:10px;padding:10px 14px;font-weight:900;cursor:pointer;}
   </style>
 </head>
 
 <body>
+  <!-- AUTH TOPBAR (required by q-questions-editor.js boot) -->
+  <div class="topbar">
+    <div style="font-weight:950;">SIRE 2.0 – Questions Editor</div>
+    <div class="row">
+      <div id="userBadge" style="font-weight:800;opacity:.95;"></div>
+      <button class="btn2" id="loginBtn" type="button" style="display:none;">Login</button>
+      <button class="btn2" id="switchUserBtn" type="button">Switch User</button>
+      <button class="btn" id="logoutBtn" type="button" style="display:none;">Logout</button>
+    </div>
+  </div>
+
   <div class="qe-wrap">
     <div class="qe-top">
-      <button class="btn light" onclick="location.href='./dashboard.html'">← Back to Dashboard</button>
+      <button class="btn light" type="button" onclick="location.href='./q-dashboard.html'">← Back to Dashboard</button>
       <div id="modeLine" class="qe-pill">Role: — • Mode: Admin • Module: QUESTIONS_EDITOR</div>
     </div>
 
@@ -57,7 +71,9 @@
 
     <div class="qe-card">
       <h1 style="margin:0 0 8px 0;">Questions Browser & Viewer / Editor (DB)</h1>
-      <div class="muted">Left side = list. Right side = viewer by default. Click <b>Edit</b> to switch to edit mode for the selected question.</div>
+      <div class="muted">
+        Left side = list. Right side = viewer by default. Click <b>Edit</b> to switch to edit mode for the selected question.
+      </div>
 
       <div style="height:10px;"></div>
 
@@ -244,7 +260,6 @@
 
             <div style="height:10px;"></div>
 
-            <!-- Numbering: separate fields -->
             <div class="qe-split3">
               <div>
                 <label>Chapter (xx)</label>
