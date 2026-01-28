@@ -2,10 +2,9 @@
 (() => {
   "use strict";
 
-  // ====== helpers ======
   const PHOTO_BUCKET = "question-photos";
 
-  // Map source_type -> suffix letter
+  // Auto suffix defaults when creating new records
   const SUFFIX_BY_SOURCE = {
     SIRE: "",
     COMPANY: "C",
@@ -13,60 +12,504 @@
     SPARE2: "B",
   };
 
-  // Some projects renamed buttons/ids over time.
-  // This helper tries multiple ids and returns the first element found.
-  function $any(...ids) {
-    for (const id of ids) {
-      const el = document.getElementById(id);
-      if (el) return el;
+  function $(id){ return document.getElementById(id); }
+  function safeStr(v){ return (v===null || v===undefined) ? "" : String(v); }
+
+  function setText(id, txt){ const el=$(id); if(el) el.textContent = txt ?? ""; }
+  function setHtml(id, html){ const el=$(id); if(el) el.innerHTML = html ?? ""; }
+  function setShow(id, on){ const el=$(id); if(el) el.style.display = on ? "" : "none"; }
+  function setVal(id, v){ const el=$(id); if(el) el.value = v ?? ""; }
+
+  function showWarn(msg){
+    const el = $("warnBox");
+    if (!el) return;
+    el.textContent = msg || "";
+    el.style.display = msg ? "block" : "none";
+  }
+  function showOk(msg){
+    const el = $("okBox");
+    if (!el) return;
+    el.textContent = msg || "";
+    el.style.display = msg ? "block" : "none";
+  }
+
+  function escapeHtml(s){
+    return safeStr(s)
+      .replaceAll("&","&amp;")
+      .replaceAll("<","&lt;")
+      .replaceAll(">","&gt;")
+      .replaceAll('"',"&quot;")
+      .replaceAll("'","&#39;");
+  }
+
+  // Payload getters
+  function pGet(p, key){
+    if (!p || typeof p !== "object") return "";
+    // Canonical snake_case keys used by our editor
+    const map = {
+      "Short Text": ["short_text", "ShortText", "shortText", "Short Text"],
+      "Question": ["question", "Question"],
+      "Inspection Guidance": ["inspection_guidance", "guidance", "InspectionGuidance", "Inspection Guidance"],
+      "Suggested Inspector Actions": ["suggested_inspector_actions", "actions", "SuggestedInspectorActions", "Suggested Inspector Actions"],
+    };
+    const candidates = map[key] || [key];
+    for (const k of candidates){
+      if (p[k] !== undefined && p[k] !== null) return safeStr(p[k]);
     }
-    return null;
+    return "";
   }
 
-  // Original convenience
-  function $(id) { return document.getElementById(id); }
-
-  function safeStr(v) {
-    return v === null || v === undefined ? "" : String(v);
+  function formatFull(row){
+    const nf = safeStr(row?.number_full).trim();
+    if (nf) return nf;
+    const nb = safeStr(row?.number_base).trim();
+    if (!nb) return "";
+    const sfx = safeStr(row?.number_suffix).trim();
+    return sfx ? `${nb}-${sfx}` : nb;
   }
 
-  function showWarn(msg) {
-    const w = $any("warnBox");
-    if (!w) return msg ? alert(msg) : undefined;
-    w.textContent = msg || "";
-    w.style.display = msg ? "block" : "none";
+  // State
+  let sb = null;
+  let bundle = null;
+  let role = "";
+  let canEdit = false;
+  let canManagePhotos = false;
+
+  let allRows = [];
+  let filteredRows = [];
+  let selectedRow = null;     // from DB (or temp for new)
+  let originalRow = null;     // snapshot for reset
+  let isEditMode = false;
+
+  // -------- Evidence/PGNO read-only (view) --------
+  async function fetchEvidence(questionId){
+    const { data, error } = await sb
+      .from("question_evidence_items")
+      .select("id, question_id, evidence_text, esms_forms, esms_refs, remarks, sort_order")
+      .eq("question_id", questionId)
+      .order("sort_order", { ascending:true });
+    if (error) throw error;
+    return data || [];
   }
 
-  function showOk(msg) {
-    const w = $any("okBox");
-    if (!w) return;
-    w.textContent = msg || "";
-    w.style.display = msg ? "block" : "none";
+  async function fetchPgno(questionId){
+    const { data, error } = await sb
+      .from("question_pgno")
+      .select("id, question_id, pgno_no, pgno_text, sort_order")
+      .eq("question_id", questionId)
+      .order("sort_order", { ascending:true });
+    if (error) throw error;
+    return data || [];
   }
 
-  function setModeLine(txt) {
-    const el = $any("modeLine");
-    if (el) el.textContent = txt || "";
+  function renderEvidenceViewer(items){
+    if (!items || !items.length){
+      setHtml("vEvidence", `<div class="muted">No evidence items stored yet.</div>`);
+      return;
+    }
+    setHtml("vEvidence", items.map((it, idx) => {
+      const ef = safeStr(it.esms_forms);
+      const er = safeStr(it.esms_refs);
+      const rm = safeStr(it.remarks);
+      return `
+        <div style="margin-bottom:10px; padding-bottom:10px; border-bottom:1px dashed #d8e6fb;">
+          <div><b>Item ${idx+1}</b></div>
+          <div style="white-space:pre-wrap; margin-top:6px;">${escapeHtml(it.evidence_text)}</div>
+          ${ef ? `<div class="muted" style="margin-top:6px;"><b>eSMS Form(s):</b> ${escapeHtml(ef)}</div>` : ""}
+          ${er ? `<div class="muted" style="margin-top:4px;"><b>eSMS Reference(s):</b> ${escapeHtml(er)}</div>` : ""}
+          ${rm ? `<div class="muted" style="margin-top:4px;"><b>Remarks:</b> ${escapeHtml(rm)}</div>` : ""}
+        </div>
+      `;
+    }).join(""));
   }
 
-  function setText(idOrEl, txt) {
-    const el = typeof idOrEl === "string" ? $(idOrEl) : idOrEl;
-    if (el) el.textContent = txt || "";
+  function renderPgnoViewer(items){
+    if (!items || !items.length){
+      setHtml("vPgno", `<div class="muted">No PGNO items stored yet.</div>`);
+      return;
+    }
+    setHtml("vPgno", items.map((it) => {
+      return `
+        <div style="margin-bottom:10px; padding-bottom:10px; border-bottom:1px dashed #d8e6fb;">
+          <div><b>${escapeHtml(it.pgno_no)}</b></div>
+          <div style="white-space:pre-wrap; margin-top:6px;">${escapeHtml(it.pgno_text)}</div>
+        </div>
+      `;
+    }).join(""));
   }
 
-  function setValue(idOrEl, val) {
-    const el = typeof idOrEl === "string" ? $(idOrEl) : idOrEl;
-    if (!el) return;
-    el.value = val ?? "";
+  // -------- List filters --------
+  function applyLocalFilters(){
+    const term = safeStr($("searchInput")?.value).toLowerCase().trim();
+    const status = safeStr($("statusFilter")?.value).trim();
+    const version = safeStr($("versionFilter")?.value).trim();
+    const source = safeStr($("sourceFilter")?.value).trim();
+
+    filteredRows = allRows.filter(r => {
+      if (status && safeStr(r.status) !== status) return false;
+      if (version && safeStr(r.version) !== version) return false;
+      if (source && source !== "ALL" && safeStr(r.source_type) !== source) return false;
+
+      if (!term) return true;
+
+      const p = r.payload || {};
+      const hay = [
+        formatFull(r),
+        safeStr(r.number_base),
+        safeStr(r.source_type),
+        safeStr(r.version),
+        pGet(p, "Short Text"),
+        pGet(p, "Question"),
+      ].join(" ").toLowerCase();
+
+      return hay.includes(term);
+    });
+
+    filteredRows.sort((a,b) => formatFull(a).localeCompare(formatFull(b), "en", { numeric:true }));
+    renderList();
+    setText("countLine", `${filteredRows.length} questions`);
   }
 
-  function setDisplay(idOrEl, on) {
-    const el = typeof idOrEl === "string" ? $(idOrEl) : idOrEl;
-    if (!el) return;
-    el.style.display = on ? "block" : "none";
+  function renderList(){
+    const list = $("qList");
+    if (!list) return;
+
+    list.innerHTML = "";
+
+    if (!filteredRows.length){
+      list.innerHTML = `<div class="muted" style="padding:12px;">No questions match the filters.</div>`;
+      return;
+    }
+
+    for (const r of filteredRows){
+      const div = document.createElement("div");
+      div.className = "qitem" + (selectedRow && selectedRow.id === r.id ? " active" : "");
+
+      const p = r.payload || {};
+      const no = formatFull(r) || "(no number)";
+      const shortT = pGet(p, "Short Text") || "(no short text)";
+      const meta = `${safeStr(r.source_type)} • ${safeStr(r.status)} • ${safeStr(r.version)}`;
+
+      div.innerHTML = `
+        <div class="qno">${escapeHtml(no)}</div>
+        <div class="qsub">${escapeHtml(shortT)}</div>
+        <div class="qmeta">${escapeHtml(meta)}</div>
+      `;
+
+      div.onclick = () => selectRow(r.id);
+      list.appendChild(div);
+    }
   }
 
-  function sanitizeFileName(name) {
+  // -------- View/Edit mode rendering --------
+  function setEditMode(on){
+    isEditMode = !!on;
+
+    setShow("viewMode", !isEditMode);
+    setShow("editMode", isEditMode);
+
+    setShow("btnSave", isEditMode);
+    setShow("btnReset", isEditMode);
+
+    // Edit button toggles label
+    if ($("btnEdit")) $("btnEdit").textContent = isEditMode ? "View" : "Edit";
+
+    // Disable all edit controls if cannot edit
+    const disable = !canEdit;
+    const ids = ["eSourceType","eStatus","eVersion","eTags","eNumberBase","eNumberSuffix","eShortText","eQuestion","eGuidance","eActions","eRawPayload"];
+    for (const id of ids){
+      const el = $(id);
+      if (el) el.disabled = disable;
+    }
+    if ($("btnSave")) $("btnSave").disabled = !canEdit;
+    if ($("btnReset")) $("btnReset").disabled = !canEdit;
+  }
+
+  function fillViewFromRow(r){
+    const p = r.payload || {};
+    setText("hdrNumber", formatFull(r));
+    setText("hdrId", r.__isNew ? "Not saved yet" : `DB id: ${r.id}`);
+
+    setText("pillSource", `source: ${safeStr(r.source_type)}`);
+    setText("pillStatus", `status: ${safeStr(r.status)}`);
+    setText("pillVersion", `version: ${safeStr(r.version)}`);
+    setText("pillSuffix", `suffix: ${safeStr(r.number_suffix) || "(none)"}`);
+
+    setText("vShortText", pGet(p, "Short Text"));
+    setText("vQuestion", pGet(p, "Question"));
+    setText("vGuidance", pGet(p, "Inspection Guidance"));
+    setText("vActions", pGet(p, "Suggested Inspector Actions"));
+  }
+
+  function fillEditFromRow(r){
+    const p = r.payload || {};
+    setVal("eSourceType", safeStr(r.source_type) || "COMPANY");
+    setVal("eStatus", safeStr(r.status) || "active");
+    setVal("eVersion", safeStr(r.version) || "SIRE_2_0_QL");
+    setVal("eTags", Array.isArray(r.tags) ? r.tags.join(", ") : safeStr(r.tags));
+    setVal("eNumberBase", safeStr(r.number_base));
+    setVal("eNumberSuffix", safeStr(r.number_suffix));
+
+    // canonical keys
+    setVal("eShortText", pGet(p, "Short Text"));
+    setVal("eQuestion", pGet(p, "Question"));
+    setVal("eGuidance", pGet(p, "Inspection Guidance"));
+    setVal("eActions", pGet(p, "Suggested Inspector Actions"));
+
+    // Raw payload
+    try{
+      setVal("eRawPayload", JSON.stringify(p, null, 2));
+    }catch(_e){
+      setVal("eRawPayload", "{}");
+    }
+  }
+
+  function buildPayloadFromEdit(){
+    // Start from raw payload JSON
+    const raw = safeStr($("eRawPayload")?.value).trim();
+    let p = {};
+    if (raw){
+      try{
+        p = JSON.parse(raw);
+      }catch(e){
+        throw new Error("Raw Payload JSON is invalid. Fix it before saving.");
+      }
+    }
+
+    // Force canonical keys from form (do not delete other keys)
+    p.short_text = safeStr($("eShortText")?.value);
+    p.question = safeStr($("eQuestion")?.value);
+    p.inspection_guidance = safeStr($("eGuidance")?.value);
+    p.suggested_inspector_actions = safeStr($("eActions")?.value);
+
+    return p;
+  }
+
+  // -------- Select row --------
+  async function selectRow(id){
+    showWarn(""); showOk("");
+
+    const r = filteredRows.find(x => x.id === id) || allRows.find(x => x.id === id);
+    if (!r) return;
+
+    selectedRow = JSON.parse(JSON.stringify(r));
+    selectedRow.__isNew = false;
+
+    originalRow = JSON.parse(JSON.stringify(selectedRow));
+
+    setShow("emptyState", false);
+    setShow("panel", true);
+
+    fillViewFromRow(selectedRow);
+    fillEditFromRow(selectedRow);
+
+    // Default to view mode
+    setEditMode(false);
+
+    // Evidence + PGNO (read-only view)
+    try{
+      const ev = await fetchEvidence(selectedRow.id);
+      renderEvidenceViewer(ev);
+    }catch(e){
+      setHtml("vEvidence", `<div class="muted">Evidence items could not be loaded.</div>`);
+      showWarn("Evidence load failed:\n\n" + String(e?.message || e));
+    }
+
+    try{
+      const pg = await fetchPgno(selectedRow.id);
+      renderPgnoViewer(pg);
+    }catch(e){
+      setHtml("vPgno", `<div class="muted">PGNO items could not be loaded.</div>`);
+      showWarn("PGNO load failed:\n\n" + String(e?.message || e));
+    }
+
+    await loadPhotosForSelected();
+    renderList();
+  }
+
+  // -------- New question --------
+  function newQuestion(){
+    showWarn(""); showOk("");
+
+    const versionFromFilter = safeStr($("versionFilter")?.value).trim();
+
+    selectedRow = {
+      __isNew: true,
+      id: null,
+      source_type: "COMPANY",
+      status: "active",
+      version: versionFromFilter || "SIRE_2_0_QL",
+      tags: [],
+      number_base: "",
+      number_suffix: SUFFIX_BY_SOURCE.COMPANY,
+      payload: {
+        short_text: "",
+        question: "",
+        inspection_guidance: "",
+        suggested_inspector_actions: "",
+      },
+    };
+
+    originalRow = JSON.parse(JSON.stringify(selectedRow));
+
+    setShow("emptyState", false);
+    setShow("panel", true);
+
+    fillViewFromRow(selectedRow);
+    fillEditFromRow(selectedRow);
+
+    // Clear evidence/pgno displays (new question has no id yet)
+    setHtml("vEvidence", `<div class="muted">Save the question first to manage evidence items.</div>`);
+    setHtml("vPgno", `<div class="muted">Save the question first to manage PGNO items.</div>`);
+
+    // Clear photos panel
+    const grid = $("photoGrid");
+    if (grid) grid.innerHTML = "";
+    setText("photoCountLine", "Save the question first to attach photos.");
+    setPhotoStatus("");
+
+    // Jump to edit mode automatically
+    setEditMode(true);
+
+    // Auto-suffix behavior on new question when source changes
+    $("eSourceType")?.addEventListener("change", () => {
+      if (!selectedRow?.__isNew) return;
+      const st = safeStr($("eSourceType")?.value);
+      const auto = SUFFIX_BY_SOURCE[st] ?? "";
+      setVal("eNumberSuffix", auto);
+    }, { once:false });
+  }
+
+  // -------- Save / Reset --------
+  async function saveSelected(){
+    if (!selectedRow) return;
+    if (!canEdit){
+      showWarn("You do not have permission to edit/save questions.");
+      return;
+    }
+
+    showWarn(""); showOk("");
+
+    try{
+      const source_type = safeStr($("eSourceType")?.value).trim() || "COMPANY";
+      const status = safeStr($("eStatus")?.value).trim() || "active";
+      const version = safeStr($("eVersion")?.value).trim() || "SIRE_2_0_QL";
+      const number_base = safeStr($("eNumberBase")?.value).trim();
+      const number_suffix = safeStr($("eNumberSuffix")?.value).trim();
+
+      if (!number_base){
+        throw new Error("Number Base is required (e.g. 10.01.01).");
+      }
+
+      const tagsCsv = safeStr($("eTags")?.value).trim();
+      const tags = tagsCsv ? tagsCsv.split(",").map(s => s.trim()).filter(Boolean) : [];
+
+      const payload = buildPayloadFromEdit();
+
+      const row = {
+        source_type,
+        status,
+        version,
+        tags,
+        number_base,
+        number_suffix,
+        payload,
+        updated_by: bundle?.session?.user?.id || null,
+      };
+
+      if (selectedRow.__isNew){
+        row.created_by = bundle?.session?.user?.id || null;
+
+        // IMPORTANT: do not send number_full (DB generates it)
+        const { data, error } = await sb
+          .from("questions_master")
+          .insert(row)
+          .select("id, source_type, number_full, number_base, number_suffix, status, version, tags, payload")
+          .single();
+
+        if (error) throw error;
+
+        showOk("Saved new question.");
+        await loadQuestionsFromDb();
+
+        // Select saved row
+        const saved = allRows.find(x => x.id === data.id);
+        if (saved) await selectRow(saved.id);
+
+      } else {
+        const { error } = await sb
+          .from("questions_master")
+          .update(row)
+          .eq("id", selectedRow.id);
+
+        if (error) throw error;
+
+        showOk("Saved changes.");
+        await loadQuestionsFromDb();
+
+        // Re-select
+        const updated = allRows.find(x => x.id === selectedRow.id);
+        if (updated) await selectRow(updated.id);
+      }
+
+      setEditMode(false);
+    }catch(e){
+      showWarn("Save failed:\n\n" + String(e?.message || e));
+    }
+  }
+
+  function resetSelected(){
+    if (!canEdit) return;
+    if (!originalRow) return;
+
+    selectedRow = JSON.parse(JSON.stringify(originalRow));
+    fillViewFromRow(selectedRow);
+    fillEditFromRow(selectedRow);
+    showOk("Edits reverted (not saved).");
+  }
+
+  // -------- DB load --------
+  async function loadQuestionsFromDb(){
+    showWarn(""); showOk("");
+    setText("loadHint", "Loading…");
+
+    const status = safeStr($("statusFilter")?.value).trim();
+    const version = safeStr($("versionFilter")?.value).trim();
+    const source = safeStr($("sourceFilter")?.value).trim();
+
+    try{
+      let q = sb
+        .from("questions_master")
+        .select("id, source_type, number_full, number_base, number_suffix, status, version, tags, payload")
+        .order("number_base", { ascending:true });
+
+      if (status) q = q.eq("status", status);
+      if (version) q = q.eq("version", version);
+      if (source && source !== "ALL") q = q.eq("source_type", source);
+
+      const { data, error } = await q;
+      if (error) throw error;
+
+      allRows = data || [];
+      setText("loadHint", `Loaded ${allRows.length}`);
+      applyLocalFilters();
+
+      if (allRows.length){
+        await selectRow(allRows[0].id);
+      }else{
+        selectedRow = null;
+        originalRow = null;
+        setShow("panel", false);
+        setShow("emptyState", true);
+      }
+    }catch(e){
+      setText("loadHint", "");
+      showWarn("Failed to load questions from DB:\n\n" + String(e?.message || e));
+    }
+  }
+
+  // -------- Photos --------
+  function sanitizeFileName(name){
     const n = safeStr(name).trim();
     if (!n) return "file";
     return (
@@ -78,592 +521,42 @@
     );
   }
 
-  // ===== numbering =====
-  function pad2(n) { return String(n).padStart(2, "0"); }
-
-  // Normalize base to digits+dots, allow xx.yy.zz or xx.yy.zzz.
-  function normalizeNumberBase(v) {
-    const s = safeStr(v).trim();
-    if (!s) return "";
-    const cleaned = s.replace(/[^0-9.]/g, "");
-    return cleaned;
+  function setPhotoStatus(msg){ const el=$("photoStatus"); if(el) el.textContent = msg || ""; }
+  function showPhotoWarn(msg){
+    const el = $("photoWarn");
+    if (!el) return;
+    el.textContent = msg || "";
+    el.style.display = msg ? "block" : "none";
   }
 
-  // Display formatting: enforce xx.yy.zz (and allow zzz)
-  function formatNumberBaseForDisplay(nb) {
-    const s = normalizeNumberBase(nb);
-    if (!s) return "";
-    const parts = s.split(".").filter(Boolean);
-    const a = parts[0] ?? "";
-    const b = parts[1] ?? "";
-    const c = parts[2] ?? "";
-    if (!a || !b || !c) return s;
-
-    const aa = pad2(parseInt(a, 10) || 0);
-    const bb = pad2(parseInt(b, 10) || 0);
-
-    // keep 2 digits for SIRE-ish, allow 3 if already 3+
-    const cNum = parseInt(c, 10);
-    const cWidth = (c.length >= 3 || cNum >= 100) ? 3 : 2;
-    const cc = String(cNum || 0).padStart(cWidth, "0");
-
-    return `${aa}.${bb}.${cc}`;
-  }
-
-  function computeNumberFull(numberBase, suffix) {
-    const nb = formatNumberBaseForDisplay(numberBase); // display-normalized
-    const sx = safeStr(suffix).trim();
-    if (!nb) return "";
-    if (!sx) return nb;
-    return `${nb}-${sx}`;
-  }
-
-  // ====== state ======
-  let sb = null;
-  let me = null;
-
-  // List loaded from DB
-  let allRows = [];
-  // Currently selected row (can be "new")
-  let selected = null;
-
-  // ====== boot ======
-  async function boot() {
-    try {
-      if (!window.AUTH) {
-        showWarn("AUTH helper not loaded (auth.js).");
-        return;
-      }
-      sb = window.AUTH.ensureSupabase();
-
-      // Must be logged in
-      me = await window.AUTH.setupAuthButtons({
-        badgeId: "userBadge",
-        loginBtnId: "loginBtn",
-        logoutBtnId: "logoutBtn",
-        switchBtnId: "switchUserBtn",
-        loginPath: "./login.html",
-      });
-
-      if (!me?.session?.user) {
-        return; // auth helper will handle login redirect flow
-      }
-
-      setModeLine(`Role: ${me.profile?.role || "—"} • Mode: Admin • Module: QUESTIONS_EDITOR`);
-
-      // Show editor card (if present)
-      const editorCard = $any("editorCard");
-      if (editorCard) editorCard.style.display = "block";
-
-      wireUI();
-
-      await toggleImportPanel();
-
-      await loadQuestions();
-    } catch (e) {
-      showWarn("Boot failed:\n\n" + (e?.message || String(e)));
-    }
-  }
-
-  function wireUI() {
-    // IMPORTANT: make all wiring null-safe
-    const reloadBtn = $any("reloadBtn");
-    if (reloadBtn) reloadBtn.onclick = () => loadQuestions();
-
-    const sourceFilter = $any("sourceFilter");
-    if (sourceFilter) sourceFilter.onchange = () => renderList();
-
-    const statusFilter = $any("statusFilter");
-    if (statusFilter) statusFilter.onchange = () => renderList();
-
-    const versionFilter = $any("versionFilter");
-    if (versionFilter) versionFilter.oninput = () => renderList();
-
-    const searchInput = $any("searchInput");
-    if (searchInput) searchInput.oninput = () => renderList();
-
-    // NEW QUESTION button id changed in some versions:
-    const newBtn = $any("newQuestionBtn", "newBtn");
-    if (newBtn) newBtn.onclick = () => newQuestion();
-
-    const btnReset = $any("btnReset");
-    if (btnReset) {
-      btnReset.onclick = () => {
-        if (!selected) return;
-        if (selected.__isNew) {
-          newQuestion();
-        } else {
-          const r = allRows.find(x => x.id === selected.id);
-          if (r) selectRow(r);
-        }
-      };
-    }
-
-    const btnSave = $any("btnSave");
-    if (btnSave) btnSave.onclick = () => saveSelected();
-
-    // photos
-    const btnRefreshPhotos = $any("btnRefreshPhotos");
-    if (btnRefreshPhotos) btnRefreshPhotos.onclick = () => loadPhotosForSelected();
-
-    const btnUploadPhotos = $any("btnUploadPhotos");
-    if (btnUploadPhotos) btnUploadPhotos.onclick = () => uploadSelectedPhotos();
-
-    // source type change: in some HTML versions dbSourceType is a <select>, in others a <span>
-    const dbSourceType = $any("dbSourceType");
-    if (dbSourceType && dbSourceType.tagName === "SELECT") {
-      dbSourceType.onchange = () => {
-        const st = dbSourceType.value;
-        const auto = SUFFIX_BY_SOURCE[st] ?? "";
-        const sfxEl = $any("dbNumberSuffix");
-        if (!sfxEl) return;
-
-        if (!safeStr(sfxEl.value).trim() || sfxEl.dataset.auto === "1") {
-          sfxEl.value = auto;
-          sfxEl.dataset.auto = "1";
-        }
-        refreshHeaderNumber();
-      };
-    }
-
-    const dbNumberBase = $any("dbNumberBase");
-    if (dbNumberBase) dbNumberBase.oninput = () => refreshHeaderNumber();
-
-    const dbNumberSuffix = $any("dbNumberSuffix");
-    if (dbNumberSuffix) {
-      dbNumberSuffix.oninput = () => {
-        dbNumberSuffix.dataset.auto = "0";
-        refreshHeaderNumber();
-      };
-    }
-  }
-
-  async function toggleImportPanel() {
-    const importCard = $any("importCard");
-    if (!importCard) return;
-
-    try {
-      const { count, error } = await sb
-        .from("questions_master")
-        .select("id", { count: "exact", head: true });
-
-      if (error) throw error;
-
-      const isSuperAdmin = me?.profile?.role === "super_admin";
-      importCard.style.display = (isSuperAdmin && (count || 0) === 0) ? "block" : "none";
-    } catch (_e) {
-      importCard.style.display = "none";
-    }
-  }
-
-  // ====== DB load + list ======
-  async function loadQuestions() {
-    showWarn("");
-    showOk("");
-    setText("loadHint", "Loading…");
-
-    try {
-      const status = safeStr($any("statusFilter")?.value || "");
-      const version = safeStr($any("versionFilter")?.value).trim();
-      const src = safeStr($any("sourceFilter")?.value || "");
-
-      let q = sb
-        .from("questions_master")
-        .select("id, number_base, number_suffix, number_full, source_type, status, version, tags, payload, updated_at, created_at")
-        .order("number_base", { ascending: true });
-
-      if (status) q = q.eq("status", status);
-      if (version) q = q.eq("version", version);
-      if (src && src !== "ALL") q = q.eq("source_type", src);
-
-      const { data, error } = await q;
-      if (error) throw error;
-
-      allRows = data || [];
-      setText("loadHint", `Loaded ${allRows.length}`);
-      renderList();
-
-      if (allRows.length) selectRow(allRows[0]);
-      else {
-        selected = null;
-        setEditorVisible(false);
-      }
-
-      await toggleImportPanel();
-    } catch (e) {
-      setText("loadHint", "");
-      showWarn("Failed to load questions from DB:\n\n" + (e?.message || String(e)));
-    }
-  }
-
-  function passesSearch(r, term) {
-    if (!term) return true;
-    const t = term.toLowerCase();
-    const n = safeStr(r.number_full || computeNumberFull(r.number_base, r.number_suffix)).toLowerCase();
-    const p = r.payload || {};
-    const st = safeStr(p.short_text || p.ShortText || p.shortText || p["Short Text"]).toLowerCase();
-    const qu = safeStr(p.question || p.Question || p["Question"]).toLowerCase();
-    return n.includes(t) || st.includes(t) || qu.includes(t);
-  }
-
-  function renderList() {
-    const list = $any("qList");
-    if (!list) return;
-
-    list.innerHTML = "";
-
-    const term = safeStr($any("searchInput")?.value).trim();
-    const filtered = allRows.filter(r => passesSearch(r, term));
-
-    const countLine = $any("countLine");
-    if (countLine) countLine.textContent = `${filtered.length} questions`;
-
-    for (const r of filtered) {
-      const div = document.createElement("div");
-      div.className = "qitem" + (selected && !selected.__isNew && selected.id === r.id ? " active" : "");
-
-      const nfullRaw = r.number_full || computeNumberFull(r.number_base, r.number_suffix);
-      // ensure padded display even if DB stored 2.1.1
-      const nfullDisplay = (() => {
-        const sx = safeStr(r.number_suffix).trim();
-        return computeNumberFull(r.number_base, sx);
-      })();
-
-      const p = r.payload || {};
-      const sub =
-        safeStr(p.short_text || p.ShortText || p.shortText || p["Short Text"]) ||
-        safeStr(p.question || p.Question || p["Question"]);
-
-      div.innerHTML = `<div class="qno">${nfullDisplay || safeStr(nfullRaw)}</div><div class="qsub">${sub}</div>`;
-      div.onclick = () => selectRow(r);
-      list.appendChild(div);
-    }
-  }
-
-  // ====== select / populate editor ======
-  function setEditorVisible(on) {
-    const emptyState = $any("emptyState");
-    const editPanel = $any("editPanel");
-    if (emptyState) emptyState.style.display = on ? "none" : "block";
-    if (editPanel) editPanel.style.display = on ? "block" : "none";
-  }
-
-  function refreshHeaderNumber() {
-    const nbEl = $any("dbNumberBase");
-    const sxEl = $any("dbNumberSuffix");
-
-    const nb = nbEl ? nbEl.value : "";
-    const sx = sxEl ? sxEl.value : "";
-
-    const hdr = $any("hdrNumber");
-    if (hdr) hdr.textContent = computeNumberFull(nb, sx) || "—";
-  }
-
-  function fillPayloadFields(payload) {
-    const p = payload || {};
-    setValue("pShortText", safeStr(p.short_text ?? p.ShortText ?? p.shortText ?? p["Short Text"]));
-    setValue("pQuestion", safeStr(p.question ?? p.Question ?? p["Question"]));
-    setValue("pGuidance", safeStr(p.inspection_guidance ?? p.guidance ?? p.InspectionGuidance ?? p["Inspection Guidance"]));
-    setValue("pActions", safeStr(p.suggested_inspector_actions ?? p.actions ?? p.SuggestedInspectorActions ?? p["Suggested Inspector Actions"]));
-    setValue("pEvidence", safeStr(p.expected_evidence ?? p.evidence ?? p.ExpectedEvidence ?? p["Expected Evidence"]));
-    setValue("pNegObs", safeStr(p.potential_grounds_for_negative_observations ?? p.neg_obs ?? p.NegativeObservations ?? p["Potential Grounds for Negative Observations"]));
-
-    const rawEl = $any("pRaw");
-    if (rawEl) {
-      try { rawEl.value = JSON.stringify(p, null, 2); }
-      catch (_e) { rawEl.value = ""; }
-    }
-  }
-
-  function readPayloadFromFields() {
-    let p = {};
-    const rawEl = $any("pRaw");
-    const raw = safeStr(rawEl?.value).trim();
-    if (raw) {
-      try { p = JSON.parse(raw); }
-      catch (_e) { p = {}; }
-    }
-
-    // Force-update common fields from form
-    const st = $any("pShortText");
-    const qu = $any("pQuestion");
-    const gd = $any("pGuidance");
-    const ac = $any("pActions");
-    const ev = $any("pEvidence");
-    const ng = $any("pNegObs");
-
-    // Keep your canonical keys (snake_case) but do not delete existing keys in raw JSON.
-    p.short_text = st ? st.value : (p.short_text ?? "");
-    p.question = qu ? qu.value : (p.question ?? "");
-    p.inspection_guidance = gd ? gd.value : (p.inspection_guidance ?? "");
-    p.suggested_inspector_actions = ac ? ac.value : (p.suggested_inspector_actions ?? "");
-    p.expected_evidence = ev ? ev.value : (p.expected_evidence ?? "");
-    p.potential_grounds_for_negative_observations = ng ? ng.value : (p.potential_grounds_for_negative_observations ?? "");
-
-    return p;
-  }
-
-  function selectRow(r) {
-    selected = JSON.parse(JSON.stringify(r));
-    selected.__isNew = false;
-
-    const newBanner = $any("newBanner");
-    if (newBanner) newBanner.style.display = "none";
-
-    setEditorVisible(true);
-
-    setText("hdrId", `DB id: ${r.id}`);
-
-    // Depending on HTML: dbSourceType might be select or pill/span
-    const dbSourceType = $any("dbSourceType");
-    if (dbSourceType) {
-      if (dbSourceType.tagName === "SELECT") dbSourceType.value = r.source_type;
-      else dbSourceType.textContent = r.source_type;
-    }
-
-    setValue("dbStatus", r.status);
-    setValue("dbVersion", r.version || "");
-    setValue("dbTags", Array.isArray(r.tags) ? r.tags.join(", ") : safeStr(r.tags));
-
-    // Some HTML versions use inputs for number_base/suffix; others use pills/spans.
-    const nbEl = $any("dbNumberBase");
-    if (nbEl) {
-      if (nbEl.tagName === "INPUT" || nbEl.tagName === "TEXTAREA") nbEl.value = safeStr(r.number_base);
-      else nbEl.textContent = formatNumberBaseForDisplay(r.number_base);
-    }
-
-    const sxEl = $any("dbNumberSuffix");
-    if (sxEl) {
-      if (sxEl.tagName === "INPUT" || sxEl.tagName === "TEXTAREA" || sxEl.tagName === "SELECT") sxEl.value = safeStr(r.number_suffix);
-      else sxEl.textContent = safeStr(r.number_suffix);
-      sxEl.dataset.auto = "0";
-    }
-
-    // Header number
-    const hdr = $any("hdrNumber");
-    if (hdr) hdr.textContent = computeNumberFull(r.number_base, r.number_suffix) || "—";
-
-    fillPayloadFields(r.payload || {});
-    setText("saveStatus", "");
-
-    renderList();
-    loadPhotosForSelected();
-  }
-
-  // ====== new question ======
-  function newQuestion() {
-    showWarn("");
-    showOk("");
-
-    const versionFromFilter = safeStr($any("versionFilter")?.value).trim();
-
-    selected = {
-      __isNew: true,
-      id: null,
-      source_type: "COMPANY",
-      status: "active",
-      version: versionFromFilter || "SIRE_2_0_QL",
-      tags: [],
-      number_base: "",
-      number_suffix: "C",
-      payload: {
-        short_text: "",
-        question: "",
-        inspection_guidance: "",
-        suggested_inspector_actions: "",
-        expected_evidence: "",
-        potential_grounds_for_negative_observations: "",
-      },
-    };
-
-    setEditorVisible(true);
-
-    const newBanner = $any("newBanner");
-    if (newBanner) newBanner.style.display = "inline-block";
-
-    setText("hdrId", "Not saved yet");
-
-    const dbSourceType = $any("dbSourceType");
-    if (dbSourceType) {
-      if (dbSourceType.tagName === "SELECT") dbSourceType.value = selected.source_type;
-      else dbSourceType.textContent = selected.source_type;
-    }
-
-    setValue("dbStatus", selected.status);
-    setValue("dbVersion", selected.version);
-    setValue("dbTags", "");
-
-    const nbEl = $any("dbNumberBase");
-    if (nbEl) {
-      if (nbEl.tagName === "INPUT" || nbEl.tagName === "TEXTAREA") nbEl.value = "";
-      else nbEl.textContent = "";
-    }
-
-    const sxEl = $any("dbNumberSuffix");
-    if (sxEl) {
-      const auto = SUFFIX_BY_SOURCE[selected.source_type] || "";
-      if (sxEl.tagName === "INPUT" || sxEl.tagName === "TEXTAREA" || sxEl.tagName === "SELECT") sxEl.value = auto;
-      else sxEl.textContent = auto;
-      sxEl.dataset.auto = "1";
-    }
-
-    refreshHeaderNumber();
-    fillPayloadFields(selected.payload);
-    setText("saveStatus", "");
-
-    // clear photos panel
-    const grid = $any("photoGrid");
-    if (grid) grid.innerHTML = "";
-    setText("photoCountLine", "Save the question first to attach photos.");
-    setText("photoStatus", "");
-  }
-
-  // ====== save ======
-  async function saveSelected() {
-    if (!selected) return;
-
-    showWarn("");
-    showOk("");
-    setText("saveStatus", "Saving…");
-
-    try {
-      const srcEl = $any("dbSourceType");
-      const src =
-        srcEl
-          ? (srcEl.tagName === "SELECT" ? srcEl.value : safeStr(srcEl.textContent).trim())
-          : "COMPANY";
-
-      const status = safeStr($any("dbStatus")?.value || "active");
-      const version = safeStr($any("dbVersion")?.value).trim() || "SIRE_2_0_QL";
-
-      // number_base / suffix can be input or span
-      const nbEl = $any("dbNumberBase");
-      const rawNb = nbEl
-        ? (nbEl.tagName === "INPUT" || nbEl.tagName === "TEXTAREA" ? nbEl.value : nbEl.textContent)
-        : "";
-      const nb = normalizeNumberBase(rawNb);
-
-      if (!nb) {
-        setText("saveStatus", "");
-        showWarn("number_base is required (e.g. 04.01.01 or 04.01.105).");
-        return;
-      }
-
-      const sxEl = $any("dbNumberSuffix");
-      const sx =
-        sxEl
-          ? (sxEl.tagName === "INPUT" || sxEl.tagName === "TEXTAREA" || sxEl.tagName === "SELECT"
-              ? sxEl.value
-              : sxEl.textContent)
-          : "";
-
-      // tags
-      const tagsCsv = safeStr($any("dbTags")?.value).trim();
-      const tags = tagsCsv
-        ? tagsCsv.split(",").map(s => s.trim()).filter(Boolean)
-        : [];
-
-      const payload = readPayloadFromFields();
-
-      // IMPORTANT FIX:
-      // DO NOT send number_full. Your DB likely generates it (GENERATED ALWAYS / trigger).
-      // Sending it causes: "cannot insert a non-DEFAULT value into column number_full"
-      const row = {
-        source_type: src,
-        status,
-        version,
-        tags,
-        number_base: nb,
-        number_suffix: safeStr(sx).trim(),  // keep empty string for SIRE if needed
-        payload,
-        updated_by: me?.user?.id || null,
-      };
-
-      if (selected.__isNew) {
-        row.created_by = me?.user?.id || null;
-
-        const { data, error } = await sb
-          .from("questions_master")
-          .insert(row)
-          .select("id, number_base, number_suffix, number_full, source_type, status, version, tags, payload, updated_at, created_at")
-          .single();
-
-        if (error) throw error;
-
-        showOk("Saved new question.");
-        setText("saveStatus", "");
-
-        await loadQuestions();
-        const newRow = allRows.find(x => x.id === data.id);
-        if (newRow) selectRow(newRow);
-
-      } else {
-        const { error } = await sb
-          .from("questions_master")
-          .update(row)
-          .eq("id", selected.id);
-
-        if (error) throw error;
-
-        showOk("Saved changes.");
-        setText("saveStatus", "");
-
-        await loadQuestions();
-        const updated = allRows.find(x => x.id === selected.id);
-        if (updated) selectRow(updated);
-      }
-    } catch (e) {
-      setText("saveStatus", "");
-      showWarn("Save failed:\n\n" + (e?.message || String(e)));
-    }
-  }
-
-  // ====== photos ======
-  function canManagePhotos() {
-    const role = me?.profile?.role || "";
-    return role === "super_admin" || role === "company_admin";
-  }
-
-  function showPhotoWarn(msg) {
-    const w = $any("photoWarn");
-    if (!w) return;
-    w.textContent = msg || "";
-    w.style.display = msg ? "block" : "none";
-  }
-
-  function setPhotoStatus(msg) {
-    const el = $any("photoStatus");
-    if (el) el.textContent = msg || "";
-  }
-
-  function storagePathFor(questionId, file) {
+  function storagePathFor(questionId, file){
     const safe = sanitizeFileName(file?.name || "image.jpg");
     const ts = new Date().toISOString().replace(/[:.]/g, "-");
     return `questions/${questionId}/${ts}_${safe}`;
   }
 
-  async function uploadSelectedPhotos() {
+  async function uploadSelectedPhotos(){
     showPhotoWarn("");
 
-    if (!selected || selected.__isNew || !selected.id) {
+    if (!selectedRow?.id){
       showPhotoWarn("Save the question first, then upload photos.");
       return;
     }
-    if (!canManagePhotos()) {
+    if (!canManagePhotos){
       showPhotoWarn("Upload not allowed for your role (admins only).");
       return;
     }
 
-    const fileEl = $any("photoFile");
+    const fileEl = $("photoFile");
     const files = fileEl?.files ? Array.from(fileEl.files) : [];
-    if (!files.length) {
+    if (!files.length){
       showPhotoWarn("Please choose one or more image files first.");
       return;
     }
 
     const MAX_MB = 10;
-    for (const f of files) {
-      if (f.size > MAX_MB * 1024 * 1024) {
+    for (const f of files){
+      if (f.size > MAX_MB * 1024 * 1024){
         showPhotoWarn(`File too large: ${f.name}\nMax allowed: ${MAX_MB}MB.`);
         return;
       }
@@ -671,29 +564,27 @@
 
     setPhotoStatus(`Uploading ${files.length} file(s)…`);
 
-    try {
-      for (let i = 0; i < files.length; i++) {
+    try{
+      for (let i=0;i<files.length;i++){
         const file = files[i];
-        setPhotoStatus(`Uploading ${i + 1}/${files.length}: ${file.name}`);
+        setPhotoStatus(`Uploading ${i+1}/${files.length}: ${file.name}`);
 
-        const path = storagePathFor(selected.id, file);
+        const path = storagePathFor(selectedRow.id, file);
 
-        // 1) storage upload
         const up = await sb.storage.from(PHOTO_BUCKET).upload(path, file, {
           upsert: false,
           contentType: file.type || "application/octet-stream",
         });
         if (up.error) throw up.error;
 
-        // 2) DB insert - file_name NOT NULL
         const ins = await sb.from("question_photos").insert({
-          question_id: selected.id,
+          question_id: selectedRow.id,
           file_path: path,
           file_name: sanitizeFileName(file.name),
           mime_type: file.type || null,
           size_bytes: typeof file.size === "number" ? file.size : null,
           caption: "",
-          uploaded_by: me?.user?.id || null,
+          uploaded_by: bundle?.session?.user?.id || null,
         });
         if (ins.error) throw ins.error;
       }
@@ -701,23 +592,23 @@
       setPhotoStatus("Upload completed.");
       if (fileEl) fileEl.value = "";
       await loadPhotosForSelected();
-    } catch (e) {
+    }catch(e){
       setPhotoStatus("");
-      showPhotoWarn("Upload failed:\n\n" + (e?.message || String(e)));
+      showPhotoWarn("Upload failed:\n\n" + String(e?.message || e));
     }
   }
 
-  async function loadPhotosForSelected() {
+  async function loadPhotosForSelected(){
     showPhotoWarn("");
 
-    const grid = $any("photoGrid");
-    const cntLine = $any("photoCountLine");
+    const grid = $("photoGrid");
+    const cntLine = $("photoCountLine");
     if (!grid || !cntLine) return;
 
     grid.innerHTML = "";
     cntLine.textContent = "";
 
-    if (!selected || selected.__isNew || !selected.id) {
+    if (!selectedRow?.id){
       cntLine.textContent = "Save the question first to attach photos.";
       setPhotoStatus("");
       return;
@@ -725,23 +616,23 @@
 
     setPhotoStatus("Loading photos…");
 
-    try {
+    try{
       const { data, error } = await sb
         .from("question_photos")
         .select("id, file_path, file_name, mime_type, size_bytes, caption, created_at")
-        .eq("question_id", selected.id)
-        .order("created_at", { ascending: false });
+        .eq("question_id", selectedRow.id)
+        .order("created_at", { ascending:false });
 
       if (error) throw error;
 
       const rows = data || [];
-      if (!rows.length) {
+      if (!rows.length){
         cntLine.textContent = "No photos attached to this question yet.";
         setPhotoStatus("");
         return;
       }
 
-      for (const r of rows) {
+      for (const r of rows){
         const publicUrl = sb.storage.from(PHOTO_BUCKET).getPublicUrl(r.file_path).data?.publicUrl || "";
 
         const card = document.createElement("div");
@@ -758,24 +649,24 @@
             ${publicUrl ? `<img src="${publicUrl}" alt="photo"/>` : `<div class="muted">No preview</div>`}
           </div>
           <div class="photoMeta">
-            <div class="small"><b>File:</b> ${niceName} ${niceSize ? `(${niceSize})` : ""}</div>
-            <div class="small"><b>Uploaded:</b> ${new Date(r.created_at).toLocaleString()}</div>
-            <div class="small"><b>Path:</b> ${r.file_path}</div>
+            <div class="small"><b>File:</b> ${escapeHtml(niceName)} ${niceSize ? `(${escapeHtml(niceSize)})` : ""}</div>
+            <div class="small"><b>Uploaded:</b> ${escapeHtml(new Date(r.created_at).toLocaleString())}</div>
+            <div class="small"><b>Path:</b> ${escapeHtml(r.file_path)}</div>
             <div class="photoBtns">
-              <a class="btn light" href="${publicUrl}" target="_blank" rel="noopener">Open</a>
+              ${publicUrl ? `<a class="btn light" href="${publicUrl}" target="_blank" rel="noopener">Open</a>` : ""}
               <button class="btn danger" type="button" data-photo-id="${r.id}" data-path="${r.file_path}">Delete</button>
             </div>
           </div>
         `;
 
         const delBtn = card.querySelector("button[data-photo-id]");
-        if (delBtn) {
-          if (!canManagePhotos()) {
+        if (delBtn){
+          if (!canManagePhotos){
             delBtn.disabled = true;
             delBtn.title = "Not allowed (admins only).";
             delBtn.classList.remove("danger");
             delBtn.classList.add("light");
-          } else {
+          }else{
             delBtn.onclick = async () => deletePhotoRowAndFile(delBtn.dataset.photoId, delBtn.dataset.path);
           }
         }
@@ -785,16 +676,16 @@
 
       cntLine.textContent = `${rows.length} photo(s) attached to this question.`;
       setPhotoStatus("");
-    } catch (e) {
+    }catch(e){
       setPhotoStatus("");
-      showPhotoWarn("Failed to load photos:\n\n" + (e?.message || String(e)));
+      showPhotoWarn("Failed to load photos:\n\n" + String(e?.message || e));
     }
   }
 
-  async function deletePhotoRowAndFile(photoId, filePath) {
+  async function deletePhotoRowAndFile(photoId, filePath){
     if (!confirm("Delete this photo?\n\nThis removes it from Storage and DB.")) return;
 
-    try {
+    try{
       setPhotoStatus("Deleting…");
 
       const rm = await sb.storage.from(PHOTO_BUCKET).remove([filePath]);
@@ -806,14 +697,102 @@
       setPhotoStatus("");
       await loadPhotosForSelected();
       showOk("Photo deleted.");
-    } catch (e) {
+    }catch(e){
       setPhotoStatus("");
-      showPhotoWarn("Delete failed:\n\n" + (e?.message || String(e)));
+      showPhotoWarn("Delete failed:\n\n" + String(e?.message || e));
     }
   }
 
-  // expose for debugging if needed
-  window.__QEDIT = { loadQuestions, newQuestion };
+  // -------- Boot --------
+  async function boot(){
+    try{
+      if (!window.AUTH){
+        showWarn("AUTH helper not loaded (auth.js).");
+        return;
+      }
+      sb = window.AUTH.ensureSupabase();
+
+      $("backBtn")?.addEventListener("click", () => { location.href = "./q-dashboard.html"; });
+
+      bundle = await window.AUTH.setupAuthButtons({
+        badgeId: "userBadge",
+        loginBtnId: "loginBtn",
+        logoutBtnId: "logoutBtn",
+        switchBtnId: "switchUserBtn"
+      });
+
+      if (!bundle?.session?.user){
+        showWarn("You are logged out. Please Login.");
+        setText("modeLine", "Access denied (not logged in).");
+        return;
+      }
+
+      role = safeStr(bundle?.profile?.role);
+      const R = window.AUTH.ROLES;
+
+      const isSuper = role === R.SUPER_ADMIN;
+      const isCompanyAdmin = role === R.COMPANY_ADMIN;
+      const isCompanySup = role === R.COMPANY_SUPERINTENDENT;
+
+      if (!(isSuper || isCompanyAdmin || isCompanySup)){
+        showWarn("You do not have permission to access Questions Editor.");
+        setText("modeLine", `Access denied for role: ${role || "(unknown)"}`);
+        return;
+      }
+
+      canEdit = isSuper || isCompanyAdmin;
+      canManagePhotos = isSuper || isCompanyAdmin;
+
+      let modeLabel = canEdit ? "Admin" : "View";
+      setText("modeLine", `Role: ${role} • Mode: ${modeLabel} • Module: QUESTIONS_EDITOR`);
+      setShow("editorCard", true);
+
+      // UI wiring
+      $("reloadBtn")?.addEventListener("click", loadQuestionsFromDb);
+      $("newQuestionBtn")?.addEventListener("click", () => {
+        if (!canEdit){
+          showWarn("You do not have permission to add new questions.");
+          return;
+        }
+        newQuestion();
+      });
+
+      $("searchInput")?.addEventListener("input", applyLocalFilters);
+
+      $("statusFilter")?.addEventListener("change", loadQuestionsFromDb);
+      $("versionFilter")?.addEventListener("change", loadQuestionsFromDb);
+      $("sourceFilter")?.addEventListener("change", loadQuestionsFromDb);
+
+      $("btnEdit")?.addEventListener("click", () => {
+        if (!canEdit){
+          showWarn("You do not have permission to edit questions.");
+          return;
+        }
+        setEditMode(!isEditMode);
+      });
+
+      $("btnSave")?.addEventListener("click", saveSelected);
+      $("btnReset")?.addEventListener("click", resetSelected);
+
+      $("btnRefreshPhotos")?.addEventListener("click", loadPhotosForSelected);
+      $("btnUploadPhotos")?.addEventListener("click", uploadSelectedPhotos);
+
+      // enforce permissions on edit button and add new button
+      if ($("btnEdit")) $("btnEdit").disabled = !canEdit;
+      if ($("newQuestionBtn")) $("newQuestionBtn").disabled = !canEdit;
+
+      // enforce permissions on upload controls
+      if ($("photoFile")) $("photoFile").disabled = !canManagePhotos;
+      if ($("btnUploadPhotos")) $("btnUploadPhotos").disabled = !canManagePhotos;
+      if (!canManagePhotos){
+        setPhotoStatus("Upload/Delete: admins only. Viewing enabled.");
+      }
+
+      await loadQuestionsFromDb();
+    }catch(e){
+      showWarn("Boot failed:\n\n" + String(e?.message || e));
+    }
+  }
 
   boot();
 })();

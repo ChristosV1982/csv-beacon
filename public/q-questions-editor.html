@@ -21,7 +21,7 @@
       --danger:#b03939;
       --ok:#1f6d32;
     }
-    body { margin:0; background:var(--bg); color:#132a4b; }
+    body { margin:0; background:var(--bg); color:#132a4b; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
     .topbar{
       display:flex; justify-content:space-between; align-items:center; gap:14px;
       padding: 10px 18px; background:var(--nav); color:#fff;
@@ -38,9 +38,7 @@
       border:1px solid transparent;
     }
     .btn.primary{ background:var(--nav2); color:#fff; }
-    .btn.light{
-      background:var(--chip); color:var(--nav); border:1px solid var(--chipLine);
-    }
+    .btn.light{ background:var(--chip); color:var(--nav); border:1px solid var(--chipLine); }
     .btn.danger{ background: var(--danger); color:#fff; }
     .btn:disabled{ opacity:0.6; cursor:not-allowed; }
 
@@ -106,8 +104,8 @@
     .qitem:hover { background:#f3f8ff; }
     .qitem.active { background:#dfeeff; }
     .qno { font-weight:900; color:var(--text); }
-    .qsub { color:#4b5f7b; font-size:0.93em; margin-top:6px; line-height:1.25; white-space:pre-wrap; }
-    .qmeta { color:#6a7e99; font-size:0.82em; margin-top:8px; }
+    .qsub { color:#4b5f7b; font-size:0.93em; margin-top:4px; line-height:1.25; }
+    .qmeta { color:#6a7e99; font-size:0.82em; margin-top:6px; }
 
     .rightPane{
       flex:1; min-width: 0;
@@ -125,28 +123,14 @@
     .viewLabel{ font-weight:900; color:#1a3261; margin-bottom:6px; }
     .viewText{ white-space:pre-wrap; line-height:1.35; }
 
-    /* Vertical stack editor */
-    .stack{ display:flex; flex-direction:column; gap:12px; }
-    .stack .field{ min-width: 0; }
-
-    /* Evidence / PGNO list editors */
-    .itemsWrap{ display:flex; flex-direction:column; gap:10px; }
-    .itemCard{
-      border:1px solid #d7e3f4;
-      border-radius:14px;
-      padding:12px;
-      background:#fff;
-      box-shadow:0 1px 10px rgba(30,70,130,0.06);
-    }
-    .itemHdr{ display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:10px; }
-    .itemNo{ font-weight:900; color:var(--text); }
-    .itemGrid{
+    /* Edit form */
+    .formGrid{
       display:grid;
-      grid-template-columns: 1fr;
-      gap:10px;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
     }
-    .miniRow{ display:flex; gap:10px; flex-wrap:wrap; }
-    .mini{ flex:1; min-width:240px; }
+    .formGrid .span2{ grid-column: span 2; }
+    .smallNote{ font-size:0.9em; color:var(--muted); margin-top:4px; }
 
     /* Photos */
     .photoBar{
@@ -218,13 +202,12 @@
       .editorGrid{ flex-direction:column; }
       .leftPane{ width:auto; max-width:none; }
       .list{ max-height: 340px; }
+      .formGrid{ grid-template-columns: 1fr; }
+      .formGrid .span2{ grid-column: span 1; }
     }
   </style>
 
-  <!-- Supabase v2 -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
-  <!-- Your auth helper -->
   <script src="auth.js"></script>
 </head>
 
@@ -248,51 +231,15 @@
     <div id="warnBox" class="warn" style="margin-top:12px;"></div>
     <div id="okBox" class="ok" style="margin-top:12px;"></div>
 
-    <!-- Import Card (super_admin only) -->
-    <div class="card" id="importCard" style="display:none;">
-      <h2>Safe Import (Lossless)</h2>
-      <div class="muted">
-        This importer reads your existing JSON file in <b>/public</b> and inserts into <b>public.questions_master</b>
-        while preserving the full original object in <b>payload</b>.
-        <br><br>
-        <b>Note:</b> Once you have loaded the full SIRE library (385 questions), you can keep this panel hidden. It stays here for safety and future re-imports (new DB / new version tag).
-      </div>
-      <div class="hr"></div>
-
-      <div class="row">
-        <div class="field">
-          <label>Version tag to store in DB (required)</label>
-          <input id="versionTag" value="SIRE_2.0_QL" />
-        </div>
-        <div style="flex:1"></div>
-        <div class="field" style="min-width:auto;">
-          <label>&nbsp;</label>
-          <div class="row">
-            <button class="btn light" id="dryRunBtn" type="button">Dry Run (validate only)</button>
-            <button class="btn primary" id="commitBtn" type="button">Commit Import</button>
-          </div>
-        </div>
-      </div>
-
-      <div class="muted" style="margin-top:10px;">
-        Source JSON: <b id="srcFile"></b>
-      </div>
-      <div class="muted" id="progressLine" style="margin-top:8px;"></div>
-      <div id="resultBox" class="muted" style="margin-top:10px; white-space:pre-wrap;"></div>
-    </div>
-
-    <!-- Browser + Viewer / Editor -->
     <div class="card" id="editorCard" style="display:none;">
       <h2>Questions Browser & Viewer / Editor (DB)</h2>
-      <div class="muted">
-        Left side = list. Right side = viewer by default. Click <b>Edit</b> to switch to edit mode for the selected question.
-      </div>
+      <div class="muted">Left side = list. Right side = viewer by default. Click <b>Edit</b> to switch to edit mode.</div>
 
       <div class="hr"></div>
 
       <div class="row">
         <button class="btn primary" id="reloadBtn" type="button">Load / Refresh Questions</button>
-        <button class="btn light" id="addNewBtn" type="button" title="Create a new question">Add New Question</button>
+        <button class="btn light" id="newQuestionBtn" type="button">Add New Question</button>
 
         <div class="field" style="min-width:240px;">
           <label>Source</label>
@@ -341,12 +288,9 @@
 
         <!-- Right pane -->
         <div class="rightPane">
-          <div id="emptyState" class="muted" style="padding:14px;">
-            Select a question from the left list.
-          </div>
+          <div id="emptyState" class="muted" style="padding:14px;">Select a question from the left list.</div>
 
           <div id="panel" style="display:none;">
-            <!-- Header -->
             <div class="row" style="justify-content:space-between; align-items:flex-start;">
               <div>
                 <div style="font-size:1.2em; font-weight:900; color:var(--text);">
@@ -354,17 +298,15 @@
                 </div>
                 <div class="muted" id="hdrId" style="margin-top:4px;"></div>
               </div>
-              <div class="row">
+
+              <div class="row" style="gap:10px;">
                 <button class="btn light" id="btnEdit" type="button">Edit</button>
-                <button class="btn light" id="btnCancelEdit" type="button" style="display:none;">Cancel</button>
                 <button class="btn primary" id="btnSave" type="button" style="display:none;">Save</button>
+                <button class="btn light" id="btnReset" type="button" style="display:none;">Reset</button>
               </div>
             </div>
 
-            <div class="hr"></div>
-
-            <!-- Meta line -->
-            <div class="row" style="gap:10px; align-items:center;">
+            <div class="row" style="gap:10px; margin-top:10px;">
               <span class="pill" id="pillSource">—</span>
               <span class="pill" id="pillStatus">—</span>
               <span class="pill" id="pillVersion">—</span>
@@ -375,760 +317,152 @@
 
             <!-- VIEW MODE -->
             <div id="viewMode">
-              <div class="stack">
-                <div class="viewBox">
-                  <div class="viewLabel">Short Text</div>
-                  <div class="viewText" id="vShortText"></div>
-                </div>
-
-                <div class="viewBox">
-                  <div class="viewLabel">Question</div>
-                  <div class="viewText" id="vQuestion"></div>
-                </div>
-
-                <div class="viewBox">
-                  <div class="viewLabel">Inspection Guidance</div>
-                  <div class="viewText" id="vGuidance"></div>
-                </div>
-
-                <div class="viewBox">
-                  <div class="viewLabel">Suggested Inspector Actions</div>
-                  <div class="viewText" id="vActions"></div>
-                </div>
-
-                <div class="viewBox">
-                  <div class="viewLabel">Expected Evidence (items)</div>
-                  <div id="vEvidence"></div>
-                </div>
-
-                <div class="viewBox">
-                  <div class="viewLabel">Potential Grounds for Negative Observations (PGNOs)</div>
-                  <div id="vPgno"></div>
-                </div>
+              <div class="viewBox">
+                <div class="viewLabel">Short Text</div>
+                <div class="viewText" id="vShortText"></div>
               </div>
 
-              <div class="hr"></div>
+              <div style="height:10px;"></div>
 
-              <!-- Photos -->
-              <div class="card" style="margin:0; padding:14px; border-radius:14px; border:1px solid #e3edf9; box-shadow:none;">
-                <h2 style="margin:0 0 6px 0; font-size:1.05em;">Question Photos</h2>
-                <div class="muted">
-                  Storage bucket: <b>question-photos</b> • Table: <b>public.question_photos</b>
-                </div>
+              <div class="viewBox">
+                <div class="viewLabel">Question</div>
+                <div class="viewText" id="vQuestion"></div>
+              </div>
 
-                <div class="photoBar">
-                  <div class="left">
-                    <button class="btn light" id="btnRefreshPhotos" type="button">Refresh Photos</button>
+              <div style="height:10px;"></div>
 
-                    <div class="field" style="min-width:260px; margin:0;">
-                      <label style="margin:0; font-weight:800;">Upload (images)</label>
-                      <input id="photoFile" type="file" accept="image/*" multiple />
-                    </div>
+              <div class="viewBox">
+                <div class="viewLabel">Inspection Guidance</div>
+                <div class="viewText" id="vGuidance"></div>
+              </div>
 
-                    <button class="btn primary" id="btnUploadPhotos" type="button">Upload</button>
-                  </div>
+              <div style="height:10px;"></div>
 
-                  <div class="muted" id="photoStatus" style="min-width:240px; text-align:right;"></div>
-                </div>
+              <div class="viewBox">
+                <div class="viewLabel">Suggested Inspector Actions</div>
+                <div class="viewText" id="vActions"></div>
+              </div>
 
-                <div id="photoWarn" class="warn" style="display:none; margin-top:10px;"></div>
-                <div class="photoGrid" id="photoGrid"></div>
-                <div class="muted" id="photoCountLine" style="margin-top:10px;"></div>
+              <div style="height:10px;"></div>
+
+              <div class="viewBox">
+                <div class="viewLabel">Expected Evidence (items)</div>
+                <div id="vEvidence"></div>
+              </div>
+
+              <div style="height:10px;"></div>
+
+              <div class="viewBox">
+                <div class="viewLabel">Potential Grounds for Negative Observations (PGNOs)</div>
+                <div id="vPgno"></div>
               </div>
             </div>
 
             <!-- EDIT MODE -->
             <div id="editMode" style="display:none;">
-              <div class="stack">
+              <div class="formGrid">
+
                 <div class="field">
-                  <label>Payload: Short Text</label>
+                  <label>Source Type</label>
+                  <select id="eSourceType">
+                    <option value="SIRE">SIRE</option>
+                    <option value="COMPANY">COMPANY</option>
+                    <option value="SPARE1">SPARE1</option>
+                    <option value="SPARE2">SPARE2</option>
+                  </select>
+                  <div class="smallNote">Controls auto-suffix only when creating a new question.</div>
+                </div>
+
+                <div class="field">
+                  <label>Status</label>
+                  <select id="eStatus">
+                    <option value="active">active</option>
+                    <option value="inactive">inactive</option>
+                  </select>
+                </div>
+
+                <div class="field">
+                  <label>Version</label>
+                  <input id="eVersion" placeholder="e.g. SIRE_2_0_QL" />
+                </div>
+
+                <div class="field">
+                  <label>Tags (comma separated)</label>
+                  <input id="eTags" placeholder="tag1, tag2, tag3" />
+                </div>
+
+                <div class="field">
+                  <label>Number Base</label>
+                  <input id="eNumberBase" placeholder="e.g. 10.01.01" />
+                </div>
+
+                <div class="field">
+                  <label>Number Suffix</label>
+                  <input id="eNumberSuffix" placeholder="(blank for SIRE)" />
+                </div>
+
+                <div class="field span2">
+                  <label>Short Text</label>
                   <textarea id="eShortText"></textarea>
                 </div>
 
-                <div class="field">
-                  <label>Payload: Question</label>
-                  <textarea id="eQuestion" style="min-height:220px;"></textarea>
+                <div class="field span2">
+                  <label>Question</label>
+                  <textarea id="eQuestion"></textarea>
                 </div>
 
-                <div class="field">
-                  <label>Payload: Inspection Guidance</label>
-                  <textarea id="eGuidance" style="min-height:200px;"></textarea>
+                <div class="field span2">
+                  <label>Inspection Guidance</label>
+                  <textarea id="eGuidance"></textarea>
                 </div>
 
-                <div class="field">
-                  <label>Payload: Suggested Inspector Actions</label>
-                  <textarea id="eActions" style="min-height:200px;"></textarea>
+                <div class="field span2">
+                  <label>Suggested Inspector Actions</label>
+                  <textarea id="eActions"></textarea>
                 </div>
 
-                <div class="card" style="margin:0; padding:14px; border-radius:14px; border:1px solid #e3edf9; box-shadow:none;">
-                  <div class="row" style="justify-content:space-between;">
-                    <h2 style="margin:0; font-size:1.05em;">Expected Evidence (items)</h2>
-                    <button class="btn light" id="btnAddEvidence" type="button">Add Evidence Item</button>
-                  </div>
-                  <div class="muted" style="margin-top:6px;">
-                    Each evidence item has: Evidence text + eSMS Form(s) + eSMS Reference(s) + Remarks.
-                  </div>
-                  <div class="hr"></div>
-                  <div id="evidenceWrap" class="itemsWrap"></div>
+                <div class="field span2">
+                  <label>Raw Payload JSON (advanced)</label>
+                  <textarea id="eRawPayload" style="min-height:180px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;"></textarea>
+                  <div class="smallNote">If this JSON is invalid, Save will be blocked.</div>
                 </div>
 
-                <div class="card" style="margin:0; padding:14px; border-radius:14px; border:1px solid #e3edf9; box-shadow:none;">
-                  <div class="row" style="justify-content:space-between;">
-                    <h2 style="margin:0; font-size:1.05em;">PGNOs (items)</h2>
-                    <button class="btn light" id="btnAddPgno" type="button">Add PGNO</button>
-                  </div>
-                  <div class="muted" style="margin-top:6px;">
-                    PGNO numbering is auto: <b>xx.yy.zz.pp</b> for SIRE, <b>xx.yy.zz.pp-C</b> for COMPANY (and similar for spare sets).
-                  </div>
-                  <div class="hr"></div>
-                  <div id="pgnoWrap" class="itemsWrap"></div>
-                </div>
-
-                <div class="field">
-                  <label>Payload JSON (full object) – Advanced edit</label>
-                  <textarea id="eRaw" style="min-height:260px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;"></textarea>
-                  <div class="muted" style="margin-top:6px;">
-                    Advanced: must remain valid JSON. Normal fields above will be merged into this object on save.
-                  </div>
-                </div>
-
-                <div class="muted" id="saveStatus"></div>
               </div>
+            </div>
+
+            <div class="hr"></div>
+
+            <!-- Photos -->
+            <div class="card" style="margin:0; padding:14px; border-radius:14px; border:1px solid #e3edf9; box-shadow:none;">
+              <h2 style="margin:0 0 6px 0; font-size:1.05em;">Question Photos</h2>
+              <div class="muted">Storage bucket: <b>question-photos</b> • Table: <b>public.question_photos</b></div>
+
+              <div class="photoBar">
+                <div class="left">
+                  <button class="btn light" id="btnRefreshPhotos" type="button">Refresh Photos</button>
+
+                  <div class="field" style="min-width:260px; margin:0;">
+                    <label style="margin:0; font-weight:800;">Upload (images)</label>
+                    <input id="photoFile" type="file" accept="image/*" multiple />
+                  </div>
+
+                  <button class="btn primary" id="btnUploadPhotos" type="button">Upload</button>
+                </div>
+
+                <div class="muted" id="photoStatus" style="min-width:240px; text-align:right;"></div>
+              </div>
+
+              <div id="photoWarn" class="warn" style="display:none; margin-top:10px;"></div>
+              <div class="photoGrid" id="photoGrid"></div>
+              <div class="muted" id="photoCountLine" style="margin-top:10px;"></div>
             </div>
 
           </div>
         </div>
       </div>
     </div>
-
   </div>
 
-  <script>
-    const sb = window.AUTH.ensureSupabase();
-
-    function $(id){ return document.getElementById(id); }
-    function setText(id, txt){ const el=$(id); if(el) el.textContent = txt ?? ""; }
-    function setHtml(id, html){ const el=$(id); if(el) el.innerHTML = html ?? ""; }
-    function setShow(id, on){ const el=$(id); if(el) el.style.display = on ? "" : "none"; }
-
-    function showWarn(msg) {
-      const w = $("warnBox");
-      if(!w) return;
-      w.textContent = msg || "";
-      w.style.display = msg ? "block" : "none";
-    }
-    function showOk(msg) {
-      const o = $("okBox");
-      if(!o) return;
-      o.textContent = msg || "";
-      o.style.display = msg ? "block" : "none";
-    }
-
-    window.showPhotoWarn = function(msg){
-      const w = $("photoWarn");
-      if(!w) return;
-      w.textContent = msg || "";
-      w.style.display = msg ? "block" : "none";
-    }
-    window.setPhotoStatus = function(msg){
-      const el = $("photoStatus");
-      if(el) el.textContent = msg || "";
-    }
-
-    window.CAN_SAVE = false;
-    window.CAN_MANAGE_PHOTOS = false;
-    window.PHOTO_BUCKET = "question-photos";
-
-    const SUFFIX_BY_SOURCE = { SIRE:"", COMPANY:"C", SPARE1:"A", SPARE2:"B" };
-
-    function safeStr(v){ return (v===null||v===undefined) ? "" : String(v); }
-    function pad2(n){ return String(n ?? "").padStart(2,"0"); }
-
-    function getPayload(p, key){ return safeStr(p && p[key]); }
-    function getPayloadNo(p){ return safeStr(p && (p["No."] || p["No"])); }
-
-    function escapeHtml(s){
-      return safeStr(s)
-        .replaceAll("&","&amp;")
-        .replaceAll("<","&lt;")
-        .replaceAll(">","&gt;")
-        .replaceAll('"',"&quot;")
-        .replaceAll("'","&#39;");
-    }
-
-    function parseBaseParts(base){
-      const s = safeStr(base).trim();
-      if(!s) return [0,0,0];
-      const parts = s.split(".").map(x => parseInt(String(x).replace(/\D/g,""),10));
-      const a = Number.isFinite(parts[0]) ? parts[0] : 0;
-      const b = Number.isFinite(parts[1]) ? parts[1] : 0;
-      const c = Number.isFinite(parts[2]) ? parts[2] : 0;
-      return [a,b,c];
-    }
-
-    function formatBaseDisplay(numberBase){
-      const [a,b,c] = parseBaseParts(numberBase);
-      return `${pad2(a)}.${pad2(b)}.${pad2(c)}`;
-    }
-    function formatFullDisplay(row){
-      const base = formatBaseDisplay(row.number_base);
-      const sfx = safeStr(row.number_suffix).trim();
-      return sfx ? `${base}-${sfx}` : base;
-    }
-
-    function rowSortKey(r){
-      const [a,b,c] = parseBaseParts(r.number_base);
-      const s = safeStr(r.number_suffix).trim().toUpperCase();
-      const sv = s ? (s.charCodeAt(0) - 64) : 0;
-      return {a,b,c,sv};
-    }
-    function compareKeys(k1,k2){
-      if(k1.a!==k2.a) return k1.a-k2.a;
-      if(k1.b!==k2.b) return k1.b-k2.b;
-      if(k1.c!==k2.c) return k1.c-k2.c;
-      return k1.sv-k2.sv;
-    }
-
-    // ---------- Import helpers (SANITIZE No.) ----------
-    function parseNoToBaseAndSuffix(noRaw){
-      const no = safeStr(noRaw).trim();
-      // Match: 02.03.04 or 10.01.01 or 10.1.1- or 02.03.04-C
-      const m = no.match(/^(\d+)\.(\d+)\.(\d+)(?:-([A-Za-z0-9]+))?/?/);
-      if(!m) return { ok:false, error:`Cannot parse No.: ${no}` };
-
-      const a = pad2(m[1].replace(/\D/g,""));
-      const b = pad2(m[2].replace(/\D/g,""));
-      const c = pad2(m[3].replace(/\D/g,""));
-      const suffix = safeStr(m[4]).trim(); // optional, without '-'
-      return { ok:true, base:`${a}.${b}.${c}`, suffix };
-    }
-
-    function chunk(arr, size){
-      const out=[]; for(let i=0;i<arr.length;i+=size) out.push(arr.slice(i,i+size)); return out;
-    }
-
-    async function fetchJsonFile(filename){
-      const res = await fetch(`./${filename}`, { cache: "no-store" });
-      if(!res.ok) throw new Error(`Failed to fetch ${filename}: ${res.status} ${res.statusText}`);
-      return await res.json();
-    }
-    function ensureArray(data){
-      if(Array.isArray(data)) return data;
-      if(data && Array.isArray(data.questions)) return data.questions;
-      if(data && Array.isArray(data.items)) return data.items;
-      throw new Error("JSON root is not an array, and no .questions/.items array found.");
-    }
-
-    async function getQuestionsMasterCount(){
-      const { count, error } = await sb
-        .from("questions_master")
-        .select("id", { count: "exact", head: true });
-      if(error) throw error;
-      return count || 0;
-    }
-
-    function normalizeRow(payload, versionTag){
-      if(!payload || typeof payload !== "object") return { ok:false, error:"Payload is not an object" };
-
-      const no = payload["No."] || payload["No"];
-      if(!no) return { ok:false, error:"Missing payload No./No." };
-
-      const parsed = parseNoToBaseAndSuffix(no);
-      if(!parsed.ok) return { ok:false, error: parsed.error };
-
-      return {
-        ok:true,
-        row:{
-          source_type: "SIRE",
-          number_base: parsed.base,
-          number_suffix: "",          // SIRE in your design: keep blank
-          is_custom: false,
-          status: "active",
-          version: versionTag,
-          tags: null,
-          payload: payload
-        }
-      };
-    }
-
-    async function dryRunImport(filename, versionTag){
-      const raw = await fetchJsonFile(filename);
-      const arr = ensureArray(raw);
-
-      const errors = [];
-      let okCount = 0;
-      const MAX_ERR = 25;
-
-      for(let i=0;i<arr.length;i++){
-        const r = normalizeRow(arr[i], versionTag);
-        if(!r.ok){
-          if(errors.length < MAX_ERR) errors.push(`Index ${i}: ${r.error}`);
-        } else {
-          okCount++;
-        }
-      }
-      return { total: arr.length, okCount, errors };
-    }
-
-    async function commitImport(filename, versionTag){
-      const existing = await getQuestionsMasterCount();
-      if(existing > 0){
-        throw new Error(`Import blocked: questions_master already has ${existing} rows. (Safety rule)`);
-      }
-
-      const raw = await fetchJsonFile(filename);
-      const arr = ensureArray(raw);
-
-      const rows = [];
-      const errors = [];
-      const MAX_ERR = 25;
-
-      for(let i=0;i<arr.length;i++){
-        const r = normalizeRow(arr[i], versionTag);
-        if(!r.ok){
-          if(errors.length < MAX_ERR) errors.push(`Index ${i}: ${r.error}`);
-          continue;
-        }
-        rows.push(r.row);
-      }
-
-      if(errors.length){
-        throw new Error(
-          "Validation failed.\n\n" +
-          errors.join("\n") +
-          (arr.length > errors.length ? `\n\n(Showing first ${MAX_ERR} errors.)` : "")
-        );
-      }
-
-      const BATCH_SIZE = 200;
-      const batches = chunk(rows, BATCH_SIZE);
-
-      let inserted = 0;
-      for(let b=0;b<batches.length;b++){
-        const { error } = await sb.from("questions_master").insert(batches[b]);
-        if(error) throw error;
-        inserted += batches[b].length;
-      }
-
-      return { total: arr.length, inserted };
-    }
-
-    // ---------- State ----------
-    let allRows = [];
-    let filteredRows = [];
-    let selectedRow = null;
-
-    let viewEvidence = [];
-    let viewPgno = [];
-    let editEvidence = [];
-    let editPgno = [];
-
-    let mode = "VIEW"; // VIEW | EDIT
-
-    async function fetchEvidence(questionId){
-      const { data, error } = await sb
-        .from("question_evidence_items")
-        .select("id, question_id, evidence_text, esms_forms, esms_refs, remarks, sort_order")
-        .eq("question_id", questionId)
-        .order("sort_order", { ascending:true });
-      if(error) throw error;
-      return data || [];
-    }
-    async function fetchPgno(questionId){
-      const { data, error } = await sb
-        .from("question_pgno")
-        .select("id, question_id, pgno_no, pgno_text, sort_order")
-        .eq("question_id", questionId)
-        .order("sort_order", { ascending:true });
-      if(error) throw error;
-      return data || [];
-    }
-
-    function applyLocalFilters(){
-      const s = safeStr($("searchInput")?.value).toLowerCase().trim();
-      const st = safeStr($("statusFilter")?.value).trim();
-      const vf = safeStr($("versionFilter")?.value).trim();
-      const src = safeStr($("sourceFilter")?.value).trim();
-
-      filteredRows = allRows.filter(r => {
-        if(st && safeStr(r.status) !== st) return false;
-        if(vf && safeStr(r.version) !== vf) return false;
-        if(src && src !== "ALL" && safeStr(r.source_type) !== src) return false;
-
-        if(!s) return true;
-        const p = r.payload || {};
-        const hay = [
-          formatFullDisplay(r),
-          safeStr(r.number_base),
-          getPayloadNo(p),
-          getPayload(p, "Short Text"),
-          getPayload(p, "Question"),
-          safeStr(r.source_type),
-          safeStr(r.version)
-        ].join(" ").toLowerCase();
-        return hay.includes(s);
-      });
-
-      filteredRows.sort((x,y)=>compareKeys(rowSortKey(x), rowSortKey(y)));
-      renderList();
-      setText("countLine", `${filteredRows.length} questions`);
-    }
-
-    function renderList(){
-      const list = $("qList");
-      if(!list) return;
-      list.innerHTML = "";
-
-      if(!filteredRows.length){
-        list.innerHTML = `<div class="muted" style="padding:12px;">No questions match the filters.</div>`;
-        return;
-      }
-
-      for(const r of filteredRows){
-        const p = r.payload || {};
-        const no = formatFullDisplay(r) || getPayloadNo(p) || "(no number)";
-
-        // IMPORTANT change: show Question text as primary; fallback to Short Text
-        const qText = getPayload(p, "Question").trim();
-        const shortT = getPayload(p, "Short Text").trim();
-        const mainLine = qText || shortT || "(no text)";
-
-        const div = document.createElement("div");
-        div.className = "qitem" + (selectedRow && selectedRow.id === r.id ? " active" : "");
-        div.innerHTML = `
-          <div class="qno">${escapeHtml(no)}</div>
-          <div class="qsub">${escapeHtml(mainLine)}</div>
-          <div class="qmeta">${escapeHtml(safeStr(r.source_type))} • ${escapeHtml(safeStr(r.status))} • ${escapeHtml(safeStr(r.version))}</div>
-        `;
-        div.onclick = () => selectRow(r.id);
-        list.appendChild(div);
-      }
-    }
-
-    function setMode(next){
-      mode = next;
-      setShow("viewMode", mode === "VIEW");
-      setShow("editMode", mode === "EDIT");
-      setShow("btnEdit", mode === "VIEW");
-      setShow("btnCancelEdit", mode === "EDIT");
-      setShow("btnSave", mode === "EDIT");
-      if(mode === "VIEW") setText("saveStatus", "");
-    }
-
-    async function selectRow(id){
-      showWarn(""); showOk("");
-      const r = filteredRows.find(x => x.id === id) || allRows.find(x => x.id === id);
-      if(!r) return;
-
-      selectedRow = JSON.parse(JSON.stringify(r));
-
-      setShow("emptyState", false);
-      setShow("panel", true);
-
-      setText("hdrNumber", formatFullDisplay(selectedRow));
-      setText("hdrId", `DB id: ${selectedRow.id}`);
-
-      setText("pillSource", `source: ${safeStr(selectedRow.source_type)}`);
-      setText("pillStatus", `status: ${safeStr(selectedRow.status)}`);
-      setText("pillVersion", `version: ${safeStr(selectedRow.version)}`);
-      setText("pillSuffix", `suffix: ${safeStr(selectedRow.number_suffix) || "(none)"}`);
-
-      const p = selectedRow.payload || {};
-      setText("vShortText", getPayload(p, "Short Text"));
-      setText("vQuestion", getPayload(p, "Question"));
-      setText("vGuidance", getPayload(p, "Inspection Guidance"));
-      setText("vActions", getPayload(p, "Suggested Inspector Actions"));
-
-      try{
-        viewEvidence = await fetchEvidence(selectedRow.id);
-        viewPgno = await fetchPgno(selectedRow.id);
-      }catch(e){
-        viewEvidence = [];
-        viewPgno = [];
-      }
-
-      renderEvidenceViewer();
-      renderPgnoViewer();
-
-      setMode("VIEW");
-
-      await window.loadPhotosForSelected?.(selectedRow.id);
-      renderList();
-    }
-
-    function renderEvidenceViewer(){
-      const wrap = $("vEvidence");
-      if(!wrap) return;
-      if(!viewEvidence.length){
-        wrap.innerHTML = `<div class="muted">No evidence items stored yet.</div>`;
-        return;
-      }
-      wrap.innerHTML = viewEvidence.map((it, idx) => {
-        const no = idx + 1;
-        const ef = safeStr(it.esms_forms);
-        const er = safeStr(it.esms_refs);
-        const rm = safeStr(it.remarks);
-        return `
-          <div style="margin-bottom:10px; padding-bottom:10px; border-bottom:1px dashed #d8e6fb;">
-            <div><b>Item ${no}</b></div>
-            <div style="white-space:pre-wrap; margin-top:6px;">${escapeHtml(it.evidence_text)}</div>
-            ${ef ? `<div class="muted" style="margin-top:6px;"><b>eSMS Form(s):</b> ${escapeHtml(ef)}</div>` : ""}
-            ${er ? `<div class="muted" style="margin-top:4px;"><b>eSMS Reference(s):</b> ${escapeHtml(er)}</div>` : ""}
-            ${rm ? `<div class="muted" style="margin-top:4px;"><b>Remarks:</b> ${escapeHtml(rm)}</div>` : ""}
-          </div>
-        `;
-      }).join("");
-    }
-
-    function renderPgnoViewer(){
-      const wrap = $("vPgno");
-      if(!wrap) return;
-      if(!viewPgno.length){
-        wrap.innerHTML = `<div class="muted">No PGNO items stored yet.</div>`;
-        return;
-      }
-      wrap.innerHTML = viewPgno.map((it) => {
-        return `
-          <div style="margin-bottom:10px; padding-bottom:10px; border-bottom:1px dashed #d8e6fb;">
-            <div><b>${escapeHtml(it.pgno_no)}</b></div>
-            <div style="white-space:pre-wrap; margin-top:6px;">${escapeHtml(it.pgno_text)}</div>
-          </div>
-        `;
-      }).join("");
-    }
-
-    async function enterEditMode(){
-      if(!selectedRow){ showWarn("Select a question first."); return; }
-      if(!window.CAN_SAVE){ showWarn("Edit blocked: your role is read-only."); return; }
-      setMode("EDIT");
-
-      const p = selectedRow.payload || {};
-      $("eShortText").value = getPayload(p,"Short Text");
-      $("eQuestion").value = getPayload(p,"Question");
-      $("eGuidance").value = getPayload(p,"Inspection Guidance");
-      $("eActions").value = getPayload(p,"Suggested Inspector Actions");
-      $("eRaw").value = JSON.stringify(p, null, 2);
-    }
-
-    async function saveCurrent(){
-      showWarn(""); showOk("");
-      if(!window.CAN_SAVE){ showWarn("Save blocked: read-only."); return; }
-      if(!selectedRow?.id){ showWarn("No question selected."); return; }
-
-      let payloadObj;
-      try{
-        payloadObj = JSON.parse($("eRaw").value || "{}");
-      }catch(e){
-        showWarn("Cannot save: Payload JSON is not valid.\n\n" + String(e?.message || e));
-        return;
-      }
-      if(!payloadObj || typeof payloadObj !== "object") payloadObj = {};
-
-      payloadObj["Short Text"] = $("eShortText").value;
-      payloadObj["Question"] = $("eQuestion").value;
-      payloadObj["Inspection Guidance"] = $("eGuidance").value;
-      payloadObj["Suggested Inspector Actions"] = $("eActions").value;
-
-      const { error } = await sb
-        .from("questions_master")
-        .update({ payload: payloadObj })
-        .eq("id", selectedRow.id);
-
-      if(error){
-        showWarn("Save failed:\n\n" + (error.message || String(error)));
-        return;
-      }
-
-      showOk("Saved.");
-      const idx = allRows.findIndex(x => x.id === selectedRow.id);
-      if(idx >= 0) allRows[idx].payload = payloadObj;
-
-      applyLocalFilters();
-      await selectRow(selectedRow.id);
-    }
-
-    async function loadQuestionsFromDb(){
-      showWarn(""); showOk("");
-      setText("loadHint", "Loading…");
-
-      const statusFilter = safeStr($("statusFilter")?.value).trim();
-      const versionFilter = safeStr($("versionFilter")?.value).trim();
-      const sourceFilter = safeStr($("sourceFilter")?.value).trim();
-
-      try{
-        let q = sb
-          .from("questions_master")
-          .select("id, source_type, number_full, number_base, number_suffix, status, version, tags, payload");
-
-        if(statusFilter) q = q.eq("status", statusFilter);
-        if(versionFilter) q = q.eq("version", versionFilter);
-        if(sourceFilter && sourceFilter !== "ALL") q = q.eq("source_type", sourceFilter);
-
-        const pageSize = 1000;
-        let from = 0;
-        let out = [];
-        while(true){
-          const { data, error } = await q.range(from, from + pageSize - 1);
-          if(error) throw error;
-          const rows = data || [];
-          out.push(...rows);
-          if(rows.length < pageSize) break;
-          from += pageSize;
-        }
-
-        allRows = out;
-        allRows.sort((x,y)=>compareKeys(rowSortKey(x), rowSortKey(y)));
-
-        setText("loadHint", `Loaded ${allRows.length}`);
-        setText("countLine", `${allRows.length} questions`);
-
-        applyLocalFilters();
-
-        if(allRows.length){
-          await selectRow(allRows[0].id);
-        }else{
-          setShow("panel", false);
-          setShow("emptyState", true);
-        }
-      }catch(e){
-        setText("loadHint", "");
-        showWarn("Failed to load questions from DB:\n\n" + String(e?.message || e));
-      }
-    }
-
-    (async () => {
-      const backBtn = $("backBtn");
-      if(backBtn) backBtn.onclick = () => { location.href = "./q-dashboard.html"; };
-
-      const bundle = await AUTH.setupAuthButtons({
-        badgeId: "userBadge",
-        loginBtnId: "loginBtn",
-        logoutBtnId: "logoutBtn",
-        switchBtnId: "switchUserBtn"
-      });
-
-      if (!bundle?.session?.user) {
-        showWarn("You are logged out. Please Login.");
-        setText("modeLine", "Access denied (not logged in).");
-        return;
-      }
-
-      const role = bundle.profile?.role;
-      const R = AUTH.ROLES;
-
-      const isSuper = role === R.SUPER_ADMIN;
-      const isCompanyAdmin = role === R.COMPANY_ADMIN;
-      const isCompanySup = role === R.COMPANY_SUPERINTENDENT;
-
-      if (!(isSuper || isCompanyAdmin || isCompanySup)) {
-        showWarn("You do not have permission to access Questions Editor.");
-        setText("modeLine", `Access denied for role: ${role || "(unknown)"}`);
-        return;
-      }
-
-      window.CAN_SAVE = (isSuper || isCompanyAdmin);
-      window.CAN_MANAGE_PHOTOS = (isSuper || isCompanyAdmin);
-
-      let modeLabel = "View";
-      if (isSuper || isCompanyAdmin) modeLabel = "Edit";
-      if (isSuper) modeLabel = "Admin";
-      setText("modeLine", `Role: ${role} • Mode: ${modeLabel} • Module: QUESTIONS_EDITOR`);
-
-      setShow("editorCard", true);
-      setShow("importCard", !!isSuper);
-
-      $("reloadBtn").onclick = loadQuestionsFromDb;
-
-      const btnEdit = $("btnEdit");
-      if(btnEdit) btnEdit.onclick = enterEditMode;
-
-      const btnCancelEdit = $("btnCancelEdit");
-      if(btnCancelEdit) btnCancelEdit.onclick = async () => {
-        if(selectedRow?.id) await selectRow(selectedRow.id);
-      };
-
-      const btnSave = $("btnSave");
-      if(btnSave) btnSave.onclick = saveCurrent;
-
-      const searchInput = $("searchInput");
-      if(searchInput) searchInput.oninput = applyLocalFilters;
-
-      $("statusFilter").onchange = loadQuestionsFromDb;
-      $("versionFilter").onchange = loadQuestionsFromDb;
-      $("sourceFilter").onchange = loadQuestionsFromDb;
-
-      const btnRefreshPhotos = $("btnRefreshPhotos");
-      if(btnRefreshPhotos) btnRefreshPhotos.onclick = () => window.loadPhotosForSelected?.(selectedRow?.id);
-
-      const btnUploadPhotos = $("btnUploadPhotos");
-      if(btnUploadPhotos) btnUploadPhotos.onclick = () => window.uploadSelectedPhotos?.(selectedRow?.id);
-
-      const fileInput = $("photoFile");
-      if(fileInput) fileInput.disabled = !window.CAN_MANAGE_PHOTOS;
-      if(btnUploadPhotos) btnUploadPhotos.disabled = !window.CAN_MANAGE_PHOTOS;
-
-      // Import wiring
-      if(isSuper){
-        const filename = "sire_questions_all_columns_named.json";
-        setText("srcFile", filename);
-
-        const dryBtn = $("dryRunBtn");
-        const commitBtn = $("commitBtn");
-        const versionInput = $("versionTag");
-
-        function setButtonsEnabled(on){
-          dryBtn.disabled = !on;
-          commitBtn.disabled = !on;
-        }
-
-        dryBtn.onclick = async () => {
-          showWarn(""); showOk("");
-          setButtonsEnabled(false);
-          try{
-            const vtag = versionInput.value.trim();
-            if(!vtag) throw new Error("Version tag is required.");
-            const check = await dryRunImport(filename, vtag);
-            if(check.errors.length){
-              showWarn("Dry run completed with errors.\n\n" + check.errors.join("\n") + `\n\nValid rows: ${check.okCount}/${check.total}`);
-            } else {
-              showOk(`Dry run OK. Valid rows: ${check.okCount}/${check.total}`);
-            }
-          }catch(e){
-            showWarn(String(e?.message || e));
-          }finally{
-            setButtonsEnabled(true);
-          }
-        };
-
-        commitBtn.onclick = async () => {
-          showWarn(""); showOk("");
-          setButtonsEnabled(false);
-          try{
-            const vtag = versionInput.value.trim();
-            if(!vtag) throw new Error("Version tag is required.");
-
-            const check = await dryRunImport(filename, vtag);
-            if(check.errors.length){
-              throw new Error("Commit blocked because validation failed.\n\n" + check.errors.join("\n") + `\n\nValid rows: ${check.okCount}/${check.total}`);
-            }
-
-            const res = await commitImport(filename, vtag);
-            showOk(`Import completed.\nInserted: ${res.inserted} rows (from ${res.total} JSON items).`);
-            await loadQuestionsFromDb();
-          }catch(e){
-            showWarn(String(e?.message || e));
-          }finally{
-            setButtonsEnabled(true);
-          }
-        };
-      }
-
-      await loadQuestionsFromDb();
-      setMode("VIEW");
-    })().catch(e => showWarn("Boot failed:\n\n" + String(e?.message || e)));
-  </script>
-
-  <!-- Photos module -->
   <script src="./q-questions-editor.js"></script>
 </body>
 </html>
