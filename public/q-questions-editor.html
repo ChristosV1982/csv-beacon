@@ -1,354 +1,1644 @@
+<!-- public/q-questions-editor.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <meta http-equiv=\"Cache-Control\" content=\"no-store, no-cache, must-revalidate, max-age=0\" />
+  <meta http-equiv=\"Pragma\" content=\"no-cache\" />
+  <meta http-equiv=\"Expires\" content=\"0\" />
+
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>SIRE 2.0 – Questions Editor</title>
-
   <link rel="stylesheet" href="style.css" />
+  <style>
+    :root{
+      --nav:#1a4170;
+      --nav2:#295eb0;
+      --bg:#f5f8fd;
+      --card:#ffffff;
+      --line:#d7e3f4;
+      --muted:#6b7b90;
+      --text:#0f2f5e;
+      --chip:#eaf1fb;
+      --chipLine:#c9d9f3;
+      --danger:#b03939;
+      --ok:#1f6d32;
+    }
+
+    body { margin:0; background:var(--bg); }
+    .topbar{
+      display:flex; justify-content:space-between; align-items:center; gap:14px;
+      padding: 10px 18px; background:var(--nav); color:#fff;
+      position:sticky; top:0; z-index:10;
+      box-shadow:0 2px 14px rgba(0,0,0,0.12);
+    }
+    .topbar .right { display:flex; gap:10px; align-items:center; }
+
+    .page { max-width: 1280px; margin: 0 auto; padding: 18px 18px 60px 18px; }
+    .btn{
+      border:none; padding:9px 14px; border-radius:10px; cursor:pointer;
+      font-weight:700; letter-spacing:0.1px;
+    }
+    .btn.primary{ background:var(--nav2); color:#fff; }
+    .btn.light{
+      background:var(--chip); color:var(--nav); border:1px solid var(--chipLine);
+    }
+    .btn.danger{ background: var(--danger); color:#fff; }
+    .btn:disabled{ opacity:0.6; cursor:not-allowed; }
+
+    .badge { opacity:0.95; font-weight:700; }
+    .pill{
+      display:inline-block; padding:6px 12px; border-radius:999px;
+      background:var(--chip); border:1px solid var(--chipLine);
+      color:var(--nav); font-weight:800; font-size:0.86em;
+    }
+
+    .card{
+      background:var(--card);
+      border:1px solid var(--line);
+      border-radius:16px;
+      box-shadow:0 2px 18px rgba(30,70,130,0.10);
+      padding:16px 16px;
+      margin: 14px 0;
+    }
+    .card h2 { margin:0 0 10px 0; font-size: 1.18em; color:#173a6a; }
+
+    .muted { color:var(--muted); }
+    .warn{
+      background:#fde8e8; border:1px solid #f4bcbc; color:#8a1f1f;
+      padding:12px 14px; border-radius:12px; white-space:pre-wrap; display:none;
+    }
+    .ok{
+      background:#e9fbef; border:1px solid #bfe7ca; color:var(--ok);
+      padding:12px 14px; border-radius:12px; white-space:pre-wrap; display:none;
+    }
+
+    .row { display:flex; gap:14px; flex-wrap:wrap; align-items:center; }
+    .field { display:flex; flex-direction:column; gap:6px; min-width:240px; }
+    .field label { font-weight:800; color:#1a3261; font-size:0.93em; }
+    .field input, .field select, .field textarea{
+      font-size: 1em; padding:10px 10px; border-radius:10px; border:1px solid #c9d6ee;
+      outline:none; background:#fff;
+    }
+    .field textarea { min-height: 90px; resize: vertical; }
+    .hr { height:1px; background:#e3edf9; margin:14px 0; }
+
+    /* Editor layout */
+    .editorGrid { display:flex; gap:14px; align-items:stretch; }
+    .leftPane{
+      width: 380px; min-width: 280px; max-width: 560px;
+      border:1px solid var(--line); border-radius:16px; overflow:hidden;
+      background:#fff; display:flex; flex-direction:column;
+    }
+    .leftTop{
+      padding:12px 12px;
+      background:linear-gradient(180deg, #eef5ff 0%, #f8fbff 100%);
+      border-bottom:1px solid var(--line);
+    }
+    .list{
+      overflow:auto;
+      max-height: calc(100vh - 330px);
+      background:#fff;
+    }
+    .qitem{
+      padding:10px 12px;
+      border-bottom:1px solid #edf2fb;
+      cursor:pointer;
+    }
+    .qitem:hover { background:#f3f8ff; }
+    .qitem.active { background:#dfeeff; }
+    .qno { font-weight:900; color:var(--text); }
+    .qsub { color:#4b5f7b; font-size:0.93em; margin-top:3px; }
+
+    .rightPane{
+      flex:1; min-width: 0;
+      border:1px solid var(--line); border-radius:16px;
+      background:#fff;
+      padding:14px 14px;
+    }
+
+    .kv{ display:grid; grid-template-columns: 180px 1fr; gap:8px 12px; align-items:center; }
+    .kv .k{ color:#1a3261; font-weight:900; font-size:0.93em; }
+    .kv .v{ color:#21324b; font-size:0.95em; word-break:break-word; }
+
+    /* Photos */
+    .photoBar{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      align-items:center;
+      justify-content:space-between;
+      margin: 10px 0 6px 0;
+      padding: 10px;
+      border:1px solid #e3edf9;
+      border-radius:12px;
+      background:#f8fbff;
+    }
+    .photoBar .left{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      align-items:center;
+    }
+    .photoGrid{
+      display:grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap:12px;
+      margin-top:10px;
+    }
+    .photoCard{
+      border:1px solid #d7e3f4;
+      border-radius:14px;
+      overflow:hidden;
+      background:#fff;
+      box-shadow:0 2px 14px rgba(30,70,130,0.08);
+      display:flex;
+      flex-direction:column;
+      min-height: 200px;
+    }
+    .photoThumb{
+      height:140px;
+      background:#eef5ff;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      overflow:hidden;
+    }
+    .photoThumb img{
+      width:100%;
+      height:100%;
+      object-fit:cover;
+      display:block;
+    }
+    .photoMeta{
+      padding:10px;
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+    }
+    .photoMeta .small{
+      font-size:0.88em;
+      color:#4b5f7b;
+      word-break:break-word;
+    }
+    .photoBtns{
+      display:flex;
+      gap:8px;
+      flex-wrap:wrap;
+    }
+
+    /* Responsive */
+    @media (max-width: 980px){
+      .editorGrid{ flex-direction:column; }
+      .leftPane{ width:auto; max-width:none; }
+      .list{ max-height: 320px; }
+    }
+  </style>
+
+  <!-- Supabase v2 -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <!-- Your auth helper -->
+  <script src="auth.js"></script>
 
   <style>
-    /* Minimal safety styling in case style.css is not applied for any reason */
-    .qe-wrap{ max-width: 1400px; margin: 0 auto; padding: 18px; }
-    .qe-top{ display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; }
-    .qe-pill{ background:#eef5ff; border:1px solid #cfe2ff; padding:6px 10px; border-radius:999px; font-size:13px; }
-    .qe-card{ background:#fff; border:1px solid #d9e2ef; border-radius:14px; padding:16px; box-shadow: 0 2px 10px rgba(0,0,0,.04); }
-    .qe-row{ display:flex; gap:14px; flex-wrap:wrap; align-items:end; }
-    .qe-row > div{ display:flex; flex-direction:column; gap:6px; }
-    label{ font-size:12px; color:#334; }
-    input, select, textarea{ padding:10px 12px; border-radius:10px; border:1px solid #cfd9e8; outline:none; }
-    textarea{ min-height: 90px; resize: vertical; }
-    .btn{ padding:10px 14px; border-radius:10px; border:1px solid #cfd9e8; background:#f7fbff; cursor:pointer; }
-    .btn.primary{ background:#1f66c2; color:#fff; border-color:#1f66c2; }
-    .btn.light{ background:#fff; }
-    .btn.danger{ background:#fff; border-color:#ffb6b6; color:#b00020; }
-    .qe-main{ display:grid; grid-template-columns: 360px 1fr; gap:14px; margin-top:14px; }
-    .qe-list{ border:1px solid #d9e2ef; border-radius:12px; overflow:hidden; }
-    .qe-list-head{ padding:10px 12px; background:#f3f7ff; display:flex; justify-content:space-between; font-size:13px; }
-    #qList{ max-height: 650px; overflow:auto; }
-    .qitem{ padding:10px 12px; border-top:1px solid #eef2f8; cursor:pointer; }
-    .qitem:hover{ background:#f8fbff; }
-    .qitem.active{ background:#eaf2ff; }
-    .qno{ font-weight:700; }
-    .qsub{ font-size:12px; color:#334; margin-top:4px; }
-    .muted{ color:#6b778c; font-size:12px; }
-    .warn{ background:#fff1f1; border:1px solid #ffc9c9; padding:10px 12px; border-radius:12px; margin-bottom:12px; display:none; white-space:pre-wrap; }
-    .ok{ background:#f1fff4; border:1px solid #bfeccc; padding:10px 12px; border-radius:12px; margin-bottom:12px; display:none; white-space:pre-wrap; }
-    .qe-right h2{ margin:0; font-size:18px; }
-    .qe-actions{ display:flex; gap:10px; justify-content:flex-end; align-items:center; }
-    .qe-split3{ display:grid; grid-template-columns: 1fr 1fr 1fr; gap:12px; }
-    .qe-split2{ display:grid; grid-template-columns: 1fr 1fr; gap:12px; }
-    .adv{ display:none; margin-top:12px; padding-top:12px; border-top:1px dashed #d9e2ef; }
-    .small{ font-size:12px; }
-    .kv{ display:flex; gap:10px; flex-wrap:wrap; }
-    .kv .qe-pill{ font-weight:600; }
+    /* prewrap viewer fields */
+    #vEvidence, #vNegObs, #vGuidance, #vActions, #vQuestion {
+      white-space: pre-wrap;
+    }
   </style>
+
 </head>
 
 <body>
-  <div class="qe-wrap">
-    <div class="qe-top">
-      <button class="btn light" onclick="location.href='./dashboard.html'">← Back to Dashboard</button>
-      <div id="modeLine" class="qe-pill">Role: — • Mode: Admin • Module: QUESTIONS_EDITOR</div>
+  <div class="topbar">
+    <div><b>SIRE 2.0 – Questions Editor</b></div>
+    <div class="right">
+      <span id="userBadge" class="badge">—</span>
+      <button id="switchUserBtn" class="btn light">Switch User</button>
+      <button id="loginBtn" class="btn light">Login</button>
+      <button id="logoutBtn" class="btn primary">Logout</button>
+    </div>
+  </div>
+
+  <div class="page">
+    <div class="row" style="justify-content:space-between;">
+      <button class="btn light" onclick="location.href='./q-dashboard.html'">← Back to Dashboard</button>
+      <div class="pill" id="modeLine">Checking access…</div>
     </div>
 
-    <div id="warnBox" class="warn"></div>
-    <div id="okBox" class="ok"></div>
+    <div id="warnBox" class="warn" style="margin-top:12px;"></div>
+    <div id="okBox" class="ok" style="margin-top:12px;"></div>
 
-    <div class="qe-card">
-      <h1 style="margin:0 0 8px 0;">Questions Browser & Viewer / Editor (DB)</h1>
-      <div class="muted">Left side = list. Right side = viewer by default. Click <b>Edit</b> to switch to edit mode for the selected question.</div>
+    <!-- Import Card (super_admin only, still blocked when rows exist) -->
+    <div class="card" id="importCard" style="display:none;">
+      <h2>Safe Import (Lossless)</h2>
+      <div class="muted">
+        This importer reads your existing JSON file in <b>/public</b> and inserts into <b>public.questions_master</b>
+        while preserving the full original object in <b>payload</b>.
+      </div>
+      <div class="hr"></div>
 
-      <div style="height:10px;"></div>
-
-      <div class="qe-row">
-        <div style="flex-direction:row; gap:10px;">
-          <button id="reloadBtn" class="btn primary" type="button">Load / Refresh Questions</button>
-          <button id="newQuestionBtn" class="btn" type="button">Add New Question</button>
+      <div class="row">
+        <div class="field">
+          <label>Version tag to store in DB (required)</label>
+          <input id="versionTag" value="SIRE_2.0_QL" />
         </div>
+        <div style="flex:1"></div>
+        <div class="field" style="min-width:auto;">
+          <label>&nbsp;</label>
+          <div class="row">
+            <button class="btn light" id="dryRunBtn">Dry Run (validate only)</button>
+            <button class="btn primary" id="commitBtn">Commit Import</button>
+          </div>
+        </div>
+      </div>
 
-        <div style="min-width:260px;">
+      <div class="muted" style="margin-top:10px;">
+        Source JSON: <b id="srcFile"></b>
+      </div>
+      <div class="muted" id="progressLine" style="margin-top:8px;"></div>
+      <div id="resultBox" class="muted" style="margin-top:10px; white-space:pre-wrap;"></div>
+    </div>
+
+    <!-- Browser + Editor UI -->
+    <div class="card" id="editorCard" style="display:none;">
+      <h2>Questions Browser & Editor (DB)</h2>
+      <div class="muted">
+        Loads questions from <b>public.questions_master</b> and supports photo upload/view per question.
+      </div>
+
+      <div class="hr"></div>
+
+      <div class="row">
+        <button class="btn primary" id="reloadBtn">Load / Refresh Questions</button>
+        <button class="btn light" id="newBtn" title="Create a new question">New Question</button>
+
+        <div class="field" style="min-width:220px;">
           <label>Source</label>
           <select id="sourceFilter">
-            <option value="ALL">All (SIRE + Company + Spare)</option>
+            <option value="ALL" selected>All (SIRE + Company + Spare)</option>
             <option value="SIRE">SIRE</option>
-            <option value="COMPANY_CUSTOM">Company (custom)</option>
-            <option value="SPARE_X">Spare X</option>
-            <option value="SPARE_Z">Spare Z</option>
+            <option value="COMPANY">COMPANY</option>
+            <option value="SPARE1">SPARE1</option>
+            <option value="SPARE2">SPARE2</option>
           </select>
         </div>
 
-        <div style="min-width:360px; flex:1;">
+        <div class="field" style="min-width:320px; flex:1;">
           <label>Search (number / short text / question)</label>
-          <input id="searchInput" type="text" placeholder="Type to filter ..." />
+          <input id="searchInput" placeholder="Type to filter…" />
         </div>
 
-        <div style="min-width:160px;">
+        <div class="field" style="min-width:220px;">
           <label>Status</label>
           <select id="statusFilter">
+            <option value="">(all)</option>
             <option value="active" selected>active</option>
             <option value="inactive">inactive</option>
           </select>
         </div>
 
-        <div style="min-width:260px; flex:1;">
-          <label>Version (optional filter)</label>
-          <input id="versionFilter" type="text" placeholder="Leave blank to show all" />
-        </div>
-
-        <div style="min-width:140px;">
-          <label>&nbsp;</label>
-          <div id="loadHint" class="muted"></div>
+        <div class="field" style="min-width:260px;">
+          <label>Version</label>
+          <input id="versionFilter" placeholder="e.g. SIRE_2.0_QL (blank = all)" />
         </div>
       </div>
 
-      <div class="qe-main">
-        <!-- LEFT LIST -->
-        <div class="qe-list">
-          <div class="qe-list-head">
-            <div id="countLine"><b>0</b> questions</div>
-            <div class="muted" id="loadedLine">Loaded 0</div>
+      <div class="hr"></div>
+
+      <div class="editorGrid">
+        <!-- Left list -->
+        <div class="leftPane">
+          <div class="leftTop">
+            <div class="row" style="justify-content:space-between;">
+              <div><b id="countLine">0 questions</b></div>
+              <div class="muted" id="loadHint"></div>
+            </div>
           </div>
-          <div id="qList"></div>
+          <div class="list" id="qList"></div>
         </div>
 
-        <!-- RIGHT PANEL -->
-        <div class="qe-right qe-card" style="border-radius:12px; box-shadow:none;">
-          <div id="emptyState" class="muted">Select a question from the list.</div>
-
-          <!-- VIEW PANEL -->
-          <div id="viewPanel" style="display:none;">
-            <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px;">
-              <div>
-                <h2 id="vhdrNumber">—</h2>
-                <div id="vhdrId" class="muted small"></div>
-              </div>
-              <div class="qe-actions">
-                <button id="btnEdit" class="btn primary" type="button">Edit</button>
-              </div>
-            </div>
-
-            <div style="height:10px;"></div>
-            <div class="kv">
-              <div class="qe-pill" id="vSourcePill">source: —</div>
-              <div class="qe-pill" id="vStatusPill">status: —</div>
-              <div class="qe-pill" id="vSuffixPill">suffix: —</div>
-            </div>
-
-            <div style="height:14px;"></div>
-
-            <div class="qe-split2">
-              <div>
-                <label>Short Text</label>
-                <div id="vShortText" class="small" style="white-space:pre-wrap;"></div>
-              </div>
-              <div>
-                <label>Question</label>
-                <div id="vQuestion" class="small" style="white-space:pre-wrap;"></div>
-              </div>
-            </div>
-
-            <div style="height:12px;"></div>
-
-            <div class="qe-split2">
-              <div>
-                <label>Inspection guidance</label>
-                <div id="vGuidance" class="small" style="white-space:pre-wrap;"></div>
-              </div>
-              <div>
-                <label>Suggested inspector actions</label>
-                <div id="vActions" class="small" style="white-space:pre-wrap;"></div>
-              </div>
-            </div>
-
-            <div style="height:12px;"></div>
-
-            <div class="qe-split2">
-              <div>
-                <label>Expected evidence</label>
-                <div id="vEvidence" class="small" style="white-space:pre-wrap;"></div>
-              </div>
-              <div>
-                <label>Potential grounds for negative observations</label>
-                <div id="vNegObs" class="small" style="white-space:pre-wrap;"></div>
-              </div>
-            </div>
-
-            <div class="adv" id="viewAdvanced">
-              <div class="qe-split2">
-                <div>
-                  <label>Tags</label>
-                  <div id="vTags" class="small" style="white-space:pre-wrap;"></div>
-                </div>
-                <div>
-                  <label>Version</label>
-                  <div id="vVersion" class="small"></div>
-                </div>
-              </div>
-
-              <div style="height:10px;"></div>
-              <div>
-                <label>Raw JSON</label>
-                <pre id="vRaw" class="small" style="white-space:pre-wrap; background:#f7fbff; border:1px solid #d9e2ef; padding:10px; border-radius:10px; overflow:auto; max-height:280px;"></pre>
-              </div>
-            </div>
-
-            <div style="height:10px;"></div>
-            <button id="btnToggleAdvancedView" class="btn" type="button">Advanced</button>
+        <!-- Right editor -->
+        <div class="rightPane">
+          <div id="emptyState" class="muted" style="padding:14px;">
+            Select a question from the left list.
           </div>
 
-          <!-- EDIT PANEL -->
           <div id="editPanel" style="display:none;">
-            <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px;">
+            <div class="row" style="justify-content:space-between; align-items:flex-start;">
               <div>
-                <h2 id="hdrNumber">—</h2>
-                <div id="hdrId" class="muted small"></div>
+                <div style="font-size:1.15em; font-weight:900; color:var(--text);">
+                  <span id="hdrNumber">—</span>
+                </div>
+                <div class="muted" id="hdrId" style="margin-top:4px;"></div>
               </div>
-              <div class="qe-actions">
-                <button id="btnView" class="btn light" type="button">View</button>
-                <button id="btnSave" class="btn primary" type="button">Save</button>
-                <button id="btnReset" class="btn" type="button">Reset</button>
+              <div class="row">
+                <button class="btn light" id="btnReset">Reset changes</button>
+                <button class="btn primary" id="btnSave">Save to DB</button>
               </div>
             </div>
 
-            <div style="height:10px;"></div>
-            <div class="kv">
-              <div class="qe-pill" id="pillSource">source: —</div>
-              <div class="qe-pill" id="pillStatus">status: —</div>
-              <div class="qe-pill" id="pillSuffix">suffix: —</div>
-              <div class="qe-pill" id="pillMode">mode: EDIT</div>
-            </div>
+            <div class="hr"></div>
 
-            <div style="height:14px;"></div>
+            <!-- New Question controls (only visible in create mode) -->
+            <div id="newQuestionPanel" class="card" style="display:none; margin:0 0 12px 0; padding:12px; border-radius:14px; border:1px solid #e3edf9; box-shadow:none;">
+              <div class="row" style="justify-content:space-between; align-items:flex-end;">
+                <div class="field" style="min-width:220px;">
+                  <label>Create: Question Set</label>
+                  <select id="newSourceType">
+                    <option value="SIRE">SIRE</option>
+                    <option value="COMPANY">COMPANY</option>
+                    <option value="SPARE1">SPARE1</option>
+                    <option value="SPARE2">SPARE2</option>
+                  </select>
+                </div>
 
-            <div class="qe-split2">
-              <div>
-                <label>Source Type</label>
-                <select id="dbSourceType">
-                  <option value="SIRE">SIRE</option>
-                  <option value="COMPANY_CUSTOM">Company (custom)</option>
-                  <option value="SPARE_X">Spare X</option>
-                  <option value="SPARE_Z">Spare Z</option>
-                </select>
-                <div class="muted small">New questions should be <b>Company (custom)</b> (or Spare). SIRE is the official library.</div>
+                <div class="field" style="min-width:140px;">
+                  <label>Chapter (xx)</label>
+                  <input id="newChap" inputmode="numeric" placeholder="e.g. 04" />
+                </div>
+
+                <div class="field" style="min-width:140px;">
+                  <label>Section (yy)</label>
+                  <input id="newSec" inputmode="numeric" placeholder="e.g. 01" />
+                </div>
+
+                <div class="field" style="min-width:160px;">
+                  <label>Item (zz / zzz)</label>
+                  <input id="newItem" inputmode="numeric" placeholder="auto" />
+                </div>
+
+                <div class="row">
+                  <button class="btn light" id="btnAutoNext" type="button">Auto Next</button>
+                  <button class="btn light" id="btnCancelNew" type="button">Cancel</button>
+                </div>
               </div>
 
-              <div>
-                <label>Status</label>
+              <div class="muted" id="newNumberHint" style="margin-top:8px;"></div>
+            </div>
+
+            <div class="kv" style="margin-bottom:12px;">
+              <div class="k">source_type</div>
+              <div class="v"><span id="dbSourceType" class="pill"></span></div>
+
+              <div class="k">DB status</div>
+              <div class="v">
                 <select id="dbStatus">
-                  <option value="active" selected>active</option>
+                  <option value="active">active</option>
                   <option value="inactive">inactive</option>
                 </select>
               </div>
+
+              <div class="k">DB version</div>
+              <div class="v"><input id="dbVersion" /></div>
+
+              <div class="k">DB tags</div>
+              <div class="v"><input id="dbTags" placeholder="comma-separated (optional)" /></div>
+
+              <div class="k">number_base</div>
+              <div class="v"><span id="dbNumberBase" class="pill"></span></div>
+
+              <div class="k">number_suffix</div>
+              <div class="v"><span id="dbNumberSuffix" class="pill"></span></div>
             </div>
 
-            <div style="height:10px;"></div>
+            <div class="hr"></div>
 
-            <!-- Numbering: separate fields -->
-            <div class="qe-split3">
-              <div>
-                <label>Chapter (xx)</label>
-                <input id="numChapter" type="number" min="0" step="1" />
-              </div>
-              <div>
-                <label>Section (yy)</label>
-                <input id="numSection" type="number" min="0" step="1" />
-              </div>
-              <div>
-                <label>Item (zz / zzz)</label>
-                <input id="numItem" type="number" min="0" step="1" />
-              </div>
-            </div>
-
-            <div style="height:10px;"></div>
-
-            <div class="qe-split2">
-              <div>
-                <label>Number Suffix</label>
-                <input id="dbNumberSuffix" type="text" placeholder="C / (blank for SIRE)" />
-                <div class="muted small">DB will enforce: SIRE = xx.yy.zz, Custom/Spare = xx.yy.zzz.</div>
-              </div>
-
-              <div>
-                <label>Tags (comma separated)</label>
-                <input id="dbTags" type="text" placeholder="tag1, tag2, tag3" />
-              </div>
-            </div>
-
-            <div class="adv" id="editAdvanced">
-              <div class="qe-split2">
-                <div>
-                  <label>Version (your tag)</label>
-                  <input id="dbVersion" type="text" />
-                </div>
-                <div>
-                  <label>Change reason (optional)</label>
-                  <input id="dbChangeReason" type="text" placeholder="Why was this changed?" />
-                </div>
-              </div>
-
-              <div style="height:10px;"></div>
-              <div>
-                <label>Raw JSON (advanced)</label>
-                <textarea id="pRaw"></textarea>
-              </div>
-            </div>
-
-            <div style="height:10px;"></div>
-            <button id="btnToggleAdvancedEdit" class="btn" type="button">Advanced (Version / Raw JSON)</button>
-
-            <div style="height:14px;"></div>
-
-            <div class="qe-split2">
-              <div>
-                <label>Short Text</label>
+            <!-- Payload editing (common fields) -->
+            <div class="row">
+              <div class="field" style="flex:1; min-width:260px;">
+                <label>Payload: Short Text</label>
                 <textarea id="pShortText"></textarea>
               </div>
-              <div>
-                <label>Question</label>
+              <div class="field" style="flex:1; min-width:260px;">
+                <label>Payload: Question</label>
                 <textarea id="pQuestion"></textarea>
               </div>
             </div>
 
-            <div style="height:12px;"></div>
-
-            <div class="qe-split2">
-              <div>
-                <label>Inspection guidance</label>
+            <div class="row">
+              <div class="field" style="flex:1; min-width:260px;">
+                <label>Payload: Inspection Guidance</label>
                 <textarea id="pGuidance"></textarea>
               </div>
-              <div>
-                <label>Suggested inspector actions</label>
+              <div class="field" style="flex:1; min-width:260px;">
+                <label>Payload: Suggested Inspector Actions</label>
                 <textarea id="pActions"></textarea>
               </div>
             </div>
 
-            <div style="height:12px;"></div>
-
-            <div class="qe-split2">
-              <div>
-                <label>Expected evidence</label>
+            <div class="row">
+              <div class="field" style="flex:1; min-width:260px;">
+                <label>Payload: Expected Evidence</label>
                 <textarea id="pEvidence"></textarea>
-                <div class="muted small">If the DB currently stores an array, this will save as an array (one line = one item).</div>
               </div>
-              <div>
-                <label>Potential grounds for negative observations</label>
+              <div class="field" style="flex:1; min-width:260px;">
+                <label>Payload: Potential Grounds for Negative Observations</label>
                 <textarea id="pNegObs"></textarea>
-                <div class="muted small">If the DB currently stores an array, this will save as an array (one line = one item).</div>
               </div>
             </div>
 
-            <div style="height:10px;"></div>
-            <div class="muted small" id="saveStatus"></div>
+            <div class="hr"></div>
+
+            <!-- ===== QUESTION PHOTOS (UPLOAD + VIEW) ===== -->
+            <div class="card" style="margin:0; padding:14px; border-radius:14px; border:1px solid #e3edf9; box-shadow:none;">
+              <h2 style="margin:0 0 6px 0; font-size:1.05em;">Question Photos</h2>
+              <div class="muted">
+                Photos are stored in Supabase Storage bucket <b>question-photos</b> and linked in DB table <b>public.question_photos</b>.
+              </div>
+
+              <div class="photoBar">
+                <div class="left">
+                  <button class="btn light" id="btnRefreshPhotos" type="button">Refresh Photos</button>
+
+                  <div class="field" style="min-width:260px; margin:0;">
+                    <label style="margin:0; font-weight:800;">Upload (images)</label>
+                    <input id="photoFile" type="file" accept="image/*" multiple />
+                  </div>
+
+                  <button class="btn primary" id="btnUploadPhotos" type="button">Upload</button>
+                </div>
+
+                <div class="muted" id="photoStatus" style="min-width:240px; text-align:right;"></div>
+              </div>
+
+              <div id="photoWarn" class="warn" style="display:none; margin-top:10px;"></div>
+
+              <div class="photoGrid" id="photoGrid"></div>
+
+              <div class="muted" id="photoCountLine" style="margin-top:10px;"></div>
+            </div>
+            <!-- ===== /QUESTION PHOTOS ===== -->
+
+            <div class="hr"></div>
+
+            <div class="field">
+              <label>Payload JSON (full object) – View/Advanced edit</label>
+              <textarea id="pRaw" style="min-height:240px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;"></textarea>
+              <div class="muted" style="margin-top:6px;">
+                This editor preserves the full JSON object. You can edit any field here if needed.
+              </div>
+            </div>
+
+            <div class="row" style="margin-top:10px;">
+              <div class="muted" id="saveStatus"></div>
+            </div>
           </div>
         </div>
       </div>
     </div>
+
   </div>
 
-  <!-- IMPORTANT: Supabase JS must load BEFORE auth.js and your module JS -->
-  <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script defer src="./auth.js"></script>
-  <script defer src="./q-questions-editor.js"></script>
+  <script>
+    const sb = window.AUTH.ensureSupabase();
+
+    function showWarn(msg) {
+      const w = document.getElementById("warnBox");
+      w.textContent = msg || "";
+      w.style.display = msg ? "block" : "none";
+    }
+    function showOk(msg) {
+      const o = document.getElementById("okBox");
+      o.textContent = msg || "";
+      o.style.display = msg ? "block" : "none";
+    }
+    function setProgress(msg){ const el=document.getElementById("progressLine"); if(el) el.textContent = msg || ""; }
+    function setResult(msg){ const el=document.getElementById("resultBox"); if(el) el.textContent = msg || ""; }
+
+    // Photos UI helpers (make global so override can reuse)
+    window.showPhotoWarn = function showPhotoWarn(msg){
+      const w = document.getElementById("photoWarn");
+      if(!w) return;
+      w.textContent = msg || "";
+      w.style.display = msg ? "block" : "none";
+    }
+    window.setPhotoStatus = function setPhotoStatus(msg){
+      const el = document.getElementById("photoStatus");
+      if(el) el.textContent = msg || "";
+    }
+
+    // ---------- Importer utilities (unchanged logic) ----------
+    function chunk(arr, size){
+      const out=[]; for(let i=0;i<arr.length;i+=size) out.push(arr.slice(i,i+size)); return out;
+    }
+    function pad2(n){ n = String(n||""); return n.padStart(2,"0"); }
+
+    function normalizeSireNumberBaseFromPayload(payload){
+      const no = payload && (payload["No."] || payload["No"]);
+      if(!no) return { ok:false, error:"Missing payload No./No." };
+      const parts = String(no).split(".").slice(0,3);
+      while(parts.length<3) parts.push("0");
+      const base = parts.slice(0,3).map(p => pad2(p)).join(".");
+      return { ok:true, base };
+    }
+
+    function normalizeRow(payload, versionTag){
+      try{
+        if(!payload || typeof payload !== "object") return { ok:false, error:"Payload is not an object" };
+        const nb = normalizeSireNumberBaseFromPayload(payload);
+        if(!nb.ok) return { ok:false, error: nb.error };
+        return {
+          ok:true,
+          row:{
+            source_type: "SIRE",
+            number_base: nb.base,
+            number_suffix: null,
+            status: "active",
+            version: versionTag,
+            tags: null,
+            payload: payload
+          }
+        };
+      }catch(e){
+        return { ok:false, error:String(e?.message || e) };
+      }
+    }
+
+    async function fetchJsonFile(filename){
+      const res = await fetch(`./${filename}`, { cache: "no-store" });
+      if(!res.ok) throw new Error(`Failed to fetch ${filename}: ${res.status} ${res.statusText}`);
+      return await res.json();
+    }
+    function ensureArray(data){
+      if(Array.isArray(data)) return data;
+      if(data && Array.isArray(data.questions)) return data.questions;
+      if(data && Array.isArray(data.items)) return data.items;
+      throw new Error("JSON root is not an array, and no .questions/.items array found.");
+    }
+    async function getQuestionsMasterCount(){
+      const { count, error } = await sb
+        .from("questions_master")
+        .select("id", { count: "exact", head: true });
+      if(error) throw error;
+      return count || 0;
+    }
+    async function dryRunImport(filename, versionTag){
+      setProgress("Dry run: loading JSON…");
+      const raw = await fetchJsonFile(filename);
+      const arr = ensureArray(raw);
+
+      setProgress(`Dry run: validating ${arr.length} items…`);
+      const errors = [];
+      let okCount = 0;
+      const MAX_ERR = 25;
+
+      for(let i=0;i<arr.length;i++){
+        const r = normalizeRow(arr[i], versionTag);
+        if(!r.ok){
+          if(errors.length < MAX_ERR) errors.push(`Index ${i}: ${r.error}`);
+        } else {
+          okCount++;
+        }
+      }
+      setProgress("");
+      return { total: arr.length, okCount, errors };
+    }
+    async function commitImport(filename, versionTag){
+      setProgress("Checking questions_master row count…");
+      const existing = await getQuestionsMasterCount();
+      if(existing > 0){
+        throw new Error(`Import blocked: questions_master already has ${existing} rows. (Safety rule)`);
+      }
+
+      setProgress("Loading JSON…");
+      const raw = await fetchJsonFile(filename);
+      const arr = ensureArray(raw);
+
+      setProgress(`Normalizing ${arr.length} items…`);
+      const rows = [];
+      const errors = [];
+      const MAX_ERR = 25;
+
+      for(let i=0;i<arr.length;i++){
+        const r = normalizeRow(arr[i], versionTag);
+        if(!r.ok){
+          if(errors.length < MAX_ERR) errors.push(`Index ${i}: ${r.error}`);
+          continue;
+        }
+        rows.push(r.row);
+      }
+
+      if(errors.length){
+        throw new Error(
+          "Validation failed.\n\n" +
+          errors.join("\n") +
+          (arr.length > errors.length ? `\n\n(Showing first ${MAX_ERR} errors.)` : "")
+        );
+      }
+
+      const BATCH_SIZE = 200;
+      const batches = chunk(rows, BATCH_SIZE);
+
+      let inserted = 0;
+      for(let b=0;b<batches.length;b++){
+        setProgress(`Committing: batch ${b+1}/${batches.length} (${inserted}/${rows.length} inserted)…`);
+        const { error } = await sb.from("questions_master").insert(batches[b]);
+        if(error) throw error;
+        inserted += batches[b].length;
+      }
+
+      setProgress("");
+      return { total: arr.length, inserted };
+    }
+
+    // ---------- Editor ----------
+    window.allRows = [];
+    window.filteredRows = [];
+    window.selected = null;
+    window.selectedOriginal = null;
+
+    // New-question (create mode) state
+    window.createMode = false;
+    window.newDraft = null;
+
+    // Suffix letters for non-SIRE sets
+    const SUFFIX_BY_SOURCE = {
+      SIRE: "",
+      COMPANY: "C",
+      SPARE1: "A",
+      SPARE2: "B",
+    };
+
+    // Role capabilities (set at boot) - MUST be on window for q-questions-editor.js override
+    window.CAN_SAVE = false;
+    window.CAN_MANAGE_PHOTOS = false;
+
+    // Storage bucket name (must match your Supabase bucket)
+    window.PHOTO_BUCKET = "question-photos";
+
+    function safeStr(v){ return (v===null||v===undefined) ? "" : String(v); }
+    function getPayloadNo(p){ return p && (p["No."] || p["No"]) ? String(p["No."] || p["No"]) : ""; }
+    function getPayloadShort(p){ return safeStr(p && p["Short Text"]); }
+    function getPayloadQuestion(p){ return safeStr(p && p["Question"]); }
+
+    function parseTags(str){
+      const s = safeStr(str).trim();
+      if(!s) return null;
+      const parts = s.split(",").map(x=>x.trim()).filter(Boolean);
+      return parts.length ? parts : null;
+    }
+
+    function parseBaseParts(base){
+      const s = safeStr(base).trim();
+      if(!s) return [0,0,0];
+      const parts = s.split(".").map(x => parseInt(x,10));
+      const a = Number.isFinite(parts[0]) ? parts[0] : 0;
+      const b = Number.isFinite(parts[1]) ? parts[1] : 0;
+      const c = Number.isFinite(parts[2]) ? parts[2] : 0;
+      return [a,b,c];
+    }
+    function suffixSortVal(sfx){
+      const s = safeStr(sfx).trim().toUpperCase();
+      if(!s) return 0;
+      const code = s.charCodeAt(0);
+      if(code>=65 && code<=90) return (code-64);
+      return 100;
+    }
+    function rowSortKey(r){
+      const [a,b,c] = parseBaseParts(r.number_base);
+      const s = suffixSortVal(r.number_suffix);
+      return {a,b,c,s};
+    }
+    function compareKeys(k1,k2){
+      if(k1.a!==k2.a) return k1.a-k2.a;
+      if(k1.b!==k2.b) return k1.b-k2.b;
+      if(k1.c!==k2.c) return k1.c-k2.c;
+      return k1.s-k2.s;
+    }
+
+    // ===== Number formatting + next-number helper (create mode) =====
+    function padN(num, width){
+      const n = Number(num);
+      if(!Number.isFinite(n)) return "";
+      return String(Math.trunc(n)).padStart(width, "0");
+    }
+
+    function suffixForSource(sourceType){
+      return SUFFIX_BY_SOURCE[sourceType] ?? "";
+    }
+
+    function makeNumberBase(sourceType, a, b, c){
+      const aa = padN(a, 2);
+      const bb = padN(b, 2);
+      const nn = Number(c);
+      if(!Number.isFinite(nn)) return "";
+      const cWidth = (sourceType === "SIRE") ? 2 : (nn >= 100 ? 3 : 2);
+      const cc = padN(nn, cWidth);
+      return `${aa}.${bb}.${cc}`;
+    }
+
+    function makeNumberFull(numberBase, suffix){
+      const base = String(numberBase || "").trim();
+      const suf = String(suffix || "").trim();
+      if(!base) return "";
+      return suf ? `${base}-${suf}` : base;
+    }
+
+    function maxThirdForPrefix(sourceType, a, b){
+      const aa = Number(a);
+      const bb = Number(b);
+      if(!Number.isFinite(aa) || !Number.isFinite(bb)) return 0;
+      const suf = suffixForSource(sourceType);
+      let max = 0;
+      for(const r of (window.allRows || [])){
+        if(String(r?.source_type || "") !== String(sourceType)) continue;
+        if(String(r?.number_suffix || "") !== String(suf)) continue;
+        const key = parseBaseParts(r.number_base);
+        if(!key) continue;
+        if(key.a === aa && key.b === bb && key.c > max) max = key.c;
+      }
+      return max;
+    }
+
+    function nextThirdForPrefix(sourceType, a, b){
+      const max = maxThirdForPrefix(sourceType, a, b);
+      return (max || 0) + 1;
+    }
+
+    function applyLocalFilters(){
+      const s = safeStr(document.getElementById("searchInput").value).toLowerCase().trim();
+      const st = safeStr(document.getElementById("statusFilter").value).trim();
+      const vf = safeStr(document.getElementById("versionFilter").value).trim();
+      const src = safeStr(document.getElementById("sourceFilter").value).trim();
+
+      window.filteredRows = window.allRows.filter(r => {
+        if(st && safeStr(r.status) !== st) return false;
+        if(vf && safeStr(r.version) !== vf) return false;
+        if(src && src !== "ALL" && safeStr(r.source_type) !== src) return false;
+
+        if(!s) return true;
+        const p = r.payload || {};
+        const hay = [
+          safeStr(r.number_full),
+          safeStr(r.number_base),
+          getPayloadNo(p),
+          getPayloadShort(p),
+          getPayloadQuestion(p),
+          safeStr(r.source_type)
+        ].join(" ").toLowerCase();
+        return hay.includes(s);
+      });
+
+      window.filteredRows.sort((x,y)=>compareKeys(rowSortKey(x), rowSortKey(y)));
+
+      renderList();
+      document.getElementById("countLine").textContent = `${window.filteredRows.length} questions`;
+    }
+
+    function renderList(){
+      const list = document.getElementById("qList");
+      list.innerHTML = "";
+      if(!window.filteredRows.length){
+        list.innerHTML = `<div class="muted" style="padding:12px;">No questions match the filters.</div>`;
+        return;
+      }
+
+      window.filteredRows.forEach((r) => {
+        const p = r.payload || {};
+        const no = safeStr(r.number_full) || getPayloadNo(p) || safeStr(r.number_base) || "(no number)";
+        const shortT = getPayloadShort(p) || "(no short text)";
+        const div = document.createElement("div");
+        div.className = "qitem" + (window.selected && window.selected.id === r.id ? " active" : "");
+        div.innerHTML = `
+          <div class="qno">${no}</div>
+          <div class="qsub">${shortT}</div>
+        `;
+        div.onclick = () => selectRow(r.id);
+        list.appendChild(div);
+      });
+    }
+
+    // ---------- PHOTOS (base implementation; override will replace upload + load) ----------
+    function fileExtFromName(name){
+      const n = safeStr(name);
+      const i = n.lastIndexOf(".");
+      if(i < 0) return "";
+      return n.slice(i+1).toLowerCase();
+    }
+
+    function randomId(len=10){
+      const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
+      let out = "";
+      for(let i=0;i<len;i++) out += chars[Math.floor(Math.random()*chars.length)];
+      return out;
+    }
+
+    // Make global so override can reuse if present
+    window.storagePathFor = function storagePathFor(questionId, file){
+      const ext = fileExtFromName(file?.name) || "jpg";
+      const ts = new Date().toISOString().replace(/[:.]/g,"-");
+      return `questions/${questionId}/${ts}_${randomId(8)}.${ext}`;
+    }
+
+    window.loadPhotosForSelected = async function loadPhotosForSelected(){
+      window.showPhotoWarn("");
+      const grid = document.getElementById("photoGrid");
+      const cntLine = document.getElementById("photoCountLine");
+      if(!grid || !cntLine) return;
+
+      grid.innerHTML = "";
+      cntLine.textContent = "";
+
+      if(!window.selected?.id){
+        cntLine.textContent = "No question selected.";
+        return;
+      }
+
+      window.setPhotoStatus("Loading photos…");
+
+      try{
+        const { data, error } = await sb
+          .from("question_photos")
+          .select("id, question_id, file_path, created_at")
+          .eq("question_id", window.selected.id)
+          .order("created_at", { ascending: false });
+
+        if(error) throw error;
+
+        const rows = data || [];
+        if(!rows.length){
+          cntLine.textContent = "No photos attached to this question yet.";
+          window.setPhotoStatus("");
+          return;
+        }
+
+        for(const r of rows){
+          const publicUrl = sb.storage.from(window.PHOTO_BUCKET).getPublicUrl(r.file_path).data?.publicUrl || "";
+          const card = document.createElement("div");
+          card.className = "photoCard";
+
+          card.innerHTML = `
+            <div class="photoThumb">
+              ${publicUrl ? `<img src="${publicUrl}" alt="photo"/>` : `<div class="muted">No preview</div>`}
+            </div>
+            <div class="photoMeta">
+              <div class="small"><b>Uploaded:</b> ${new Date(r.created_at).toLocaleString()}</div>
+              <div class="small"><b>Path:</b> ${r.file_path}</div>
+              <div class="photoBtns">
+                <a class="btn light" href="${publicUrl}" target="_blank" rel="noopener">Open</a>
+                <button class="btn danger" type="button" data-del-photo="1" data-photo-id="${r.id}" data-path="${r.file_path}">
+                  Delete
+                </button>
+              </div>
+            </div>
+          `;
+
+          const delBtn = card.querySelector("button[data-del-photo]");
+          if(delBtn){
+            if(!window.CAN_MANAGE_PHOTOS){
+              delBtn.disabled = true;
+              delBtn.title = "Not allowed (admins only).";
+              delBtn.classList.remove("danger");
+              delBtn.classList.add("light");
+            }else{
+              delBtn.onclick = async () => {
+                if(!confirm("Delete this photo?\n\nThis removes it from Storage and DB.")) return;
+                await deletePhotoRowAndFile(delBtn.getAttribute("data-photo-id"), delBtn.getAttribute("data-path"));
+              };
+            }
+          }
+
+          grid.appendChild(card);
+        }
+
+        cntLine.textContent = `${rows.length} photo(s) attached to this question.`;
+        window.setPhotoStatus("");
+
+      }catch(e){
+        window.setPhotoStatus("");
+        window.showPhotoWarn("Failed to load photos:\n\n" + String(e?.message || e));
+      }
+    }
+
+    window.uploadSelectedPhotos = async function uploadSelectedPhotos(){
+      window.showPhotoWarn("");
+
+      if(!window.selected?.id){
+        window.showPhotoWarn("Select a question first.");
+        return;
+      }
+      if(!window.CAN_MANAGE_PHOTOS){
+        window.showPhotoWarn("Upload not allowed for your role (admins only).");
+        return;
+      }
+
+      const input = document.getElementById("photoFile");
+      const files = input?.files ? Array.from(input.files) : [];
+      if(!files.length){
+        window.showPhotoWarn("Please choose one or more image files first.");
+        return;
+      }
+
+      const MAX_MB = 10;
+      for(const f of files){
+        if(f.size > MAX_MB * 1024 * 1024){
+          window.showPhotoWarn(`File too large: ${f.name}\nMax allowed (client-side): ${MAX_MB}MB.`);
+          return;
+        }
+      }
+
+      window.setPhotoStatus(`Uploading ${files.length} file(s)…`);
+
+      try{
+        for(let i=0;i<files.length;i++){
+          const file = files[i];
+          window.setPhotoStatus(`Uploading ${i+1}/${files.length}: ${file.name}`);
+
+          const path = window.storagePathFor(window.selected.id, file);
+
+          const up = await sb.storage
+            .from(window.PHOTO_BUCKET)
+            .upload(path, file, { upsert: false, contentType: file.type });
+
+          if(up.error) throw up.error;
+
+          const ins = await sb
+            .from("question_photos")
+            .insert({ question_id: window.selected.id, file_path: path });
+
+          if(ins.error) throw ins.error;
+        }
+
+        window.setPhotoStatus("Upload completed.");
+        if(input) input.value = "";
+        await window.loadPhotosForSelected();
+
+      }catch(e){
+        window.setPhotoStatus("");
+        window.showPhotoWarn("Upload failed:\n\n" + String(e?.message || e));
+      }
+    }
+
+    async function deletePhotoRowAndFile(photoId, filePath){
+      window.showPhotoWarn("");
+      if(!window.CAN_MANAGE_PHOTOS){
+        window.showPhotoWarn("Delete not allowed for your role (admins only).");
+        return;
+      }
+      if(!photoId || !filePath){
+        window.showPhotoWarn("Delete failed: missing id or file path.");
+        return;
+      }
+
+      window.setPhotoStatus("Deleting…");
+
+      try{
+        const rm = await sb.storage.from(window.PHOTO_BUCKET).remove([filePath]);
+        if(rm.error) throw rm.error;
+
+        const del = await sb.from("question_photos").delete().eq("id", photoId);
+        if(del.error) throw del.error;
+
+        window.setPhotoStatus("Deleted.");
+        await window.loadPhotosForSelected();
+
+      }catch(e){
+        window.setPhotoStatus("");
+        window.showPhotoWarn("Delete failed:\n\n" + String(e?.message || e));
+      }
+    }
+    window.deletePhotoRowAndFile = deletePhotoRowAndFile;
+
+    function selectRow(id){
+      if(window.createMode){
+        // Selecting an existing question exits create mode
+        exitCreateMode();
+      }
+      const r =
+        window.filteredRows.find(x => x.id === id) ||
+        window.allRows.find(x => x.id === id);
+      if(!r) return;
+
+      window.selected = JSON.parse(JSON.stringify(r));
+      window.selectedOriginal = JSON.parse(JSON.stringify(r));
+
+      document.getElementById("emptyState").style.display = "none";
+      document.getElementById("editPanel").style.display = "block";
+      document.getElementById("saveStatus").textContent = "";
+
+      const p = window.selected.payload || {};
+
+      document.getElementById("hdrNumber").textContent =
+        safeStr(window.selected.number_full) || getPayloadNo(p) || safeStr(window.selected.number_base) || "—";
+      document.getElementById("hdrId").textContent = `DB id: ${window.selected.id}`;
+
+      document.getElementById("dbSourceType").textContent = safeStr(window.selected.source_type) || "—";
+
+      document.getElementById("dbStatus").value = safeStr(window.selected.status) || "active";
+      document.getElementById("dbVersion").value = safeStr(window.selected.version);
+      document.getElementById("dbTags").value = Array.isArray(window.selected.tags) ? window.selected.tags.join(", ") : "";
+
+      document.getElementById("dbNumberBase").textContent = safeStr(window.selected.number_base);
+      document.getElementById("dbNumberSuffix").textContent = safeStr(window.selected.number_suffix);
+
+      document.getElementById("pShortText").value = safeStr(p["Short Text"]);
+      document.getElementById("pQuestion").value = safeStr(p["Question"]);
+      document.getElementById("pGuidance").value = safeStr(p["Inspection Guidance"]);
+      document.getElementById("pActions").value = safeStr(p["Suggested Inspector Actions"]);
+      document.getElementById("pEvidence").value = safeStr(p["Expected Evidence"]);
+      document.getElementById("pNegObs").value = safeStr(p["Potential Grounds for Negative Observations"]);
+
+      document.getElementById("pRaw").value = JSON.stringify(p, null, 2);
+
+      document.getElementById("btnSave").disabled = !window.CAN_SAVE;
+
+      document.getElementById("btnUploadPhotos").disabled = !window.CAN_MANAGE_PHOTOS;
+      document.getElementById("photoFile").disabled = !window.CAN_MANAGE_PHOTOS;
+
+      renderList();
+      window.loadPhotosForSelected();
+    }
+
+    function resetSelected(){
+      if(!window.selectedOriginal) return;
+      selectRow(window.selectedOriginal.id);
+    }
+
+    function showNewQuestionPanel(show){
+      const pnl = document.getElementById("newQuestionPanel");
+      if(pnl) pnl.style.display = show ? "block" : "none";
+      const saveBtn = document.getElementById("btnSave");
+      if(saveBtn) saveBtn.textContent = show ? "Create in DB" : "Save to DB";
+    }
+
+    function buildBlankPayload(numberFull){
+      return {
+        "No.": numberFull || "",
+        "Short Text": "",
+        "Question": "",
+        "Inspection Guidance": "",
+        "Suggested Inspector Actions": "",
+        "Expected Evidence": "",
+        "Potential Grounds for Negative Observations": "",
+      };
+    }
+
+    function syncNewNumberFromInputs(){
+      const src = safeStr(document.getElementById("newSourceType")?.value).trim() || "COMPANY";
+      const a = safeInt(document.getElementById("newChapter")?.value, null);
+      const b = safeInt(document.getElementById("newSection")?.value, null);
+      const c = safeInt(document.getElementById("newThird")?.value, null);
+      if(a===null || b===null || c===null) return null;
+
+      const suffix = suffixForSource(src);
+      const base = makeNumberBase(a,b,c, thirdWidthForValue(src,c));
+      const full = makeNumberFull(base, suffix);
+
+      // Update header + pills
+      document.getElementById("hdrNumber").textContent = full;
+      document.getElementById("dbSourceType").textContent = src;
+      document.getElementById("dbNumberBase").textContent = base;
+      document.getElementById("dbNumberSuffix").textContent = suffix;
+
+      // Ensure payload No. matches
+      let payloadObj = null;
+      try{ payloadObj = JSON.parse(document.getElementById("pRaw").value); }catch(_){ payloadObj = null; }
+      if(!payloadObj || typeof payloadObj !== "object") payloadObj = buildBlankPayload(full);
+      payloadObj["No."] = full;
+      document.getElementById("pRaw").value = JSON.stringify(payloadObj, null, 2);
+
+      return { src, a, b, c, base, suffix, full };
+    }
+
+    async function startNewQuestion(){
+      if(!window.CAN_SAVE){
+        showWarn("Create blocked: your role is read-only in this module.");
+        return;
+      }
+
+      showWarn(""); showOk("");
+
+      // Enter create mode
+      window.createMode = true;
+      window.selected = null;
+      window.selectedOriginal = null;
+
+      document.getElementById("emptyState").style.display = "none";
+      document.getElementById("editPanel").style.display = "block";
+      document.getElementById("hdrId").textContent = "New question (not saved yet)";
+      document.getElementById("saveStatus").textContent = "";
+
+      // Defaults
+      const srcFilter = safeStr(document.getElementById("sourceFilter")?.value).trim();
+      const defaultSrc = (srcFilter && srcFilter !== "ALL") ? srcFilter : "COMPANY";
+
+      const srcEl = document.getElementById("newSourceType");
+      const aEl = document.getElementById("newChapter");
+      const bEl = document.getElementById("newSection");
+      const cEl = document.getElementById("newThird");
+
+      if(srcEl) srcEl.value = defaultSrc;
+
+      // Use last selected prefix if available, otherwise 1.1
+      let a = 1, b = 1;
+      if(window.filteredRows && window.filteredRows.length){
+        const first = window.filteredRows[0];
+        const parts = parseBaseParts(first?.number_base);
+        if(parts) { a = parts.a; b = parts.b; }
+      }
+
+      if(aEl) aEl.value = a;
+      if(bEl) bEl.value = b;
+
+      const nextC = nextThirdFor(defaultSrc, a, b);
+      if(cEl) cEl.value = nextC;
+
+      // Set DB meta defaults
+      document.getElementById("dbStatus").value = "active";
+      const v = safeStr(document.getElementById("versionFilter")?.value).trim() || "SIRE_2.0_QL";
+      document.getElementById("dbVersion").value = v;
+      document.getElementById("dbTags").value = "";
+
+      // Blank payload
+      const n = syncNewNumberFromInputs();
+      const blank = buildBlankPayload(n?.full || "");
+      document.getElementById("pShortText").value = "";
+      document.getElementById("pQuestion").value = "";
+      document.getElementById("pGuidance").value = "";
+      document.getElementById("pActions").value = "";
+      document.getElementById("pEvidence").value = "";
+      document.getElementById("pNegObs").value = "";
+      document.getElementById("pRaw").value = JSON.stringify(blank, null, 2);
+
+      // Photos disabled until saved (needs question_id)
+      document.getElementById("btnUploadPhotos").disabled = true;
+      document.getElementById("photoFile").disabled = true;
+      document.getElementById("photoGrid").innerHTML = "";
+      document.getElementById("photoCountLine").textContent = "Save the new question first, then you can upload photos.";
+
+      showNewQuestionPanel(true);
+    }
+
+    // Reads the Create Mode inputs and updates the visible pills/header.
+    // Returns { source_type, suffix, number_base, number_full } on success; null on validation failure.
+    function syncNewNumberFromInputs(){
+      const src = safeStr(document.getElementById("newSourceType")?.value).trim() || "COMPANY";
+      const ch = safeStr(document.getElementById("newChapter")?.value).trim();
+      const se = safeStr(document.getElementById("newSection")?.value).trim();
+      const th = safeStr(document.getElementById("newThird")?.value).trim();
+
+      const a = Number(ch), b = Number(se), c = Number(th);
+      if(!Number.isInteger(a) || a < 0 || a > 99) { showWarn("Chapter (xx) must be 0-99"); return null; }
+      if(!Number.isInteger(b) || b < 0 || b > 99) { showWarn("Section (yy) must be 0-99"); return null; }
+      if(!Number.isInteger(c) || c < 0 || c > 999) { showWarn("Third segment (zz/zzz) must be 0-999"); return null; }
+
+      const suffix = suffixForSourceType(src);
+      const thirdWidth = (src === "SIRE") ? 2 : (c >= 100 ? 3 : 2);
+
+      const number_base = `${padN(a,2)}.${padN(b,2)}.${padN(c,thirdWidth)}`;
+      const number_full = makeNumberFull(number_base, suffix);
+
+      // update header + pills
+      document.getElementById("hdrNumber").textContent = number_full;
+      document.getElementById("hdrId").textContent = "(new) Not saved yet";
+      document.getElementById("dbSourceType").textContent = src;
+      document.getElementById("dbNumberBase").textContent = number_base;
+      document.getElementById("dbNumberSuffix").textContent = suffix || "(none)";
+
+      // keep payload "No." consistent if raw JSON parses
+      try{
+        const rawEl = document.getElementById("pRaw");
+        const obj = JSON.parse(rawEl.value || "{}") || {};
+        obj["No."] = number_full;
+        rawEl.value = JSON.stringify(obj, null, 2);
+      }catch(_e){/* ignore */}
+
+      return { source_type: src, suffix, number_base, number_full };
+    }
+
+    function showNewQuestionPanel(show){
+      const pnl = document.getElementById("newQuestionPanel");
+      if(pnl) pnl.style.display = show ? "block" : "none";
+
+      // Photo controls disabled for unsaved questions
+      const disable = !!show;
+      const file = document.getElementById("photoFile");
+      const upBtn = document.getElementById("btnUploadPhotos");
+      const rfBtn = document.getElementById("btnRefreshPhotos");
+      if(file) file.disabled = disable;
+      if(upBtn) upBtn.disabled = disable;
+      if(rfBtn) rfBtn.disabled = disable;
+
+      const photoStatus = document.getElementById("photoStatus");
+      if(photoStatus && disable) photoStatus.textContent = "Save the new question first to enable photo upload.";
+      const grid = document.getElementById("photoGrid");
+      if(grid && disable) grid.innerHTML = "";
+      const cnt = document.getElementById("photoCountLine");
+      if(cnt && disable) cnt.textContent = "";
+
+      // Save button label
+      const saveBtn = document.getElementById("btnSave");
+      if(saveBtn) saveBtn.textContent = show ? "Create in DB" : "Save to DB";
+    }
+
+    function enterCreateMode(defaultSource){
+      window.createMode = true;
+      window.selected = null;
+      window.selectedOriginal = null;
+
+      document.getElementById("emptyState").style.display = "none";
+      document.getElementById("editPanel").style.display = "block";
+      showNewQuestionPanel(true);
+
+      showWarn(""); showOk("");
+      document.getElementById("saveStatus").textContent = "";
+
+      // base defaults
+      const src = defaultSource && defaultSource !== "ALL" ? defaultSource : "COMPANY";
+      const srcEl = document.getElementById("newSourceType");
+      if(srcEl) srcEl.value = src;
+
+      const aEl = document.getElementById("newChapter");
+      const bEl = document.getElementById("newSection");
+      const cEl = document.getElementById("newThird");
+      if(aEl) aEl.value = "1";
+      if(bEl) bEl.value = "1";
+      if(cEl) cEl.value = String(nextThirdFor(window.allRows, src, 1, 1));
+
+      // version: prefer filter value, else existing field, else default
+      const vFilter = safeStr(document.getElementById("versionFilter").value).trim();
+      const vEl = document.getElementById("dbVersion");
+      if(vEl) vEl.value = vFilter || "SIRE_2.0_QL";
+      document.getElementById("dbStatus").value = "active";
+      document.getElementById("dbTags").value = "";
+
+      // seed payload
+      const raw = {
+        "No.": "",
+        "Short Text": "",
+        "Question": "",
+        "Inspection Guidance": "",
+        "Suggested Inspector Actions": "",
+        "Expected Evidence": "",
+        "Potential Grounds for Negative Observations": ""
+      };
+      document.getElementById("pRaw").value = JSON.stringify(raw, null, 2);
+      document.getElementById("pShortText").value = "";
+      document.getElementById("pQuestion").value = "";
+      document.getElementById("pGuidance").value = "";
+      document.getElementById("pActions").value = "";
+      document.getElementById("pEvidence").value = "";
+      document.getElementById("pNegObs").value = "";
+
+      // initial number sync
+      showWarn("");
+      syncNewNumberFromInputs();
+    }
+
+    function exitCreateMode(){
+      window.createMode = false;
+      showNewQuestionPanel(false);
+    }
+
+    async function saveSelected(){
+      if(!window.selected && !window.createMode) return;
+
+      if(!window.CAN_SAVE){
+        showWarn("Save blocked: your role is read-only in this module.");
+        return;
+      }
+
+      showWarn(""); showOk("");
+      const saveStatus = document.getElementById("saveStatus");
+      saveStatus.textContent = "Saving…";
+
+      let payloadObj = null;
+      try{
+        payloadObj = JSON.parse(document.getElementById("pRaw").value || "{}");
+      }catch(e){
+        saveStatus.textContent = "";
+        showWarn("Cannot save: Payload JSON is not valid.\n\n" + String(e?.message || e));
+        return;
+      }
+
+      // Normalize common fields from textareas into payload
+      payloadObj["Short Text"] = document.getElementById("pShortText").value;
+      payloadObj["Question"] = document.getElementById("pQuestion").value;
+      payloadObj["Inspection Guidance"] = document.getElementById("pGuidance").value;
+      payloadObj["Suggested Inspector Actions"] = document.getElementById("pActions").value;
+      payloadObj["Expected Evidence"] = document.getElementById("pEvidence").value;
+      payloadObj["Potential Grounds for Negative Observations"] = document.getElementById("pNegObs").value;
+
+      const newStatus = document.getElementById("dbStatus").value;
+      const newVersion = document.getElementById("dbVersion").value.trim();
+      const newTags = parseTags(document.getElementById("dbTags").value);
+
+      try{
+        if(window.createMode){
+          const info = syncNewNumberFromInputs();
+          if(!info){
+            saveStatus.textContent = "";
+            return;
+          }
+
+          const safeVersion = newVersion || "SIRE_2.0_QL";
+          payloadObj["No."] = info.number_full;
+
+          // Check for duplicates by number_full
+          const { data: dup, error: dupErr } = await sb
+            .from("questions_master")
+            .select("id")
+            .eq("number_full", info.number_full)
+            .limit(1);
+          if(dupErr) throw dupErr;
+          if(dup && dup.length){
+            saveStatus.textContent = "";
+            showWarn(`Cannot create: a question with this number already exists (${info.number_full}).`);
+            return;
+          }
+
+          const insertRow = {
+            source_type: info.source_type,
+            number_base: info.number_base,
+            number_suffix: info.suffix,
+            number_full: info.number_full,
+            status: newStatus,
+            version: safeVersion,
+            tags: newTags,
+            payload: payloadObj,
+          };
+
+          const { data: created, error: insErr } = await sb
+            .from("questions_master")
+            .insert(insertRow)
+            .select("id, source_type, number_full, number_base, number_suffix, status, version, tags, payload")
+            .single();
+          if(insErr) throw insErr;
+
+          showOk("Created in DB.");
+          saveStatus.textContent = "Created.";
+
+          // Add to local cache and re-render
+          window.allRows.unshift(created);
+          exitCreateMode();
+          applyLocalFilters();
+          selectRow(created.id);
+          return;
+        }
+
+        // ===== EDIT MODE: update existing question =====
+        const safeVersion = newVersion || window.selected.version || "SIRE_2.0_QL";
+        const { error } = await sb
+          .from("questions_master")
+          .update({
+            status: newStatus,
+            version: safeVersion,
+            tags: newTags,
+            payload: payloadObj
+          })
+          .eq("id", window.selected.id);
+
+        if(error) throw error;
+
+        showOk("Saved to DB.");
+        saveStatus.textContent = "Saved.";
+
+        const idx = window.allRows.findIndex(x => x.id === window.selected.id);
+        if(idx >= 0){
+          window.allRows[idx].status = newStatus;
+          window.allRows[idx].version = safeVersion;
+          window.allRows[idx].tags = newTags;
+          window.allRows[idx].payload = payloadObj;
+        }
+
+        applyLocalFilters();
+        selectRow(window.selected.id);
+
+      }catch(e){
+        saveStatus.textContent = "";
+        showWarn("Save failed:\n\n" + String(e?.message || e));
+      }
+    }
+
+    async function loadQuestionsFromDb(){
+      showWarn(""); showOk("");
+      document.getElementById("loadHint").textContent = "Loading…";
+
+      const statusFilter = safeStr(document.getElementById("statusFilter").value).trim();
+      const versionFilter = safeStr(document.getElementById("versionFilter").value).trim();
+      const sourceFilter = safeStr(document.getElementById("sourceFilter").value).trim();
+
+      try{
+        let q = sb
+          .from("questions_master")
+          .select("id, source_type, number_full, number_base, number_suffix, status, version, tags, payload");
+
+        if(statusFilter) q = q.eq("status", statusFilter);
+        if(versionFilter) q = q.eq("version", versionFilter);
+        if(sourceFilter && sourceFilter !== "ALL") q = q.eq("source_type", sourceFilter);
+
+        const pageSize = 1000;
+        let from = 0;
+        let out = [];
+        while(true){
+          const { data, error } = await q.range(from, from + pageSize - 1);
+          if(error) throw error;
+          const rows = data || [];
+          out.push(...rows);
+          if(rows.length < pageSize) break;
+          from += pageSize;
+        }
+
+        window.allRows = out;
+        window.allRows.sort((x,y)=>compareKeys(rowSortKey(x), rowSortKey(y)));
+
+        document.getElementById("loadHint").textContent = `Loaded ${window.allRows.length}`;
+        document.getElementById("countLine").textContent = `${window.allRows.length} questions`;
+
+        applyLocalFilters();
+
+        if(window.allRows.length && !window.selected){
+          selectRow(window.allRows[0].id);
+        }
+
+      }catch(e){
+        document.getElementById("loadHint").textContent = "";
+        showWarn("Failed to load questions from DB:\n\n" + String(e?.message || e));
+      }
+    }
+
+    // ---------- Boot ----------
+    (async () => {
+      const bundle = await AUTH.setupAuthButtons({
+        badgeId: "userBadge",
+        loginBtnId: "loginBtn",
+        logoutBtnId: "logoutBtn",
+        switchBtnId: "switchUserBtn"
+      });
+
+      if (!bundle?.session?.user) {
+        showWarn("You are logged out. Please Login.");
+        document.getElementById("modeLine").textContent = "Access denied (not logged in).";
+        return;
+      }
+
+      const role = bundle.profile?.role;
+      const R = AUTH.ROLES;
+
+      const isSuper = role === R.SUPER_ADMIN;
+      const isCompanyAdmin = role === R.COMPANY_ADMIN;
+      const isCompanySup = role === R.COMPANY_SUPERINTENDENT;
+
+      if (!(isSuper || isCompanyAdmin || isCompanySup)) {
+        showWarn("You do not have permission to access Questions Editor.");
+        document.getElementById("modeLine").textContent = `Access denied for role: ${role || "(unknown)"}`;
+        return;
+      }
+
+      window.CAN_SAVE = (isSuper || isCompanyAdmin);
+      window.CAN_MANAGE_PHOTOS = (isSuper || isCompanyAdmin);
+
+      let mode = "View";
+      if (isSuper || isCompanyAdmin) mode = "Edit";
+      if (isSuper) mode = "Admin";
+
+      document.getElementById("modeLine").textContent =
+        `Role: ${role} • Mode: ${mode} • Module: QUESTIONS_EDITOR`;
+
+      document.getElementById("editorCard").style.display = "block";
+      if(isSuper){
+        document.getElementById("importCard").style.display = "block";
+      }
+
+      document.getElementById("reloadBtn").onclick = () => { window.selected=null; loadQuestionsFromDb(); };
+      // Create new question
+      const newBtn = document.getElementById("newBtn");
+      if(newBtn){
+        newBtn.style.display = window.CAN_SAVE ? "inline-block" : "none";
+        newBtn.onclick = startNewQuestion;
+      }
+
+      const newSourceType = document.getElementById("newSourceType");
+      const newChapter = document.getElementById("newChapter");
+      const newSection = document.getElementById("newSection");
+      const newThird = document.getElementById("newThird");
+      const btnAutoNext = document.getElementById("btnAutoNext");
+      const btnCancelNew = document.getElementById("btnCancelNew");
+
+      function bind(el, ev, fn){ if(el) el.addEventListener(ev, fn); }
+      bind(newSourceType, "change", () => syncNewNumberFromInputs(true));
+      bind(newChapter, "input", () => syncNewNumberFromInputs(false));
+      bind(newSection, "input", () => syncNewNumberFromInputs(false));
+      bind(newThird, "input", () => syncNewNumberFromInputs(false));
+      bind(btnAutoNext, "click", () => { syncNewNumberFromInputs(true); });
+      bind(btnCancelNew, "click", () => { exitCreateMode(); });
+      document.getElementById("searchInput").oninput = applyLocalFilters;
+      document.getElementById("statusFilter").onchange = () => { window.selected=null; loadQuestionsFromDb(); };
+      document.getElementById("versionFilter").onchange = () => { window.selected=null; loadQuestionsFromDb(); };
+      document.getElementById("sourceFilter").onchange = () => { window.selected=null; loadQuestionsFromDb(); };
+
+      document.getElementById("btnReset").onclick = resetSelected;
+      document.getElementById("btnSave").onclick = saveSelected;
+
+      document.getElementById("btnRefreshPhotos").onclick = window.loadPhotosForSelected;
+      document.getElementById("btnUploadPhotos").onclick = window.uploadSelectedPhotos;
+
+      if(!window.CAN_SAVE){
+        const b = document.getElementById("btnSave");
+        b.disabled = true;
+        b.classList.remove("primary");
+        b.classList.add("light");
+        b.title = "Read-only for your role";
+        document.getElementById("saveStatus").textContent = "Read-only access for your role.";
+      }
+
+      if(!window.CAN_MANAGE_PHOTOS){
+        const b = document.getElementById("btnUploadPhotos");
+        b.disabled = true;
+        b.classList.remove("primary");
+        b.classList.add("light");
+        b.title = "Not allowed (admins only).";
+        document.getElementById("photoFile").disabled = true;
+        window.setPhotoStatus("Upload/Delete: admins only. Viewing is enabled.");
+      }
+
+      // Import wiring (kept)
+      if(isSuper){
+        const filename = "sire_questions_all_columns_named.json";
+        document.getElementById("srcFile").textContent = filename;
+
+        const dryBtn = document.getElementById("dryRunBtn");
+        const commitBtn = document.getElementById("commitBtn");
+        const versionInput = document.getElementById("versionTag");
+
+        function setButtonsEnabled(on){
+          dryBtn.disabled = !on;
+          commitBtn.disabled = !on;
+        }
+
+        dryBtn.addEventListener("click", async () => {
+          showWarn(""); showOk(""); setResult("");
+          setButtonsEnabled(false);
+          try{
+            const versionTag = versionInput.value?.trim();
+            if(!versionTag) throw new Error("Version tag is required.");
+
+            const check = await dryRunImport(filename, versionTag);
+            if(check.errors.length){
+              showWarn(
+                "Dry run completed with errors.\n\n" +
+                check.errors.join("\n") +
+                `\n\nValid rows: ${check.okCount}/${check.total}`
+              );
+              setResult(`Dry run: ${check.okCount}/${check.total} valid. Fix errors before commit.`);
+            } else {
+              showOk(`Dry run OK. Valid rows: ${check.okCount}/${check.total}`);
+              setResult(`Dry run OK: ${check.okCount} rows ready to import.`);
+            }
+          }catch(e){
+            showWarn(String(e?.message || e));
+          }finally{
+            setProgress("");
+            setButtonsEnabled(true);
+          }
+        });
+
+        commitBtn.addEventListener("click", async () => {
+          showWarn(""); showOk(""); setResult("");
+          setButtonsEnabled(false);
+          try{
+            const versionTag = versionInput.value?.trim();
+            if(!versionTag) throw new Error("Version tag is required.");
+
+            const check = await dryRunImport(filename, versionTag);
+            if(check.errors.length){
+              throw new Error(
+                "Commit blocked because validation failed.\n\n" +
+                check.errors.join("\n") +
+                `\n\nValid rows: ${check.okCount}/${check.total}`
+              );
+            }
+
+            const res = await commitImport(filename, versionTag);
+            showOk(`Import completed.\nInserted: ${res.inserted} rows (from ${res.total} JSON items).`);
+            setResult(`Inserted ${res.inserted} rows.`);
+
+            await loadQuestionsFromDb();
+
+          }catch(e){
+            showWarn(String(e?.message || e));
+          }finally{
+            setProgress("");
+            setButtonsEnabled(true);
+          }
+        });
+      }
+
+      await loadQuestionsFromDb();
+
+    })().catch(e => showWarn(String(e?.message || e)));
+  </script>
+
+  <!-- Your override that fixes file_name NOT NULL -->
+  <script>
+  (function(){
+    var s = document.createElement("script");
+    s.src = "./q-questions-editor.js?v=" + Date.now();
+    s.defer = true;
+    document.currentScript.parentNode.insertBefore(s, document.currentScript.nextSibling);
+  })();
+</script>
 </body>
 </html>
