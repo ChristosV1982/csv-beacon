@@ -9,7 +9,6 @@
   <link rel="stylesheet" href="./q-questions-editor.css" />
 
   <style>
-    /* Minimal safety styling in case CSS is not applied */
     .qe-wrap{ max-width: 1400px; margin: 0 auto; padding: 18px; }
     .qe-top{ display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; }
     .qe-pill{ background:#eef5ff; border:1px solid #cfe2ff; padding:6px 10px; border-radius:999px; font-size:13px; }
@@ -40,16 +39,27 @@
     .qe-split2{ display:grid; grid-template-columns: 1fr 1fr; gap:12px; }
     .adv{ display:none; margin-top:12px; padding-top:12px; border-top:1px dashed #d9e2ef; }
     .small{ font-size:12px; }
+
     .kv{ display:flex; gap:10px; flex-wrap:wrap; }
     .kv .qe-pill{ font-weight:800; }
+
     .topbar{background:#1a4170;color:#fff;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;}
     .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
     .btn2{background:#eaf1fb;color:#1a4170;border:1px solid #c9d9f3;border-radius:10px;padding:10px 14px;font-weight:900;cursor:pointer;}
+
+    .pgnoBox{ border:1px solid #d9e2ef; border-radius:12px; padding:12px; background:#fbfdff; }
+    .pgnoRow{ border:1px solid #e7eef9; border-radius:12px; padding:10px; background:#fff; margin-bottom:10px; }
+    .pgnoHdr{ display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; }
+    .pgnoCode{ font-weight:950; }
+    .pgnoTiny{ font-size:12px; color:#556; }
+    .pgnoGrid{ display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-top:10px; }
+    .pgnoGrid textarea{ min-height:70px; }
+    .pgnoGrid .full{ grid-column: 1 / -1; }
   </style>
 </head>
 
 <body>
-  <!-- AUTH TOPBAR (required by q-questions-editor.js boot) -->
+  <!-- AUTH TOPBAR -->
   <div class="topbar">
     <div style="font-weight:950;">SIRE 2.0 – Questions Editor</div>
     <div class="row">
@@ -72,7 +82,7 @@
     <div class="qe-card">
       <h1 style="margin:0 0 8px 0;">Questions Browser & Viewer / Editor (DB)</h1>
       <div class="muted">
-        Left side = list. Right side = viewer by default. Click <b>Edit</b> to switch to edit mode for the selected question.
+        PGNOs are now stored in DB as separate rows and auto-numbered per question (e.g. 02.02.02.01).
       </div>
 
       <div style="height:10px;"></div>
@@ -179,15 +189,20 @@
 
             <div style="height:12px;"></div>
 
-            <div class="qe-split2">
-              <div>
-                <label>Expected evidence</label>
-                <div id="vEvidence" class="small" style="white-space:pre-wrap;"></div>
+            <div>
+              <label>Expected evidence</label>
+              <div id="vEvidence" class="small" style="white-space:pre-wrap;"></div>
+            </div>
+
+            <div style="height:12px;"></div>
+
+            <div class="pgnoBox">
+              <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
+                <div style="font-weight:950;">Potential grounds for negative observations (PGNOs)</div>
+                <div class="muted" id="vPgnoCount">—</div>
               </div>
-              <div>
-                <label>Potential grounds for negative observations</label>
-                <div id="vNegObs" class="small" style="white-space:pre-wrap;"></div>
-              </div>
+              <div style="height:10px;"></div>
+              <div id="vPgnoList" class="small"></div>
             </div>
 
             <div class="adv" id="viewAdvanced">
@@ -246,7 +261,7 @@
                   <option value="SPARE_X">Spare X</option>
                   <option value="SPARE_Z">Spare Z</option>
                 </select>
-                <div class="muted small">New questions should be <b>Company (custom)</b> (or Spare). SIRE is the official library.</div>
+                <div class="muted small">New questions should be <b>Company (custom)</b> (or Spare).</div>
               </div>
 
               <div>
@@ -281,7 +296,7 @@
               <div>
                 <label>Number Suffix</label>
                 <input id="dbNumberSuffix" type="text" placeholder="C / (blank for SIRE)" />
-                <div class="muted small">DB will enforce: SIRE = xx.yy.zz, Custom/Spare = xx.yy.zzz.</div>
+                <div class="muted small">SIRE = xx.yy.zz, Custom/Spare = xx.yy.zzz.</div>
               </div>
 
               <div>
@@ -340,16 +355,28 @@
 
             <div style="height:12px;"></div>
 
-            <div class="qe-split2">
-              <div>
-                <label>Expected evidence</label>
-                <textarea id="pEvidence"></textarea>
-                <div class="muted small">If the DB currently stores an array, this will save as an array (one line = one item).</div>
+            <div>
+              <label>Expected evidence</label>
+              <textarea id="pEvidence"></textarea>
+              <div class="muted small">If DB stores an array, one line = one item.</div>
+            </div>
+
+            <div style="height:14px;"></div>
+
+            <div class="pgnoBox">
+              <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
+                <div style="font-weight:950;">PGNOs (stored as DB rows)</div>
+                <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                  <div class="muted" id="pgnoCountLine">—</div>
+                  <button id="btnAddPgno" class="btn" type="button">+ Add PGNO</button>
+                </div>
               </div>
-              <div>
-                <label>Potential grounds for negative observations</label>
-                <textarea id="pNegObs"></textarea>
-                <div class="muted small">If the DB currently stores an array, this will save as an array (one line = one item).</div>
+
+              <div style="height:10px;"></div>
+              <div id="pgnoEditorList"></div>
+
+              <div class="muted small">
+                Codes are auto-generated on save: <b>number_base</b> + <b>.01</b>, <b>.02</b>, etc.
               </div>
             </div>
 
@@ -361,7 +388,6 @@
     </div>
   </div>
 
-  <!-- IMPORTANT: Supabase JS must load BEFORE auth.js and your module JS -->
   <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script defer src="./auth.js"></script>
   <script defer src="./q-questions-editor.js"></script>

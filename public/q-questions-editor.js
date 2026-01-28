@@ -1,7 +1,6 @@
 (() => {
   "use strict";
 
-  // ====== helpers ======
   function $(id) { return document.getElementById(id); }
   function safeStr(v) { return v === null || v === undefined ? "" : String(v); }
 
@@ -21,28 +20,20 @@
     const el = $(id);
     if (el) el.textContent = txt || "";
   }
-
   function isIntLike(v) {
     const n = Number(v);
     return Number.isFinite(n) && Math.floor(n) === n;
   }
 
   // DB constraint:
-  // - SIRE number_base must be xx.yy.zz (1–2 digits each)
-  // - COMPANY_CUSTOM/SPARE number_base must be xx.yy.zzz (last part 3 digits)
+  // - SIRE number_base: xx.yy.zz (2 digits each)
+  // - Custom/Spare: xx.yy.zzz (last part 3 digits)
   function buildNumberBase(sourceType, xx, yy, zz) {
-    const a = Number(xx);
-    const b = Number(yy);
-    const c = Number(zz);
-
+    const a = Number(xx), b = Number(yy), c = Number(zz);
     if (!Number.isFinite(a) || !Number.isFinite(b) || !Number.isFinite(c)) return "";
 
-    const isSire = sourceType === "SIRE";
     const p2 = (n) => String(n).padStart(2, "0");
-
-    if (isSire) {
-      return `${p2(a)}.${p2(b)}.${p2(c)}`;
-    }
+    if (sourceType === "SIRE") return `${p2(a)}.${p2(b)}.${p2(c)}`;
 
     const p3 = (n) => String(n).padStart(3, "0");
     return `${p2(a)}.${p2(b)}.${p3(c)}`;
@@ -62,7 +53,13 @@
     return { xx: String(Number(m[1])), yy: String(Number(m[2])), zz: String(Number(m[3])) };
   }
 
-  // Preserve arrays for these fields:
+  function numberKey(row) {
+    const nb = safeStr(row.number_base).trim();
+    const m = nb.match(/^(\d+)\.(\d+)\.(\d+)$/);
+    if (!m) return [9999, 9999, 999999, nb];
+    return [Number(m[1]), Number(m[2]), Number(m[3]), nb];
+  }
+
   function toMultiline(v) {
     if (Array.isArray(v)) return v.map(x => safeStr(x)).join("\n");
     if (typeof v === "string") return v;
@@ -82,15 +79,32 @@
     obj[key] = safeStr(textValue);
   }
 
-  // Sort correctly by chapter/section/item numerically
-  function numberKey(row) {
-    const nb = safeStr(row.number_base).trim();
-    const m = nb.match(/^(\d+)\.(\d+)\.(\d+)$/);
-    if (!m) return [9999, 9999, 999999, nb];
-    const a = Number(m[1]);
-    const b = Number(m[2]);
-    const c = Number(m[3]);
-    return [a, b, c, nb];
+  // ===== PGNO helpers =====
+  function pgnoCode(numberBase, seq1based) {
+    const nb = safeStr(numberBase).trim();
+    const s2 = String(seq1based).padStart(2, "0");
+    return nb ? `${nb}.${s2}` : `?.?.?.${s2}`;
+  }
+
+  function ensurePgnoStateFromPayloadIfEmpty() {
+    if (!selected) return;
+    if (Array.isArray(selected.pgno_items) && selected.pgno_items.length) return;
+
+    const p = selected.payload || {};
+    const old = p.potential_grounds_for_negative_observations;
+
+    if (Array.isArray(old)) {
+      selected.pgno_items = old.map(t => ({ text: safeStr(t), remarks: "" }));
+      return;
+    }
+    if (typeof old === "string" && old.trim()) {
+      // If it was one blob, split by lines as a fallback
+      const lines = old.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+      selected.pgno_items = lines.map(t => ({ text: t, remarks: "" }));
+      return;
+    }
+
+    selected.pgno_items = [];
   }
 
   // ====== state ======
@@ -101,10 +115,8 @@
   let selected = null; // cloned copy
   let mode = "VIEW";   // VIEW | EDIT
 
-  // ====== UI mode ======
   function setMode(newMode) {
     mode = newMode;
-
     const empty = $("emptyState");
     const v = $("viewPanel");
     const e = $("editPanel");
@@ -135,7 +147,124 @@
     setText("pillSuffix", `suffix: ${sx || "(blank)"}`);
   }
 
-  // ====== view fill ======
+  // ===== PGNO renderers =====
+  function renderPgnoView() {
+    const host = $("vPgnoList");
+    if (!host) return;
+
+    ensurePgnoStateFromPayloadIfEmpty();
+
+    const items = selected?.pgno_items || [];
+    setText("vPgnoCount", `${items.length} PGNO(s)`);
+
+    if (!items.length) {
+      host.innerHTML = `<div class="muted">No PGNOs recorded for this question.</div>`;
+      return;
+    }
+
+    const nb = safeStr(selected.number_base).trim();
+    host.innerHTML = items.map((it, i) => {
+      const code = pgnoCode(nb, i + 1);
+      const t = safeStr(it.text);
+      const r = safeStr(it.remarks);
+      return `
+        <div class="pgnoRow">
+          <div class="pgnoHdr">
+            <div class="pgnoCode">${code}</div>
+          </div>
+          <div class="pgnoTiny" style="margin-top:6px; white-space:pre-wrap;">${escapeHtml(t)}</div>
+          ${r ? `<div class="pgnoTiny" style="margin-top:8px;"><b>Remarks:</b> ${escapeHtml(r)}</div>` : ``}
+        </div>
+      `;
+    }).join("");
+  }
+
+  function renderPgnoEditor() {
+    const host = $("pgnoEditorList");
+    if (!host) return;
+
+    ensurePgnoStateFromPayloadIfEmpty();
+
+    const items = selected.pgno_items || [];
+    setText("pgnoCountLine", `${items.length} PGNO(s)`);
+
+    const nb = previewNumberBaseForHeader(); // use current inputs if user is editing the number
+    host.innerHTML = "";
+
+    items.forEach((it, idx) => {
+      const row = document.createElement("div");
+      row.className = "pgnoRow";
+
+      const code = pgnoCode(nb, idx + 1);
+
+      row.innerHTML = `
+        <div class="pgnoHdr">
+          <div>
+            <div class="pgnoCode">${code}</div>
+            <div class="pgnoTiny">Seq: ${idx + 1}</div>
+          </div>
+          <div>
+            <button class="btn" type="button" data-del="${idx}">Delete</button>
+          </div>
+        </div>
+
+        <div class="pgnoGrid">
+          <div class="full">
+            <label>PGNO text</label>
+            <textarea data-text="${idx}"></textarea>
+          </div>
+          <div class="full">
+            <label>Remarks (per PGNO)</label>
+            <textarea data-remarks="${idx}" placeholder="Optional remarks for this PGNO"></textarea>
+          </div>
+        </div>
+      `;
+
+      host.appendChild(row);
+
+      const taText = row.querySelector(`textarea[data-text="${idx}"]`);
+      const taRem = row.querySelector(`textarea[data-remarks="${idx}"]`);
+      if (taText) taText.value = safeStr(it.text);
+      if (taRem) taRem.value = safeStr(it.remarks);
+
+      if (taText) {
+        taText.addEventListener("input", () => {
+          selected.pgno_items[idx].text = taText.value;
+        });
+      }
+      if (taRem) {
+        taRem.addEventListener("input", () => {
+          selected.pgno_items[idx].remarks = taRem.value;
+        });
+      }
+
+      const delBtn = row.querySelector(`button[data-del="${idx}"]`);
+      if (delBtn) {
+        delBtn.addEventListener("click", () => {
+          selected.pgno_items.splice(idx, 1);
+          renderPgnoEditor();
+        });
+      }
+    });
+  }
+
+  function addPgnoRow() {
+    if (!selected) return;
+    ensurePgnoStateFromPayloadIfEmpty();
+    selected.pgno_items.push({ text: "", remarks: "" });
+    renderPgnoEditor();
+  }
+
+  // Escape for view HTML
+  function escapeHtml(s) {
+    return safeStr(s)
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+
   function fillViewPanel(r) {
     const nb = safeStr(r.number_base);
     const nfull = r.number_full || computeNumberFull(nb, r.number_suffix);
@@ -150,10 +279,7 @@
     setText("vActions", safeStr(p.suggested_inspector_actions ?? p.actions ?? p.SuggestedInspectorActions ?? p["Suggested Inspector Actions"]));
 
     const ev = p.expected_evidence ?? p.evidence ?? p.ExpectedEvidence ?? p["Expected Evidence"];
-    const ng = p.potential_grounds_for_negative_observations ?? p.neg_obs ?? p.NegativeObservations ?? p["Potential Grounds for Negative Observations"];
-
     setText("vEvidence", toMultiline(ev));
-    setText("vNegObs", toMultiline(ng));
 
     setText("vTags", Array.isArray(r.tags) ? r.tags.join(", ") : safeStr(r.tags || ""));
     setText("vVersion", safeStr(r.version || ""));
@@ -165,9 +291,9 @@
     }
 
     setPillsFromSelected();
+    renderPgnoView();
   }
 
-  // ====== edit fill ======
   function fillEditPanel(r) {
     $("dbSourceType").value = r.source_type || "SIRE";
     $("dbStatus").value = r.status || "active";
@@ -192,30 +318,38 @@
     $("pActions").value = safeStr(p.suggested_inspector_actions ?? p.actions ?? p.SuggestedInspectorActions ?? p["Suggested Inspector Actions"]);
 
     const ev = p.expected_evidence ?? p.evidence ?? p.ExpectedEvidence ?? p["Expected Evidence"];
-    const ng = p.potential_grounds_for_negative_observations ?? p.neg_obs ?? p.NegativeObservations ?? p["Potential Grounds for Negative Observations"];
-
     $("pEvidence").value = toMultiline(ev);
-    $("pNegObs").value = toMultiline(ng);
 
     try { $("pRaw").value = JSON.stringify(p, null, 2); }
     catch { $("pRaw").value = ""; }
 
     setPillsFromSelected();
+    renderPgnoEditor();
+  }
+
+  function previewNumberBaseForHeader() {
+    // In EDIT mode, use inputs to preview codes live
+    const src = $("dbSourceType")?.value || (selected?.source_type || "SIRE");
+    const xx = $("numChapter")?.value;
+    const yy = $("numSection")?.value;
+    const zz = $("numItem")?.value;
+
+    const nb = buildNumberBase(src, xx, yy, zz);
+    return nb || safeStr(selected?.number_base).trim();
   }
 
   function refreshHeaderFromNumberInputs() {
     if (!selected) return;
-    const src = $("dbSourceType").value;
-    const xx = $("numChapter").value;
-    const yy = $("numSection").value;
-    const zz = $("numItem").value;
 
-    const nb = buildNumberBase(src, xx, yy, zz);
+    const nb = previewNumberBaseForHeader();
     const sx = safeStr($("dbNumberSuffix").value).trim();
     setText("hdrNumber", computeNumberFull(nb, sx) || "—");
+
+    // PGNO codes depend on number_base -> re-render editor list to update code labels
+    renderPgnoEditor();
   }
 
-  // ====== list ======
+  // ===== list =====
   function passesSearch(r, term) {
     if (!term) return true;
     const t = term.toLowerCase();
@@ -264,7 +398,7 @@
     }
   }
 
-  // ====== DB load ======
+  // ===== DB load =====
   async function loadQuestions() {
     showWarn("");
     showOk("");
@@ -291,7 +425,7 @@
       setText("loadHint", `Loaded ${allRows.length}`);
       renderList();
 
-      if (allRows.length) selectRow(allRows[0]);
+      if (allRows.length) await selectRow(allRows[0]);
       else {
         selected = null;
         setMode("VIEW");
@@ -302,10 +436,72 @@
     }
   }
 
-  // ====== select ======
-  function selectRow(row) {
+  // ===== PGNO DB operations =====
+  async function loadPgnoFromDb(questionId) {
+    const { data, error } = await sb
+      .from("pgno_master")
+      .select("id, seq, pgno_code, pgno_text, remarks")
+      .eq("question_id", questionId)
+      .order("seq", { ascending: true });
+
+    if (error) throw error;
+
+    return (data || []).map(r => ({
+      id: r.id,
+      text: safeStr(r.pgno_text),
+      remarks: safeStr(r.remarks),
+    }));
+  }
+
+  async function savePgnoToDb(questionId, numberBase, items) {
+    // Normalize: remove empties, trim
+    const clean = (items || [])
+      .map(x => ({ text: safeStr(x.text).trim(), remarks: safeStr(x.remarks).trim() }))
+      .filter(x => x.text.length > 0);
+
+    // Replace-all strategy (simple and consistent with renumbering)
+    // 1) delete existing
+    const { error: delErr } = await sb.from("pgno_master").delete().eq("question_id", questionId);
+    if (delErr) throw delErr;
+
+    if (!clean.length) return;
+
+    // 2) insert fresh rows with seq and derived code
+    const rows = clean.map((x, i) => ({
+      question_id: questionId,
+      seq: i + 1,
+      pgno_code: pgnoCode(numberBase, i + 1),
+      pgno_text: x.text,
+      remarks: x.remarks,
+      created_by: me?.user?.id || null,
+      updated_by: me?.user?.id || null,
+    }));
+
+    const { error: insErr } = await sb.from("pgno_master").insert(rows);
+    if (insErr) throw insErr;
+  }
+
+  // ===== select =====
+  async function selectRow(row) {
     selected = JSON.parse(JSON.stringify(row));
     selected.__isNew = false;
+    selected.pgno_items = [];
+
+    try {
+      if (selected.id) {
+        const pg = await loadPgnoFromDb(selected.id);
+        selected.pgno_items = pg;
+      }
+    } catch (e) {
+      // If pgno_master is not created yet or RLS blocks, do not crash the editor:
+      // fallback to payload
+      selected.pgno_items = [];
+      showWarn(
+        "Warning: could not load PGNO rows from pgno_master.\n" +
+        "Fallback to payload PGNO list.\n\n" +
+        "Error: " + String(e?.message || e)
+      );
+    }
 
     fillViewPanel(selected);
     fillEditPanel(selected);
@@ -313,7 +509,7 @@
     renderList();
   }
 
-  // ====== new question ======
+  // ===== new question =====
   function newQuestion() {
     showWarn("");
     showOk("");
@@ -337,19 +533,20 @@
         inspection_guidance: "",
         suggested_inspector_actions: "",
         expected_evidence: [],
+        // keep compatibility field (texts only)
         potential_grounds_for_negative_observations: [],
       },
+      pgno_items: [],
     };
 
     fillViewPanel(selected);
     fillEditPanel(selected);
-
     setMode("EDIT");
     setPillsFromSelected();
     refreshHeaderFromNumberInputs();
   }
 
-  // ====== save ======
+  // ===== save =====
   async function saveSelected() {
     if (!selected) return;
 
@@ -401,12 +598,15 @@
       if (payload.expected_evidence === undefined && selected.payload?.expected_evidence !== undefined) {
         payload.expected_evidence = selected.payload.expected_evidence;
       }
-      if (payload.potential_grounds_for_negative_observations === undefined && selected.payload?.potential_grounds_for_negative_observations !== undefined) {
-        payload.potential_grounds_for_negative_observations = selected.payload.potential_grounds_for_negative_observations;
-      }
-
       applyTextAreaPreservingType(payload, "expected_evidence", $("pEvidence").value);
-      applyTextAreaPreservingType(payload, "potential_grounds_for_negative_observations", $("pNegObs").value);
+
+      // Compatibility: store PGNO texts only in payload array
+      ensurePgnoStateFromPayloadIfEmpty();
+      const pgnoTexts = (selected.pgno_items || [])
+        .map(x => safeStr(x.text).trim())
+        .filter(Boolean);
+
+      payload.potential_grounds_for_negative_observations = pgnoTexts;
 
       const is_custom = (src !== "SIRE");
 
@@ -434,12 +634,23 @@
 
         if (error) throw error;
 
+        // Save PGNO rows (must happen AFTER question exists)
+        try {
+          await savePgnoToDb(data.id, number_base, selected.pgno_items || []);
+        } catch (e) {
+          showWarn(
+            "Question saved, but PGNO rows could not be saved.\n" +
+            "Check pgno_master table + RLS.\n\n" +
+            "Error: " + String(e?.message || e)
+          );
+        }
+
         showOk("Saved new question.");
         setText("saveStatus", "");
         await loadQuestions();
 
         const newRow = allRows.find(x => x.id === data.id);
-        if (newRow) selectRow(newRow);
+        if (newRow) await selectRow(newRow);
 
       } else {
         const { error } = await sb
@@ -449,12 +660,23 @@
 
         if (error) throw error;
 
+        // Save PGNO rows
+        try {
+          await savePgnoToDb(selected.id, number_base, selected.pgno_items || []);
+        } catch (e) {
+          showWarn(
+            "Question saved, but PGNO rows could not be saved.\n" +
+            "Check pgno_master table + RLS.\n\n" +
+            "Error: " + String(e?.message || e)
+          );
+        }
+
         showOk("Saved changes.");
         setText("saveStatus", "");
         await loadQuestions();
 
         const updated = allRows.find(x => x.id === selected.id);
-        if (updated) selectRow(updated);
+        if (updated) await selectRow(updated);
       }
 
     } catch (e) {
@@ -463,28 +685,23 @@
     }
   }
 
-  // ====== advanced toggle ======
   function toggleAdvanced(which) {
     const el = $(which);
     if (!el) return;
     el.style.display = (el.style.display === "block") ? "none" : "block";
   }
 
-  // ====== wiring ======
   function wireUI() {
-    // DB-reload filters
     $("reloadBtn").onclick = () => loadQuestions();
     $("statusFilter").onchange = () => loadQuestions();
     $("sourceFilter").onchange = () => loadQuestions();
 
-    // Version filter: debounce reload to avoid hammering DB while typing
     let vTimer = null;
     $("versionFilter").oninput = () => {
       if (vTimer) clearTimeout(vTimer);
       vTimer = setTimeout(() => loadQuestions(), 450);
     };
 
-    // Search is client-side
     $("searchInput").oninput = () => renderList();
 
     $("newQuestionBtn").onclick = () => newQuestion();
@@ -497,12 +714,12 @@
 
     $("btnView").onclick = () => setMode("VIEW");
 
-    $("btnReset").onclick = () => {
+    $("btnReset").onclick = async () => {
       if (!selected) return;
       if (selected.__isNew) newQuestion();
       else {
         const r = allRows.find(x => x.id === selected.id);
-        if (r) selectRow(r);
+        if (r) await selectRow(r);
       }
     };
 
@@ -522,19 +739,19 @@
 
     $("btnToggleAdvancedView").onclick = () => toggleAdvanced("viewAdvanced");
     $("btnToggleAdvancedEdit").onclick = () => toggleAdvanced("editAdvanced");
+
+    $("btnAddPgno").onclick = () => addPgnoRow();
   }
 
-  // ====== boot ======
   async function boot() {
     showWarn("");
     showOk("");
 
     try {
       if (!window.supabase) {
-        showWarn("Boot failed:\n\nSupabase JS not available\n\nFix: ensure the Supabase CDN script is included BEFORE auth.js and q-questions-editor.js.");
+        showWarn("Boot failed:\n\nSupabase JS not available.");
         return;
       }
-
       if (!window.AUTH) {
         showWarn("Boot failed:\n\nAUTH helper not loaded (auth.js).");
         return;
