@@ -1,5 +1,4 @@
 (() => {
-  if (window.__QQUESTIONS_EDITOR_LOADED) return; window.__QQUESTIONS_EDITOR_LOADED = true;
   "use strict";
 
   // ====== helpers ======
