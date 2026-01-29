@@ -9,99 +9,60 @@
   <link rel="stylesheet" href="./q-questions-editor.css" />
 
   <style>
-    /* ========= GLOBAL / TYPOGRAPHY ========= */
-    html, body { height: 100%; }
+    /* ===== Global visual upgrades ===== */
     body{
-      margin:0;
-      background:#f3f7ff;
-      color:#0f172a;
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-      font-size: 15px; /* bigger text overall */
-      line-height: 1.45;
-    }
-
-    label{
-      font-size:13px;         /* bigger labels */
-      color:#1f2a44;
-      font-weight: 800;
-      letter-spacing: .1px;
-    }
-
-    input, select, textarea{
-      width: 100%;            /* IMPORTANT: full width */
-      box-sizing: border-box; /* IMPORTANT: no overflow */
-      padding: 12px 14px;
-      border-radius: 12px;
-      border: 1px solid #cfd9e8;
-      outline: none;
-      background: #fff;
-      font-size: 14px;        /* bigger inputs */
+      font-size: 15px;
       line-height: 1.35;
+      color:#13213a;
+      background:#f4f7fc;
     }
-
-    textarea{
-      min-height: 120px;      /* bigger default height */
-      resize: vertical;
-    }
-
-    /* ========= BUTTONS ========= */
-    .btn{
-      padding:10px 14px;
-      border-radius:12px;
-      border:1px solid #cfd9e8;
-      background:#f7fbff;
-      cursor:pointer;
-      font-weight:900;
-    }
-    .btn.primary{
-      background:#1f66c2;
-      color:#fff;
-      border-color:#1f66c2;
-      box-shadow: 0 10px 18px rgba(31,102,194,.18);
-    }
-    .btn.light{ background:#fff; }
-
-    .btn2{
-      background:#eaf1fb;
-      color:#1a4170;
-      border:1px solid #c9d9f3;
-      border-radius:12px;
-      padding:10px 14px;
-      font-weight:950;
-      cursor:pointer;
-    }
-
-    /* ========= LAYOUT ========= */
     .qe-wrap{ max-width: 1500px; margin: 0 auto; padding: 18px; }
     .qe-top{ display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; }
-    .qe-pill{
-      background:#eef5ff;
-      border:1px solid #cfe2ff;
-      padding:7px 12px;
-      border-radius:999px;
-      font-size:13px;
-      font-weight: 850;
-    }
-
-    .qe-card{
-      background:#fff;
-      border:1px solid #d9e2ef;
-      border-radius:16px;
-      padding:18px;
-      box-shadow: 0 10px 30px rgba(15,23,42,.06);
-    }
-
+    .qe-pill{ background:#eef5ff; border:1px solid #cfe2ff; padding:7px 12px; border-radius:999px; font-size:13px; }
+    .qe-card{ background:#fff; border:1px solid #d9e2ef; border-radius:16px; padding:18px; box-shadow: 0 6px 20px rgba(15,30,60,.08); }
     .qe-row{ display:flex; gap:14px; flex-wrap:wrap; align-items:end; }
-    .qe-row > div{ display:flex; flex-direction:column; gap:6px; }
 
-    .qe-main{
-      display:grid;
-      grid-template-columns: 380px 1fr;
-      gap:14px;
-      margin-top:14px;
+    label{ font-size:13px; color:#24324a; font-weight:800; }
+    input, select, textarea{
+      padding:11px 12px;
+      border-radius:12px;
+      border:1px solid #cfd9e8;
+      outline:none;
+      background:#fff;
+      font-size:14px;
+    }
+    input:focus, select:focus, textarea:focus{
+      border-color:#7fb0ff;
+      box-shadow:0 0 0 3px rgba(62,140,255,.12);
     }
 
-    /* ========= TOPBAR ========= */
+    textarea{ min-height: 110px; resize: vertical; width:100%; }
+    .btn{ padding:10px 14px; border-radius:12px; border:1px solid #cfd9e8; background:#f7fbff; cursor:pointer; font-weight:900; }
+    .btn.primary{ background:#1f66c2; color:#fff; border-color:#1f66c2; }
+    .btn.light{ background:#fff; }
+
+    .qe-main{ display:grid; grid-template-columns: 400px 1fr; gap:14px; margin-top:14px; }
+    .qe-list{ border:1px solid #d9e2ef; border-radius:14px; overflow:hidden; background:#fff; box-shadow:0 6px 16px rgba(15,30,60,.06); }
+    .qe-list-head{ padding:12px 14px; background:#f3f7ff; display:flex; justify-content:space-between; font-size:13px; border-bottom:1px solid #e6eefb; }
+    #qList{ max-height: 720px; overflow:auto; }
+    .qitem{ padding:12px 14px; border-top:1px solid #eef2f8; cursor:pointer; }
+    .qitem:hover{ background:#f8fbff; }
+    .qitem.active{ background:#eaf2ff; border-left:4px solid #1f66c2; padding-left:10px; }
+    .qno{ font-weight:950; font-size:15px; letter-spacing:.3px; }
+    .qsub{ font-size:13px; color:#2b3750; margin-top:6px; line-height:1.35; }
+    .muted{ color:#6b778c; font-size:13px; }
+    .warn{ background:#fff1f1; border:1px solid #ffc9c9; padding:12px 14px; border-radius:14px; margin:12px 0; display:none; white-space:pre-wrap; }
+    .ok{ background:#f1fff4; border:1px solid #bfeccc; padding:12px 14px; border-radius:14px; margin:12px 0; display:none; white-space:pre-wrap; }
+    .qe-right h2{ margin:0; font-size:22px; }
+    .qe-actions{ display:flex; gap:10px; justify-content:flex-end; align-items:center; flex-wrap:wrap; }
+    .qe-split3{ display:grid; grid-template-columns: 1fr 1fr 1fr; gap:12px; }
+    .qe-split2{ display:grid; grid-template-columns: 1fr 1fr; gap:12px; }
+    .adv{ display:none; margin-top:12px; padding-top:12px; border-top:1px dashed #d9e2ef; }
+    .small{ font-size:13px; }
+
+    .kv{ display:flex; gap:10px; flex-wrap:wrap; }
+    .kv .qe-pill{ font-weight:900; }
+
     .topbar{
       background:#1a4170;
       color:#fff;
@@ -111,147 +72,73 @@
       align-items:center;
       gap:12px;
       flex-wrap:wrap;
-      box-shadow: 0 8px 24px rgba(15,23,42,.18);
-      position: sticky;
-      top: 0;
-      z-index: 100;
+      box-shadow: 0 6px 20px rgba(10,20,50,.18);
     }
-    .row{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+    .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+    .btn2{background:#eaf1fb;color:#1a4170;border:1px solid #c9d9f3;border-radius:12px;padding:10px 14px;font-weight:950;cursor:pointer;}
 
-    /* ========= LEFT LIST ========= */
-    .qe-list{
-      border:1px solid #d9e2ef;
-      border-radius:14px;
-      overflow:hidden;
-      background:#fff;
-      box-shadow: 0 10px 26px rgba(15,23,42,.05);
-    }
-    .qe-list-head{
-      padding:12px 14px;
-      background: linear-gradient(180deg, #f3f7ff 0%, #eef4ff 100%);
-      display:flex;
-      justify-content:space-between;
-      font-size:13px;
-      border-bottom: 1px solid #e6eefc;
-    }
-    #qList{ max-height: 720px; overflow:auto; }
-
-    .qitem{
-      padding:12px 14px;
-      border-top:1px solid #eef2f8;
-      cursor:pointer;
-    }
-    .qitem:hover{ background:#f8fbff; }
-    .qitem.active{
-      background:#eaf2ff;
-      border-left: 4px solid #1f66c2;
-      padding-left: 10px;
-    }
-    .qno{ font-weight:950; font-size: 15px; }
-    .qsub{ font-size: 13px; color:#334; margin-top:6px; line-height: 1.35; }
-
-    /* ========= MESSAGES ========= */
-    .muted{ color:#6b778c; font-size:13px; }
-    .small{ font-size:13px; }
-
-    .warn{
-      background:#fff1f1;
-      border:1px solid #ffc9c9;
-      padding:12px 14px;
-      border-radius:14px;
-      margin:12px 0;
-      display:none;
-      white-space:pre-wrap;
-      font-weight: 700;
-    }
-    .ok{
-      background:#f1fff4;
-      border:1px solid #bfeccc;
-      padding:12px 14px;
-      border-radius:14px;
-      margin:12px 0;
-      display:none;
-      white-space:pre-wrap;
-      font-weight: 700;
-    }
-
-    /* ========= RIGHT PANEL ========= */
-    .qe-right h2{ margin:0; font-size:22px; letter-spacing: .2px; }
-    .qe-actions{ display:flex; gap:10px; justify-content:flex-end; align-items:center; flex-wrap:wrap; }
-
-    /* Make “attributes” stack vertically everywhere */
-    .qe-split2{ display:grid; grid-template-columns: 1fr; gap:12px; }
-    .qe-split3{ display:grid; grid-template-columns: 1fr 1fr 1fr; gap:12px; }
-
-    /* Make each attribute look like a “rich box” */
-    .qe-split2 > div,
-    .qe-split3 > div{
-      border: 1px solid #e3ebfb;
-      background: #fbfdff;
-      border-radius: 14px;
-      padding: 12px;
-    }
-
-    /* ========= “MASTER LIST” SECTIONS (Expected Evidence / PGNO) ========= */
+    /* Shared “master list” box look */
     .masterBox{
       border:1px solid #d9e2ef;
       border-radius:14px;
       padding:14px;
-      background: linear-gradient(180deg, #fbfdff 0%, #f6f9ff 100%);
-      box-shadow: inset 0 1px 0 rgba(255,255,255,.7);
+      background:#f6f9ff;
     }
-
     .masterRow{
       border:1px solid #e7eef9;
       border-radius:14px;
       padding:12px;
       background:#fff;
       margin-bottom:12px;
-      box-shadow: 0 8px 18px rgba(15,23,42,.04);
+      box-shadow: 0 4px 14px rgba(15,30,60,.06);
     }
-
-    .masterHdr{
-      display:flex;
-      justify-content:space-between;
-      align-items:flex-start;
-      gap:10px;
-      flex-wrap:wrap;
-      border-bottom: 1px dashed #e6eefc;
-      padding-bottom: 10px;
-      margin-bottom: 10px;
-    }
-
-    .masterCode{ font-weight: 950; font-size: 14px; }
-    .masterTiny{ font-size:13px; color:#556; }
-
-    /* IMPORTANT: stack all editor fields vertically and full width */
-    .masterGrid{
-      display:grid;
-      grid-template-columns: 1fr; /* vertical stack */
-      gap:10px;
-      margin-top:10px;
-    }
+    .masterHdr{ display:flex; justify-content:space-between; align-items:flex-start; gap:10px; flex-wrap:wrap; }
+    .masterCode{ font-weight:950; font-size:14px; }
+    .masterTiny{ font-size:13px; color:#4b5972; }
+    .masterGrid{ display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-top:10px; }
+    .masterGrid textarea{ min-height:90px; width:100%; }
     .masterGrid .full{ grid-column: 1 / -1; }
-    .masterGrid textarea{
-      width: 100%;
-      min-height: 120px; /* bigger textareas in EE/PGNO editor rows */
+
+    /* Make edit grids stack vertically (full width) */
+    .masterGrid.vertical{ grid-template-columns: 1fr; }
+    .masterGrid.vertical .full{ grid-column: 1 / -1; }
+
+    /* Attribute table style (like your screenshot) */
+    .attrTable{
+      border:1px solid #d9e2ef;
+      border-radius:14px;
+      overflow:hidden;
+      background:#fff;
+    }
+    .attrRow{
+      display:grid;
+      grid-template-columns: 260px 1fr 260px 1fr;
+      border-top:1px solid #e6eefb;
+    }
+    .attrRow:first-child{ border-top:none; }
+    .attrCell{
+      padding:10px 12px;
+      font-size:13px;
+      line-height:1.25;
+      border-right:1px solid #e6eefb;
+    }
+    .attrCell:last-child{ border-right:none; }
+    .attrKey{
+      background:#f3f7ff;
+      font-weight:950;
+      color:#21335a;
+    }
+    .attrVal{
+      background:#fbfdff;
+      color:#1c2a44;
     }
 
-    /* View blocks: improve readability */
-    #vShortText, #vQuestion, #vGuidance, #vActions{
-      font-size: 14px;
-      line-height: 1.5;
-      background: #fff;
-      border: 1px solid #e3ebfb;
-      border-radius: 14px;
-      padding: 12px;
-    }
-
-    /* Responsive */
-    @media (max-width: 1100px){
+    @media (max-width: 1200px){
       .qe-main{ grid-template-columns: 1fr; }
-      #qList{ max-height: 420px; }
-      .qe-split3{ grid-template-columns: 1fr; }
+      .attrRow{ grid-template-columns: 200px 1fr; }
+      .attrCell{ border-right:none; border-top:1px solid #e6eefb; }
+      .attrRow{ border-top:none; }
+      .attrRow:first-child .attrCell{ border-top:none; }
     }
   </style>
 </head>
@@ -261,7 +148,7 @@
   <div class="topbar">
     <div style="font-weight:950;">SIRE 2.0 – Questions Editor</div>
     <div class="row">
-      <div id="userBadge" style="font-weight:800;opacity:.95;"></div>
+      <div id="userBadge" style="font-weight:900;opacity:.95;"></div>
       <button class="btn2" id="loginBtn" type="button" style="display:none;">Login</button>
       <button class="btn2" id="switchUserBtn" type="button">Switch User</button>
       <button class="btn" id="logoutBtn" type="button" style="display:none;">Logout</button>
@@ -278,7 +165,7 @@
     <div id="okBox" class="ok"></div>
 
     <div class="qe-card">
-      <h1 style="margin:0 0 8px 0; font-size:26px; letter-spacing:.2px;">Questions Browser & Viewer / Editor (DB)</h1>
+      <h1 style="margin:0 0 8px 0; font-size:26px;">Questions Browser & Viewer / Editor (DB)</h1>
       <div class="muted">
         PGNOs and Expected Evidence are stored as separate DB rows (per bullet) and are editable for <b>all</b> questions.
       </div>
@@ -320,6 +207,14 @@
           <input id="versionFilter" type="text" placeholder="Leave blank to show all" />
         </div>
 
+        <div style="min-width:240px;">
+          <label>Show full question in list</label>
+          <div style="display:flex; align-items:center; gap:10px; padding:10px 12px; border:1px solid #cfd9e8; border-radius:12px; background:#fff;">
+            <input id="toggleShowFullQuestion" type="checkbox" style="transform:scale(1.2);" />
+            <div class="muted" id="toggleShowFullQuestionLabel">OFF (Short Text)</div>
+          </div>
+        </div>
+
         <div style="min-width:140px;">
           <label>&nbsp;</label>
           <div id="loadHint" class="muted"></div>
@@ -353,7 +248,7 @@
             </div>
 
             <div style="height:10px;"></div>
-            <div class="kv" style="display:flex; gap:10px; flex-wrap:wrap;">
+            <div class="kv">
               <div class="qe-pill" id="vSourcePill">source: —</div>
               <div class="qe-pill" id="vStatusPill">status: —</div>
               <div class="qe-pill" id="vSuffixPill">suffix: —</div>
@@ -361,31 +256,68 @@
 
             <div style="height:14px;"></div>
 
-            <div class="qe-split2">
-              <div>
-                <label>Short Text</label>
-                <div id="vShortText" class="small" style="white-space:pre-wrap;"></div>
+            <!-- QUESTION ATTRIBUTES (VIEW) -->
+            <div class="masterBox" style="margin-bottom:12px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
+                <div style="font-weight:950;">Question Attributes</div>
+                <div class="muted small">from payload</div>
               </div>
-              <div>
-                <label>Question</label>
-                <div id="vQuestion" class="small" style="white-space:pre-wrap;"></div>
+
+              <div style="height:10px;"></div>
+
+              <div class="attrTable">
+                <div class="attrRow">
+                  <div class="attrCell attrKey">Question Type:</div>
+                  <div class="attrCell attrVal" id="vMetaQuestionType"></div>
+                  <div class="attrCell attrKey">Question Response Type:</div>
+                  <div class="attrCell attrVal" id="vMetaResponseTypes"></div>
+                </div>
+                <div class="attrRow">
+                  <div class="attrCell attrKey">Vessel Type:</div>
+                  <div class="attrCell attrVal" id="vMetaVesselType"></div>
+                  <div class="attrCell attrKey">ROVIQ List:</div>
+                  <div class="attrCell attrVal" id="vMetaRoviq"></div>
+                </div>
+                <div class="attrRow">
+                  <div class="attrCell attrKey">Company Rank Allocation:</div>
+                  <div class="attrCell attrVal" id="vMetaCompanyRank"></div>
+                  <div class="attrCell attrKey">SPIS Rank Allocation:</div>
+                  <div class="attrCell attrVal" id="vMetaSpisRank"></div>
+                </div>
+                <div class="attrRow">
+                  <div class="attrCell attrKey">TMSA3 Reference:</div>
+                  <div class="attrCell attrVal" id="vMetaTmsa3"></div>
+                  <div class="attrCell attrKey">TMSA4 Reference:</div>
+                  <div class="attrCell attrVal" id="vMetaTmsa4"></div>
+                </div>
               </div>
             </div>
 
-            <div style="height:12px;"></div>
+            <div class="masterBox" style="margin-bottom:12px;">
+              <div style="font-weight:950; margin-bottom:8px;">Question Content</div>
 
-            <div class="qe-split2">
-              <div>
-                <label>Inspection guidance</label>
-                <div id="vGuidance" class="small" style="white-space:pre-wrap;"></div>
-              </div>
-              <div>
-                <label>Suggested inspector actions</label>
-                <div id="vActions" class="small" style="white-space:pre-wrap;"></div>
+              <div style="display:grid; grid-template-columns: 1fr; gap:12px;">
+                <div class="masterRow" style="margin:0;">
+                  <div class="masterTiny" style="font-weight:950; margin-bottom:6px;">Short Text</div>
+                  <div id="vShortText" class="small" style="white-space:pre-wrap;"></div>
+                </div>
+
+                <div class="masterRow" style="margin:0;">
+                  <div class="masterTiny" style="font-weight:950; margin-bottom:6px;">Question</div>
+                  <div id="vQuestion" class="small" style="white-space:pre-wrap;"></div>
+                </div>
+
+                <div class="masterRow" style="margin:0;">
+                  <div class="masterTiny" style="font-weight:950; margin-bottom:6px;">Inspection guidance</div>
+                  <div id="vGuidance" class="small" style="white-space:pre-wrap;"></div>
+                </div>
+
+                <div class="masterRow" style="margin:0;">
+                  <div class="masterTiny" style="font-weight:950; margin-bottom:6px;">Suggested inspector actions</div>
+                  <div id="vActions" class="small" style="white-space:pre-wrap;"></div>
+                </div>
               </div>
             </div>
-
-            <div style="height:12px;"></div>
 
             <!-- EXPECTED EVIDENCE (VIEW) -->
             <div class="masterBox">
@@ -409,7 +341,7 @@
               <div id="vPgnoList" class="small"></div>
             </div>
 
-            <div class="adv" id="viewAdvanced" style="display:none; margin-top:12px; padding-top:12px; border-top:1px dashed #d9e2ef;">
+            <div class="adv" id="viewAdvanced">
               <div class="qe-split2">
                 <div>
                   <label>Tags</label>
@@ -424,7 +356,7 @@
               <div style="height:10px;"></div>
               <div>
                 <label>Raw JSON</label>
-                <pre id="vRaw" class="small" style="white-space:pre-wrap; background:#f7fbff; border:1px solid #d9e2ef; padding:10px; border-radius:12px; overflow:auto; max-height:280px;"></pre>
+                <pre id="vRaw" class="small" style="white-space:pre-wrap; background:#f7fbff; border:1px solid #d9e2ef; padding:12px; border-radius:12px; overflow:auto; max-height:320px;"></pre>
               </div>
             </div>
 
@@ -447,7 +379,7 @@
             </div>
 
             <div style="height:10px;"></div>
-            <div class="kv" style="display:flex; gap:10px; flex-wrap:wrap;">
+            <div class="kv">
               <div class="qe-pill" id="pillSource">source: —</div>
               <div class="qe-pill" id="pillStatus">status: —</div>
               <div class="qe-pill" id="pillSuffix">suffix: —</div>
@@ -509,7 +441,7 @@
               </div>
             </div>
 
-            <div class="adv" id="editAdvanced" style="display:none; margin-top:12px; padding-top:12px; border-top:1px dashed #d9e2ef;">
+            <div class="adv" id="editAdvanced">
               <div class="qe-split2">
                 <div>
                   <label>Version (your tag)</label>
@@ -533,31 +465,153 @@
 
             <div style="height:14px;"></div>
 
-            <div class="qe-split2">
-              <div>
-                <label>Short Text</label>
-                <textarea id="pShortText"></textarea>
+            <!-- QUESTION ATTRIBUTES (EDIT) -->
+            <div class="masterBox" style="margin-bottom:12px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
+                <div style="font-weight:950;">Question Attributes</div>
+                <div class="muted small">editable • saved into payload</div>
               </div>
-              <div>
-                <label>Question</label>
-                <textarea id="pQuestion"></textarea>
+
+              <div style="height:10px;"></div>
+
+              <div class="qe-split2" style="gap:12px;">
+                <div>
+                  <label>Question Type</label>
+                  <input id="pQuestionType" list="questionTypeList" placeholder="Core / Rotational 1 / Rotational 2" />
+                  <datalist id="questionTypeList">
+                    <option value="Core"></option>
+                    <option value="Rotational 1"></option>
+                    <option value="Rotational 2"></option>
+                  </datalist>
+                </div>
+
+                <div>
+                  <label>Vessel Type (comma separated)</label>
+                  <input id="pVesselType" placeholder="Oil, Chemical, LNG, LPG" />
+                </div>
+              </div>
+
+              <div style="height:10px;"></div>
+
+              <div class="qe-split2" style="gap:12px;">
+                <div>
+                  <label>ROVIQ List</label>
+                  <input id="pRoviqList" placeholder="Documentation, Pre-board" />
+                </div>
+
+                <div>
+                  <label>Company Rank Allocation</label>
+                  <input id="pCompanyRankAllocation" placeholder="Master, Chief Officer, Deck Officers..." />
+                </div>
+              </div>
+
+              <div style="height:10px;"></div>
+
+              <div class="qe-split2" style="gap:12px;">
+                <div>
+                  <label>SPIS Rank Allocation</label>
+                  <input id="pSpisRankAllocation" placeholder="Master" />
+                </div>
+
+                <div>
+                  <label>TMSA3 Reference</label>
+                  <input id="pTmsa3Ref" placeholder="(optional)" />
+                </div>
+              </div>
+
+              <div style="height:10px;"></div>
+
+              <div class="qe-split2" style="gap:12px;">
+                <div>
+                  <label>TMSA4 Reference</label>
+                  <input id="pTmsa4Ref" placeholder="(optional)" />
+                </div>
+
+                <div>
+                  <label>Question Response Type</label>
+
+                  <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:center; padding:10px 12px; border:1px solid #cfd9e8; border-radius:12px; background:#fff;">
+                    <label style="display:flex; gap:8px; align-items:center; margin:0; font-weight:900;">
+                      <input id="rtHuman" type="checkbox" style="transform:scale(1.15);" />
+                      Human
+                    </label>
+
+                    <label style="display:flex; gap:8px; align-items:center; margin:0; font-weight:900;">
+                      <input id="rtHardware" type="checkbox" style="transform:scale(1.15);" />
+                      Hardware
+                    </label>
+
+                    <label style="display:flex; gap:8px; align-items:center; margin:0; font-weight:900;">
+                      <input id="rtProcess" type="checkbox" style="transform:scale(1.15);" />
+                      Process
+                    </label>
+
+                    <label style="display:flex; gap:8px; align-items:center; margin:0; font-weight:900;">
+                      <input id="rtPhoto" type="checkbox" style="transform:scale(1.15);" />
+                      Photo
+                    </label>
+                  </div>
+
+                  <div class="muted small" style="margin-top:6px;">
+                    Human/Hardware/Process also store their tool type (Binary/Graduated) in the payload.
+                  </div>
+                </div>
+              </div>
+
+              <div style="height:10px;"></div>
+
+              <div class="qe-split3" style="gap:12px;">
+                <div>
+                  <label>Human Response Type</label>
+                  <select id="pHumanRespType">
+                    <option value=""></option>
+                    <option value="Binary">Binary</option>
+                    <option value="Graduated">Graduated</option>
+                  </select>
+                </div>
+                <div>
+                  <label>Hardware Response Type</label>
+                  <select id="pHardwareRespType">
+                    <option value=""></option>
+                    <option value="Binary">Binary</option>
+                    <option value="Graduated">Graduated</option>
+                  </select>
+                </div>
+                <div>
+                  <label>Process Response Type</label>
+                  <select id="pProcessRespType">
+                    <option value=""></option>
+                    <option value="Binary">Binary</option>
+                    <option value="Graduated">Graduated</option>
+                  </select>
+                </div>
               </div>
             </div>
 
-            <div style="height:12px;"></div>
+            <!-- MAIN TEXT FIELDS (full width stacked) -->
+            <div class="masterBox" style="margin-bottom:12px;">
+              <div style="font-weight:950; margin-bottom:10px;">Question Content</div>
 
-            <div class="qe-split2">
-              <div>
+              <div class="masterRow" style="margin:0 0 12px 0;">
+                <label>Short Text</label>
+                <textarea id="pShortText"></textarea>
+              </div>
+
+              <div class="masterRow" style="margin:0 0 12px 0;">
+                <label>Question</label>
+                <textarea id="pQuestion"></textarea>
+              </div>
+
+              <div class="masterRow" style="margin:0 0 12px 0;">
                 <label>Inspection guidance</label>
                 <textarea id="pGuidance"></textarea>
               </div>
-              <div>
+
+              <div class="masterRow" style="margin:0;">
                 <label>Suggested inspector actions</label>
                 <textarea id="pActions"></textarea>
               </div>
             </div>
-
-            <div style="height:14px;"></div>
 
             <!-- EXPECTED EVIDENCE (EDIT) -->
             <div class="masterBox">

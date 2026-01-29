@@ -26,17 +26,21 @@
     return Number.isFinite(n) && Math.floor(n) === n;
   }
 
-  // ===== List toggle persistence =====
-  const LS_KEY_SHOW_FULL = "qe_show_full_question_in_list";
-  function getShowFullQuestionInList() {
-    const raw = safeStr(localStorage.getItem(LS_KEY_SHOW_FULL)).trim();
-    if (raw === "") return true;               // default ON
-    if (raw === "1" || raw === "true") return true;
-    if (raw === "0" || raw === "false") return false;
-    return true;
+  // ===== List toggle: show full question in list =====
+  const LS_SHOW_FULL = "qe_show_full_question";
+  function getShowFullQuestion() {
+    try { return localStorage.getItem(LS_SHOW_FULL) === "1"; } catch { return false; }
   }
-  function setShowFullQuestionInList(v) {
-    localStorage.setItem(LS_KEY_SHOW_FULL, v ? "1" : "0");
+  function setShowFullQuestion(v) {
+    try { localStorage.setItem(LS_SHOW_FULL, v ? "1" : "0"); } catch {}
+  }
+  function syncToggleUI() {
+    const cb = $("toggleShowFullQuestion");
+    const lab = $("toggleShowFullQuestionLabel");
+    if (!cb) return;
+    const on = getShowFullQuestion();
+    cb.checked = on;
+    if (lab) lab.textContent = on ? "ON (Full Question)" : "OFF (Short Text)";
   }
 
   // ===== Number helpers =====
@@ -88,9 +92,8 @@
     const nbNorm = normalizeNumberBaseRow(row);
     const computed = computeNumberFull(nbNorm, sx);
 
-    // Keep legacy stored number_full ONLY as fallback (some DB rows may have it)
+    // Keep legacy stored number_full ONLY as fallback
     let nf = safeStr(row?.number_full).trim();
-    // fix legacy “02.01.01-” cases when suffix is blank
     if (nf && nf.endsWith("-") && !sx) nf = nf.slice(0, -1);
 
     return computed || nf || "—";
@@ -100,12 +103,10 @@
     const s = safeStr(nb).trim();
     const m = s.match(/^(\d+)\.(\d+)\.(\d+)$/);
     if (!m) return { xx:"", yy:"", zz:"" };
-    // Use numeric strings in inputs (no padding) - ok for editing
     return { xx: String(Number(m[1])), yy: String(Number(m[2])), zz: String(Number(m[3])) };
   }
 
   function numberKey(row) {
-    // Sort using numeric parts from normalized base so order is stable
     const nb = normalizeNumberBaseRow(row);
     const m = nb.match(/^(\d+)\.(\d+)\.(\d+)$/);
     if (!m) return [9999, 9999, 999999, nb];
@@ -142,19 +143,24 @@
       const clean = line.replace(/^•\s*/, "").replace(/^-\s*/, "").replace(/^–\s*/, "").replace(/^—\s*/, "").trim();
       if (!clean) continue;
 
-      if (!out.length) {
-        out.push(clean);
-        continue;
-      }
+      if (!out.length) { out.push(clean); continue; }
 
-      if (isBulletStart(line)) {
-        out.push(clean);
-      } else {
-        // continuation of previous bullet
-        out[out.length - 1] = (out[out.length - 1] + " " + clean).trim();
-      }
+      if (isBulletStart(line)) out.push(clean);
+      else out[out.length - 1] = (out[out.length - 1] + " " + clean).trim();
     }
     return out;
+  }
+
+  // ===== Payload helpers for attributes =====
+  function payloadGet(p, keys) {
+    for (const k of keys) {
+      const v = p?.[k];
+      if (v !== undefined && v !== null && String(v).trim() !== "") return v;
+    }
+    return "";
+  }
+  function payloadSet(p, key, value) {
+    p[key] = safeStr(value).trim();
   }
 
   // ===== PGNO helpers =====
@@ -298,7 +304,7 @@
             <div class="masterCode">${escapeHtml(code)}</div>
           </div>
           <div class="masterTiny" style="margin-top:6px; white-space:pre-wrap;">${escapeHtml(t)}</div>
-          ${r ? `<div class="masterTiny" style="margin-top:8px;"><b>Remarks:</b> ${escapeHtml(r)}</div>` : ``}
+          ${r ? `<div class="masterTiny" style="margin-top:10px;"><b>Remarks:</b> ${escapeHtml(r)}</div>` : ``}
         </div>
       `;
     }).join("");
@@ -335,7 +341,7 @@
           </div>
         </div>
 
-        <div class="masterGrid">
+        <div class="masterGrid vertical">
           <div class="full">
             <label>PGNO text</label>
             <textarea data-text="${idx}"></textarea>
@@ -403,7 +409,7 @@
           <div class="masterTiny" style="margin-top:6px; white-space:pre-wrap;">${escapeHtml(t)}</div>
 
           ${(ch || form || r) ? `
-            <div style="height:8px;"></div>
+            <div style="height:10px;"></div>
             ${ch ? `<div class="masterTiny"><b>eSMS Reference(s):</b> ${escapeHtml(ch)}</div>` : ``}
             ${form ? `<div class="masterTiny"><b>eSMS Form(s):</b> ${escapeHtml(form)}</div>` : ``}
             ${r ? `<div class="masterTiny"><b>Remarks:</b> ${escapeHtml(r)}</div>` : ``}
@@ -439,7 +445,7 @@
           </div>
         </div>
 
-        <div class="masterGrid">
+        <div class="masterGrid vertical">
           <div class="full">
             <label>Expected Evidence text</label>
             <textarea data-ee-text="${idx}"></textarea>
@@ -502,11 +508,35 @@
     setText("vhdrId", r.id ? `DB id: ${r.id}` : "");
 
     const p = r.payload || {};
+
+    // Main content
     setText("vShortText", safeStr(p.short_text ?? p.ShortText ?? p.shortText ?? p["Short Text"]));
     setText("vQuestion", safeStr(p.question ?? p.Question ?? p["Question"]));
     setText("vGuidance", safeStr(p.inspection_guidance ?? p.guidance ?? p.InspectionGuidance ?? p["Inspection Guidance"]));
     setText("vActions", safeStr(p.suggested_inspector_actions ?? p.actions ?? p.SuggestedInspectorActions ?? p["Suggested Inspector Actions"]));
 
+    // Attributes
+    setText("vMetaQuestionType", safeStr(payloadGet(p, ["Question Type", "question_type"])) || "—");
+    setText("vMetaVesselType", safeStr(payloadGet(p, ["Vessel Type", "vessel_type"])) || "—");
+    setText("vMetaRoviq", safeStr(payloadGet(p, ["ROVIQ List", "roviq_list"])) || "—");
+    setText("vMetaCompanyRank", safeStr(payloadGet(p, ["Company Rank Allocation", "company_rank_allocation"])) || "—");
+    setText("vMetaSpisRank", safeStr(payloadGet(p, ["SPIS Rank Allocation", "spis_rank_allocation"])) || "—");
+    setText("vMetaTmsa3", safeStr(payloadGet(p, ["TMSA3 Reference", "tmsa3_reference"])) || "—");
+    setText("vMetaTmsa4", safeStr(payloadGet(p, ["TMSA4 Reference", "tmsa4_reference"])) || "—");
+
+    const humanRT = safeStr(payloadGet(p, ["Human Response Type", "human_response_type"]));
+    const hardwareRT = safeStr(payloadGet(p, ["Hardware Response Type", "hardware_response_type"]));
+    const processRT = safeStr(payloadGet(p, ["Process Response Type", "process_response_type"]));
+    const photoR = safeStr(payloadGet(p, ["Photo Response", "photo_response"])).toUpperCase();
+
+    const respTypes = [];
+    if (humanRT) respTypes.push("Human");
+    if (hardwareRT) respTypes.push("Hardware");
+    if (processRT) respTypes.push("Process");
+    if (photoR === "Y") respTypes.push("Photo");
+    setText("vMetaResponseTypes", respTypes.length ? respTypes.join(", ") : "—");
+
+    // Advanced
     setText("vTags", Array.isArray(r.tags) ? r.tags.join(", ") : safeStr(r.tags || ""));
     setText("vVersion", safeStr(r.version || ""));
 
@@ -540,6 +570,31 @@
     setText("hdrNumber", displayNumber(r));
 
     const p = r.payload || {};
+
+    // Attributes (EDIT)
+    $("pQuestionType").value = safeStr(payloadGet(p, ["Question Type", "question_type"]));
+    $("pVesselType").value = safeStr(payloadGet(p, ["Vessel Type", "vessel_type"]));
+    $("pRoviqList").value = safeStr(payloadGet(p, ["ROVIQ List", "roviq_list"]));
+    $("pCompanyRankAllocation").value = safeStr(payloadGet(p, ["Company Rank Allocation", "company_rank_allocation"]));
+    $("pSpisRankAllocation").value = safeStr(payloadGet(p, ["SPIS Rank Allocation", "spis_rank_allocation"]));
+    $("pTmsa3Ref").value = safeStr(payloadGet(p, ["TMSA3 Reference", "tmsa3_reference"]));
+    $("pTmsa4Ref").value = safeStr(payloadGet(p, ["TMSA4 Reference", "tmsa4_reference"]));
+
+    const humanRT = safeStr(payloadGet(p, ["Human Response Type", "human_response_type"]));
+    const hardwareRT = safeStr(payloadGet(p, ["Hardware Response Type", "hardware_response_type"]));
+    const processRT = safeStr(payloadGet(p, ["Process Response Type", "process_response_type"]));
+    const photoR = safeStr(payloadGet(p, ["Photo Response", "photo_response"])).toUpperCase();
+
+    $("rtHuman").checked = !!humanRT;
+    $("rtHardware").checked = !!hardwareRT;
+    $("rtProcess").checked = !!processRT;
+    $("rtPhoto").checked = (photoR === "Y");
+
+    $("pHumanRespType").value = humanRT;
+    $("pHardwareRespType").value = hardwareRT;
+    $("pProcessRespType").value = processRT;
+
+    // Main content
     $("pShortText").value = safeStr(p.short_text ?? p.ShortText ?? p.shortText ?? p["Short Text"]);
     $("pQuestion").value = safeStr(p.question ?? p.Question ?? p["Question"]);
     $("pGuidance").value = safeStr(p.inspection_guidance ?? p.guidance ?? p.InspectionGuidance ?? p["Inspection Guidance"]);
@@ -571,7 +626,7 @@
     const tmp = { ...selected, number_base: nb, number_suffix: sx, number_full: "" };
 
     setText("hdrNumber", displayNumber(tmp));
-    renderPgnoEditor(); // codes depend on number_base
+    renderPgnoEditor();
   }
 
   // ===== list =====
@@ -607,7 +662,7 @@
     setText("countLine", `${filtered.length} questions`);
     setText("loadedLine", `Loaded ${allRows.length}`);
 
-    const showFull = getShowFullQuestionInList();
+    const showFull = getShowFullQuestion();
 
     for (const r of filtered) {
       const div = document.createElement("div");
@@ -615,13 +670,12 @@
 
       const p = r.payload || {};
 
-      const fullQuestion = safeStr(p.question || p.Question || p["Question"]).trim();
-      const shortText = safeStr(p.short_text || p.ShortText || p.shortText || p["Short Text"]).trim();
+      const shortText = safeStr(p.short_text || p.ShortText || p.shortText || p["Short Text"]);
+      const question = safeStr(p.question || p.Question || p["Question"]);
 
-      // ✅ Toggle behavior
       const sub = showFull
-        ? (fullQuestion || shortText || "—")
-        : (shortText || fullQuestion || "—");
+        ? (question || shortText)
+        : (shortText || question);
 
       div.innerHTML = `
         <div class="qno">${escapeHtml(displayNumber(r))}</div>
@@ -687,7 +741,7 @@
     }));
   }
 
-  async function savePgnoToDb(questionId, numberBase, items) {
+  async function savePgnoToDb(questionId, numberBase, sourceType, items) {
     const clean = (items || [])
       .map(x => ({ text: safeStr(x.text).trim(), remarks: safeStr(x.remarks).trim() }))
       .filter(x => x.text.length > 0);
@@ -700,7 +754,7 @@
     const rows = clean.map((x, i) => ({
       question_id: questionId,
       seq: i + 1,
-      pgno_code: pgnoCode(numberBase, i + 1, "SIRE"),
+      pgno_code: pgnoCode(numberBase, i + 1, sourceType || "SIRE"),
       pgno_text: x.text,
       remarks: x.remarks,
       created_by: me?.user?.id || null,
@@ -822,6 +876,18 @@
         suggested_inspector_actions: "",
         expected_evidence: [],
         potential_grounds_for_negative_observations: [],
+
+        "Question Type": "",
+        "Vessel Type": "",
+        "ROVIQ List": "",
+        "Company Rank Allocation": "",
+        "SPIS Rank Allocation": "",
+        "TMSA3 Reference": "",
+        "TMSA4 Reference": "",
+        "Human Response Type": "",
+        "Hardware Response Type": "",
+        "Process Response Type": "",
+        "Photo Response": "N",
       },
       pgno_items: [],
       ee_items: [],
@@ -883,6 +949,27 @@
       payload.inspection_guidance = safeStr($("pGuidance").value);
       payload.suggested_inspector_actions = safeStr($("pActions").value);
 
+      // Attributes
+      payloadSet(payload, "Question Type", $("pQuestionType").value);
+      payloadSet(payload, "Vessel Type", $("pVesselType").value);
+      payloadSet(payload, "ROVIQ List", $("pRoviqList").value);
+      payloadSet(payload, "Company Rank Allocation", $("pCompanyRankAllocation").value);
+      payloadSet(payload, "SPIS Rank Allocation", $("pSpisRankAllocation").value);
+      payloadSet(payload, "TMSA3 Reference", $("pTmsa3Ref").value);
+      payloadSet(payload, "TMSA4 Reference", $("pTmsa4Ref").value);
+
+      // Response toggles + tool types
+      const humanOn = $("rtHuman").checked;
+      const hardwareOn = $("rtHardware").checked;
+      const processOn = $("rtProcess").checked;
+      const photoOn = $("rtPhoto").checked;
+
+      payloadSet(payload, "Human Response Type", humanOn ? ($("pHumanRespType").value || "Graduated") : "");
+      payloadSet(payload, "Hardware Response Type", hardwareOn ? ($("pHardwareRespType").value || "Binary") : "");
+      payloadSet(payload, "Process Response Type", processOn ? ($("pProcessRespType").value || "Graduated") : "");
+      payloadSet(payload, "Photo Response", photoOn ? "Y" : "N");
+
+      // Compatibility payload: store texts-only arrays
       ensurePgnoStateFromPayloadIfEmpty();
       ensureEeStateFromPayloadIfEmpty();
 
@@ -920,7 +1007,7 @@
 
         if (error) throw error;
 
-        try { await savePgnoToDb(data.id, number_base, selected.pgno_items || []); }
+        try { await savePgnoToDb(data.id, number_base, src, selected.pgno_items || []); }
         catch (e) { showWarn("Question saved, but PGNO rows could not be saved.\n\nError: " + String(e?.message || e)); }
 
         try { await saveEeToDb(data.id, selected.ee_items || []); }
@@ -946,7 +1033,7 @@
 
         if (error) throw error;
 
-        try { await savePgnoToDb(selected.id, number_base, selected.pgno_items || []); }
+        try { await savePgnoToDb(selected.id, number_base, src, selected.pgno_items || []); }
         catch (e) { showWarn("Question saved, but PGNO rows could not be saved.\n\nError: " + String(e?.message || e)); }
 
         try { await saveEeToDb(selected.id, selected.ee_items || []); }
@@ -990,12 +1077,13 @@
 
     $("searchInput").oninput = () => renderList();
 
-    // ✅ wire the toggle checkbox
-    const cb = $("toggleShowFullQuestion");
-    if (cb) {
-      cb.checked = getShowFullQuestionInList();
-      cb.onchange = () => {
-        setShowFullQuestionInList(!!cb.checked);
+    // list toggle
+    const t = $("toggleShowFullQuestion");
+    if (t) {
+      syncToggleUI();
+      t.onchange = () => {
+        setShowFullQuestion(!!t.checked);
+        syncToggleUI();
         renderList();
       };
     }
