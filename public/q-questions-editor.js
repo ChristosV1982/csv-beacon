@@ -60,25 +60,6 @@
     return [Number(m[1]), Number(m[2]), Number(m[3]), nb];
   }
 
-  function toMultiline(v) {
-    if (Array.isArray(v)) return v.map(x => safeStr(x)).join("\n");
-    if (typeof v === "string") return v;
-    if (v === null || v === undefined) return "";
-    try { return JSON.stringify(v, null, 2); } catch { return ""; }
-  }
-
-  function applyTextAreaPreservingType(obj, key, textValue) {
-    const current = obj[key];
-    if (Array.isArray(current)) {
-      obj[key] = safeStr(textValue)
-        .split(/\r?\n/)
-        .map(s => s.trim())
-        .filter(Boolean);
-      return;
-    }
-    obj[key] = safeStr(textValue);
-  }
-
   // Escape for view HTML
   function escapeHtml(s) {
     return safeStr(s)
@@ -96,87 +77,84 @@
     return nb ? `${nb}.${s2}` : `?.?.?.${s2}`;
   }
 
-  // Correct bullet parsing:
-  // Split ONLY when bullet marker is at start-of-line.
-  // Continuation lines stay with the current bullet.
-  function parseBulletedBlobToItems(blobText) {
-    const raw = safeStr(blobText).replace(/\r/g, "");
-    if (!raw.trim()) return [];
-
-    // Convert bullet-at-line-start to sentinel; do NOT split on normal newlines.
-    const withSentinel = raw.replace(/^\s*[•·●▪◦]\s*/gm, "@@B@@");
-    const parts = withSentinel.split("@@B@@").map(s => s.trim()).filter(Boolean);
-
-    return parts.map(p => ({ text: p, remarks: "" }));
-  }
-
-  function toBulletString(items) {
-    const clean = (items || [])
-      .map(x => safeStr(x.text).trim())
-      .filter(Boolean);
-
-    return clean.map(t => {
-      const lines = t.split(/\r?\n/);
-      const first = lines[0] || "";
-      const rest = lines.slice(1).map(l => "  " + l).join("\n");
-      return rest ? `• ${first}\n${rest}` : `• ${first}`;
-    }).join("\n");
-  }
-
-  function isExistingSire() {
-    return !!selected && !selected.__isNew && selected.source_type === "SIRE";
-  }
-
   function ensurePgnoStateFromPayloadIfEmpty() {
     if (!selected) return;
     if (Array.isArray(selected.pgno_items) && selected.pgno_items.length) return;
 
     const p = selected.payload || {};
-
-    // Prefer SIRE structured keys if present
-    if (Array.isArray(p.NegObs_Bullets) && p.NegObs_Bullets.length) {
-      const bullets = p.NegObs_Bullets.map(x => safeStr(x));
-      let remarks = [];
-      if (Array.isArray(p.NegObs_Remarks_PerBullet)) {
-        // Often it's [[a,b],[a,b]...]; we store combined
-        remarks = p.NegObs_Remarks_PerBullet.map(r => {
-          if (Array.isArray(r)) {
-            const a = safeStr(r[0]).trim();
-            const b = safeStr(r[1]).trim();
-            return (a && b) ? (a + "\n" + b) : (a || b);
-          }
-          return safeStr(r).trim();
-        });
-      }
-      selected.pgno_items = bullets.map((t, i) => ({ text: t, remarks: safeStr(remarks[i] || "") }));
-      return;
-    }
-
-    // Title-case blob (common in your DB payload)
-    const titleBlob = p["Potential Grounds for Negative Observations"];
-    if (typeof titleBlob === "string" && titleBlob.trim()) {
-      selected.pgno_items = parseBulletedBlobToItems(titleBlob);
-      return;
-    }
-
-    // Compatibility key (your custom questions)
     const old = p.potential_grounds_for_negative_observations;
+
     if (Array.isArray(old)) {
       selected.pgno_items = old.map(t => ({ text: safeStr(t), remarks: "" }));
       return;
     }
     if (typeof old === "string" && old.trim()) {
-      // fallback: treat as bullet blob if it has bullet markers, else line split
-      if (old.match(/^\s*[•·●▪◦]/m)) {
-        selected.pgno_items = parseBulletedBlobToItems(old);
-      } else {
-        const lines = old.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
-        selected.pgno_items = lines.map(t => ({ text: t, remarks: "" }));
-      }
+      const lines = old.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+      selected.pgno_items = lines.map(t => ({ text: t, remarks: "" }));
       return;
     }
 
     selected.pgno_items = [];
+  }
+
+  // ===== Expected Evidence helpers =====
+  function normalizeBulletsFromTextBlob(blob) {
+    const s = safeStr(blob).trim();
+    if (!s) return [];
+    // If bullet symbols at start of lines exist -> split at those bullets
+    const hasBulletStart = /(^|\n)\s*[•·●▪◦]/m.test(s);
+    if (hasBulletStart) {
+      const marked = s.replace(/(^|\n)\s*[•·●▪◦]\s*/gm, "$1§§§");
+      return marked
+        .split("§§§")
+        .map(x => x.trim())
+        .filter(Boolean);
+    }
+    // fallback: one per line
+    return s
+      .split(/\r?\n/)
+      .map(x => x.trim())
+      .filter(Boolean);
+  }
+
+  function ensureEvidenceStateFromPayloadIfEmpty() {
+    if (!selected) return;
+    if (Array.isArray(selected.evidence_items) && selected.evidence_items.length) return;
+
+    const p = selected.payload || {};
+
+    // Best: ExpEv_Bullets (objects)
+    const evBul = p.ExpEv_Bullets;
+    if (Array.isArray(evBul) && evBul.length) {
+      selected.evidence_items = evBul
+        .map(o => ({
+          text: safeStr(o?.text).trim(),
+          esms_references: safeStr(o?.ch).trim(),
+          esms_forms: safeStr(o?.form).trim(),
+          remarks: safeStr(o?.remarks).trim(),
+        }))
+        .filter(x => x.text);
+      return;
+    }
+
+    // Next: expected_evidence (array of strings)
+    const evArr = p.expected_evidence;
+    if (Array.isArray(evArr) && evArr.length) {
+      selected.evidence_items = evArr
+        .map(t => ({ text: safeStr(t).trim(), esms_references: "", esms_forms: "", remarks: "" }))
+        .filter(x => x.text);
+      return;
+    }
+
+    // Next: "Expected Evidence" (string blob)
+    const evBlob = p["Expected Evidence"];
+    if (typeof evBlob === "string" && evBlob.trim()) {
+      const lines = normalizeBulletsFromTextBlob(evBlob);
+      selected.evidence_items = lines.map(t => ({ text: t, esms_references: "", esms_forms: "", remarks: "" }));
+      return;
+    }
+
+    selected.evidence_items = [];
   }
 
   // ====== state ======
@@ -219,18 +197,123 @@
     setText("pillSuffix", `suffix: ${sx || "(blank)"}`);
   }
 
-  function previewNumberBaseForHeader() {
-    // In EDIT mode, use inputs to preview codes live,
-    // BUT for existing SIRE questions keep the DB number_base fixed.
-    if (isExistingSire()) return safeStr(selected?.number_base).trim();
+  // ===== Expected Evidence renderers =====
+  function renderEvidenceView() {
+    const host = $("vEvList");
+    if (!host) return;
 
-    const src = $("dbSourceType")?.value || (selected?.source_type || "SIRE");
-    const xx = $("numChapter")?.value;
-    const yy = $("numSection")?.value;
-    const zz = $("numItem")?.value;
+    ensureEvidenceStateFromPayloadIfEmpty();
 
-    const nb = buildNumberBase(src, xx, yy, zz);
-    return nb || safeStr(selected?.number_base).trim();
+    const items = selected?.evidence_items || [];
+    setText("vEvCount", `${items.length} item(s)`);
+
+    if (!items.length) {
+      host.innerHTML = `<div class="muted">No Expected Evidence recorded for this question.</div>`;
+      return;
+    }
+
+    host.innerHTML = items.map((it, i) => {
+      const t = safeStr(it.text);
+      const ch = safeStr(it.esms_references);
+      const form = safeStr(it.esms_forms);
+      const rem = safeStr(it.remarks);
+
+      return `
+        <div class="evRow">
+          <div class="evHdr">
+            <div class="evNo">• ${i + 1}</div>
+          </div>
+
+          <div class="evTiny" style="margin-top:6px; white-space:pre-wrap;">${escapeHtml(t)}</div>
+
+          <div class="evTiny" style="margin-top:8px;">
+            ${ch ? `<div><b>eSMS Reference(s):</b> ${escapeHtml(ch)}</div>` : ``}
+            ${form ? `<div><b>eSMS Form(s):</b> ${escapeHtml(form)}</div>` : ``}
+            ${rem ? `<div><b>Remarks:</b> ${escapeHtml(rem)}</div>` : ``}
+          </div>
+        </div>
+      `;
+    }).join("");
+  }
+
+  function renderEvidenceEditor() {
+    const host = $("evEditorList");
+    if (!host) return;
+
+    ensureEvidenceStateFromPayloadIfEmpty();
+
+    const items = selected.evidence_items || [];
+    setText("evCountLine", `${items.length} item(s)`);
+
+    host.innerHTML = "";
+
+    items.forEach((it, idx) => {
+      const row = document.createElement("div");
+      row.className = "evRow";
+
+      row.innerHTML = `
+        <div class="evHdr">
+          <div>
+            <div class="evNo">• ${idx + 1}</div>
+            <div class="evTiny">Seq: ${idx + 1}</div>
+          </div>
+          <div>
+            <button class="btn" type="button" data-evdel="${idx}">Delete</button>
+          </div>
+        </div>
+
+        <div class="evGrid">
+          <div class="full">
+            <label>Expected Evidence text</label>
+            <textarea data-evtext="${idx}"></textarea>
+          </div>
+          <div>
+            <label>eSMS Reference(s)</label>
+            <textarea data-evch="${idx}" placeholder="e.g. Ch. 7.3 / 7.5 ..."></textarea>
+          </div>
+          <div>
+            <label>eSMS Form(s)</label>
+            <textarea data-evform="${idx}" placeholder="e.g. CBO 04, IG-01 ..."></textarea>
+          </div>
+          <div class="full">
+            <label>Remarks</label>
+            <textarea data-evrem="${idx}" placeholder="Optional remarks"></textarea>
+          </div>
+        </div>
+      `;
+
+      host.appendChild(row);
+
+      const taText = row.querySelector(`textarea[data-evtext="${idx}"]`);
+      const taCh   = row.querySelector(`textarea[data-evch="${idx}"]`);
+      const taForm = row.querySelector(`textarea[data-evform="${idx}"]`);
+      const taRem  = row.querySelector(`textarea[data-evrem="${idx}"]`);
+
+      if (taText) taText.value = safeStr(it.text);
+      if (taCh) taCh.value = safeStr(it.esms_references);
+      if (taForm) taForm.value = safeStr(it.esms_forms);
+      if (taRem) taRem.value = safeStr(it.remarks);
+
+      if (taText) taText.addEventListener("input", () => { selected.evidence_items[idx].text = taText.value; });
+      if (taCh)   taCh.addEventListener("input", () => { selected.evidence_items[idx].esms_references = taCh.value; });
+      if (taForm) taForm.addEventListener("input", () => { selected.evidence_items[idx].esms_forms = taForm.value; });
+      if (taRem)  taRem.addEventListener("input", () => { selected.evidence_items[idx].remarks = taRem.value; });
+
+      const delBtn = row.querySelector(`button[data-evdel="${idx}"]`);
+      if (delBtn) {
+        delBtn.addEventListener("click", () => {
+          selected.evidence_items.splice(idx, 1);
+          renderEvidenceEditor();
+        });
+      }
+    });
+  }
+
+  function addEvidenceRow() {
+    if (!selected) return;
+    ensureEvidenceStateFromPayloadIfEmpty();
+    selected.evidence_items.push({ text: "", esms_references: "", esms_forms: "", remarks: "" });
+    renderEvidenceEditor();
   }
 
   // ===== PGNO renderers =====
@@ -274,7 +357,7 @@
     const items = selected.pgno_items || [];
     setText("pgnoCountLine", `${items.length} PGNO(s)`);
 
-    const nb = previewNumberBaseForHeader();
+    const nb = previewNumberBaseForHeader(); // use current inputs if user is editing the number
     host.innerHTML = "";
 
     items.forEach((it, idx) => {
@@ -313,14 +396,24 @@
       if (taText) taText.value = safeStr(it.text);
       if (taRem) taRem.value = safeStr(it.remarks);
 
-      if (taText) taText.addEventListener("input", () => { selected.pgno_items[idx].text = taText.value; });
-      if (taRem) taRem.addEventListener("input", () => { selected.pgno_items[idx].remarks = taRem.value; });
+      if (taText) {
+        taText.addEventListener("input", () => {
+          selected.pgno_items[idx].text = taText.value;
+        });
+      }
+      if (taRem) {
+        taRem.addEventListener("input", () => {
+          selected.pgno_items[idx].remarks = taRem.value;
+        });
+      }
 
       const delBtn = row.querySelector(`button[data-del="${idx}"]`);
-      if (delBtn) delBtn.addEventListener("click", () => {
-        selected.pgno_items.splice(idx, 1);
-        renderPgnoEditor();
-      });
+      if (delBtn) {
+        delBtn.addEventListener("click", () => {
+          selected.pgno_items.splice(idx, 1);
+          renderPgnoEditor();
+        });
+      }
     });
   }
 
@@ -344,9 +437,6 @@
     setText("vGuidance", safeStr(p.inspection_guidance ?? p.guidance ?? p.InspectionGuidance ?? p["Inspection Guidance"]));
     setText("vActions", safeStr(p.suggested_inspector_actions ?? p.actions ?? p.SuggestedInspectorActions ?? p["Suggested Inspector Actions"]));
 
-    const ev = p.expected_evidence ?? p.evidence ?? p.ExpectedEvidence ?? p["Expected Evidence"];
-    setText("vEvidence", toMultiline(ev));
-
     setText("vTags", Array.isArray(r.tags) ? r.tags.join(", ") : safeStr(r.tags || ""));
     setText("vVersion", safeStr(r.version || ""));
 
@@ -357,6 +447,7 @@
     }
 
     setPillsFromSelected();
+    renderEvidenceView();
     renderPgnoView();
   }
 
@@ -383,22 +474,23 @@
     $("pGuidance").value = safeStr(p.inspection_guidance ?? p.guidance ?? p.InspectionGuidance ?? p["Inspection Guidance"]);
     $("pActions").value = safeStr(p.suggested_inspector_actions ?? p.actions ?? p.SuggestedInspectorActions ?? p["Suggested Inspector Actions"]);
 
-    const ev = p.expected_evidence ?? p.evidence ?? p.ExpectedEvidence ?? p["Expected Evidence"];
-    $("pEvidence").value = toMultiline(ev);
-
     try { $("pRaw").value = JSON.stringify(p, null, 2); }
     catch { $("pRaw").value = ""; }
 
-    // Lock numbering/source ONLY for existing SIRE (but PGNO editor remains editable)
-    const lock = isExistingSire();
-    $("dbSourceType").disabled = lock;
-    $("numChapter").disabled = lock;
-    $("numSection").disabled = lock;
-    $("numItem").disabled = lock;
-    $("dbNumberSuffix").disabled = lock;
-
     setPillsFromSelected();
+    renderEvidenceEditor();
     renderPgnoEditor();
+  }
+
+  function previewNumberBaseForHeader() {
+    // In EDIT mode, use inputs to preview codes live
+    const src = $("dbSourceType")?.value || (selected?.source_type || "SIRE");
+    const xx = $("numChapter")?.value;
+    const yy = $("numSection")?.value;
+    const zz = $("numItem")?.value;
+
+    const nb = buildNumberBase(src, xx, yy, zz);
+    return nb || safeStr(selected?.number_base).trim();
   }
 
   function refreshHeaderFromNumberInputs() {
@@ -455,7 +547,7 @@
         safeStr(p.short_text || p.ShortText || p.shortText || p["Short Text"]) ||
         safeStr(p.question || p.Question || p["Question"]);
 
-      div.innerHTML = `<div class="qno">${safeStr(nfull)}</div><div class="qsub">${safeStr(sub)}</div>`;
+      div.innerHTML = `<div class="qno">${safeStr(nfull)}</div><div class="qsub">${escapeHtml(sub)}</div>`;
       div.onclick = () => selectRow(r);
       list.appendChild(div);
     }
@@ -521,7 +613,6 @@
       .map(x => ({ text: safeStr(x.text).trim(), remarks: safeStr(x.remarks).trim() }))
       .filter(x => x.text.length > 0);
 
-    // Replace-all (consistent with renumbering)
     const { error: delErr } = await sb.from("pgno_master").delete().eq("question_id", questionId);
     if (delErr) throw delErr;
 
@@ -541,27 +632,84 @@
     if (insErr) throw insErr;
   }
 
+  // ===== Expected Evidence DB operations =====
+  async function loadEvidenceFromDb(questionId) {
+    const { data, error } = await sb
+      .from("expected_evidence_master")
+      .select("id, seq, evidence_text, esms_references, esms_forms, remarks")
+      .eq("question_id", questionId)
+      .order("seq", { ascending: true });
+
+    if (error) throw error;
+
+    return (data || []).map(r => ({
+      id: r.id,
+      text: safeStr(r.evidence_text),
+      esms_references: safeStr(r.esms_references),
+      esms_forms: safeStr(r.esms_forms),
+      remarks: safeStr(r.remarks),
+    }));
+  }
+
+  async function saveEvidenceToDb(questionId, items) {
+    const clean = (items || [])
+      .map(x => ({
+        text: safeStr(x.text).trim(),
+        esms_references: safeStr(x.esms_references).trim(),
+        esms_forms: safeStr(x.esms_forms).trim(),
+        remarks: safeStr(x.remarks).trim(),
+      }))
+      .filter(x => x.text.length > 0);
+
+    const { error: delErr } = await sb.from("expected_evidence_master").delete().eq("question_id", questionId);
+    if (delErr) throw delErr;
+
+    if (!clean.length) return;
+
+    const rows = clean.map((x, i) => ({
+      question_id: questionId,
+      seq: i + 1,
+      evidence_text: x.text,
+      esms_references: x.esms_references || null,
+      esms_forms: x.esms_forms || null,
+      remarks: x.remarks || null,
+      created_by: me?.user?.id || null,
+      updated_by: me?.user?.id || null,
+    }));
+
+    const { error: insErr } = await sb.from("expected_evidence_master").insert(rows);
+    if (insErr) throw insErr;
+  }
+
   // ===== select =====
   async function selectRow(row) {
     selected = JSON.parse(JSON.stringify(row));
     selected.__isNew = false;
-    selected.pgno_items = [];
 
+    selected.pgno_items = [];
+    selected.evidence_items = [];
+
+    // Load PGNO + Expected Evidence from DB
     try {
       if (selected.id) {
-        selected.pgno_items = await loadPgnoFromDb(selected.id);
+        const [pg, ev] = await Promise.all([
+          loadPgnoFromDb(selected.id),
+          loadEvidenceFromDb(selected.id),
+        ]);
+        selected.pgno_items = pg || [];
+        selected.evidence_items = ev || [];
       }
     } catch (e) {
+      // Do not crash editor; fallback to payload
       selected.pgno_items = [];
+      selected.evidence_items = [];
+
       showWarn(
-        "Warning: could not load PGNO rows from pgno_master.\n" +
-        "Fallback to payload parsing.\n\n" +
+        "Warning: could not load PGNO / Expected Evidence rows from DB.\n" +
+        "Fallback to payload data.\n\n" +
         "Error: " + String(e?.message || e)
       );
     }
-
-    // If DB load yielded none (or failed), attempt payload-based reconstruction for display/edit
-    ensurePgnoStateFromPayloadIfEmpty();
 
     fillViewPanel(selected);
     fillEditPanel(selected);
@@ -593,9 +741,11 @@
         inspection_guidance: "",
         suggested_inspector_actions: "",
         expected_evidence: [],
+        ExpEv_Bullets: [],
         potential_grounds_for_negative_observations: [],
       },
       pgno_items: [],
+      evidence_items: [],
     };
 
     fillViewPanel(selected);
@@ -614,39 +764,28 @@
     setText("saveStatus", "Saving…");
 
     try {
+      const src = $("dbSourceType").value;
       const status = safeStr($("dbStatus").value || "active");
       const version = safeStr($("dbVersion").value).trim() || safeStr(selected.version || "SIRE_2_0_QL");
-
-      const isLock = isExistingSire();
-
-      // For existing SIRE, keep immutable values from DB
-      const src = isLock ? "SIRE" : $("dbSourceType").value;
 
       const xx = $("numChapter").value;
       const yy = $("numSection").value;
       const zz = $("numItem").value;
 
-      if (!isLock) {
-        if (!isIntLike(Number(xx)) || !isIntLike(Number(yy)) || !isIntLike(Number(zz))) {
-          setText("saveStatus", "");
-          showWarn("Chapter / Section / Item must be whole numbers.");
-          return;
-        }
+      if (!isIntLike(Number(xx)) || !isIntLike(Number(yy)) || !isIntLike(Number(zz))) {
+        setText("saveStatus", "");
+        showWarn("Chapter / Section / Item must be whole numbers.");
+        return;
       }
 
-      const number_base = isLock
-        ? safeStr(selected.number_base).trim()
-        : buildNumberBase(src, xx, yy, zz);
-
+      const number_base = buildNumberBase(src, xx, yy, zz);
       if (!number_base) {
         setText("saveStatus", "");
         showWarn("Number is required.");
         return;
       }
 
-      const number_suffix = isLock
-        ? safeStr(selected.number_suffix).trim()
-        : safeStr($("dbNumberSuffix").value).trim();
+      const number_suffix = safeStr($("dbNumberSuffix").value).trim();
 
       const tagsCsv = safeStr($("dbTags").value).trim();
       const tags = tagsCsv ? tagsCsv.split(",").map(s => s.trim()).filter(Boolean) : [];
@@ -665,27 +804,33 @@
       payload.inspection_guidance = safeStr($("pGuidance").value);
       payload.suggested_inspector_actions = safeStr($("pActions").value);
 
-      if (payload.expected_evidence === undefined && selected.payload?.expected_evidence !== undefined) {
-        payload.expected_evidence = selected.payload.expected_evidence;
-      }
-      applyTextAreaPreservingType(payload, "expected_evidence", $("pEvidence").value);
+      // Expected Evidence compatibility fields (payload)
+      ensureEvidenceStateFromPayloadIfEmpty();
+      const evClean = (selected.evidence_items || [])
+        .map(x => ({
+          text: safeStr(x.text).trim(),
+          esms_references: safeStr(x.esms_references).trim(),
+          esms_forms: safeStr(x.esms_forms).trim(),
+          remarks: safeStr(x.remarks).trim(),
+        }))
+        .filter(x => x.text);
 
+      payload.expected_evidence = evClean.map(x => x.text);
+
+      payload.ExpEv_Bullets = evClean.map(x => ({
+        text: x.text,
+        ch: x.esms_references || "",
+        form: x.esms_forms || "",
+        remarks: x.remarks || "",
+      }));
+
+      // PGNO compatibility field (payload)
       ensurePgnoStateFromPayloadIfEmpty();
+      const pgnoTexts = (selected.pgno_items || [])
+        .map(x => safeStr(x.text).trim())
+        .filter(Boolean);
 
-      const cleanPgno = (selected.pgno_items || [])
-        .map(x => ({ text: safeStr(x.text).trim(), remarks: safeStr(x.remarks).trim() }))
-        .filter(x => x.text.length > 0);
-
-      // Payload sync:
-      if (src === "SIRE") {
-        payload.NegObs_Bullets = cleanPgno.map(x => x.text);
-        payload.NegObs_Remarks_PerBullet = cleanPgno.map(x => [x.remarks || "", ""]);
-        payload["Potential Grounds for Negative Observations"] = toBulletString(cleanPgno);
-      } else {
-        // Custom/Spare compatibility
-        payload.potential_grounds_for_negative_observations = cleanPgno.map(x => x.text);
-        payload.pgno_remarks = cleanPgno.map(x => x.remarks);
-      }
+      payload.potential_grounds_for_negative_observations = pgnoTexts;
 
       const is_custom = (src !== "SIRE");
 
@@ -713,7 +858,26 @@
 
         if (error) throw error;
 
-        await savePgnoToDb(data.id, number_base, cleanPgno);
+        // Save DB rows AFTER question exists
+        try {
+          await saveEvidenceToDb(data.id, selected.evidence_items || []);
+        } catch (e) {
+          showWarn(
+            "Question saved, but Expected Evidence rows could not be saved.\n" +
+            "Check expected_evidence_master table + RLS.\n\n" +
+            "Error: " + String(e?.message || e)
+          );
+        }
+
+        try {
+          await savePgnoToDb(data.id, number_base, selected.pgno_items || []);
+        } catch (e) {
+          showWarn(
+            "Question saved, but PGNO rows could not be saved.\n" +
+            "Check pgno_master table + RLS.\n\n" +
+            "Error: " + String(e?.message || e)
+          );
+        }
 
         showOk("Saved new question.");
         setText("saveStatus", "");
@@ -730,7 +894,27 @@
 
         if (error) throw error;
 
-        await savePgnoToDb(selected.id, number_base, cleanPgno);
+        // Save Expected Evidence rows
+        try {
+          await saveEvidenceToDb(selected.id, selected.evidence_items || []);
+        } catch (e) {
+          showWarn(
+            "Question saved, but Expected Evidence rows could not be saved.\n" +
+            "Check expected_evidence_master table + RLS.\n\n" +
+            "Error: " + String(e?.message || e)
+          );
+        }
+
+        // Save PGNO rows
+        try {
+          await savePgnoToDb(selected.id, number_base, selected.pgno_items || []);
+        } catch (e) {
+          showWarn(
+            "Question saved, but PGNO rows could not be saved.\n" +
+            "Check pgno_master table + RLS.\n\n" +
+            "Error: " + String(e?.message || e)
+          );
+        }
 
         showOk("Saved changes.");
         setText("saveStatus", "");
@@ -787,10 +971,6 @@
     $("btnSave").onclick = () => saveSelected();
 
     $("dbSourceType").onchange = () => {
-      if (isExistingSire()) {
-        // Should not happen (disabled), but keep safe:
-        $("dbSourceType").value = "SIRE";
-      }
       const st = $("dbSourceType").value;
       if (st === "SIRE") $("dbNumberSuffix").value = "";
       if (st !== "SIRE" && !safeStr($("dbNumberSuffix").value).trim()) $("dbNumberSuffix").value = "C";
@@ -806,6 +986,7 @@
     $("btnToggleAdvancedEdit").onclick = () => toggleAdvanced("editAdvanced");
 
     $("btnAddPgno").onclick = () => addPgnoRow();
+    $("btnAddEv").onclick = () => addEvidenceRow();
   }
 
   async function boot() {
