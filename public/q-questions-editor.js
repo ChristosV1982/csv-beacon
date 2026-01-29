@@ -25,6 +25,16 @@
     return Number.isFinite(n) && Math.floor(n) === n;
   }
 
+  // Escape for view HTML
+  function escapeHtml(s) {
+    return safeStr(s)
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+
   // DB constraint:
   // - SIRE number_base: xx.yy.zz (2 digits each)
   // - Custom/Spare: xx.yy.zzz (last part 3 digits)
@@ -39,11 +49,28 @@
     return `${p2(a)}.${p2(b)}.${p3(c)}`;
   }
 
-  function computeNumberFull(numberBase, suffix) {
+  // === DISPLAY NORMALIZATION (IMPORTANT) ===
+  // Always show consistent formatting, even if DB rows have inconsistent number_base/number_full.
+  function formatNumberBaseForDisplay(sourceType, numberBase) {
     const nb = safeStr(numberBase).trim();
+    const m = nb.match(/^(\d+)\.(\d+)\.(\d+)$/);
+    if (!m) return nb;
+
+    const a = Number(m[1]), b = Number(m[2]), c = Number(m[3]);
+    if (!Number.isFinite(a) || !Number.isFinite(b) || !Number.isFinite(c)) return nb;
+
+    const p2 = (n) => String(n).padStart(2, "0");
+    const p3 = (n) => String(n).padStart(3, "0");
+
+    if (sourceType === "SIRE") return `${p2(a)}.${p2(b)}.${p2(c)}`;
+    return `${p2(a)}.${p2(b)}.${p3(c)}`;
+  }
+
+  function computeNumberFullForDisplay(sourceType, numberBase, suffix) {
+    const nbFmt = formatNumberBaseForDisplay(sourceType, numberBase);
     const sx = safeStr(suffix).trim();
-    if (!nb) return "";
-    return sx ? `${nb}-${sx}` : nb;
+    if (!nbFmt) return "";
+    return sx ? `${nbFmt}-${sx}` : nbFmt;
   }
 
   function parseNumberBase(nb) {
@@ -60,21 +87,12 @@
     return [Number(m[1]), Number(m[2]), Number(m[3]), nb];
   }
 
-  // Escape for view HTML
-  function escapeHtml(s) {
-    return safeStr(s)
-      .replaceAll("&", "&amp;")
-      .replaceAll("<", "&lt;")
-      .replaceAll(">", "&gt;")
-      .replaceAll('"', "&quot;")
-      .replaceAll("'", "&#039;");
-  }
-
   // ===== PGNO helpers =====
   function pgnoCode(numberBase, seq1based) {
-    const nb = safeStr(numberBase).trim();
+    const st = ($("dbSourceType")?.value || selected?.source_type || "SIRE");
+    const nbFmt = formatNumberBaseForDisplay(st, numberBase);
     const s2 = String(seq1based).padStart(2, "0");
-    return nb ? `${nb}.${s2}` : `?.?.?.${s2}`;
+    return nbFmt ? `${nbFmt}.${s2}` : `?.?.?.${s2}`;
   }
 
   function ensurePgnoStateFromPayloadIfEmpty() {
@@ -101,7 +119,6 @@
   function normalizeBulletsFromTextBlob(blob) {
     const s = safeStr(blob).trim();
     if (!s) return [];
-    // If bullet symbols at start of lines exist -> split at those bullets
     const hasBulletStart = /(^|\n)\s*[•·●▪◦]/m.test(s);
     if (hasBulletStart) {
       const marked = s.replace(/(^|\n)\s*[•·●▪◦]\s*/gm, "$1§§§");
@@ -110,11 +127,7 @@
         .map(x => x.trim())
         .filter(Boolean);
     }
-    // fallback: one per line
-    return s
-      .split(/\r?\n/)
-      .map(x => x.trim())
-      .filter(Boolean);
+    return s.split(/\r?\n/).map(x => x.trim()).filter(Boolean);
   }
 
   function ensureEvidenceStateFromPayloadIfEmpty() {
@@ -123,7 +136,6 @@
 
     const p = selected.payload || {};
 
-    // Best: ExpEv_Bullets (objects)
     const evBul = p.ExpEv_Bullets;
     if (Array.isArray(evBul) && evBul.length) {
       selected.evidence_items = evBul
@@ -137,7 +149,6 @@
       return;
     }
 
-    // Next: expected_evidence (array of strings)
     const evArr = p.expected_evidence;
     if (Array.isArray(evArr) && evArr.length) {
       selected.evidence_items = evArr
@@ -146,7 +157,6 @@
       return;
     }
 
-    // Next: "Expected Evidence" (string blob)
     const evBlob = p["Expected Evidence"];
     if (typeof evBlob === "string" && evBlob.trim()) {
       const lines = normalizeBulletsFromTextBlob(evBlob);
@@ -339,7 +349,7 @@
       return `
         <div class="pgnoRow">
           <div class="pgnoHdr">
-            <div class="pgnoCode">${code}</div>
+            <div class="pgnoCode">${escapeHtml(code)}</div>
           </div>
           <div class="pgnoTiny" style="margin-top:6px; white-space:pre-wrap;">${escapeHtml(t)}</div>
           ${r ? `<div class="pgnoTiny" style="margin-top:8px;"><b>Remarks:</b> ${escapeHtml(r)}</div>` : ``}
@@ -357,7 +367,7 @@
     const items = selected.pgno_items || [];
     setText("pgnoCountLine", `${items.length} PGNO(s)`);
 
-    const nb = previewNumberBaseForHeader(); // use current inputs if user is editing the number
+    const nb = previewNumberBaseForHeader(); // already padded when coming from inputs
     host.innerHTML = "";
 
     items.forEach((it, idx) => {
@@ -369,7 +379,7 @@
       row.innerHTML = `
         <div class="pgnoHdr">
           <div>
-            <div class="pgnoCode">${code}</div>
+            <div class="pgnoCode">${escapeHtml(code)}</div>
             <div class="pgnoTiny">Seq: ${idx + 1}</div>
           </div>
           <div>
@@ -396,16 +406,8 @@
       if (taText) taText.value = safeStr(it.text);
       if (taRem) taRem.value = safeStr(it.remarks);
 
-      if (taText) {
-        taText.addEventListener("input", () => {
-          selected.pgno_items[idx].text = taText.value;
-        });
-      }
-      if (taRem) {
-        taRem.addEventListener("input", () => {
-          selected.pgno_items[idx].remarks = taRem.value;
-        });
-      }
+      if (taText) taText.addEventListener("input", () => { selected.pgno_items[idx].text = taText.value; });
+      if (taRem) taRem.addEventListener("input", () => { selected.pgno_items[idx].remarks = taRem.value; });
 
       const delBtn = row.querySelector(`button[data-del="${idx}"]`);
       if (delBtn) {
@@ -425,8 +427,8 @@
   }
 
   function fillViewPanel(r) {
-    const nb = safeStr(r.number_base);
-    const nfull = r.number_full || computeNumberFull(nb, r.number_suffix);
+    const st = r.source_type || "SIRE";
+    const nfull = computeNumberFullForDisplay(st, r.number_base, r.number_suffix);
 
     setText("vhdrNumber", nfull || "—");
     setText("vhdrId", r.id ? `DB id: ${r.id}` : "");
@@ -466,7 +468,10 @@
     $("numItem").value = parts.zz;
 
     setText("hdrId", r.id ? `DB id: ${r.id}` : "Not saved yet");
-    setText("hdrNumber", computeNumberFull(r.number_base, r.number_suffix) || "—");
+
+    const st = $("dbSourceType").value || (r.source_type || "SIRE");
+    const hdrNb = previewNumberBaseForHeader() || r.number_base;
+    setText("hdrNumber", computeNumberFullForDisplay(st, hdrNb, $("dbNumberSuffix").value) || "—");
 
     const p = r.payload || {};
     $("pShortText").value = safeStr(p.short_text ?? p.ShortText ?? p.shortText ?? p["Short Text"]);
@@ -483,7 +488,6 @@
   }
 
   function previewNumberBaseForHeader() {
-    // In EDIT mode, use inputs to preview codes live
     const src = $("dbSourceType")?.value || (selected?.source_type || "SIRE");
     const xx = $("numChapter")?.value;
     const yy = $("numSection")?.value;
@@ -496,11 +500,11 @@
   function refreshHeaderFromNumberInputs() {
     if (!selected) return;
 
+    const st = $("dbSourceType")?.value || (selected?.source_type || "SIRE");
     const nb = previewNumberBaseForHeader();
     const sx = safeStr($("dbNumberSuffix").value).trim();
-    setText("hdrNumber", computeNumberFull(nb, sx) || "—");
 
-    // PGNO codes depend on number_base -> re-render editor list to update code labels
+    setText("hdrNumber", computeNumberFullForDisplay(st, nb, sx) || "—");
     renderPgnoEditor();
   }
 
@@ -509,7 +513,9 @@
     if (!term) return true;
     const t = term.toLowerCase();
 
-    const n = safeStr(r.number_full || computeNumberFull(r.number_base, r.number_suffix)).toLowerCase();
+    const stype = r.source_type || "SIRE";
+    const n = computeNumberFullForDisplay(stype, r.number_base, r.number_suffix).toLowerCase();
+
     const p = r.payload || {};
     const st = safeStr(p.short_text || p.ShortText || p.shortText || p["Short Text"]).toLowerCase();
     const qu = safeStr(p.question || p.Question || p["Question"]).toLowerCase();
@@ -541,13 +547,15 @@
       const div = document.createElement("div");
       div.className = "qitem" + (selected && !selected.__isNew && selected.id === r.id ? " active" : "");
 
-      const nfull = r.number_full || computeNumberFull(r.number_base, r.number_suffix);
+      const stype = r.source_type || "SIRE";
+      const nfull = computeNumberFullForDisplay(stype, r.number_base, r.number_suffix);
+
       const p = r.payload || {};
       const sub =
         safeStr(p.short_text || p.ShortText || p.shortText || p["Short Text"]) ||
         safeStr(p.question || p.Question || p["Question"]);
 
-      div.innerHTML = `<div class="qno">${safeStr(nfull)}</div><div class="qsub">${escapeHtml(sub)}</div>`;
+      div.innerHTML = `<div class="qno">${escapeHtml(nfull || "—")}</div><div class="qsub">${escapeHtml(sub)}</div>`;
       div.onclick = () => selectRow(r);
       list.appendChild(div);
     }
@@ -689,7 +697,6 @@
     selected.pgno_items = [];
     selected.evidence_items = [];
 
-    // Load PGNO + Expected Evidence from DB
     try {
       if (selected.id) {
         const [pg, ev] = await Promise.all([
@@ -700,10 +707,8 @@
         selected.evidence_items = ev || [];
       }
     } catch (e) {
-      // Do not crash editor; fallback to payload
       selected.pgno_items = [];
       selected.evidence_items = [];
-
       showWarn(
         "Warning: could not load PGNO / Expected Evidence rows from DB.\n" +
         "Fallback to payload data.\n\n" +
@@ -858,10 +863,8 @@
 
         if (error) throw error;
 
-        // Save DB rows AFTER question exists
-        try {
-          await saveEvidenceToDb(data.id, selected.evidence_items || []);
-        } catch (e) {
+        try { await saveEvidenceToDb(data.id, selected.evidence_items || []); }
+        catch (e) {
           showWarn(
             "Question saved, but Expected Evidence rows could not be saved.\n" +
             "Check expected_evidence_master table + RLS.\n\n" +
@@ -869,9 +872,8 @@
           );
         }
 
-        try {
-          await savePgnoToDb(data.id, number_base, selected.pgno_items || []);
-        } catch (e) {
+        try { await savePgnoToDb(data.id, number_base, selected.pgno_items || []); }
+        catch (e) {
           showWarn(
             "Question saved, but PGNO rows could not be saved.\n" +
             "Check pgno_master table + RLS.\n\n" +
@@ -894,10 +896,8 @@
 
         if (error) throw error;
 
-        // Save Expected Evidence rows
-        try {
-          await saveEvidenceToDb(selected.id, selected.evidence_items || []);
-        } catch (e) {
+        try { await saveEvidenceToDb(selected.id, selected.evidence_items || []); }
+        catch (e) {
           showWarn(
             "Question saved, but Expected Evidence rows could not be saved.\n" +
             "Check expected_evidence_master table + RLS.\n\n" +
@@ -905,10 +905,8 @@
           );
         }
 
-        // Save PGNO rows
-        try {
-          await savePgnoToDb(selected.id, number_base, selected.pgno_items || []);
-        } catch (e) {
+        try { await savePgnoToDb(selected.id, number_base, selected.pgno_items || []); }
+        catch (e) {
           showWarn(
             "Question saved, but PGNO rows could not be saved.\n" +
             "Check pgno_master table + RLS.\n\n" +
@@ -948,7 +946,6 @@
     };
 
     $("searchInput").oninput = () => renderList();
-
     $("newQuestionBtn").onclick = () => newQuestion();
 
     $("btnEdit").onclick = () => {
