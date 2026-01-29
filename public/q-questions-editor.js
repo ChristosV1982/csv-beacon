@@ -79,6 +79,16 @@
     obj[key] = safeStr(textValue);
   }
 
+  // Escape for view HTML
+  function escapeHtml(s) {
+    return safeStr(s)
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+
   // ===== PGNO helpers =====
   function pgnoCode(numberBase, seq1based) {
     const nb = safeStr(numberBase).trim();
@@ -86,21 +96,83 @@
     return nb ? `${nb}.${s2}` : `?.?.?.${s2}`;
   }
 
+  // Correct bullet parsing:
+  // Split ONLY when bullet marker is at start-of-line.
+  // Continuation lines stay with the current bullet.
+  function parseBulletedBlobToItems(blobText) {
+    const raw = safeStr(blobText).replace(/\r/g, "");
+    if (!raw.trim()) return [];
+
+    // Convert bullet-at-line-start to sentinel; do NOT split on normal newlines.
+    const withSentinel = raw.replace(/^\s*[•·●▪◦]\s*/gm, "@@B@@");
+    const parts = withSentinel.split("@@B@@").map(s => s.trim()).filter(Boolean);
+
+    return parts.map(p => ({ text: p, remarks: "" }));
+  }
+
+  function toBulletString(items) {
+    const clean = (items || [])
+      .map(x => safeStr(x.text).trim())
+      .filter(Boolean);
+
+    return clean.map(t => {
+      const lines = t.split(/\r?\n/);
+      const first = lines[0] || "";
+      const rest = lines.slice(1).map(l => "  " + l).join("\n");
+      return rest ? `• ${first}\n${rest}` : `• ${first}`;
+    }).join("\n");
+  }
+
+  function isExistingSire() {
+    return !!selected && !selected.__isNew && selected.source_type === "SIRE";
+  }
+
   function ensurePgnoStateFromPayloadIfEmpty() {
     if (!selected) return;
     if (Array.isArray(selected.pgno_items) && selected.pgno_items.length) return;
 
     const p = selected.payload || {};
-    const old = p.potential_grounds_for_negative_observations;
 
+    // Prefer SIRE structured keys if present
+    if (Array.isArray(p.NegObs_Bullets) && p.NegObs_Bullets.length) {
+      const bullets = p.NegObs_Bullets.map(x => safeStr(x));
+      let remarks = [];
+      if (Array.isArray(p.NegObs_Remarks_PerBullet)) {
+        // Often it's [[a,b],[a,b]...]; we store combined
+        remarks = p.NegObs_Remarks_PerBullet.map(r => {
+          if (Array.isArray(r)) {
+            const a = safeStr(r[0]).trim();
+            const b = safeStr(r[1]).trim();
+            return (a && b) ? (a + "\n" + b) : (a || b);
+          }
+          return safeStr(r).trim();
+        });
+      }
+      selected.pgno_items = bullets.map((t, i) => ({ text: t, remarks: safeStr(remarks[i] || "") }));
+      return;
+    }
+
+    // Title-case blob (common in your DB payload)
+    const titleBlob = p["Potential Grounds for Negative Observations"];
+    if (typeof titleBlob === "string" && titleBlob.trim()) {
+      selected.pgno_items = parseBulletedBlobToItems(titleBlob);
+      return;
+    }
+
+    // Compatibility key (your custom questions)
+    const old = p.potential_grounds_for_negative_observations;
     if (Array.isArray(old)) {
       selected.pgno_items = old.map(t => ({ text: safeStr(t), remarks: "" }));
       return;
     }
     if (typeof old === "string" && old.trim()) {
-      // If it was one blob, split by lines as a fallback
-      const lines = old.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
-      selected.pgno_items = lines.map(t => ({ text: t, remarks: "" }));
+      // fallback: treat as bullet blob if it has bullet markers, else line split
+      if (old.match(/^\s*[•·●▪◦]/m)) {
+        selected.pgno_items = parseBulletedBlobToItems(old);
+      } else {
+        const lines = old.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+        selected.pgno_items = lines.map(t => ({ text: t, remarks: "" }));
+      }
       return;
     }
 
@@ -147,6 +219,20 @@
     setText("pillSuffix", `suffix: ${sx || "(blank)"}`);
   }
 
+  function previewNumberBaseForHeader() {
+    // In EDIT mode, use inputs to preview codes live,
+    // BUT for existing SIRE questions keep the DB number_base fixed.
+    if (isExistingSire()) return safeStr(selected?.number_base).trim();
+
+    const src = $("dbSourceType")?.value || (selected?.source_type || "SIRE");
+    const xx = $("numChapter")?.value;
+    const yy = $("numSection")?.value;
+    const zz = $("numItem")?.value;
+
+    const nb = buildNumberBase(src, xx, yy, zz);
+    return nb || safeStr(selected?.number_base).trim();
+  }
+
   // ===== PGNO renderers =====
   function renderPgnoView() {
     const host = $("vPgnoList");
@@ -188,7 +274,7 @@
     const items = selected.pgno_items || [];
     setText("pgnoCountLine", `${items.length} PGNO(s)`);
 
-    const nb = previewNumberBaseForHeader(); // use current inputs if user is editing the number
+    const nb = previewNumberBaseForHeader();
     host.innerHTML = "";
 
     items.forEach((it, idx) => {
@@ -227,24 +313,14 @@
       if (taText) taText.value = safeStr(it.text);
       if (taRem) taRem.value = safeStr(it.remarks);
 
-      if (taText) {
-        taText.addEventListener("input", () => {
-          selected.pgno_items[idx].text = taText.value;
-        });
-      }
-      if (taRem) {
-        taRem.addEventListener("input", () => {
-          selected.pgno_items[idx].remarks = taRem.value;
-        });
-      }
+      if (taText) taText.addEventListener("input", () => { selected.pgno_items[idx].text = taText.value; });
+      if (taRem) taRem.addEventListener("input", () => { selected.pgno_items[idx].remarks = taRem.value; });
 
       const delBtn = row.querySelector(`button[data-del="${idx}"]`);
-      if (delBtn) {
-        delBtn.addEventListener("click", () => {
-          selected.pgno_items.splice(idx, 1);
-          renderPgnoEditor();
-        });
-      }
+      if (delBtn) delBtn.addEventListener("click", () => {
+        selected.pgno_items.splice(idx, 1);
+        renderPgnoEditor();
+      });
     });
   }
 
@@ -253,16 +329,6 @@
     ensurePgnoStateFromPayloadIfEmpty();
     selected.pgno_items.push({ text: "", remarks: "" });
     renderPgnoEditor();
-  }
-
-  // Escape for view HTML
-  function escapeHtml(s) {
-    return safeStr(s)
-      .replaceAll("&", "&amp;")
-      .replaceAll("<", "&lt;")
-      .replaceAll(">", "&gt;")
-      .replaceAll('"', "&quot;")
-      .replaceAll("'", "&#039;");
   }
 
   function fillViewPanel(r) {
@@ -323,19 +389,16 @@
     try { $("pRaw").value = JSON.stringify(p, null, 2); }
     catch { $("pRaw").value = ""; }
 
+    // Lock numbering/source ONLY for existing SIRE (but PGNO editor remains editable)
+    const lock = isExistingSire();
+    $("dbSourceType").disabled = lock;
+    $("numChapter").disabled = lock;
+    $("numSection").disabled = lock;
+    $("numItem").disabled = lock;
+    $("dbNumberSuffix").disabled = lock;
+
     setPillsFromSelected();
     renderPgnoEditor();
-  }
-
-  function previewNumberBaseForHeader() {
-    // In EDIT mode, use inputs to preview codes live
-    const src = $("dbSourceType")?.value || (selected?.source_type || "SIRE");
-    const xx = $("numChapter")?.value;
-    const yy = $("numSection")?.value;
-    const zz = $("numItem")?.value;
-
-    const nb = buildNumberBase(src, xx, yy, zz);
-    return nb || safeStr(selected?.number_base).trim();
   }
 
   function refreshHeaderFromNumberInputs() {
@@ -454,19 +517,16 @@
   }
 
   async function savePgnoToDb(questionId, numberBase, items) {
-    // Normalize: remove empties, trim
     const clean = (items || [])
       .map(x => ({ text: safeStr(x.text).trim(), remarks: safeStr(x.remarks).trim() }))
       .filter(x => x.text.length > 0);
 
-    // Replace-all strategy (simple and consistent with renumbering)
-    // 1) delete existing
+    // Replace-all (consistent with renumbering)
     const { error: delErr } = await sb.from("pgno_master").delete().eq("question_id", questionId);
     if (delErr) throw delErr;
 
     if (!clean.length) return;
 
-    // 2) insert fresh rows with seq and derived code
     const rows = clean.map((x, i) => ({
       question_id: questionId,
       seq: i + 1,
@@ -489,19 +549,19 @@
 
     try {
       if (selected.id) {
-        const pg = await loadPgnoFromDb(selected.id);
-        selected.pgno_items = pg;
+        selected.pgno_items = await loadPgnoFromDb(selected.id);
       }
     } catch (e) {
-      // If pgno_master is not created yet or RLS blocks, do not crash the editor:
-      // fallback to payload
       selected.pgno_items = [];
       showWarn(
         "Warning: could not load PGNO rows from pgno_master.\n" +
-        "Fallback to payload PGNO list.\n\n" +
+        "Fallback to payload parsing.\n\n" +
         "Error: " + String(e?.message || e)
       );
     }
+
+    // If DB load yielded none (or failed), attempt payload-based reconstruction for display/edit
+    ensurePgnoStateFromPayloadIfEmpty();
 
     fillViewPanel(selected);
     fillEditPanel(selected);
@@ -533,7 +593,6 @@
         inspection_guidance: "",
         suggested_inspector_actions: "",
         expected_evidence: [],
-        // keep compatibility field (texts only)
         potential_grounds_for_negative_observations: [],
       },
       pgno_items: [],
@@ -555,28 +614,39 @@
     setText("saveStatus", "Saving…");
 
     try {
-      const src = $("dbSourceType").value;
       const status = safeStr($("dbStatus").value || "active");
       const version = safeStr($("dbVersion").value).trim() || safeStr(selected.version || "SIRE_2_0_QL");
+
+      const isLock = isExistingSire();
+
+      // For existing SIRE, keep immutable values from DB
+      const src = isLock ? "SIRE" : $("dbSourceType").value;
 
       const xx = $("numChapter").value;
       const yy = $("numSection").value;
       const zz = $("numItem").value;
 
-      if (!isIntLike(Number(xx)) || !isIntLike(Number(yy)) || !isIntLike(Number(zz))) {
-        setText("saveStatus", "");
-        showWarn("Chapter / Section / Item must be whole numbers.");
-        return;
+      if (!isLock) {
+        if (!isIntLike(Number(xx)) || !isIntLike(Number(yy)) || !isIntLike(Number(zz))) {
+          setText("saveStatus", "");
+          showWarn("Chapter / Section / Item must be whole numbers.");
+          return;
+        }
       }
 
-      const number_base = buildNumberBase(src, xx, yy, zz);
+      const number_base = isLock
+        ? safeStr(selected.number_base).trim()
+        : buildNumberBase(src, xx, yy, zz);
+
       if (!number_base) {
         setText("saveStatus", "");
         showWarn("Number is required.");
         return;
       }
 
-      const number_suffix = safeStr($("dbNumberSuffix").value).trim();
+      const number_suffix = isLock
+        ? safeStr(selected.number_suffix).trim()
+        : safeStr($("dbNumberSuffix").value).trim();
 
       const tagsCsv = safeStr($("dbTags").value).trim();
       const tags = tagsCsv ? tagsCsv.split(",").map(s => s.trim()).filter(Boolean) : [];
@@ -600,13 +670,22 @@
       }
       applyTextAreaPreservingType(payload, "expected_evidence", $("pEvidence").value);
 
-      // Compatibility: store PGNO texts only in payload array
       ensurePgnoStateFromPayloadIfEmpty();
-      const pgnoTexts = (selected.pgno_items || [])
-        .map(x => safeStr(x.text).trim())
-        .filter(Boolean);
 
-      payload.potential_grounds_for_negative_observations = pgnoTexts;
+      const cleanPgno = (selected.pgno_items || [])
+        .map(x => ({ text: safeStr(x.text).trim(), remarks: safeStr(x.remarks).trim() }))
+        .filter(x => x.text.length > 0);
+
+      // Payload sync:
+      if (src === "SIRE") {
+        payload.NegObs_Bullets = cleanPgno.map(x => x.text);
+        payload.NegObs_Remarks_PerBullet = cleanPgno.map(x => [x.remarks || "", ""]);
+        payload["Potential Grounds for Negative Observations"] = toBulletString(cleanPgno);
+      } else {
+        // Custom/Spare compatibility
+        payload.potential_grounds_for_negative_observations = cleanPgno.map(x => x.text);
+        payload.pgno_remarks = cleanPgno.map(x => x.remarks);
+      }
 
       const is_custom = (src !== "SIRE");
 
@@ -634,16 +713,7 @@
 
         if (error) throw error;
 
-        // Save PGNO rows (must happen AFTER question exists)
-        try {
-          await savePgnoToDb(data.id, number_base, selected.pgno_items || []);
-        } catch (e) {
-          showWarn(
-            "Question saved, but PGNO rows could not be saved.\n" +
-            "Check pgno_master table + RLS.\n\n" +
-            "Error: " + String(e?.message || e)
-          );
-        }
+        await savePgnoToDb(data.id, number_base, cleanPgno);
 
         showOk("Saved new question.");
         setText("saveStatus", "");
@@ -660,16 +730,7 @@
 
         if (error) throw error;
 
-        // Save PGNO rows
-        try {
-          await savePgnoToDb(selected.id, number_base, selected.pgno_items || []);
-        } catch (e) {
-          showWarn(
-            "Question saved, but PGNO rows could not be saved.\n" +
-            "Check pgno_master table + RLS.\n\n" +
-            "Error: " + String(e?.message || e)
-          );
-        }
+        await savePgnoToDb(selected.id, number_base, cleanPgno);
 
         showOk("Saved changes.");
         setText("saveStatus", "");
@@ -726,6 +787,10 @@
     $("btnSave").onclick = () => saveSelected();
 
     $("dbSourceType").onchange = () => {
+      if (isExistingSire()) {
+        // Should not happen (disabled), but keep safe:
+        $("dbSourceType").value = "SIRE";
+      }
       const st = $("dbSourceType").value;
       if (st === "SIRE") $("dbNumberSuffix").value = "";
       if (st !== "SIRE" && !safeStr($("dbNumberSuffix").value).trim()) $("dbNumberSuffix").value = "C";
