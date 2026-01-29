@@ -26,6 +26,19 @@
     return Number.isFinite(n) && Math.floor(n) === n;
   }
 
+  // ===== List toggle persistence =====
+  const LS_KEY_SHOW_FULL = "qe_show_full_question_in_list";
+  function getShowFullQuestionInList() {
+    const raw = safeStr(localStorage.getItem(LS_KEY_SHOW_FULL)).trim();
+    if (raw === "") return true;               // default ON
+    if (raw === "1" || raw === "true") return true;
+    if (raw === "0" || raw === "false") return false;
+    return true;
+  }
+  function setShowFullQuestionInList(v) {
+    localStorage.setItem(LS_KEY_SHOW_FULL, v ? "1" : "0");
+  }
+
   // ===== Number helpers =====
   function buildNumberBase(sourceType, xx, yy, zz) {
     const a = Number(xx), b = Number(yy), c = Number(zz);
@@ -594,21 +607,21 @@
     setText("countLine", `${filtered.length} questions`);
     setText("loadedLine", `Loaded ${allRows.length}`);
 
+    const showFull = getShowFullQuestionInList();
+
     for (const r of filtered) {
       const div = document.createElement("div");
       div.className = "qitem" + (selected && !selected.__isNew && selected.id === r.id ? " active" : "");
 
       const p = r.payload || {};
 
-      // ✅ Change requested:
-      // Prefer FULL Question text in the list, fallback to Short Text only if Question is empty.
-      const fullQuestion =
-        safeStr(p.question || p.Question || p["Question"]).trim();
+      const fullQuestion = safeStr(p.question || p.Question || p["Question"]).trim();
+      const shortText = safeStr(p.short_text || p.ShortText || p.shortText || p["Short Text"]).trim();
 
-      const shortText =
-        safeStr(p.short_text || p.ShortText || p.shortText || p["Short Text"]).trim();
-
-      const sub = fullQuestion || shortText || "—";
+      // ✅ Toggle behavior
+      const sub = showFull
+        ? (fullQuestion || shortText || "—")
+        : (shortText || fullQuestion || "—");
 
       div.innerHTML = `
         <div class="qno">${escapeHtml(displayNumber(r))}</div>
@@ -687,7 +700,7 @@
     const rows = clean.map((x, i) => ({
       question_id: questionId,
       seq: i + 1,
-      pgno_code: pgnoCode(numberBase, i + 1, "SIRE"), // numberBase already built padded at save-time
+      pgno_code: pgnoCode(numberBase, i + 1, "SIRE"),
       pgno_text: x.text,
       remarks: x.remarks,
       created_by: me?.user?.id || null,
@@ -755,7 +768,6 @@
     selected.pgno_items = [];
     selected.ee_items = [];
 
-    // Load PGNO rows
     try {
       if (selected.id) selected.pgno_items = await loadPgnoFromDb(selected.id);
     } catch (e) {
@@ -767,7 +779,6 @@
       );
     }
 
-    // Load Expected Evidence rows
     try {
       if (selected.id) selected.ee_items = await loadEeFromDb(selected.id);
     } catch (e) {
@@ -872,7 +883,6 @@
       payload.inspection_guidance = safeStr($("pGuidance").value);
       payload.suggested_inspector_actions = safeStr($("pActions").value);
 
-      // Compatibility payload: store texts-only arrays
       ensurePgnoStateFromPayloadIfEmpty();
       ensureEeStateFromPayloadIfEmpty();
 
@@ -979,6 +989,16 @@
     };
 
     $("searchInput").oninput = () => renderList();
+
+    // ✅ wire the toggle checkbox
+    const cb = $("toggleShowFullQuestion");
+    if (cb) {
+      cb.checked = getShowFullQuestionInList();
+      cb.onchange = () => {
+        setShowFullQuestionInList(!!cb.checked);
+        renderList();
+      };
+    }
 
     $("newQuestionBtn").onclick = () => newQuestion();
 

@@ -31,7 +31,7 @@
     .qitem.active{ background:#eaf2ff; }
     .qno{ font-weight:900; }
 
-    /* ✅ Important: allow full question text to wrap and show all lines */
+    /* allow full question text to wrap and show all lines */
     .qsub{
       font-size:12px;
       color:#334;
@@ -58,6 +58,12 @@
     .topbar{background:#1a4170;color:#fff;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;}
     .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
     .btn2{background:#eaf1fb;color:#1a4170;border:1px solid #c9d9f3;border-radius:10px;padding:10px 14px;font-weight:900;cursor:pointer;}
+
+    /* Toggle UI */
+    .qe-toggleRow{ display:flex; align-items:center; gap:10px; flex-direction:row; }
+    .qe-toggleRow input[type="checkbox"]{ width:18px; height:18px; margin:0; }
+    .qe-toggleLabel{ font-size:12px; color:#334; font-weight:800; user-select:none; cursor:pointer; }
+    .qe-toggleHint{ font-size:12px; color:#6b778c; }
 
     /* Shared “master list” box look */
     .masterBox{ border:1px solid #d9e2ef; border-radius:12px; padding:12px; background:#fbfdff; }
@@ -120,6 +126,16 @@
         <div style="min-width:360px; flex:1;">
           <label>Search (number / short text / question)</label>
           <input id="searchInput" type="text" placeholder="Type to filter ..." />
+        </div>
+
+        <!-- ✅ New toggle -->
+        <div style="min-width:260px;">
+          <label>List display</label>
+          <div class="qe-toggleRow">
+            <input id="toggleShowFullQuestion" type="checkbox" />
+            <label class="qe-toggleLabel" for="toggleShowFullQuestion">Show full question in list</label>
+          </div>
+          <div class="qe-toggleHint">OFF = show “Short Text” in list</div>
         </div>
 
         <div style="min-width:160px;">
