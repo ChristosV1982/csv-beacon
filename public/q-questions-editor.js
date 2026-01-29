@@ -1,3 +1,4 @@
+// public/q-questions-editor.js
 (() => {
   "use strict";
 
@@ -44,27 +45,55 @@
     return sx ? `${nb}-${sx}` : nb;
   }
 
-  function displayNumber(row) {
-    const nb = safeStr(row?.number_base).trim();
-    const sx = safeStr(row?.number_suffix).trim();
-    const computed = computeNumberFull(nb, sx);
+  // Normalize number_base for DISPLAY so it ALWAYS appears as:
+  // SIRE => xx.yy.zz (2/2/2)
+  // Non-SIRE => xx.yy.zzz (2/2/3)
+  function normalizeNumberBaseValue(sourceType, numberBase) {
+    const nb = safeStr(numberBase).trim();
+    const m = nb.match(/^(\d+)\.(\d+)\.(\d+)$/);
+    if (!m) return nb;
 
+    const a = Number(m[1]), b = Number(m[2]), c = Number(m[3]);
+    if (!Number.isFinite(a) || !Number.isFinite(b) || !Number.isFinite(c)) return nb;
+
+    const p2 = (n) => String(n).padStart(2, "0");
+    const p3 = (n) => String(n).padStart(3, "0");
+
+    if (sourceType === "SIRE") return `${p2(a)}.${p2(b)}.${p2(c)}`;
+    return `${p2(a)}.${p2(b)}.${p3(c)}`;
+  }
+
+  function normalizeNumberBaseRow(row) {
+    const st = safeStr(row?.source_type).trim() || "SIRE";
+    return normalizeNumberBaseValue(st, row?.number_base);
+  }
+
+  function displayNumber(row) {
+    const sx = safeStr(row?.number_suffix).trim();
+
+    // Always compute display from NORMALIZED base so list/view/edit are consistent
+    const nbNorm = normalizeNumberBaseRow(row);
+    const computed = computeNumberFull(nbNorm, sx);
+
+    // Keep legacy stored number_full ONLY as fallback (some DB rows may have it)
     let nf = safeStr(row?.number_full).trim();
     // fix legacy “02.01.01-” cases when suffix is blank
     if (nf && nf.endsWith("-") && !sx) nf = nf.slice(0, -1);
 
-    return nf || computed || "—";
+    return computed || nf || "—";
   }
 
   function parseNumberBase(nb) {
     const s = safeStr(nb).trim();
     const m = s.match(/^(\d+)\.(\d+)\.(\d+)$/);
     if (!m) return { xx:"", yy:"", zz:"" };
+    // Use numeric strings in inputs (no padding) - ok for editing
     return { xx: String(Number(m[1])), yy: String(Number(m[2])), zz: String(Number(m[3])) };
   }
 
   function numberKey(row) {
-    const nb = safeStr(row.number_base).trim();
+    // Sort using numeric parts from normalized base so order is stable
+    const nb = normalizeNumberBaseRow(row);
     const m = nb.match(/^(\d+)\.(\d+)\.(\d+)$/);
     if (!m) return [9999, 9999, 999999, nb];
     return [Number(m[1]), Number(m[2]), Number(m[3]), nb];
@@ -116,10 +145,10 @@
   }
 
   // ===== PGNO helpers =====
-  function pgnoCode(numberBase, seq1based) {
-    const nb = safeStr(numberBase).trim();
+  function pgnoCode(numberBase, seq1based, sourceType) {
+    const nbNorm = normalizeNumberBaseValue(sourceType || "SIRE", numberBase);
     const s2 = String(seq1based).padStart(2, "0");
-    return nb ? `${nb}.${s2}` : `?.?.?.${s2}`;
+    return nbNorm ? `${nbNorm}.${s2}` : `?.?.?.${s2}`;
   }
 
   // ===== state =====
@@ -188,12 +217,6 @@
 
     const p = selected.payload || {};
 
-    // possible shapes:
-    // - p.expected_evidence: array of strings
-    // - p["Expected Evidence"]: array of strings
-    // - p.ExpEv_Bullets: array of objects {text, ch, form, remarks}
-    // - string blob with bullets
-
     const byObjArray = (arr) => arr
       .map(o => ({
         text: safeStr(o?.text ?? o?.evidence_text ?? o?.Evidence ?? "").trim(),
@@ -249,9 +272,11 @@
       return;
     }
 
-    const nb = safeStr(selected.number_base).trim();
+    const nb = normalizeNumberBaseRow(selected);
+    const st = selected?.source_type || "SIRE";
+
     host.innerHTML = items.map((it, i) => {
-      const code = pgnoCode(nb, i + 1);
+      const code = pgnoCode(nb, i + 1, st);
       const t = safeStr(it.text);
       const r = safeStr(it.remarks);
       return `
@@ -276,13 +301,15 @@
     setText("pgnoCountLine", `${items.length} PGNO(s)`);
 
     const nb = previewNumberBaseForHeader();
+    const st = $("dbSourceType")?.value || (selected?.source_type || "SIRE");
+
     host.innerHTML = "";
 
     items.forEach((it, idx) => {
       const row = document.createElement("div");
       row.className = "masterRow";
 
-      const code = pgnoCode(nb, idx + 1);
+      const code = pgnoCode(nb, idx + 1, st);
 
       row.innerHTML = `
         <div class="masterHdr">
@@ -491,7 +518,7 @@
     $("dbVersion").value = safeStr(r.version || "");
     $("dbChangeReason").value = safeStr(r.change_reason || "");
 
-    const parts = parseNumberBase(r.number_base);
+    const parts = parseNumberBase(normalizeNumberBaseRow(r));
     $("numChapter").value = parts.xx;
     $("numSection").value = parts.yy;
     $("numItem").value = parts.zz;
@@ -521,7 +548,7 @@
     const zz = $("numItem")?.value;
 
     const nb = buildNumberBase(src, xx, yy, zz);
-    return nb || safeStr(selected?.number_base).trim();
+    return nb || normalizeNumberBaseRow(selected) || safeStr(selected?.number_base).trim();
   }
 
   function refreshHeaderFromNumberInputs() {
@@ -650,7 +677,7 @@
     const rows = clean.map((x, i) => ({
       question_id: questionId,
       seq: i + 1,
-      pgno_code: pgnoCode(numberBase, i + 1),
+      pgno_code: pgnoCode(numberBase, i + 1, "SIRE"), // numberBase already built padded at save-time
       pgno_text: x.text,
       remarks: x.remarks,
       created_by: me?.user?.id || null,
@@ -772,8 +799,8 @@
         question: "",
         inspection_guidance: "",
         suggested_inspector_actions: "",
-        expected_evidence: [], // keep compatibility (texts only)
-        potential_grounds_for_negative_observations: [], // texts only
+        expected_evidence: [],
+        potential_grounds_for_negative_observations: [],
       },
       pgno_items: [],
       ee_items: [],
@@ -873,11 +900,8 @@
 
         if (error) throw error;
 
-        // Save master rows AFTER question exists
         try { await savePgnoToDb(data.id, number_base, selected.pgno_items || []); }
-        catch (e) {
-          showWarn("Question saved, but PGNO rows could not be saved.\n\nError: " + String(e?.message || e));
-        }
+        catch (e) { showWarn("Question saved, but PGNO rows could not be saved.\n\nError: " + String(e?.message || e)); }
 
         try { await saveEeToDb(data.id, selected.ee_items || []); }
         catch (e) {
@@ -903,9 +927,7 @@
         if (error) throw error;
 
         try { await savePgnoToDb(selected.id, number_base, selected.pgno_items || []); }
-        catch (e) {
-          showWarn("Question saved, but PGNO rows could not be saved.\n\nError: " + String(e?.message || e));
-        }
+        catch (e) { showWarn("Question saved, but PGNO rows could not be saved.\n\nError: " + String(e?.message || e)); }
 
         try { await saveEeToDb(selected.id, selected.ee_items || []); }
         catch (e) {
