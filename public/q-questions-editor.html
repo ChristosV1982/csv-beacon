@@ -25,11 +25,23 @@
     .qe-list{ border:1px solid #d9e2ef; border-radius:12px; overflow:hidden; }
     .qe-list-head{ padding:10px 12px; background:#f3f7ff; display:flex; justify-content:space-between; font-size:13px; }
     #qList{ max-height: 650px; overflow:auto; }
+
     .qitem{ padding:10px 12px; border-top:1px solid #eef2f8; cursor:pointer; }
     .qitem:hover{ background:#f8fbff; }
     .qitem.active{ background:#eaf2ff; }
     .qno{ font-weight:900; }
-    .qsub{ font-size:12px; color:#334; margin-top:4px; }
+
+    /* ✅ Important: allow full question text to wrap and show all lines */
+    .qsub{
+      font-size:12px;
+      color:#334;
+      margin-top:4px;
+      white-space: normal;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+      line-height: 1.35;
+    }
+
     .muted{ color:#6b778c; font-size:12px; }
     .warn{ background:#fff1f1; border:1px solid #ffc9c9; padding:10px 12px; border-radius:12px; margin:12px 0; display:none; white-space:pre-wrap; }
     .ok{ background:#f1fff4; border:1px solid #bfeccc; padding:10px 12px; border-radius:12px; margin:12px 0; display:none; white-space:pre-wrap; }

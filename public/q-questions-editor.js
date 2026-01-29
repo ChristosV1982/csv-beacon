@@ -599,11 +599,21 @@
       div.className = "qitem" + (selected && !selected.__isNew && selected.id === r.id ? " active" : "");
 
       const p = r.payload || {};
-      const sub =
-        safeStr(p.short_text || p.ShortText || p.shortText || p["Short Text"]) ||
-        safeStr(p.question || p.Question || p["Question"]);
 
-      div.innerHTML = `<div class="qno">${escapeHtml(displayNumber(r))}</div><div class="qsub">${escapeHtml(sub)}</div>`;
+      // ✅ Change requested:
+      // Prefer FULL Question text in the list, fallback to Short Text only if Question is empty.
+      const fullQuestion =
+        safeStr(p.question || p.Question || p["Question"]).trim();
+
+      const shortText =
+        safeStr(p.short_text || p.ShortText || p.shortText || p["Short Text"]).trim();
+
+      const sub = fullQuestion || shortText || "—";
+
+      div.innerHTML = `
+        <div class="qno">${escapeHtml(displayNumber(r))}</div>
+        <div class="qsub">${escapeHtml(sub)}</div>
+      `;
       div.onclick = () => selectRow(r);
       list.appendChild(div);
     }
