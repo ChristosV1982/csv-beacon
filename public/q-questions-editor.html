@@ -9,136 +9,130 @@
   <link rel="stylesheet" href="./q-questions-editor.css" />
 
   <style>
-    /* ===== Global visual upgrades ===== */
-    body{
-      font-size: 15px;
-      line-height: 1.35;
-      color:#13213a;
-      background:#f4f7fc;
+    :root{
+      --cardBorder:#d9e2ef;
+      --soft:#f6f9ff;
+      --soft2:#fbfdff;
+      --text:#0f172a;
+      --muted:#6b778c;
     }
+
+    body{ color:var(--text); }
     .qe-wrap{ max-width: 1500px; margin: 0 auto; padding: 18px; }
     .qe-top{ display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; }
-    .qe-pill{ background:#eef5ff; border:1px solid #cfe2ff; padding:7px 12px; border-radius:999px; font-size:13px; }
-    .qe-card{ background:#fff; border:1px solid #d9e2ef; border-radius:16px; padding:18px; box-shadow: 0 6px 20px rgba(15,30,60,.08); }
+    .qe-pill{ background:#eef5ff; border:1px solid #cfe2ff; padding:6px 10px; border-radius:999px; font-size:13px; }
+    .qe-card{ background:#fff; border:1px solid var(--cardBorder); border-radius:14px; padding:16px; box-shadow: 0 2px 10px rgba(0,0,0,.04); }
     .qe-row{ display:flex; gap:14px; flex-wrap:wrap; align-items:end; }
-
-    label{ font-size:13px; color:#24324a; font-weight:800; }
-    input, select, textarea{
-      padding:11px 12px;
-      border-radius:12px;
-      border:1px solid #cfd9e8;
-      outline:none;
-      background:#fff;
-      font-size:14px;
-    }
-    input:focus, select:focus, textarea:focus{
-      border-color:#7fb0ff;
-      box-shadow:0 0 0 3px rgba(62,140,255,.12);
-    }
-
-    textarea{ min-height: 110px; resize: vertical; width:100%; }
+    .qe-row > div{ display:flex; flex-direction:column; gap:6px; }
+    label{ font-size:13px; color:#223; font-weight:800; }
+    input, select, textarea{ padding:12px 12px; border-radius:12px; border:1px solid #cfd9e8; outline:none; font-size:14px; }
+    textarea{ min-height: 110px; resize: vertical; width:100%; box-sizing:border-box; }
     .btn{ padding:10px 14px; border-radius:12px; border:1px solid #cfd9e8; background:#f7fbff; cursor:pointer; font-weight:900; }
     .btn.primary{ background:#1f66c2; color:#fff; border-color:#1f66c2; }
     .btn.light{ background:#fff; }
-
-    .qe-main{ display:grid; grid-template-columns: 400px 1fr; gap:14px; margin-top:14px; }
-    .qe-list{ border:1px solid #d9e2ef; border-radius:14px; overflow:hidden; background:#fff; box-shadow:0 6px 16px rgba(15,30,60,.06); }
-    .qe-list-head{ padding:12px 14px; background:#f3f7ff; display:flex; justify-content:space-between; font-size:13px; border-bottom:1px solid #e6eefb; }
+    .qe-main{ display:grid; grid-template-columns: 380px 1fr; gap:14px; margin-top:14px; }
+    .qe-list{ border:1px solid var(--cardBorder); border-radius:14px; overflow:hidden; background:#fff; }
+    .qe-list-head{ padding:10px 12px; background:#f3f7ff; display:flex; justify-content:space-between; font-size:13px; border-bottom:1px solid #e7eef9; }
     #qList{ max-height: 720px; overflow:auto; }
-    .qitem{ padding:12px 14px; border-top:1px solid #eef2f8; cursor:pointer; }
+    .qitem{ padding:12px 12px; border-top:1px solid #eef2f8; cursor:pointer; }
     .qitem:hover{ background:#f8fbff; }
-    .qitem.active{ background:#eaf2ff; border-left:4px solid #1f66c2; padding-left:10px; }
-    .qno{ font-weight:950; font-size:15px; letter-spacing:.3px; }
-    .qsub{ font-size:13px; color:#2b3750; margin-top:6px; line-height:1.35; }
-    .muted{ color:#6b778c; font-size:13px; }
-    .warn{ background:#fff1f1; border:1px solid #ffc9c9; padding:12px 14px; border-radius:14px; margin:12px 0; display:none; white-space:pre-wrap; }
-    .ok{ background:#f1fff4; border:1px solid #bfeccc; padding:12px 14px; border-radius:14px; margin:12px 0; display:none; white-space:pre-wrap; }
+    .qitem.active{ background:#eaf2ff; border-left:4px solid #1f66c2; }
+    .qno{ font-weight:950; font-size:16px; }
+    .qsub{ font-size:13px; color:#223; margin-top:6px; line-height:1.25; }
+    .muted{ color:var(--muted); font-size:13px; }
+    .warn{ background:#fff1f1; border:1px solid #ffc9c9; padding:10px 12px; border-radius:12px; margin:12px 0; display:none; white-space:pre-wrap; }
+    .ok{ background:#f1fff4; border:1px solid #bfeccc; padding:10px 12px; border-radius:12px; margin:12px 0; display:none; white-space:pre-wrap; }
     .qe-right h2{ margin:0; font-size:22px; }
     .qe-actions{ display:flex; gap:10px; justify-content:flex-end; align-items:center; flex-wrap:wrap; }
-    .qe-split3{ display:grid; grid-template-columns: 1fr 1fr 1fr; gap:12px; }
-    .qe-split2{ display:grid; grid-template-columns: 1fr 1fr; gap:12px; }
     .adv{ display:none; margin-top:12px; padding-top:12px; border-top:1px dashed #d9e2ef; }
-    .small{ font-size:13px; }
+    .small{ font-size:14px; line-height:1.35; }
 
     .kv{ display:flex; gap:10px; flex-wrap:wrap; }
     .kv .qe-pill{ font-weight:900; }
 
-    .topbar{
-      background:#1a4170;
-      color:#fff;
-      padding:12px 16px;
-      display:flex;
-      justify-content:space-between;
-      align-items:center;
-      gap:12px;
-      flex-wrap:wrap;
-      box-shadow: 0 6px 20px rgba(10,20,50,.18);
-    }
+    .topbar{background:#1a4170;color:#fff;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;}
     .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
     .btn2{background:#eaf1fb;color:#1a4170;border:1px solid #c9d9f3;border-radius:12px;padding:10px 14px;font-weight:950;cursor:pointer;}
 
-    /* Shared “master list” box look */
-    .masterBox{
-      border:1px solid #d9e2ef;
+    /* Section blocks */
+    .sectionBox{
+      border:1px solid var(--cardBorder);
       border-radius:14px;
+      background:var(--soft2);
       padding:14px;
-      background:#f6f9ff;
     }
-    .masterRow{
+    .sectionTitle{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:10px;
+      flex-wrap:wrap;
+      font-weight:950;
+      font-size:15px;
+      margin-bottom:10px;
+    }
+
+    /* Attributes table */
+    .attrTable{
+      width:100%;
+      border-collapse:separate;
+      border-spacing:0;
+      overflow:hidden;
+      border:1px solid #d7e2f1;
+      border-radius:12px;
+      background:#fff;
+    }
+    .attrTable td{
+      border-bottom:1px solid #e7eef9;
+      border-right:1px solid #e7eef9;
+      padding:10px 12px;
+      vertical-align:top;
+      font-size:14px;
+    }
+    .attrTable tr:last-child td{ border-bottom:none; }
+    .attrTable td:last-child{ border-right:none; }
+    .attrK{ width:260px; font-weight:950; background:#f5f9ff; }
+    .attrV{ width: calc((100% - 260px)/2); }
+    .pillMini{
+      display:inline-block;
+      padding:4px 10px;
+      border-radius:999px;
+      border:1px solid #cfe2ff;
+      background:#eef5ff;
+      font-weight:900;
+      font-size:12px;
+      margin-right:8px;
+      margin-top:6px;
+    }
+
+    /* Full width edit grids */
+    .stackGrid{
+      display:grid;
+      grid-template-columns: 1fr;
+      gap:12px;
+    }
+    .fieldBox{
+      background:#fff;
       border:1px solid #e7eef9;
       border-radius:14px;
       padding:12px;
-      background:#fff;
-      margin-bottom:12px;
-      box-shadow: 0 4px 14px rgba(15,30,60,.06);
     }
-    .masterHdr{ display:flex; justify-content:space-between; align-items:flex-start; gap:10px; flex-wrap:wrap; }
+    .fieldBox label{ display:block; margin-bottom:8px; }
+    .fieldBox textarea, .fieldBox input, .fieldBox select{ width:100%; }
+
+    /* Shared “master list” box look */
+    .masterBox{ border:1px solid #d9e2ef; border-radius:14px; padding:12px; background:#fbfdff; }
+    .masterRow{ border:1px solid #e7eef9; border-radius:14px; padding:12px; background:#fff; margin-bottom:12px; }
+    .masterHdr{ display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; }
     .masterCode{ font-weight:950; font-size:14px; }
-    .masterTiny{ font-size:13px; color:#4b5972; }
-    .masterGrid{ display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-top:10px; }
-    .masterGrid textarea{ min-height:90px; width:100%; }
+    .masterTiny{ font-size:13px; color:#556; }
+    .masterGrid{ display:grid; grid-template-columns: 1fr; gap:10px; margin-top:10px; }
+    .masterGrid textarea{ min-height:110px; width:100%; }
     .masterGrid .full{ grid-column: 1 / -1; }
 
-    /* Make edit grids stack vertically (full width) */
-    .masterGrid.vertical{ grid-template-columns: 1fr; }
-    .masterGrid.vertical .full{ grid-column: 1 / -1; }
-
-    /* Attribute table style (like your screenshot) */
-    .attrTable{
-      border:1px solid #d9e2ef;
-      border-radius:14px;
-      overflow:hidden;
-      background:#fff;
-    }
-    .attrRow{
-      display:grid;
-      grid-template-columns: 260px 1fr 260px 1fr;
-      border-top:1px solid #e6eefb;
-    }
-    .attrRow:first-child{ border-top:none; }
-    .attrCell{
-      padding:10px 12px;
-      font-size:13px;
-      line-height:1.25;
-      border-right:1px solid #e6eefb;
-    }
-    .attrCell:last-child{ border-right:none; }
-    .attrKey{
-      background:#f3f7ff;
-      font-weight:950;
-      color:#21335a;
-    }
-    .attrVal{
-      background:#fbfdff;
-      color:#1c2a44;
-    }
-
-    @media (max-width: 1200px){
-      .qe-main{ grid-template-columns: 1fr; }
-      .attrRow{ grid-template-columns: 200px 1fr; }
-      .attrCell{ border-right:none; border-top:1px solid #e6eefb; }
-      .attrRow{ border-top:none; }
-      .attrRow:first-child .attrCell{ border-top:none; }
+    .hintRow{
+      display:flex; gap:10px; align-items:center; flex-wrap:wrap;
+      margin-top:8px;
     }
   </style>
 </head>
@@ -148,7 +142,7 @@
   <div class="topbar">
     <div style="font-weight:950;">SIRE 2.0 – Questions Editor</div>
     <div class="row">
-      <div id="userBadge" style="font-weight:900;opacity:.95;"></div>
+      <div id="userBadge" style="font-weight:800;opacity:.95;"></div>
       <button class="btn2" id="loginBtn" type="button" style="display:none;">Login</button>
       <button class="btn2" id="switchUserBtn" type="button">Switch User</button>
       <button class="btn" id="logoutBtn" type="button" style="display:none;">Logout</button>
@@ -207,14 +201,6 @@
           <input id="versionFilter" type="text" placeholder="Leave blank to show all" />
         </div>
 
-        <div style="min-width:240px;">
-          <label>Show full question in list</label>
-          <div style="display:flex; align-items:center; gap:10px; padding:10px 12px; border:1px solid #cfd9e8; border-radius:12px; background:#fff;">
-            <input id="toggleShowFullQuestion" type="checkbox" style="transform:scale(1.2);" />
-            <div class="muted" id="toggleShowFullQuestionLabel">OFF (Short Text)</div>
-          </div>
-        </div>
-
         <div style="min-width:140px;">
           <label>&nbsp;</label>
           <div id="loadHint" class="muted"></div>
@@ -232,7 +218,7 @@
         </div>
 
         <!-- RIGHT PANEL -->
-        <div class="qe-right qe-card" style="border-radius:14px; box-shadow:none; border:1px solid #d9e2ef;">
+        <div class="qe-right qe-card" style="border-radius:14px; box-shadow:none;">
           <div id="emptyState" class="muted">Select a question from the list.</div>
 
           <!-- VIEW PANEL -->
@@ -256,68 +242,71 @@
 
             <div style="height:14px;"></div>
 
-            <!-- QUESTION ATTRIBUTES (VIEW) -->
-            <div class="masterBox" style="margin-bottom:12px;">
-              <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
-                <div style="font-weight:950;">Question Attributes</div>
-                <div class="muted small">from payload</div>
+            <!-- ATTRIBUTES (VIEW) -->
+            <div class="sectionBox">
+              <div class="sectionTitle">
+                <div>Question Attributes</div>
+                <div class="muted">from payload</div>
               </div>
 
-              <div style="height:10px;"></div>
-
-              <div class="attrTable">
-                <div class="attrRow">
-                  <div class="attrCell attrKey">Question Type:</div>
-                  <div class="attrCell attrVal" id="vMetaQuestionType"></div>
-                  <div class="attrCell attrKey">Question Response Type:</div>
-                  <div class="attrCell attrVal" id="vMetaResponseTypes"></div>
-                </div>
-                <div class="attrRow">
-                  <div class="attrCell attrKey">Vessel Type:</div>
-                  <div class="attrCell attrVal" id="vMetaVesselType"></div>
-                  <div class="attrCell attrKey">ROVIQ List:</div>
-                  <div class="attrCell attrVal" id="vMetaRoviq"></div>
-                </div>
-                <div class="attrRow">
-                  <div class="attrCell attrKey">Company Rank Allocation:</div>
-                  <div class="attrCell attrVal" id="vMetaCompanyRank"></div>
-                  <div class="attrCell attrKey">SPIS Rank Allocation:</div>
-                  <div class="attrCell attrVal" id="vMetaSpisRank"></div>
-                </div>
-                <div class="attrRow">
-                  <div class="attrCell attrKey">TMSA3 Reference:</div>
-                  <div class="attrCell attrVal" id="vMetaTmsa3"></div>
-                  <div class="attrCell attrKey">TMSA4 Reference:</div>
-                  <div class="attrCell attrVal" id="vMetaTmsa4"></div>
-                </div>
-              </div>
+              <table class="attrTable">
+                <tr>
+                  <td class="attrK">Question Type:</td>
+                  <td class="attrV" id="vAttrQuestionType"></td>
+                  <td class="attrK">Question Response Type:</td>
+                  <td class="attrV" id="vAttrResponseType"></td>
+                </tr>
+                <tr>
+                  <td class="attrK">Vessel Type:</td>
+                  <td class="attrV" id="vAttrVesselType"></td>
+                  <td class="attrK">ROVIQ List:</td>
+                  <td class="attrV" id="vAttrRoviqList"></td>
+                </tr>
+                <tr>
+                  <td class="attrK">Company Rank Allocation:</td>
+                  <td class="attrV" id="vAttrCompanyRank"></td>
+                  <td class="attrK">TMSA3 Reference:</td>
+                  <td class="attrV" id="vAttrTmsa3"></td>
+                </tr>
+                <tr>
+                  <td class="attrK">TMSA4 Reference:</td>
+                  <td class="attrV" id="vAttrTmsa4"></td>
+                  <td class="attrK"></td>
+                  <td class="attrV"></td>
+                </tr>
+              </table>
             </div>
 
-            <div class="masterBox" style="margin-bottom:12px;">
-              <div style="font-weight:950; margin-bottom:8px;">Question Content</div>
+            <div style="height:14px;"></div>
 
-              <div style="display:grid; grid-template-columns: 1fr; gap:12px;">
-                <div class="masterRow" style="margin:0;">
-                  <div class="masterTiny" style="font-weight:950; margin-bottom:6px;">Short Text</div>
+            <!-- CONTENT (VIEW) -->
+            <div class="sectionBox">
+              <div class="sectionTitle"><div>Question Content</div></div>
+
+              <div class="stackGrid">
+                <div class="fieldBox">
+                  <label>Short Text</label>
                   <div id="vShortText" class="small" style="white-space:pre-wrap;"></div>
                 </div>
 
-                <div class="masterRow" style="margin:0;">
-                  <div class="masterTiny" style="font-weight:950; margin-bottom:6px;">Question</div>
+                <div class="fieldBox">
+                  <label>Question</label>
                   <div id="vQuestion" class="small" style="white-space:pre-wrap;"></div>
                 </div>
 
-                <div class="masterRow" style="margin:0;">
-                  <div class="masterTiny" style="font-weight:950; margin-bottom:6px;">Inspection guidance</div>
+                <div class="fieldBox">
+                  <label>Inspection guidance</label>
                   <div id="vGuidance" class="small" style="white-space:pre-wrap;"></div>
                 </div>
 
-                <div class="masterRow" style="margin:0;">
-                  <div class="masterTiny" style="font-weight:950; margin-bottom:6px;">Suggested inspector actions</div>
+                <div class="fieldBox">
+                  <label>Suggested inspector actions</label>
                   <div id="vActions" class="small" style="white-space:pre-wrap;"></div>
                 </div>
               </div>
             </div>
+
+            <div style="height:14px;"></div>
 
             <!-- EXPECTED EVIDENCE (VIEW) -->
             <div class="masterBox">
@@ -329,7 +318,7 @@
               <div id="vEeList" class="small"></div>
             </div>
 
-            <div style="height:12px;"></div>
+            <div style="height:14px;"></div>
 
             <!-- PGNO (VIEW) -->
             <div class="masterBox">
@@ -342,25 +331,26 @@
             </div>
 
             <div class="adv" id="viewAdvanced">
-              <div class="qe-split2">
-                <div>
-                  <label>Tags</label>
-                  <div id="vTags" class="small" style="white-space:pre-wrap;"></div>
+              <div class="sectionBox">
+                <div class="sectionTitle"><div>Advanced</div></div>
+                <div class="stackGrid">
+                  <div class="fieldBox">
+                    <label>Tags</label>
+                    <div id="vTags" class="small" style="white-space:pre-wrap;"></div>
+                  </div>
+                  <div class="fieldBox">
+                    <label>Version</label>
+                    <div id="vVersion" class="small"></div>
+                  </div>
+                  <div class="fieldBox">
+                    <label>Raw JSON</label>
+                    <pre id="vRaw" class="small" style="white-space:pre-wrap; background:#f7fbff; border:1px solid #d9e2ef; padding:10px; border-radius:12px; overflow:auto; max-height:320px;"></pre>
+                  </div>
                 </div>
-                <div>
-                  <label>Version</label>
-                  <div id="vVersion" class="small"></div>
-                </div>
-              </div>
-
-              <div style="height:10px;"></div>
-              <div>
-                <label>Raw JSON</label>
-                <pre id="vRaw" class="small" style="white-space:pre-wrap; background:#f7fbff; border:1px solid #d9e2ef; padding:12px; border-radius:12px; overflow:auto; max-height:320px;"></pre>
               </div>
             </div>
 
-            <div style="height:10px;"></div>
+            <div style="height:12px;"></div>
             <button id="btnToggleAdvancedView" class="btn" type="button">Advanced</button>
           </div>
 
@@ -388,230 +378,192 @@
 
             <div style="height:14px;"></div>
 
-            <div class="qe-split2">
-              <div>
-                <label>Source Type</label>
-                <select id="dbSourceType">
-                  <option value="SIRE">SIRE</option>
-                  <option value="COMPANY_CUSTOM">Company (custom)</option>
-                  <option value="SPARE_X">Spare X</option>
-                  <option value="SPARE_Z">Spare Z</option>
-                </select>
-                <div class="muted small">New questions should be <b>Company (custom)</b> (or Spare).</div>
-              </div>
+            <div class="sectionBox">
+              <div class="sectionTitle"><div>Meta</div></div>
 
-              <div>
-                <label>Status</label>
-                <select id="dbStatus">
-                  <option value="active" selected>active</option>
-                  <option value="inactive">inactive</option>
-                </select>
-              </div>
-            </div>
-
-            <div style="height:10px;"></div>
-
-            <div class="qe-split3">
-              <div>
-                <label>Chapter (xx)</label>
-                <input id="numChapter" type="number" min="0" step="1" />
-              </div>
-              <div>
-                <label>Section (yy)</label>
-                <input id="numSection" type="number" min="0" step="1" />
-              </div>
-              <div>
-                <label>Item (zz / zzz)</label>
-                <input id="numItem" type="number" min="0" step="1" />
-              </div>
-            </div>
-
-            <div style="height:10px;"></div>
-
-            <div class="qe-split2">
-              <div>
-                <label>Number Suffix</label>
-                <input id="dbNumberSuffix" type="text" placeholder="C / (blank for SIRE)" />
-                <div class="muted small">SIRE = xx.yy.zz, Custom/Spare = xx.yy.zzz.</div>
-              </div>
-
-              <div>
-                <label>Tags (comma separated)</label>
-                <input id="dbTags" type="text" placeholder="tag1, tag2, tag3" />
-              </div>
-            </div>
-
-            <div class="adv" id="editAdvanced">
-              <div class="qe-split2">
-                <div>
-                  <label>Version (your tag)</label>
-                  <input id="dbVersion" type="text" />
+              <div class="stackGrid">
+                <div class="fieldBox">
+                  <label>Source Type</label>
+                  <select id="dbSourceType">
+                    <option value="SIRE">SIRE</option>
+                    <option value="COMPANY_CUSTOM">Company (custom)</option>
+                    <option value="SPARE_X">Spare X</option>
+                    <option value="SPARE_Z">Spare Z</option>
+                  </select>
+                  <div class="muted small">New questions should be <b>Company (custom)</b> (or Spare).</div>
                 </div>
-                <div>
-                  <label>Change reason (optional)</label>
-                  <input id="dbChangeReason" type="text" placeholder="Why was this changed?" />
+
+                <div class="fieldBox">
+                  <label>Status</label>
+                  <select id="dbStatus">
+                    <option value="active" selected>active</option>
+                    <option value="inactive">inactive</option>
+                  </select>
+                </div>
+
+                <div class="fieldBox">
+                  <label>Number Parts</label>
+                  <div class="hintRow">
+                    <div style="flex:1;">
+                      <div class="muted" style="font-weight:900;">Chapter (xx)</div>
+                      <input id="numChapter" type="number" min="0" step="1" />
+                    </div>
+                    <div style="flex:1;">
+                      <div class="muted" style="font-weight:900;">Section (yy)</div>
+                      <input id="numSection" type="number" min="0" step="1" />
+                    </div>
+                    <div style="flex:1;">
+                      <div class="muted" style="font-weight:900;">Item (zz / zzz)</div>
+                      <input id="numItem" type="number" min="0" step="1" />
+                    </div>
+                  </div>
+                </div>
+
+                <div class="fieldBox">
+                  <label>Number Suffix</label>
+                  <input id="dbNumberSuffix" type="text" placeholder="C / (blank for SIRE)" />
+                  <div class="muted small">SIRE = xx.yy.zz, Custom/Spare = xx.yy.zzz.</div>
+                </div>
+
+                <div class="fieldBox">
+                  <label>Tags (comma separated)</label>
+                  <input id="dbTags" type="text" placeholder="tag1, tag2, tag3" />
                 </div>
               </div>
 
               <div style="height:10px;"></div>
-              <div>
-                <label>Raw JSON (advanced)</label>
-                <textarea id="pRaw"></textarea>
+              <button id="btnToggleAdvancedEdit" class="btn" type="button">Advanced (Version / Raw JSON)</button>
+
+              <div class="adv" id="editAdvanced">
+                <div style="height:12px;"></div>
+                <div class="stackGrid">
+                  <div class="fieldBox">
+                    <label>Version (your tag)</label>
+                    <input id="dbVersion" type="text" />
+                  </div>
+                  <div class="fieldBox">
+                    <label>Change reason (optional)</label>
+                    <input id="dbChangeReason" type="text" placeholder="Why was this changed?" />
+                  </div>
+                  <div class="fieldBox">
+                    <label>Raw JSON (advanced)</label>
+                    <textarea id="pRaw"></textarea>
+                  </div>
+                </div>
               </div>
             </div>
-
-            <div style="height:10px;"></div>
-            <button id="btnToggleAdvancedEdit" class="btn" type="button">Advanced (Version / Raw JSON)</button>
 
             <div style="height:14px;"></div>
 
-            <!-- QUESTION ATTRIBUTES (EDIT) -->
-            <div class="masterBox" style="margin-bottom:12px;">
-              <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
-                <div style="font-weight:950;">Question Attributes</div>
-                <div class="muted small">editable • saved into payload</div>
-              </div>
+            <!-- ATTRIBUTES (EDIT) -->
+            <div class="sectionBox">
+              <div class="sectionTitle"><div>Question Attributes</div><div class="muted">editable</div></div>
 
-              <div style="height:10px;"></div>
-
-              <div class="qe-split2" style="gap:12px;">
-                <div>
+              <div class="stackGrid">
+                <div class="fieldBox">
                   <label>Question Type</label>
-                  <input id="pQuestionType" list="questionTypeList" placeholder="Core / Rotational 1 / Rotational 2" />
-                  <datalist id="questionTypeList">
-                    <option value="Core"></option>
-                    <option value="Rotational 1"></option>
-                    <option value="Rotational 2"></option>
-                  </datalist>
+                  <select id="eQuestionType">
+                    <option value=""></option>
+                    <option value="Core">Core</option>
+                    <option value="Rotational 1">Rotational 1</option>
+                    <option value="Rotational 2">Rotational 2</option>
+                  </select>
                 </div>
 
-                <div>
+                <div class="fieldBox">
                   <label>Vessel Type (comma separated)</label>
-                  <input id="pVesselType" placeholder="Oil, Chemical, LNG, LPG" />
-                </div>
-              </div>
-
-              <div style="height:10px;"></div>
-
-              <div class="qe-split2" style="gap:12px;">
-                <div>
-                  <label>ROVIQ List</label>
-                  <input id="pRoviqList" placeholder="Documentation, Pre-board" />
+                  <input id="eVesselType" type="text" placeholder="Oil, Chemical, LNG, LPG" />
                 </div>
 
-                <div>
-                  <label>Company Rank Allocation</label>
-                  <input id="pCompanyRankAllocation" placeholder="Master, Chief Officer, Deck Officers..." />
-                </div>
-              </div>
-
-              <div style="height:10px;"></div>
-
-              <div class="qe-split2" style="gap:12px;">
-                <div>
-                  <label>SPIS Rank Allocation</label>
-                  <input id="pSpisRankAllocation" placeholder="Master" />
+                <div class="fieldBox">
+                  <label>ROVIQ List (comma separated)</label>
+                  <input id="eRoviqList" type="text" placeholder="Cargo Control Room, Main Deck, Documentation ..." />
                 </div>
 
-                <div>
+                <div class="fieldBox">
+                  <label>Company Rank Allocation (comma separated)</label>
+                  <input id="eCompanyRank" type="text" placeholder="Master, Chief Officer, Deck Officers ..." />
+                </div>
+
+                <div class="fieldBox">
                   <label>TMSA3 Reference</label>
-                  <input id="pTmsa3Ref" placeholder="(optional)" />
+                  <input id="eTmsa3" type="text" placeholder="" />
                 </div>
-              </div>
 
-              <div style="height:10px;"></div>
-
-              <div class="qe-split2" style="gap:12px;">
-                <div>
+                <div class="fieldBox">
                   <label>TMSA4 Reference</label>
-                  <input id="pTmsa4Ref" placeholder="(optional)" />
+                  <input id="eTmsa4" type="text" placeholder="" />
                 </div>
 
-                <div>
-                  <label>Question Response Type</label>
+                <div class="fieldBox">
+                  <label>Question Response Type (computed from payload fields)</label>
+                  <div id="eResponseTypePreview" class="small"></div>
 
-                  <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:center; padding:10px 12px; border:1px solid #cfd9e8; border-radius:12px; background:#fff;">
-                    <label style="display:flex; gap:8px; align-items:center; margin:0; font-weight:900;">
-                      <input id="rtHuman" type="checkbox" style="transform:scale(1.15);" />
-                      Human
-                    </label>
+                  <div style="height:10px;"></div>
 
-                    <label style="display:flex; gap:8px; align-items:center; margin:0; font-weight:900;">
-                      <input id="rtHardware" type="checkbox" style="transform:scale(1.15);" />
-                      Hardware
-                    </label>
-
-                    <label style="display:flex; gap:8px; align-items:center; margin:0; font-weight:900;">
-                      <input id="rtProcess" type="checkbox" style="transform:scale(1.15);" />
-                      Process
-                    </label>
-
-                    <label style="display:flex; gap:8px; align-items:center; margin:0; font-weight:900;">
-                      <input id="rtPhoto" type="checkbox" style="transform:scale(1.15);" />
-                      Photo
-                    </label>
+                  <div class="hintRow">
+                    <div style="flex:1;">
+                      <div class="muted" style="font-weight:900;">Human Response Type</div>
+                      <input id="eHumanRespType" type="text" placeholder="Graduated / None / ..." />
+                    </div>
+                    <div style="flex:1;">
+                      <div class="muted" style="font-weight:900;">Hardware Response Type</div>
+                      <input id="eHardwareRespType" type="text" placeholder="Graduated / None / ..." />
+                    </div>
+                    <div style="flex:1;">
+                      <div class="muted" style="font-weight:900;">Process Response Type</div>
+                      <input id="eProcessRespType" type="text" placeholder="Graduated / None / ..." />
+                    </div>
                   </div>
 
-                  <div class="muted small" style="margin-top:6px;">
-                    Human/Hardware/Process also store their tool type (Binary/Graduated) in the payload.
+                  <div style="height:10px;"></div>
+
+                  <div>
+                    <div class="muted" style="font-weight:900;">Photo Response</div>
+                    <select id="ePhotoResp">
+                      <option value=""></option>
+                      <option value="Y">Y</option>
+                      <option value="N">N</option>
+                    </select>
                   </div>
-                </div>
-              </div>
 
-              <div style="height:10px;"></div>
-
-              <div class="qe-split3" style="gap:12px;">
-                <div>
-                  <label>Human Response Type</label>
-                  <select id="pHumanRespType">
-                    <option value=""></option>
-                    <option value="Binary">Binary</option>
-                    <option value="Graduated">Graduated</option>
-                  </select>
-                </div>
-                <div>
-                  <label>Hardware Response Type</label>
-                  <select id="pHardwareRespType">
-                    <option value=""></option>
-                    <option value="Binary">Binary</option>
-                    <option value="Graduated">Graduated</option>
-                  </select>
-                </div>
-                <div>
-                  <label>Process Response Type</label>
-                  <select id="pProcessRespType">
-                    <option value=""></option>
-                    <option value="Binary">Binary</option>
-                    <option value="Graduated">Graduated</option>
-                  </select>
+                  <div class="muted small" style="margin-top:8px;">
+                    Rule: include Human/Hardware/Process only if value is not <b>None</b>. Include Photo only if Photo Response is <b>Y</b>.
+                  </div>
                 </div>
               </div>
             </div>
 
-            <!-- MAIN TEXT FIELDS (full width stacked) -->
-            <div class="masterBox" style="margin-bottom:12px;">
-              <div style="font-weight:950; margin-bottom:10px;">Question Content</div>
+            <div style="height:14px;"></div>
 
-              <div class="masterRow" style="margin:0 0 12px 0;">
-                <label>Short Text</label>
-                <textarea id="pShortText"></textarea>
-              </div>
+            <!-- CONTENT (EDIT) -->
+            <div class="sectionBox">
+              <div class="sectionTitle"><div>Question Content</div></div>
 
-              <div class="masterRow" style="margin:0 0 12px 0;">
-                <label>Question</label>
-                <textarea id="pQuestion"></textarea>
-              </div>
+              <div class="stackGrid">
+                <div class="fieldBox">
+                  <label>Short Text</label>
+                  <textarea id="pShortText"></textarea>
+                </div>
 
-              <div class="masterRow" style="margin:0 0 12px 0;">
-                <label>Inspection guidance</label>
-                <textarea id="pGuidance"></textarea>
-              </div>
+                <div class="fieldBox">
+                  <label>Question</label>
+                  <textarea id="pQuestion"></textarea>
+                </div>
 
-              <div class="masterRow" style="margin:0;">
-                <label>Suggested inspector actions</label>
-                <textarea id="pActions"></textarea>
+                <div class="fieldBox">
+                  <label>Inspection guidance</label>
+                  <textarea id="pGuidance"></textarea>
+                </div>
+
+                <div class="fieldBox">
+                  <label>Suggested inspector actions</label>
+                  <textarea id="pActions"></textarea>
+                </div>
               </div>
             </div>
+
+            <div style="height:14px;"></div>
 
             <!-- EXPECTED EVIDENCE (EDIT) -->
             <div class="masterBox">
@@ -651,7 +603,7 @@
               </div>
             </div>
 
-            <div style="height:10px;"></div>
+            <div style="height:12px;"></div>
             <div class="muted small" id="saveStatus"></div>
           </div>
         </div>

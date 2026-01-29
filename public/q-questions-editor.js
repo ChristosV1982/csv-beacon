@@ -1,4 +1,3 @@
-// public/q-questions-editor.js
 (() => {
   "use strict";
 
@@ -26,21 +25,57 @@
     return Number.isFinite(n) && Math.floor(n) === n;
   }
 
-  // ===== List toggle: show full question in list =====
-  const LS_SHOW_FULL = "qe_show_full_question";
-  function getShowFullQuestion() {
-    try { return localStorage.getItem(LS_SHOW_FULL) === "1"; } catch { return false; }
+  // =========================
+  // Payload helpers (IMPORTANT)
+  // =========================
+  function getPayloadVal(p, candidates) {
+    if (!p) return "";
+    for (const k of candidates) {
+      if (k in p) {
+        const v = p[k];
+        if (v !== null && v !== undefined) return v;
+      }
+    }
+    return "";
   }
-  function setShowFullQuestion(v) {
-    try { localStorage.setItem(LS_SHOW_FULL, v ? "1" : "0"); } catch {}
+
+  function setPayloadValBoth(p, snakeKey, titleKey, value) {
+    // keep both forms for compatibility with existing data and any older code
+    p[snakeKey] = value;
+    p[titleKey] = value;
   }
-  function syncToggleUI() {
-    const cb = $("toggleShowFullQuestion");
-    const lab = $("toggleShowFullQuestionLabel");
-    if (!cb) return;
-    const on = getShowFullQuestion();
-    cb.checked = on;
-    if (lab) lab.textContent = on ? "ON (Full Question)" : "OFF (Short Text)";
+
+  function normNone(v) {
+    const s = safeStr(v).trim();
+    if (!s) return "";
+    if (s.toLowerCase() === "none") return "None";
+    return s;
+  }
+
+  function computeResponseTypeFromPayload(p) {
+    const hw = normNone(getPayloadVal(p, ["hardware_response_type", "Hardware Response Type", "HardwareResponseType"]));
+    const hu = normNone(getPayloadVal(p, ["human_response_type", "Human Response Type", "HumanResponseType"]));
+    const pr = normNone(getPayloadVal(p, ["process_response_type", "Process Response Type", "ProcessResponseType"]));
+    const ph = normNone(getPayloadVal(p, ["photo_response", "Photo Response", "PhotoResponse"]));
+
+    const out = [];
+    if (hu && hu !== "None") out.push("Human");
+    if (hw && hw !== "None") out.push("Hardware");
+    if (pr && pr !== "None") out.push("Process");
+    if (safeStr(ph).trim().toUpperCase() === "Y") out.push("Photo");
+
+    return out.join(", ");
+  }
+
+  function refreshResponseTypePreviewFromEditInputs() {
+    const p = {};
+    p.human_response_type = safeStr($("eHumanRespType")?.value).trim();
+    p.hardware_response_type = safeStr($("eHardwareRespType")?.value).trim();
+    p.process_response_type = safeStr($("eProcessRespType")?.value).trim();
+    p.photo_response = safeStr($("ePhotoResp")?.value).trim();
+    const computed = computeResponseTypeFromPayload(p) || "";
+    const host = $("eResponseTypePreview");
+    if (host) host.textContent = computed || "—";
   }
 
   // ===== Number helpers =====
@@ -92,8 +127,9 @@
     const nbNorm = normalizeNumberBaseRow(row);
     const computed = computeNumberFull(nbNorm, sx);
 
-    // Keep legacy stored number_full ONLY as fallback
+    // Keep legacy stored number_full ONLY as fallback (some DB rows may have it)
     let nf = safeStr(row?.number_full).trim();
+    // fix legacy “02.01.01-” cases when suffix is blank
     if (nf && nf.endsWith("-") && !sx) nf = nf.slice(0, -1);
 
     return computed || nf || "—";
@@ -103,10 +139,12 @@
     const s = safeStr(nb).trim();
     const m = s.match(/^(\d+)\.(\d+)\.(\d+)$/);
     if (!m) return { xx:"", yy:"", zz:"" };
+    // Use numeric strings in inputs (no padding) - ok for editing
     return { xx: String(Number(m[1])), yy: String(Number(m[2])), zz: String(Number(m[3])) };
   }
 
   function numberKey(row) {
+    // Sort using numeric parts from normalized base so order is stable
     const nb = normalizeNumberBaseRow(row);
     const m = nb.match(/^(\d+)\.(\d+)\.(\d+)$/);
     if (!m) return [9999, 9999, 999999, nb];
@@ -143,24 +181,19 @@
       const clean = line.replace(/^•\s*/, "").replace(/^-\s*/, "").replace(/^–\s*/, "").replace(/^—\s*/, "").trim();
       if (!clean) continue;
 
-      if (!out.length) { out.push(clean); continue; }
+      if (!out.length) {
+        out.push(clean);
+        continue;
+      }
 
-      if (isBulletStart(line)) out.push(clean);
-      else out[out.length - 1] = (out[out.length - 1] + " " + clean).trim();
+      if (isBulletStart(line)) {
+        out.push(clean);
+      } else {
+        // continuation of previous bullet
+        out[out.length - 1] = (out[out.length - 1] + " " + clean).trim();
+      }
     }
     return out;
-  }
-
-  // ===== Payload helpers for attributes =====
-  function payloadGet(p, keys) {
-    for (const k of keys) {
-      const v = p?.[k];
-      if (v !== undefined && v !== null && String(v).trim() !== "") return v;
-    }
-    return "";
-  }
-  function payloadSet(p, key, value) {
-    p[key] = safeStr(value).trim();
   }
 
   // ===== PGNO helpers =====
@@ -194,6 +227,8 @@
     if (empty) empty.style.display = "none";
     if (v) v.style.display = (mode === "VIEW") ? "block" : "none";
     if (e) e.style.display = (mode === "EDIT") ? "block" : "none";
+
+    if (mode === "EDIT") refreshResponseTypePreviewFromEditInputs();
   }
 
   function setPillsFromSelected() {
@@ -216,7 +251,7 @@
     if (Array.isArray(selected.pgno_items) && selected.pgno_items.length) return;
 
     const p = selected.payload || {};
-    const old = p.potential_grounds_for_negative_observations;
+    const old = p.potential_grounds_for_negative_observations ?? p["Potential Grounds for Negative Observations"];
 
     if (Array.isArray(old)) {
       selected.pgno_items = old.map(t => ({ text: safeStr(t), remarks: "" }));
@@ -254,9 +289,7 @@
       }))
       .filter(x => x.text);
 
-    let raw = p.expected_evidence;
-    if (raw === undefined) raw = p["Expected Evidence"];
-    if (raw === undefined) raw = p.ExpEv_Bullets;
+    let raw = p.expected_evidence ?? p["Expected Evidence"] ?? p.ExpEv_Bullets;
 
     if (Array.isArray(raw)) {
       if (raw.length && typeof raw[0] === "object") {
@@ -304,7 +337,7 @@
             <div class="masterCode">${escapeHtml(code)}</div>
           </div>
           <div class="masterTiny" style="margin-top:6px; white-space:pre-wrap;">${escapeHtml(t)}</div>
-          ${r ? `<div class="masterTiny" style="margin-top:10px;"><b>Remarks:</b> ${escapeHtml(r)}</div>` : ``}
+          ${r ? `<div class="masterTiny" style="margin-top:8px;"><b>Remarks:</b> ${escapeHtml(r)}</div>` : ``}
         </div>
       `;
     }).join("");
@@ -341,7 +374,7 @@
           </div>
         </div>
 
-        <div class="masterGrid vertical">
+        <div class="masterGrid">
           <div class="full">
             <label>PGNO text</label>
             <textarea data-text="${idx}"></textarea>
@@ -409,7 +442,7 @@
           <div class="masterTiny" style="margin-top:6px; white-space:pre-wrap;">${escapeHtml(t)}</div>
 
           ${(ch || form || r) ? `
-            <div style="height:10px;"></div>
+            <div style="height:8px;"></div>
             ${ch ? `<div class="masterTiny"><b>eSMS Reference(s):</b> ${escapeHtml(ch)}</div>` : ``}
             ${form ? `<div class="masterTiny"><b>eSMS Form(s):</b> ${escapeHtml(form)}</div>` : ``}
             ${r ? `<div class="masterTiny"><b>Remarks:</b> ${escapeHtml(r)}</div>` : ``}
@@ -445,7 +478,7 @@
           </div>
         </div>
 
-        <div class="masterGrid vertical">
+        <div class="masterGrid">
           <div class="full">
             <label>Expected Evidence text</label>
             <textarea data-ee-text="${idx}"></textarea>
@@ -503,40 +536,76 @@
   }
 
   // ===== view/edit fill =====
+  function fillAttributesView(p) {
+    setText("vAttrQuestionType",
+      safeStr(getPayloadVal(p, ["question_type","Question Type","QuestionType"])).trim() || "—"
+    );
+
+    const resp = computeResponseTypeFromPayload(p);
+    setText("vAttrResponseType", resp || "—");
+
+    setText("vAttrVesselType",
+      safeStr(getPayloadVal(p, ["vessel_type","Vessel Type","VesselType"])).trim() || "—"
+    );
+
+    setText("vAttrRoviqList",
+      safeStr(getPayloadVal(p, ["roviq_list","ROVIQ List","ROVIQList"])).trim() || "—"
+    );
+
+    setText("vAttrCompanyRank",
+      safeStr(getPayloadVal(p, ["company_rank_allocation","Company Rank Allocation","CompanyRankAllocation"])).trim() || "—"
+    );
+
+    setText("vAttrTmsa3",
+      safeStr(getPayloadVal(p, ["tmsa3_reference","TMSA3 Reference","TMSA3Reference"])).trim() || "—"
+    );
+
+    setText("vAttrTmsa4",
+      safeStr(getPayloadVal(p, ["tmsa4_reference","TMSA4 Reference","TMSA4Reference"])).trim() || "—"
+    );
+  }
+
+  function fillAttributesEdit(p) {
+    const qt = safeStr(getPayloadVal(p, ["question_type","Question Type","QuestionType"])).trim();
+    const vt = safeStr(getPayloadVal(p, ["vessel_type","Vessel Type","VesselType"])).trim();
+    const rv = safeStr(getPayloadVal(p, ["roviq_list","ROVIQ List","ROVIQList"])).trim();
+    const cr = safeStr(getPayloadVal(p, ["company_rank_allocation","Company Rank Allocation","CompanyRankAllocation"])).trim();
+    const t3 = safeStr(getPayloadVal(p, ["tmsa3_reference","TMSA3 Reference","TMSA3Reference"])).trim();
+    const t4 = safeStr(getPayloadVal(p, ["tmsa4_reference","TMSA4 Reference","TMSA4Reference"])).trim();
+
+    const hu = safeStr(getPayloadVal(p, ["human_response_type","Human Response Type","HumanResponseType"])).trim();
+    const hw = safeStr(getPayloadVal(p, ["hardware_response_type","Hardware Response Type","HardwareResponseType"])).trim();
+    const pr = safeStr(getPayloadVal(p, ["process_response_type","Process Response Type","ProcessResponseType"])).trim();
+    const ph = safeStr(getPayloadVal(p, ["photo_response","Photo Response","PhotoResponse"])).trim();
+
+    if ($("eQuestionType")) $("eQuestionType").value = qt || "";
+    if ($("eVesselType")) $("eVesselType").value = vt || "";
+    if ($("eRoviqList")) $("eRoviqList").value = rv || "";
+    if ($("eCompanyRank")) $("eCompanyRank").value = cr || "";
+    if ($("eTmsa3")) $("eTmsa3").value = t3 || "";
+    if ($("eTmsa4")) $("eTmsa4").value = t4 || "";
+
+    if ($("eHumanRespType")) $("eHumanRespType").value = hu || "";
+    if ($("eHardwareRespType")) $("eHardwareRespType").value = hw || "";
+    if ($("eProcessRespType")) $("eProcessRespType").value = pr || "";
+    if ($("ePhotoResp")) $("ePhotoResp").value = ph || "";
+
+    refreshResponseTypePreviewFromEditInputs();
+  }
+
   function fillViewPanel(r) {
     setText("vhdrNumber", displayNumber(r));
     setText("vhdrId", r.id ? `DB id: ${r.id}` : "");
 
     const p = r.payload || {};
 
-    // Main content
     setText("vShortText", safeStr(p.short_text ?? p.ShortText ?? p.shortText ?? p["Short Text"]));
     setText("vQuestion", safeStr(p.question ?? p.Question ?? p["Question"]));
     setText("vGuidance", safeStr(p.inspection_guidance ?? p.guidance ?? p.InspectionGuidance ?? p["Inspection Guidance"]));
     setText("vActions", safeStr(p.suggested_inspector_actions ?? p.actions ?? p.SuggestedInspectorActions ?? p["Suggested Inspector Actions"]));
 
-    // Attributes
-    setText("vMetaQuestionType", safeStr(payloadGet(p, ["Question Type", "question_type"])) || "—");
-    setText("vMetaVesselType", safeStr(payloadGet(p, ["Vessel Type", "vessel_type"])) || "—");
-    setText("vMetaRoviq", safeStr(payloadGet(p, ["ROVIQ List", "roviq_list"])) || "—");
-    setText("vMetaCompanyRank", safeStr(payloadGet(p, ["Company Rank Allocation", "company_rank_allocation"])) || "—");
-    setText("vMetaSpisRank", safeStr(payloadGet(p, ["SPIS Rank Allocation", "spis_rank_allocation"])) || "—");
-    setText("vMetaTmsa3", safeStr(payloadGet(p, ["TMSA3 Reference", "tmsa3_reference"])) || "—");
-    setText("vMetaTmsa4", safeStr(payloadGet(p, ["TMSA4 Reference", "tmsa4_reference"])) || "—");
+    fillAttributesView(p);
 
-    const humanRT = safeStr(payloadGet(p, ["Human Response Type", "human_response_type"]));
-    const hardwareRT = safeStr(payloadGet(p, ["Hardware Response Type", "hardware_response_type"]));
-    const processRT = safeStr(payloadGet(p, ["Process Response Type", "process_response_type"]));
-    const photoR = safeStr(payloadGet(p, ["Photo Response", "photo_response"])).toUpperCase();
-
-    const respTypes = [];
-    if (humanRT) respTypes.push("Human");
-    if (hardwareRT) respTypes.push("Hardware");
-    if (processRT) respTypes.push("Process");
-    if (photoR === "Y") respTypes.push("Photo");
-    setText("vMetaResponseTypes", respTypes.length ? respTypes.join(", ") : "—");
-
-    // Advanced
     setText("vTags", Array.isArray(r.tags) ? r.tags.join(", ") : safeStr(r.tags || ""));
     setText("vVersion", safeStr(r.version || ""));
 
@@ -570,31 +639,6 @@
     setText("hdrNumber", displayNumber(r));
 
     const p = r.payload || {};
-
-    // Attributes (EDIT)
-    $("pQuestionType").value = safeStr(payloadGet(p, ["Question Type", "question_type"]));
-    $("pVesselType").value = safeStr(payloadGet(p, ["Vessel Type", "vessel_type"]));
-    $("pRoviqList").value = safeStr(payloadGet(p, ["ROVIQ List", "roviq_list"]));
-    $("pCompanyRankAllocation").value = safeStr(payloadGet(p, ["Company Rank Allocation", "company_rank_allocation"]));
-    $("pSpisRankAllocation").value = safeStr(payloadGet(p, ["SPIS Rank Allocation", "spis_rank_allocation"]));
-    $("pTmsa3Ref").value = safeStr(payloadGet(p, ["TMSA3 Reference", "tmsa3_reference"]));
-    $("pTmsa4Ref").value = safeStr(payloadGet(p, ["TMSA4 Reference", "tmsa4_reference"]));
-
-    const humanRT = safeStr(payloadGet(p, ["Human Response Type", "human_response_type"]));
-    const hardwareRT = safeStr(payloadGet(p, ["Hardware Response Type", "hardware_response_type"]));
-    const processRT = safeStr(payloadGet(p, ["Process Response Type", "process_response_type"]));
-    const photoR = safeStr(payloadGet(p, ["Photo Response", "photo_response"])).toUpperCase();
-
-    $("rtHuman").checked = !!humanRT;
-    $("rtHardware").checked = !!hardwareRT;
-    $("rtProcess").checked = !!processRT;
-    $("rtPhoto").checked = (photoR === "Y");
-
-    $("pHumanRespType").value = humanRT;
-    $("pHardwareRespType").value = hardwareRT;
-    $("pProcessRespType").value = processRT;
-
-    // Main content
     $("pShortText").value = safeStr(p.short_text ?? p.ShortText ?? p.shortText ?? p["Short Text"]);
     $("pQuestion").value = safeStr(p.question ?? p.Question ?? p["Question"]);
     $("pGuidance").value = safeStr(p.inspection_guidance ?? p.guidance ?? p.InspectionGuidance ?? p["Inspection Guidance"]);
@@ -602,6 +646,8 @@
 
     try { $("pRaw").value = JSON.stringify(p, null, 2); }
     catch { $("pRaw").value = ""; }
+
+    fillAttributesEdit(p);
 
     setPillsFromSelected();
 
@@ -626,7 +672,7 @@
     const tmp = { ...selected, number_base: nb, number_suffix: sx, number_full: "" };
 
     setText("hdrNumber", displayNumber(tmp));
-    renderPgnoEditor();
+    renderPgnoEditor(); // codes depend on number_base
   }
 
   // ===== list =====
@@ -662,25 +708,16 @@
     setText("countLine", `${filtered.length} questions`);
     setText("loadedLine", `Loaded ${allRows.length}`);
 
-    const showFull = getShowFullQuestion();
-
     for (const r of filtered) {
       const div = document.createElement("div");
       div.className = "qitem" + (selected && !selected.__isNew && selected.id === r.id ? " active" : "");
 
       const p = r.payload || {};
+      const sub =
+        safeStr(p.short_text || p.ShortText || p.shortText || p["Short Text"]) ||
+        safeStr(p.question || p.Question || p["Question"]);
 
-      const shortText = safeStr(p.short_text || p.ShortText || p.shortText || p["Short Text"]);
-      const question = safeStr(p.question || p.Question || p["Question"]);
-
-      const sub = showFull
-        ? (question || shortText)
-        : (shortText || question);
-
-      div.innerHTML = `
-        <div class="qno">${escapeHtml(displayNumber(r))}</div>
-        <div class="qsub">${escapeHtml(sub)}</div>
-      `;
+      div.innerHTML = `<div class="qno">${escapeHtml(displayNumber(r))}</div><div class="qsub">${escapeHtml(sub)}</div>`;
       div.onclick = () => selectRow(r);
       list.appendChild(div);
     }
@@ -741,7 +778,7 @@
     }));
   }
 
-  async function savePgnoToDb(questionId, numberBase, sourceType, items) {
+  async function savePgnoToDb(questionId, numberBase, items) {
     const clean = (items || [])
       .map(x => ({ text: safeStr(x.text).trim(), remarks: safeStr(x.remarks).trim() }))
       .filter(x => x.text.length > 0);
@@ -754,7 +791,7 @@
     const rows = clean.map((x, i) => ({
       question_id: questionId,
       seq: i + 1,
-      pgno_code: pgnoCode(numberBase, i + 1, sourceType || "SIRE"),
+      pgno_code: pgnoCode(numberBase, i + 1, "SIRE"),
       pgno_text: x.text,
       remarks: x.remarks,
       created_by: me?.user?.id || null,
@@ -877,17 +914,17 @@
         expected_evidence: [],
         potential_grounds_for_negative_observations: [],
 
-        "Question Type": "",
-        "Vessel Type": "",
-        "ROVIQ List": "",
-        "Company Rank Allocation": "",
-        "SPIS Rank Allocation": "",
-        "TMSA3 Reference": "",
-        "TMSA4 Reference": "",
-        "Human Response Type": "",
-        "Hardware Response Type": "",
-        "Process Response Type": "",
-        "Photo Response": "N",
+        // attributes (snake_case)
+        question_type: "",
+        vessel_type: "",
+        roviq_list: "",
+        company_rank_allocation: "",
+        tmsa3_reference: "",
+        tmsa4_reference: "",
+        human_response_type: "None",
+        hardware_response_type: "None",
+        process_response_type: "None",
+        photo_response: "N",
       },
       pgno_items: [],
       ee_items: [],
@@ -944,30 +981,36 @@
         payload = selected.payload || {};
       }
 
+      // core text fields
       payload.short_text = safeStr($("pShortText").value);
       payload.question = safeStr($("pQuestion").value);
       payload.inspection_guidance = safeStr($("pGuidance").value);
       payload.suggested_inspector_actions = safeStr($("pActions").value);
 
-      // Attributes
-      payloadSet(payload, "Question Type", $("pQuestionType").value);
-      payloadSet(payload, "Vessel Type", $("pVesselType").value);
-      payloadSet(payload, "ROVIQ List", $("pRoviqList").value);
-      payloadSet(payload, "Company Rank Allocation", $("pCompanyRankAllocation").value);
-      payloadSet(payload, "SPIS Rank Allocation", $("pSpisRankAllocation").value);
-      payloadSet(payload, "TMSA3 Reference", $("pTmsa3Ref").value);
-      payloadSet(payload, "TMSA4 Reference", $("pTmsa4Ref").value);
+      // ===== Attributes (READ FROM EDIT UI, WRITE BACK TO PAYLOAD) =====
+      const qType = safeStr($("eQuestionType")?.value).trim();
+      const vType = safeStr($("eVesselType")?.value).trim();
+      const roviq = safeStr($("eRoviqList")?.value).trim();
+      const ranks = safeStr($("eCompanyRank")?.value).trim();
+      const tmsa3 = safeStr($("eTmsa3")?.value).trim();
+      const tmsa4 = safeStr($("eTmsa4")?.value).trim();
 
-      // Response toggles + tool types
-      const humanOn = $("rtHuman").checked;
-      const hardwareOn = $("rtHardware").checked;
-      const processOn = $("rtProcess").checked;
-      const photoOn = $("rtPhoto").checked;
+      const hu = safeStr($("eHumanRespType")?.value).trim();
+      const hw = safeStr($("eHardwareRespType")?.value).trim();
+      const pr = safeStr($("eProcessRespType")?.value).trim();
+      const ph = safeStr($("ePhotoResp")?.value).trim();
 
-      payloadSet(payload, "Human Response Type", humanOn ? ($("pHumanRespType").value || "Graduated") : "");
-      payloadSet(payload, "Hardware Response Type", hardwareOn ? ($("pHardwareRespType").value || "Binary") : "");
-      payloadSet(payload, "Process Response Type", processOn ? ($("pProcessRespType").value || "Graduated") : "");
-      payloadSet(payload, "Photo Response", photoOn ? "Y" : "N");
+      setPayloadValBoth(payload, "question_type", "Question Type", qType);
+      setPayloadValBoth(payload, "vessel_type", "Vessel Type", vType);
+      setPayloadValBoth(payload, "roviq_list", "ROVIQ List", roviq);
+      setPayloadValBoth(payload, "company_rank_allocation", "Company Rank Allocation", ranks);
+      setPayloadValBoth(payload, "tmsa3_reference", "TMSA3 Reference", tmsa3);
+      setPayloadValBoth(payload, "tmsa4_reference", "TMSA4 Reference", tmsa4);
+
+      setPayloadValBoth(payload, "human_response_type", "Human Response Type", hu);
+      setPayloadValBoth(payload, "hardware_response_type", "Hardware Response Type", hw);
+      setPayloadValBoth(payload, "process_response_type", "Process Response Type", pr);
+      setPayloadValBoth(payload, "photo_response", "Photo Response", ph);
 
       // Compatibility payload: store texts-only arrays
       ensurePgnoStateFromPayloadIfEmpty();
@@ -1007,7 +1050,7 @@
 
         if (error) throw error;
 
-        try { await savePgnoToDb(data.id, number_base, src, selected.pgno_items || []); }
+        try { await savePgnoToDb(data.id, number_base, selected.pgno_items || []); }
         catch (e) { showWarn("Question saved, but PGNO rows could not be saved.\n\nError: " + String(e?.message || e)); }
 
         try { await saveEeToDb(data.id, selected.ee_items || []); }
@@ -1033,7 +1076,7 @@
 
         if (error) throw error;
 
-        try { await savePgnoToDb(selected.id, number_base, src, selected.pgno_items || []); }
+        try { await savePgnoToDb(selected.id, number_base, selected.pgno_items || []); }
         catch (e) { showWarn("Question saved, but PGNO rows could not be saved.\n\nError: " + String(e?.message || e)); }
 
         try { await saveEeToDb(selected.id, selected.ee_items || []); }
@@ -1077,17 +1120,6 @@
 
     $("searchInput").oninput = () => renderList();
 
-    // list toggle
-    const t = $("toggleShowFullQuestion");
-    if (t) {
-      syncToggleUI();
-      t.onchange = () => {
-        setShowFullQuestion(!!t.checked);
-        syncToggleUI();
-        renderList();
-      };
-    }
-
     $("newQuestionBtn").onclick = () => newQuestion();
 
     $("btnEdit").onclick = () => {
@@ -1126,6 +1158,14 @@
 
     $("btnAddPgno").onclick = () => addPgnoRow();
     $("btnAddEe").onclick = () => addEeRow();
+
+    // attribute edit -> refresh preview
+    const ids = ["eHumanRespType","eHardwareRespType","eProcessRespType","ePhotoResp"];
+    ids.forEach(id => {
+      const el = $(id);
+      if (el) el.addEventListener("input", refreshResponseTypePreviewFromEditInputs);
+      if (el) el.addEventListener("change", refreshResponseTypePreviewFromEditInputs);
+    });
   }
 
   async function boot() {
