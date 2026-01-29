@@ -47,24 +47,15 @@
     .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
     .btn2{background:#eaf1fb;color:#1a4170;border:1px solid #c9d9f3;border-radius:10px;padding:10px 14px;font-weight:900;cursor:pointer;}
 
-    .pgnoBox{ border:1px solid #d9e2ef; border-radius:12px; padding:12px; background:#fbfdff; }
-    .pgnoRow{ border:1px solid #e7eef9; border-radius:12px; padding:10px; background:#fff; margin-bottom:10px; }
-    .pgnoHdr{ display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; }
-    .pgnoCode{ font-weight:950; }
-    .pgnoTiny{ font-size:12px; color:#556; }
-    .pgnoGrid{ display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-top:10px; }
-    .pgnoGrid textarea{ min-height:70px; }
-    .pgnoGrid .full{ grid-column: 1 / -1; }
-
-    /* Expected Evidence UI (same visual system as PGNO) */
-    .evBox{ border:1px solid #d9e2ef; border-radius:12px; padding:12px; background:#fbfdff; }
-    .evRow{ border:1px solid #e7eef9; border-radius:12px; padding:10px; background:#fff; margin-bottom:10px; }
-    .evHdr{ display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; }
-    .evNo{ font-weight:950; }
-    .evTiny{ font-size:12px; color:#556; }
-    .evGrid{ display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-top:10px; }
-    .evGrid textarea{ min-height:70px; }
-    .evGrid .full{ grid-column: 1 / -1; }
+    /* Shared “master list” box look */
+    .masterBox{ border:1px solid #d9e2ef; border-radius:12px; padding:12px; background:#fbfdff; }
+    .masterRow{ border:1px solid #e7eef9; border-radius:12px; padding:10px; background:#fff; margin-bottom:10px; }
+    .masterHdr{ display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; }
+    .masterCode{ font-weight:950; }
+    .masterTiny{ font-size:12px; color:#556; }
+    .masterGrid{ display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-top:10px; }
+    .masterGrid textarea{ min-height:70px; }
+    .masterGrid .full{ grid-column: 1 / -1; }
   </style>
 </head>
 
@@ -92,7 +83,7 @@
     <div class="qe-card">
       <h1 style="margin:0 0 8px 0;">Questions Browser & Viewer / Editor (DB)</h1>
       <div class="muted">
-        PGNOs are stored as separate DB rows and auto-numbered per question (e.g. 02.02.02.01). Expected Evidence is stored as separate DB rows (bulleted), with editable meta.
+        PGNOs and Expected Evidence are stored as separate DB rows (per bullet) and are editable for <b>all</b> questions.
       </div>
 
       <div style="height:10px;"></div>
@@ -200,19 +191,19 @@
             <div style="height:12px;"></div>
 
             <!-- EXPECTED EVIDENCE (VIEW) -->
-            <div class="evBox">
+            <div class="masterBox">
               <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
                 <div style="font-weight:950;">Expected Evidence</div>
-                <div class="muted" id="vEvCount">—</div>
+                <div class="muted" id="vEeCount">—</div>
               </div>
               <div style="height:10px;"></div>
-              <div id="vEvList" class="small"></div>
+              <div id="vEeList" class="small"></div>
             </div>
 
             <div style="height:12px;"></div>
 
             <!-- PGNO (VIEW) -->
-            <div class="pgnoBox">
+            <div class="masterBox">
               <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
                 <div style="font-weight:950;">Potential grounds for negative observations (PGNOs)</div>
                 <div class="muted" id="vPgnoCount">—</div>
@@ -372,27 +363,27 @@
             <div style="height:14px;"></div>
 
             <!-- EXPECTED EVIDENCE (EDIT) -->
-            <div class="evBox">
+            <div class="masterBox">
               <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
                 <div style="font-weight:950;">Expected Evidence (stored as DB rows)</div>
                 <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-                  <div class="muted" id="evCountLine">—</div>
-                  <button id="btnAddEv" class="btn" type="button">+ Add Expected Evidence</button>
+                  <div class="muted" id="eeCountLine">—</div>
+                  <button id="btnAddEe" class="btn" type="button">+ Add Expected Evidence</button>
                 </div>
               </div>
 
               <div style="height:10px;"></div>
-              <div id="evEditorList"></div>
+              <div id="eeEditorList"></div>
 
               <div class="muted small">
-                Expected Evidence is bulleted (seq 1..n) under the header. No codes.
+                One row = one bullet. Sequence is auto-saved as 1, 2, 3, ...
               </div>
             </div>
 
             <div style="height:14px;"></div>
 
             <!-- PGNO (EDIT) -->
-            <div class="pgnoBox">
+            <div class="masterBox">
               <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
                 <div style="font-weight:950;">PGNOs (stored as DB rows)</div>
                 <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
