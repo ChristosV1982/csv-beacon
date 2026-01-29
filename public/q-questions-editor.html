@@ -9,70 +9,255 @@
   <link rel="stylesheet" href="./q-questions-editor.css" />
 
   <style>
-    .qe-wrap{ max-width: 1400px; margin: 0 auto; padding: 18px; }
+    /* ===== Richer overall typography ===== */
+    :root{
+      --bg:#f3f6fb;
+      --card:#ffffff;
+      --line:#d9e2ef;
+      --soft:#eef3fb;
+      --soft2:#f6f9ff;
+      --text:#102a43;
+      --muted:#6b778c;
+      --brand:#1f66c2;
+      --brand2:#1a4170;
+      --shadow: 0 6px 22px rgba(16,42,67,.08);
+      --shadow2: 0 2px 10px rgba(16,42,67,.06);
+      --r12:12px;
+      --r14:14px;
+      --r16:16px;
+    }
+
+    html, body{
+      font-size: 15px; /* was effectively smaller */
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    .qe-wrap{ max-width: 1480px; margin: 0 auto; padding: 18px; }
+
+    /* ===== Top bars ===== */
+    .topbar{
+      background: linear-gradient(90deg, var(--brand2), #0f2f57);
+      color:#fff;
+      padding:12px 16px;
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:12px;
+      flex-wrap:wrap;
+      box-shadow: var(--shadow2);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+    .btn2{
+      background:#eaf1fb;
+      color:var(--brand2);
+      border:1px solid #c9d9f3;
+      border-radius:12px;
+      padding:10px 14px;
+      font-weight:900;
+      cursor:pointer;
+    }
+
+    /* ===== Cards / pills ===== */
+    .qe-pill{
+      background: #eef5ff;
+      border:1px solid #cfe2ff;
+      padding:7px 12px;
+      border-radius:999px;
+      font-size:14px;
+      box-shadow: 0 1px 0 rgba(16,42,67,.04);
+    }
+
     .qe-top{ display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; }
-    .qe-pill{ background:#eef5ff; border:1px solid #cfe2ff; padding:6px 10px; border-radius:999px; font-size:13px; }
-    .qe-card{ background:#fff; border:1px solid #d9e2ef; border-radius:14px; padding:16px; box-shadow: 0 2px 10px rgba(0,0,0,.04); }
-    .qe-row{ display:flex; gap:14px; flex-wrap:wrap; align-items:end; }
-    .qe-row > div{ display:flex; flex-direction:column; gap:6px; }
-    label{ font-size:12px; color:#334; }
-    input, select, textarea{ padding:10px 12px; border-radius:10px; border:1px solid #cfd9e8; outline:none; }
-    textarea{ min-height: 90px; resize: vertical; }
-    .btn{ padding:10px 14px; border-radius:10px; border:1px solid #cfd9e8; background:#f7fbff; cursor:pointer; font-weight:800; }
-    .btn.primary{ background:#1f66c2; color:#fff; border-color:#1f66c2; }
+
+    .qe-card{
+      background: var(--card);
+      border:1px solid var(--line);
+      border-radius: var(--r16);
+      padding:16px;
+      box-shadow: var(--shadow);
+    }
+
+    /* ===== Inputs / labels ===== */
+    label{ font-size:13px; color:#223; font-weight:800; }
+    input, select, textarea{
+      padding:11px 12px;
+      border-radius:12px;
+      border:1px solid #cfd9e8;
+      outline:none;
+      font-size:15px;
+      background:#fff;
+    }
+    textarea{ min-height: 110px; resize: vertical; }
+
+    .btn{
+      padding:10px 14px;
+      border-radius:12px;
+      border:1px solid #cfd9e8;
+      background:#f7fbff;
+      cursor:pointer;
+      font-weight:900;
+      font-size:14px;
+    }
+    .btn.primary{ background:var(--brand); color:#fff; border-color:var(--brand); box-shadow: 0 6px 14px rgba(31,102,194,.20); }
     .btn.light{ background:#fff; }
-    .qe-main{ display:grid; grid-template-columns: 360px 1fr; gap:14px; margin-top:14px; }
-    .qe-list{ border:1px solid #d9e2ef; border-radius:12px; overflow:hidden; }
-    .qe-list-head{ padding:10px 12px; background:#f3f7ff; display:flex; justify-content:space-between; font-size:13px; }
-    #qList{ max-height: 650px; overflow:auto; }
 
-    .qitem{ padding:10px 12px; border-top:1px solid #eef2f8; cursor:pointer; }
-    .qitem:hover{ background:#f8fbff; }
-    .qitem.active{ background:#eaf2ff; }
-    .qno{ font-weight:900; }
+    .muted{ color:var(--muted); font-size:13px; }
+    .small{ font-size:13px; }
 
-    /* allow full question text to wrap and show all lines */
+    .warn{
+      background:#fff1f1;
+      border:1px solid #ffc9c9;
+      padding:12px 14px;
+      border-radius:var(--r14);
+      margin:12px 0;
+      display:none;
+      white-space:pre-wrap;
+      box-shadow: 0 3px 10px rgba(16,42,67,.06);
+      font-size:14px;
+    }
+    .ok{
+      background:#f1fff4;
+      border:1px solid #bfeccc;
+      padding:12px 14px;
+      border-radius:var(--r14);
+      margin:12px 0;
+      display:none;
+      white-space:pre-wrap;
+      box-shadow: 0 3px 10px rgba(16,42,67,.06);
+      font-size:14px;
+    }
+
+    /* ===== Filters row ===== */
+    .qe-row{
+      display:flex;
+      gap:14px;
+      flex-wrap:wrap;
+      align-items:end;
+      padding: 10px 12px;
+      background: var(--soft2);
+      border: 1px solid var(--line);
+      border-radius: var(--r14);
+    }
+    .qe-row > div{ display:flex; flex-direction:column; gap:7px; }
+    .qe-toggleRow{ display:flex; align-items:center; gap:10px; flex-direction:row; }
+    .qe-toggleRow input[type="checkbox"]{ width:18px; height:18px; margin:0; }
+    .qe-toggleLabel{ font-size:13px; color:#223; font-weight:900; user-select:none; cursor:pointer; }
+    .qe-toggleHint{ font-size:12px; color:var(--muted); margin-top:2px; }
+
+    /* ===== Main grid ===== */
+    .qe-main{
+      display:grid;
+      grid-template-columns: 380px 1fr;
+      gap:14px;
+      margin-top:14px;
+    }
+
+    /* ===== Left list (richer) ===== */
+    .qe-list{
+      border:1px solid var(--line);
+      border-radius: var(--r16);
+      overflow:hidden;
+      background:#fff;
+      box-shadow: var(--shadow2);
+    }
+    .qe-list-head{
+      padding:12px 14px;
+      background: linear-gradient(180deg, #f3f7ff, #eef4ff);
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      font-size:14px;
+      border-bottom:1px solid var(--line);
+    }
+    #qList{
+      max-height: 690px;
+      overflow:auto;
+      padding: 10px;
+      background: #fff;
+    }
+
+    .qitem{
+      padding:12px 12px;
+      margin-bottom:10px;
+      border:1px solid #e7eef9;
+      border-radius: var(--r14);
+      cursor:pointer;
+      background: #fff;
+      box-shadow: 0 2px 10px rgba(16,42,67,.05);
+      transition: transform .08s ease, box-shadow .08s ease, border-color .08s ease;
+    }
+    .qitem:hover{
+      transform: translateY(-1px);
+      box-shadow: 0 10px 18px rgba(16,42,67,.10);
+      border-color: #cfe2ff;
+      background: #fbfdff;
+    }
+    .qitem.active{
+      border-color:#9ec5ff;
+      background: #eef5ff;
+      box-shadow: 0 10px 18px rgba(16,42,67,.12);
+    }
+    .qno{ font-weight:950; font-size:15px; letter-spacing:.2px; }
     .qsub{
-      font-size:12px;
-      color:#334;
-      margin-top:4px;
+      font-size: 13.5px;
+      color:#223;
+      margin-top:6px;
       white-space: normal;
       overflow-wrap: anywhere;
       word-break: break-word;
-      line-height: 1.35;
+      line-height: 1.42;
     }
 
-    .muted{ color:#6b778c; font-size:12px; }
-    .warn{ background:#fff1f1; border:1px solid #ffc9c9; padding:10px 12px; border-radius:12px; margin:12px 0; display:none; white-space:pre-wrap; }
-    .ok{ background:#f1fff4; border:1px solid #bfeccc; padding:10px 12px; border-radius:12px; margin:12px 0; display:none; white-space:pre-wrap; }
-    .qe-right h2{ margin:0; font-size:18px; }
+    /* ===== Right panel ===== */
+    .qe-right h2{ margin:0; font-size:20px; letter-spacing:.2px; }
     .qe-actions{ display:flex; gap:10px; justify-content:flex-end; align-items:center; flex-wrap:wrap; }
-    .qe-split3{ display:grid; grid-template-columns: 1fr 1fr 1fr; gap:12px; }
-    .qe-split2{ display:grid; grid-template-columns: 1fr 1fr; gap:12px; }
-    .adv{ display:none; margin-top:12px; padding-top:12px; border-top:1px dashed #d9e2ef; }
-    .small{ font-size:12px; }
 
     .kv{ display:flex; gap:10px; flex-wrap:wrap; }
-    .kv .qe-pill{ font-weight:800; }
+    .kv .qe-pill{ font-weight:900; }
 
-    .topbar{background:#1a4170;color:#fff;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;}
-    .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
-    .btn2{background:#eaf1fb;color:#1a4170;border:1px solid #c9d9f3;border-radius:10px;padding:10px 14px;font-weight:900;cursor:pointer;}
+    .adv{ display:none; margin-top:12px; padding-top:12px; border-top:1px dashed var(--line); }
 
-    /* Toggle UI */
-    .qe-toggleRow{ display:flex; align-items:center; gap:10px; flex-direction:row; }
-    .qe-toggleRow input[type="checkbox"]{ width:18px; height:18px; margin:0; }
-    .qe-toggleLabel{ font-size:12px; color:#334; font-weight:800; user-select:none; cursor:pointer; }
-    .qe-toggleHint{ font-size:12px; color:#6b778c; }
+    /* ===== New stacked attribute cards ===== */
+    .attrStack{ display:flex; flex-direction:column; gap:12px; }
 
-    /* Shared “master list” box look */
-    .masterBox{ border:1px solid #d9e2ef; border-radius:12px; padding:12px; background:#fbfdff; }
-    .masterRow{ border:1px solid #e7eef9; border-radius:12px; padding:10px; background:#fff; margin-bottom:10px; }
+    .attrCard{
+      border:1px solid var(--line);
+      border-radius: var(--r16);
+      background: linear-gradient(180deg, #ffffff, #fbfdff);
+      box-shadow: 0 4px 14px rgba(16,42,67,.06);
+      overflow:hidden;
+    }
+    .attrHdr{
+      padding:10px 12px;
+      background: var(--soft);
+      border-bottom:1px solid var(--line);
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:12px;
+      font-weight:950;
+      font-size:14px;
+    }
+    .attrBody{
+      padding:12px 12px;
+      font-size:14px;
+      white-space: pre-wrap;
+      line-height: 1.5;
+    }
+
+    /* ===== Shared “master list” boxes ===== */
+    .masterBox{ border:1px solid var(--line); border-radius: var(--r16); padding:12px; background: var(--soft2); box-shadow: 0 4px 14px rgba(16,42,67,.05); }
+    .masterRow{ border:1px solid #e7eef9; border-radius: var(--r16); padding:12px; background:#fff; margin-bottom:10px; box-shadow: 0 2px 10px rgba(16,42,67,.05); }
     .masterHdr{ display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; }
-    .masterCode{ font-weight:950; }
-    .masterTiny{ font-size:12px; color:#556; }
+    .masterCode{ font-weight:950; font-size:14px; }
+    .masterTiny{ font-size:13px; color:#445; }
     .masterGrid{ display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-top:10px; }
-    .masterGrid textarea{ min-height:70px; }
+    .masterGrid textarea{ min-height:80px; }
     .masterGrid .full{ grid-column: 1 / -1; }
   </style>
 </head>
@@ -99,12 +284,12 @@
     <div id="okBox" class="ok"></div>
 
     <div class="qe-card">
-      <h1 style="margin:0 0 8px 0;">Questions Browser & Viewer / Editor (DB)</h1>
+      <h1 style="margin:0 0 8px 0; font-size:26px; letter-spacing:.2px;">Questions Browser & Viewer / Editor (DB)</h1>
       <div class="muted">
         PGNOs and Expected Evidence are stored as separate DB rows (per bullet) and are editable for <b>all</b> questions.
       </div>
 
-      <div style="height:10px;"></div>
+      <div style="height:12px;"></div>
 
       <div class="qe-row">
         <div style="flex-direction:row; gap:10px;">
@@ -128,7 +313,7 @@
           <input id="searchInput" type="text" placeholder="Type to filter ..." />
         </div>
 
-        <!-- ✅ New toggle -->
+        <!-- Toggle -->
         <div style="min-width:260px;">
           <label>List display</label>
           <div class="qe-toggleRow">
@@ -168,7 +353,7 @@
         </div>
 
         <!-- RIGHT PANEL -->
-        <div class="qe-right qe-card" style="border-radius:12px; box-shadow:none;">
+        <div class="qe-right qe-card" style="border-radius:16px;">
           <div id="emptyState" class="muted">Select a question from the list.</div>
 
           <!-- VIEW PANEL -->
@@ -192,31 +377,30 @@
 
             <div style="height:14px;"></div>
 
-            <div class="qe-split2">
-              <div>
-                <label>Short Text</label>
-                <div id="vShortText" class="small" style="white-space:pre-wrap;"></div>
+            <!-- ✅ Stacked attribute cards -->
+            <div class="attrStack">
+              <div class="attrCard">
+                <div class="attrHdr">Short Text</div>
+                <div id="vShortText" class="attrBody"></div>
               </div>
-              <div>
-                <label>Question</label>
-                <div id="vQuestion" class="small" style="white-space:pre-wrap;"></div>
+
+              <div class="attrCard">
+                <div class="attrHdr">Question</div>
+                <div id="vQuestion" class="attrBody"></div>
+              </div>
+
+              <div class="attrCard">
+                <div class="attrHdr">Inspection guidance</div>
+                <div id="vGuidance" class="attrBody"></div>
+              </div>
+
+              <div class="attrCard">
+                <div class="attrHdr">Suggested inspector actions</div>
+                <div id="vActions" class="attrBody"></div>
               </div>
             </div>
 
-            <div style="height:12px;"></div>
-
-            <div class="qe-split2">
-              <div>
-                <label>Inspection guidance</label>
-                <div id="vGuidance" class="small" style="white-space:pre-wrap;"></div>
-              </div>
-              <div>
-                <label>Suggested inspector actions</label>
-                <div id="vActions" class="small" style="white-space:pre-wrap;"></div>
-              </div>
-            </div>
-
-            <div style="height:12px;"></div>
+            <div style="height:14px;"></div>
 
             <!-- EXPECTED EVIDENCE (VIEW) -->
             <div class="masterBox">
@@ -228,7 +412,7 @@
               <div id="vEeList" class="small"></div>
             </div>
 
-            <div style="height:12px;"></div>
+            <div style="height:14px;"></div>
 
             <!-- PGNO (VIEW) -->
             <div class="masterBox">
@@ -241,25 +425,23 @@
             </div>
 
             <div class="adv" id="viewAdvanced">
-              <div class="qe-split2">
-                <div>
-                  <label>Tags</label>
-                  <div id="vTags" class="small" style="white-space:pre-wrap;"></div>
+              <div class="attrStack" style="margin-top:12px;">
+                <div class="attrCard">
+                  <div class="attrHdr">Tags</div>
+                  <div id="vTags" class="attrBody"></div>
                 </div>
-                <div>
-                  <label>Version</label>
-                  <div id="vVersion" class="small"></div>
+                <div class="attrCard">
+                  <div class="attrHdr">Version</div>
+                  <div id="vVersion" class="attrBody"></div>
                 </div>
-              </div>
-
-              <div style="height:10px;"></div>
-              <div>
-                <label>Raw JSON</label>
-                <pre id="vRaw" class="small" style="white-space:pre-wrap; background:#f7fbff; border:1px solid #d9e2ef; padding:10px; border-radius:10px; overflow:auto; max-height:280px;"></pre>
+                <div class="attrCard">
+                  <div class="attrHdr">Raw JSON</div>
+                  <pre id="vRaw" class="attrBody" style="background:transparent; margin:0; overflow:auto; max-height:320px;"></pre>
+                </div>
               </div>
             </div>
 
-            <div style="height:10px;"></div>
+            <div style="height:12px;"></div>
             <button id="btnToggleAdvancedView" class="btn" type="button">Advanced</button>
           </div>
 
@@ -287,7 +469,8 @@
 
             <div style="height:14px;"></div>
 
-            <div class="qe-split2">
+            <!-- Keep your existing controls (already good), but with richer styles -->
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
               <div>
                 <label>Source Type</label>
                 <select id="dbSourceType">
@@ -298,7 +481,6 @@
                 </select>
                 <div class="muted small">New questions should be <b>Company (custom)</b> (or Spare).</div>
               </div>
-
               <div>
                 <label>Status</label>
                 <select id="dbStatus">
@@ -308,9 +490,9 @@
               </div>
             </div>
 
-            <div style="height:10px;"></div>
+            <div style="height:12px;"></div>
 
-            <div class="qe-split3">
+            <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:12px;">
               <div>
                 <label>Chapter (xx)</label>
                 <input id="numChapter" type="number" min="0" step="1" />
@@ -325,15 +507,14 @@
               </div>
             </div>
 
-            <div style="height:10px;"></div>
+            <div style="height:12px;"></div>
 
-            <div class="qe-split2">
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
               <div>
                 <label>Number Suffix</label>
                 <input id="dbNumberSuffix" type="text" placeholder="C / (blank for SIRE)" />
                 <div class="muted small">SIRE = xx.yy.zz, Custom/Spare = xx.yy.zzz.</div>
               </div>
-
               <div>
                 <label>Tags (comma separated)</label>
                 <input id="dbTags" type="text" placeholder="tag1, tag2, tag3" />
@@ -341,7 +522,7 @@
             </div>
 
             <div class="adv" id="editAdvanced">
-              <div class="qe-split2">
+              <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
                 <div>
                   <label>Version (your tag)</label>
                   <input id="dbVersion" type="text" />
@@ -351,7 +532,6 @@
                   <input id="dbChangeReason" type="text" placeholder="Why was this changed?" />
                 </div>
               </div>
-
               <div style="height:10px;"></div>
               <div>
                 <label>Raw JSON (advanced)</label>
@@ -364,27 +544,34 @@
 
             <div style="height:14px;"></div>
 
-            <div class="qe-split2">
-              <div>
-                <label>Short Text</label>
-                <textarea id="pShortText"></textarea>
+            <!-- ✅ Stacked edit attribute cards (full width) -->
+            <div class="attrStack">
+              <div class="attrCard">
+                <div class="attrHdr">Short Text</div>
+                <div class="attrBody" style="padding:12px;">
+                  <textarea id="pShortText" style="width:100%;"></textarea>
+                </div>
               </div>
-              <div>
-                <label>Question</label>
-                <textarea id="pQuestion"></textarea>
-              </div>
-            </div>
 
-            <div style="height:12px;"></div>
-
-            <div class="qe-split2">
-              <div>
-                <label>Inspection guidance</label>
-                <textarea id="pGuidance"></textarea>
+              <div class="attrCard">
+                <div class="attrHdr">Question</div>
+                <div class="attrBody" style="padding:12px;">
+                  <textarea id="pQuestion" style="width:100%;"></textarea>
+                </div>
               </div>
-              <div>
-                <label>Suggested inspector actions</label>
-                <textarea id="pActions"></textarea>
+
+              <div class="attrCard">
+                <div class="attrHdr">Inspection guidance</div>
+                <div class="attrBody" style="padding:12px;">
+                  <textarea id="pGuidance" style="width:100%;"></textarea>
+                </div>
+              </div>
+
+              <div class="attrCard">
+                <div class="attrHdr">Suggested inspector actions</div>
+                <div class="attrBody" style="padding:12px;">
+                  <textarea id="pActions" style="width:100%;"></textarea>
+                </div>
               </div>
             </div>
 
@@ -399,13 +586,9 @@
                   <button id="btnAddEe" class="btn" type="button">+ Add Expected Evidence</button>
                 </div>
               </div>
-
               <div style="height:10px;"></div>
               <div id="eeEditorList"></div>
-
-              <div class="muted small">
-                One row = one bullet. Sequence is auto-saved as 1, 2, 3, ...
-              </div>
+              <div class="muted small">One row = one bullet. Sequence is auto-saved as 1, 2, 3, ...</div>
             </div>
 
             <div style="height:14px;"></div>
@@ -419,13 +602,9 @@
                   <button id="btnAddPgno" class="btn" type="button">+ Add PGNO</button>
                 </div>
               </div>
-
               <div style="height:10px;"></div>
               <div id="pgnoEditorList"></div>
-
-              <div class="muted small">
-                Codes are auto-generated on save: <b>number_base</b> + <b>.01</b>, <b>.02</b>, etc.
-              </div>
+              <div class="muted small">Codes are auto-generated on save: <b>number_base</b> + <b>.01</b>, <b>.02</b>, etc.</div>
             </div>
 
             <div style="height:10px;"></div>
