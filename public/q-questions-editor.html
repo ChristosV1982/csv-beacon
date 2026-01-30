@@ -25,6 +25,9 @@
     .btn{ padding:10px 14px; border-radius:10px; border:1px solid #cfd9e8; background:#f7fbff; cursor:pointer; font-weight:900; }
     .btn.primary{ background:#1f66c2; color:#fff; border-color:#1f66c2; }
     .btn.light{ background:#fff; }
+    .btn.danger{ background:#b42318; color:#fff; border-color:#b42318; }
+    .btn.warn{ background:#dc6803; color:#fff; border-color:#dc6803; }
+    .btn:disabled{ opacity:.55; cursor:not-allowed; }
     .qe-main{ display:grid; grid-template-columns: 380px 1fr; gap:14px; margin-top:14px; }
     .qe-list{ border:1px solid #d9e2ef; border-radius:12px; overflow:hidden; background:#fff; }
     .qe-list-head{ padding:10px 12px; background:#f3f7ff; display:flex; justify-content:space-between; font-size:13px; }
@@ -49,7 +52,6 @@
     .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
     .btn2{background:#eaf1fb;color:#1a4170;border:1px solid #c9d9f3;border-radius:10px;padding:10px 14px;font-weight:950;cursor:pointer;}
 
-    /* Shared “master list” box look */
     .masterBox{ border:1px solid #d9e2ef; border-radius:14px; padding:14px; background:#fbfdff; }
     .masterRow{ border:1px solid #e7eef9; border-radius:14px; padding:12px; background:#fff; margin-bottom:12px; }
     .masterHdr{ display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; }
@@ -59,7 +61,6 @@
     .masterGrid textarea{ min-height:90px; }
     .masterGrid .full{ grid-column: 1 / -1; }
 
-    /* Attribute table */
     .attrBoxTitle{ display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; }
     .attrTable{ width:100%; border-collapse:separate; border-spacing:0; overflow:hidden; border:1px solid #d9e2ef; border-radius:12px; }
     .attrTable th, .attrTable td{ padding:10px 12px; border-bottom:1px solid #e7eef9; border-right:1px solid #e7eef9; vertical-align:top; }
@@ -75,13 +76,11 @@
     .toggleCard .qe-pill{ display:flex; align-items:center; gap:10px; }
     .toggleCard input{ width:auto; }
     .chkRow{ display:flex; gap:14px; flex-wrap:wrap; }
-    .chkRow label{ font-weight:800; }
     .chkRow .chk{ display:flex; gap:8px; align-items:center; background:#f7fbff; border:1px solid #d9e2ef; padding:8px 10px; border-radius:999px; }
   </style>
 </head>
 
 <body>
-  <!-- AUTH TOPBAR -->
   <div class="topbar">
     <div style="font-weight:950;">SIRE 2.0 – Questions Editor</div>
     <div class="row">
@@ -161,7 +160,6 @@
       </div>
 
       <div class="qe-main">
-        <!-- LEFT LIST -->
         <div class="qe-list">
           <div class="qe-list-head">
             <div id="countLine"><b>0</b> questions</div>
@@ -170,7 +168,6 @@
           <div id="qList"></div>
         </div>
 
-        <!-- RIGHT PANEL -->
         <div class="qe-right qe-card" style="border-radius:12px; box-shadow:none;">
           <div id="emptyState" class="muted">Select a question from the list.</div>
 
@@ -195,7 +192,6 @@
 
             <div style="height:14px;"></div>
 
-            <!-- ATTRIBUTES (VIEW) -->
             <div class="masterBox">
               <div class="attrBoxTitle">
                 <div style="font-weight:950;">Question Attributes</div>
@@ -233,7 +229,6 @@
 
             <div style="height:14px;"></div>
 
-            <!-- CONTENT (VIEW) -->
             <div class="sectionBox">
               <div class="sectionTitle">Question Content</div>
 
@@ -260,7 +255,6 @@
 
             <div style="height:14px;"></div>
 
-            <!-- EXPECTED EVIDENCE (VIEW) -->
             <div class="masterBox">
               <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
                 <div style="font-weight:950;">Expected Evidence</div>
@@ -272,7 +266,6 @@
 
             <div style="height:14px;"></div>
 
-            <!-- PGNO (VIEW) -->
             <div class="masterBox">
               <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
                 <div style="font-weight:950;">Potential grounds for negative observations (PGNOs)</div>
@@ -321,6 +314,10 @@
                 <button id="btnView" class="btn light" type="button">View</button>
                 <button id="btnSave" class="btn primary" type="button">Save</button>
                 <button id="btnReset" class="btn" type="button">Reset</button>
+
+                <!-- NEW -->
+                <button id="btnDeactivateQuestion" class="btn warn" type="button" title="Set status to inactive">Deactivate</button>
+                <button id="btnDeleteQuestion" class="btn danger" type="button" title="Permanently delete this question">Delete</button>
               </div>
             </div>
 
@@ -334,7 +331,6 @@
 
             <div style="height:14px;"></div>
 
-            <!-- DB META -->
             <div class="masterBox">
               <div style="font-weight:950; margin-bottom:10px;">DB Fields</div>
 
@@ -417,7 +413,6 @@
 
             <div style="height:14px;"></div>
 
-            <!-- ATTRIBUTES (EDIT) -->
             <div class="masterBox">
               <div style="font-weight:950; margin-bottom:10px;">Question Attributes (editable)</div>
 
@@ -483,7 +478,6 @@
 
             <div style="height:14px;"></div>
 
-            <!-- CONTENT (EDIT) -->
             <div class="masterBox">
               <div style="font-weight:950; margin-bottom:10px;">Question Content (editable)</div>
 
@@ -509,7 +503,6 @@
 
             <div style="height:14px;"></div>
 
-            <!-- EXPECTED EVIDENCE (EDIT) -->
             <div class="masterBox">
               <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
                 <div style="font-weight:950;">Expected Evidence (stored as DB rows)</div>
@@ -529,7 +522,6 @@
 
             <div style="height:14px;"></div>
 
-            <!-- PGNO (EDIT) -->
             <div class="masterBox">
               <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
                 <div style="font-weight:950;">PGNOs (stored as DB rows)</div>

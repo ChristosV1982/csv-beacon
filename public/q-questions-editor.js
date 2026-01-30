@@ -32,21 +32,16 @@
     for (const k of keys) {
       const v = p[k];
       if (v === null || v === undefined) continue;
-      // allow empty strings to still be returned if later keys exist; prefer first non-empty
       const s = safeStr(v);
       if (s.trim() !== "") return s;
     }
-    // if all empty, return first existing
     for (const k of keys) {
       if (Object.prototype.hasOwnProperty.call(p, k)) return safeStr(p[k]);
     }
     return "";
   }
   function pSet(p, keyPreferred, altKeys, value) {
-    // write to preferred key; also keep a snake_case alt if you want
-    // but DO NOT overwrite unrelated fields.
     p[keyPreferred] = value;
-
     if (Array.isArray(altKeys)) {
       for (const k of altKeys) p[k] = value;
     }
@@ -223,6 +218,15 @@
     if (empty) empty.style.display = "none";
     if (v) v.style.display = (mode === "VIEW") ? "block" : "none";
     if (e) e.style.display = (mode === "EDIT") ? "block" : "none";
+
+    // In edit mode, disable Delete/Deactivate for "new unsaved" rows
+    if (mode === "EDIT") {
+      const dis = !!selected.__isNew || !selected.id;
+      const bDel = $("btnDeleteQuestion");
+      const bDea = $("btnDeactivateQuestion");
+      if (bDel) bDel.disabled = dis;
+      if (bDea) bDea.disabled = dis;
+    }
   }
 
   function setPillsFromSelected() {
@@ -539,20 +543,16 @@
 
   // ========= Question Attributes (View + Edit) =========
   function fillAttributesViewFromPayload(p) {
-    // View IDs
     setText("vAttrQuestionType", pGet(p, ["Question Type", "question_type", "questionType"]));
     setText("vAttrVesselType", pGet(p, ["Vessel Type", "vessel_type", "vesselType"]));
     setText("vAttrRoviq", pGet(p, ["ROVIQ List", "ROVIQ", "roviq_list", "roviqList"]));
     setText("vAttrCompanyRank", pGet(p, ["Company Rank Allocation", "Company_Rank_Allocation", "company_rank_allocation", "companyRankAllocation"]));
     setText("vAttrTmsa3", pGet(p, ["TMSA3 Reference", "TMSA3", "tmsa3_reference", "tmsa3Reference"]));
     setText("vAttrTmsa4", pGet(p, ["TMSA4 Reference", "TMSA4", "tmsa4_reference", "tmsa4Reference"]));
-
-    const resp = responseTypeStringFromPayload(p);
-    setText("vAttrResponseType", resp);
+    setText("vAttrResponseType", responseTypeStringFromPayload(p));
   }
 
   function fillAttributesEditFromPayload(p) {
-    // Editable fields
     const qt = pGet(p, ["Question Type", "question_type", "questionType"]);
     const vt = pGet(p, ["Vessel Type", "vessel_type", "vesselType"]);
     const ro = pGet(p, ["ROVIQ List", "ROVIQ", "roviq_list", "roviqList"]);
@@ -567,7 +567,6 @@
     if ($("eTmsa3")) $("eTmsa3").value = t3;
     if ($("eTmsa4")) $("eTmsa4").value = t4;
 
-    // Response Type checkboxes (derived from payload)
     const arr = computeResponseTypesFromPayload(p);
     const setChk = (id, on) => { const el = $(id); if (el) el.checked = !!on; };
 
@@ -576,41 +575,33 @@
     setChk("rtProcess", arr.includes("Process"));
     setChk("rtPhoto", arr.includes("Photo"));
 
-    // Show computed string too (read-only display)
     setText("eAttrResponseTypePreview", arr.length ? arr.join(", ") : "");
   }
 
   function applyAttributesFromEditUIIntoPayload(payload) {
-    // Question Type
     const qt = safeStr($("eQuestionType")?.value).trim();
     pSet(payload, "Question Type", ["question_type"], qt);
 
-    // Vessel Type
     const vt = safeStr($("eVesselType")?.value).trim();
     pSet(payload, "Vessel Type", ["vessel_type"], vt);
 
-    // ROVIQ
     const ro = safeStr($("eRoviqList")?.value).trim();
     pSet(payload, "ROVIQ List", ["roviq_list"], ro);
 
-    // Company Rank Allocation
     const cr = safeStr($("eCompanyRankAllocation")?.value).trim();
     pSet(payload, "Company Rank Allocation", ["company_rank_allocation"], cr);
 
-    // TMSA refs
     const t3 = safeStr($("eTmsa3")?.value).trim();
     const t4 = safeStr($("eTmsa4")?.value).trim();
     pSet(payload, "TMSA3 Reference", ["tmsa3_reference"], t3);
     pSet(payload, "TMSA4 Reference", ["tmsa4_reference"], t4);
 
-    // Response Types → update underlying JSON fields
     const wantHuman = !!$("rtHuman")?.checked;
     const wantHardware = !!$("rtHardware")?.checked;
     const wantProcess = !!$("rtProcess")?.checked;
     const wantPhoto = !!$("rtPhoto")?.checked;
 
     const setResp = (key) => {
-      // if enabled: keep existing non-None value, else set "Graduated" default
       const existing = safeStr(payload[key]).trim();
       if (existing && existing.toLowerCase() !== "none") return existing;
       return "Graduated";
@@ -621,7 +612,6 @@
     payload["Process Response Type"] = wantProcess ? setResp("Process Response Type") : "None";
     payload["Photo Response"] = wantPhoto ? "Y" : "N";
 
-    // Convenience string (optional)
     payload["Question Response Type"] = responseTypeStringFromPayload(payload);
   }
 
@@ -641,16 +631,12 @@
 
     const p = r.payload || {};
 
-    // Content (old + new key styles)
     setText("vShortText", pGet(p, ["short_text", "Short Text", "ShortText", "shortText"]));
     setText("vQuestion", pGet(p, ["question", "Question"]));
 
-    const ig = pGet(p, ["inspection_guidance", "Inspection Guidance", "InspectionGuidance", "guidance"]);
-    const act = pGet(p, ["suggested_inspector_actions", "Suggested Inspector Actions", "SuggestedInspectorActions", "actions"]);
-    setText("vGuidance", ig);
-    setText("vActions", act);
+    setText("vGuidance", pGet(p, ["inspection_guidance", "Inspection Guidance", "InspectionGuidance", "guidance"]));
+    setText("vActions", pGet(p, ["suggested_inspector_actions", "Suggested Inspector Actions", "SuggestedInspectorActions", "actions"]));
 
-    // Attributes
     fillAttributesViewFromPayload(p);
 
     setText("vTags", Array.isArray(r.tags) ? r.tags.join(", ") : safeStr(r.tags || ""));
@@ -691,7 +677,6 @@
     $("pGuidance").value = pGet(p, ["inspection_guidance", "Inspection Guidance", "InspectionGuidance", "guidance"]);
     $("pActions").value = pGet(p, ["suggested_inspector_actions", "Suggested Inspector Actions", "SuggestedInspectorActions", "actions"]);
 
-    // Attributes editor
     fillAttributesEditFromPayload(p);
 
     try { $("pRaw").value = JSON.stringify(p, null, 2); }
@@ -764,7 +749,6 @@
       const p = r.payload || {};
       const shortText = pGet(p, ["short_text", "Short Text", "ShortText", "shortText"]);
       const questionText = pGet(p, ["question", "Question"]);
-
       const sub = showFull ? (questionText || shortText) : (shortText || questionText);
 
       div.innerHTML = `
@@ -960,13 +944,11 @@
       number_base: "",
       number_suffix: "C",
       payload: {
-        // content
         short_text: "",
         question: "",
         inspection_guidance: "",
         suggested_inspector_actions: "",
 
-        // attributes
         "Question Type": "",
         "Vessel Type": "",
         "ROVIQ List": "",
@@ -978,7 +960,6 @@
         "Process Response Type": "None",
         "Photo Response": "N",
 
-        // legacy compatibility
         expected_evidence: [],
         potential_grounds_for_negative_observations: [],
       },
@@ -991,6 +972,79 @@
     setMode("EDIT");
     setPillsFromSelected();
     refreshHeaderFromNumberInputs();
+  }
+
+  // ===== deactivate / delete =====
+  async function deactivateSelected() {
+    if (!selected || selected.__isNew || !selected.id) return;
+
+    showWarn("");
+    showOk("");
+    setText("saveStatus", "");
+
+    const qno = displayNumber(selected);
+    const ok = confirm(`Deactivate question ${qno}?\n\nThis will set status = inactive.`);
+    if (!ok) return;
+
+    try {
+      const { error } = await sb
+        .from("questions_master")
+        .update({ status: "inactive", updated_by: me?.user?.id || null })
+        .eq("id", selected.id);
+
+      if (error) throw error;
+
+      showOk(`Deactivated ${qno}. If your Status filter is set to "active", this question may disappear from the list.`);
+      await loadQuestions();
+
+      // Try to reselect if it is still visible (e.g. filter inactive)
+      const still = allRows.find(r => r.id === selected.id);
+      if (still) await selectRow(still);
+      else {
+        selected = null;
+        setMode("VIEW");
+      }
+    } catch (e) {
+      showWarn("Deactivate failed:\n\n" + (e?.message || String(e)));
+    }
+  }
+
+  async function deleteSelected() {
+    if (!selected || selected.__isNew || !selected.id) return;
+
+    showWarn("");
+    showOk("");
+    setText("saveStatus", "");
+
+    const qno = displayNumber(selected);
+    const ok = confirm(
+      `DELETE question ${qno}?\n\n` +
+      `This will permanently delete:\n` +
+      `- the question row (questions_master)\n` +
+      `- its PGNO rows (pgno_master)\n` +
+      `- its Expected Evidence rows (expected_evidence_master)\n\n` +
+      `This cannot be undone.`
+    );
+    if (!ok) return;
+
+    try {
+      // delete children first
+      const { error: e1 } = await sb.from("pgno_master").delete().eq("question_id", selected.id);
+      if (e1) throw e1;
+
+      const { error: e2 } = await sb.from("expected_evidence_master").delete().eq("question_id", selected.id);
+      if (e2) throw e2;
+
+      const { error: e3 } = await sb.from("questions_master").delete().eq("id", selected.id);
+      if (e3) throw e3;
+
+      showOk(`Deleted ${qno}.`);
+      selected = null;
+      await loadQuestions();
+      setMode("VIEW");
+    } catch (e) {
+      showWarn("Delete failed:\n\n" + (e?.message || String(e)));
+    }
   }
 
   // ===== save =====
@@ -1037,16 +1091,13 @@
         payload = selected.payload || {};
       }
 
-      // content
       payload.short_text = safeStr($("pShortText").value);
       payload.question = safeStr($("pQuestion").value);
       payload.inspection_guidance = safeStr($("pGuidance").value);
       payload.suggested_inspector_actions = safeStr($("pActions").value);
 
-      // attributes (from edit UI)
       applyAttributesFromEditUIIntoPayload(payload);
 
-      // Compatibility payload: store texts-only arrays
       ensurePgnoStateFromPayloadIfEmpty();
       ensureEeStateFromPayloadIfEmpty();
 
@@ -1155,7 +1206,6 @@
     $("searchInput").oninput = () => renderList();
     $("newQuestionBtn").onclick = () => newQuestion();
 
-    // Toggle: show full question in list
     const tgl = $("showFullQuestionToggle");
     if (tgl) {
       tgl.checked = getShowFullInList();
@@ -1186,6 +1236,10 @@
 
     $("btnSave").onclick = () => saveSelected();
 
+    // NEW: Deactivate / Delete question (edit mode only)
+    $("btnDeactivateQuestion").onclick = () => deactivateSelected();
+    $("btnDeleteQuestion").onclick = () => deleteSelected();
+
     $("dbSourceType").onchange = () => {
       const st = $("dbSourceType").value;
       if (st === "SIRE") $("dbNumberSuffix").value = "";
@@ -1204,7 +1258,6 @@
     $("btnAddPgno").onclick = () => addPgnoRow();
     $("btnAddEe").onclick = () => addEeRow();
 
-    // Response type checkboxes preview
     ["rtHuman","rtHardware","rtProcess","rtPhoto"].forEach(id => {
       const el = $(id);
       if (el) el.addEventListener("change", refreshResponseTypePreviewFromCheckboxes);
