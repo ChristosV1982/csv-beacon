@@ -5,6 +5,35 @@
   function $(id) { return document.getElementById(id); }
   function safeStr(v) { return v === null || v === undefined ? "" : String(v); }
 
+  // Null-safe event binder
+  function onClick(id, fn) {
+    const el = $(id);
+    if (!el) {
+      console.warn(`[q-questions-editor] Missing element #${id} (HTML out of sync).`);
+      return false;
+    }
+    el.onclick = fn;
+    return true;
+  }
+  function onChange(id, fn) {
+    const el = $(id);
+    if (!el) {
+      console.warn(`[q-questions-editor] Missing element #${id} (HTML out of sync).`);
+      return false;
+    }
+    el.onchange = fn;
+    return true;
+  }
+  function onInput(id, fn) {
+    const el = $(id);
+    if (!el) {
+      console.warn(`[q-questions-editor] Missing element #${id} (HTML out of sync).`);
+      return false;
+    }
+    el.oninput = fn;
+    return true;
+  }
+
   function showWarn(msg) {
     const w = $("warnBox");
     if (!w) return;
@@ -204,6 +233,7 @@
 
   function setMode(newMode) {
     mode = newMode;
+
     const empty = $("emptyState");
     const v = $("viewPanel");
     const e = $("editPanel");
@@ -219,7 +249,8 @@
     if (v) v.style.display = (mode === "VIEW") ? "block" : "none";
     if (e) e.style.display = (mode === "EDIT") ? "block" : "none";
 
-    // In edit mode, disable Delete/Deactivate for "new unsaved" rows
+    setText("pillMode", `mode: ${mode}`);
+
     if (mode === "EDIT") {
       const dis = !!selected.__isNew || !selected.id;
       const bDel = $("btnDeleteQuestion");
@@ -241,6 +272,7 @@
     setText("pillSource", `source: ${st}`);
     setText("pillStatus", `status: ${status}`);
     setText("pillSuffix", `suffix: ${sx || "(blank)"}`);
+    setText("pillMode", `mode: ${mode}`);
   }
 
   // ===== fallback builders from payload =====
@@ -338,12 +370,12 @@
       const t = safeStr(it.text);
       const r = safeStr(it.remarks);
       return `
-        <div class="masterRow">
-          <div class="masterHdr">
-            <div class="masterCode">${escapeHtml(code)}</div>
+        <div class="masterBox" style="margin-bottom:10px;">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px;">
+            <div style="font-weight:900;">${escapeHtml(code)}</div>
           </div>
-          <div class="masterTiny" style="margin-top:6px; white-space:pre-wrap;">${escapeHtml(t)}</div>
-          ${r ? `<div class="masterTiny" style="margin-top:8px;"><b>Remarks:</b> ${escapeHtml(r)}</div>` : ``}
+          <div class="pre" style="margin-top:8px;">${escapeHtml(t)}</div>
+          ${r ? `<div class="muted small" style="margin-top:8px;"><b>Remarks:</b> ${escapeHtml(r)}</div>` : ``}
         </div>
       `;
     }).join("");
@@ -364,21 +396,22 @@
     host.innerHTML = "";
 
     items.forEach((it, idx) => {
-      const row = document.createElement("div");
-      row.className = "masterRow";
+      const wrap = document.createElement("div");
+      wrap.className = "masterBox";
+      wrap.style.marginBottom = "10px";
 
       const code = pgnoCode(nb, idx + 1, st);
 
-      row.innerHTML = `
-        <div class="masterHdr">
+      wrap.innerHTML = `
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px; flex-wrap:wrap;">
           <div>
-            <div class="masterCode">${escapeHtml(code)}</div>
-            <div class="masterTiny">Seq: ${idx + 1}</div>
+            <div style="font-weight:900;">${escapeHtml(code)}</div>
+            <div class="muted small">Seq: ${idx + 1}</div>
           </div>
-          <div>
-            <button class="btn" type="button" data-del="${idx}">Delete</button>
-          </div>
+          <button class="btn" type="button" data-del="${idx}">Delete</button>
         </div>
+
+        <div style="height:10px;"></div>
 
         <div class="masterGrid">
           <div class="full">
@@ -392,17 +425,17 @@
         </div>
       `;
 
-      host.appendChild(row);
+      host.appendChild(wrap);
 
-      const taText = row.querySelector(`textarea[data-text="${idx}"]`);
-      const taRem = row.querySelector(`textarea[data-remarks="${idx}"]`);
+      const taText = wrap.querySelector(`textarea[data-text="${idx}"]`);
+      const taRem = wrap.querySelector(`textarea[data-remarks="${idx}"]`);
       if (taText) taText.value = safeStr(it.text);
       if (taRem) taRem.value = safeStr(it.remarks);
 
       if (taText) taText.addEventListener("input", () => { selected.pgno_items[idx].text = taText.value; });
       if (taRem) taRem.addEventListener("input", () => { selected.pgno_items[idx].remarks = taRem.value; });
 
-      const delBtn = row.querySelector(`button[data-del="${idx}"]`);
+      const delBtn = wrap.querySelector(`button[data-del="${idx}"]`);
       if (delBtn) {
         delBtn.addEventListener("click", () => {
           selected.pgno_items.splice(idx, 1);
@@ -441,17 +474,15 @@
       const r = safeStr(it.remarks);
 
       return `
-        <div class="masterRow">
-          <div class="masterHdr">
-            <div class="masterCode">${i + 1}.</div>
-          </div>
-          <div class="masterTiny" style="margin-top:6px; white-space:pre-wrap;">${escapeHtml(t)}</div>
+        <div class="masterBox" style="margin-bottom:10px;">
+          <div style="font-weight:900;">${i + 1}.</div>
+          <div class="pre" style="margin-top:8px;">${escapeHtml(t)}</div>
 
           ${(ch || form || r) ? `
             <div style="height:8px;"></div>
-            ${ch ? `<div class="masterTiny"><b>eSMS Reference(s):</b> ${escapeHtml(ch)}</div>` : ``}
-            ${form ? `<div class="masterTiny"><b>eSMS Form(s):</b> ${escapeHtml(form)}</div>` : ``}
-            ${r ? `<div class="masterTiny"><b>Remarks:</b> ${escapeHtml(r)}</div>` : ``}
+            ${ch ? `<div class="muted small"><b>eSMS Reference(s):</b> ${escapeHtml(ch)}</div>` : ``}
+            ${form ? `<div class="muted small"><b>eSMS Form(s):</b> ${escapeHtml(form)}</div>` : ``}
+            ${r ? `<div class="muted small"><b>Remarks:</b> ${escapeHtml(r)}</div>` : ``}
           ` : ``}
         </div>
       `;
@@ -470,19 +501,20 @@
     host.innerHTML = "";
 
     items.forEach((it, idx) => {
-      const row = document.createElement("div");
-      row.className = "masterRow";
+      const wrap = document.createElement("div");
+      wrap.className = "masterBox";
+      wrap.style.marginBottom = "10px";
 
-      row.innerHTML = `
-        <div class="masterHdr">
+      wrap.innerHTML = `
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px; flex-wrap:wrap;">
           <div>
-            <div class="masterCode">${idx + 1}.</div>
-            <div class="masterTiny">Seq: ${idx + 1}</div>
+            <div style="font-weight:900;">${idx + 1}.</div>
+            <div class="muted small">Seq: ${idx + 1}</div>
           </div>
-          <div>
-            <button class="btn" type="button" data-del-ee="${idx}">Delete</button>
-          </div>
+          <button class="btn" type="button" data-del-ee="${idx}">Delete</button>
         </div>
+
+        <div style="height:10px;"></div>
 
         <div class="masterGrid">
           <div class="full">
@@ -507,12 +539,12 @@
         </div>
       `;
 
-      host.appendChild(row);
+      host.appendChild(wrap);
 
-      const taText = row.querySelector(`textarea[data-ee-text="${idx}"]`);
-      const taCh = row.querySelector(`textarea[data-ee-ch="${idx}"]`);
-      const taForm = row.querySelector(`textarea[data-ee-form="${idx}"]`);
-      const taRem = row.querySelector(`textarea[data-ee-remarks="${idx}"]`);
+      const taText = wrap.querySelector(`textarea[data-ee-text="${idx}"]`);
+      const taCh = wrap.querySelector(`textarea[data-ee-ch="${idx}"]`);
+      const taForm = wrap.querySelector(`textarea[data-ee-form="${idx}"]`);
+      const taRem = wrap.querySelector(`textarea[data-ee-remarks="${idx}"]`);
 
       if (taText) taText.value = safeStr(it.text);
       if (taCh) taCh.value = safeStr(it.esms_references);
@@ -524,7 +556,7 @@
       if (taForm) taForm.addEventListener("input", () => { selected.ee_items[idx].esms_forms = taForm.value; });
       if (taRem) taRem.addEventListener("input", () => { selected.ee_items[idx].remarks = taRem.value; });
 
-      const delBtn = row.querySelector(`button[data-del-ee="${idx}"]`);
+      const delBtn = wrap.querySelector(`button[data-del-ee="${idx}"]`);
       if (delBtn) {
         delBtn.addEventListener("click", () => {
           selected.ee_items.splice(idx, 1);
@@ -633,7 +665,6 @@
 
     setText("vShortText", pGet(p, ["short_text", "Short Text", "ShortText", "shortText"]));
     setText("vQuestion", pGet(p, ["question", "Question"]));
-
     setText("vGuidance", pGet(p, ["inspection_guidance", "Inspection Guidance", "InspectionGuidance", "guidance"]));
     setText("vActions", pGet(p, ["suggested_inspector_actions", "Suggested Inspector Actions", "SuggestedInspectorActions", "actions"]));
 
@@ -722,9 +753,10 @@
 
   function renderList() {
     const list = $("qList");
+    if (!list) return;
     list.innerHTML = "";
 
-    const term = safeStr($("searchInput").value).trim();
+    const term = safeStr($("searchInput")?.value).trim();
     const filtered = allRows.filter(r => passesSearch(r, term));
 
     filtered.sort((a, b) => {
@@ -767,9 +799,9 @@
     setText("loadHint", "Loading…");
 
     try {
-      const status = safeStr($("statusFilter").value || "");
-      const version = safeStr($("versionFilter").value).trim();
-      const src = safeStr($("sourceFilter").value || "");
+      const status = safeStr($("statusFilter")?.value || "");
+      const version = safeStr($("versionFilter")?.value).trim();
+      const src = safeStr($("sourceFilter")?.value || "");
 
       let q = sb
         .from("questions_master")
@@ -815,7 +847,7 @@
     }));
   }
 
-  async function savePgnoToDb(questionId, numberBase, items) {
+  async function savePgnoToDb(questionId, numberBase, items, sourceType) {
     const clean = (items || [])
       .map(x => ({ text: safeStr(x.text).trim(), remarks: safeStr(x.remarks).trim() }))
       .filter(x => x.text.length > 0);
@@ -828,7 +860,7 @@
     const rows = clean.map((x, i) => ({
       question_id: questionId,
       seq: i + 1,
-      pgno_code: pgnoCode(numberBase, i + 1, "SIRE"),
+      pgno_code: pgnoCode(numberBase, i + 1, sourceType || "SIRE"),
       pgno_text: x.text,
       remarks: x.remarks,
       created_by: me?.user?.id || null,
@@ -931,7 +963,7 @@
     showOk("");
     setText("saveStatus", "");
 
-    const versionFromFilter = safeStr($("versionFilter").value).trim();
+    const versionFromFilter = safeStr($("versionFilter")?.value).trim();
 
     selected = {
       __isNew: true,
@@ -994,10 +1026,9 @@
 
       if (error) throw error;
 
-      showOk(`Deactivated ${qno}. If your Status filter is set to "active", this question may disappear from the list.`);
+      showOk(`Deactivated ${qno}. If Status filter = "active", it may disappear from the list.`);
       await loadQuestions();
 
-      // Try to reselect if it is still visible (e.g. filter inactive)
       const still = allRows.find(r => r.id === selected.id);
       if (still) await selectRow(still);
       else {
@@ -1020,15 +1051,14 @@
     const ok = confirm(
       `DELETE question ${qno}?\n\n` +
       `This will permanently delete:\n` +
-      `- the question row (questions_master)\n` +
-      `- its PGNO rows (pgno_master)\n` +
-      `- its Expected Evidence rows (expected_evidence_master)\n\n` +
+      `- questions_master\n` +
+      `- pgno_master (children)\n` +
+      `- expected_evidence_master (children)\n\n` +
       `This cannot be undone.`
     );
     if (!ok) return;
 
     try {
-      // delete children first
       const { error: e1 } = await sb.from("pgno_master").delete().eq("question_id", selected.id);
       if (e1) throw e1;
 
@@ -1056,13 +1086,13 @@
     setText("saveStatus", "Saving…");
 
     try {
-      const src = $("dbSourceType").value;
-      const status = safeStr($("dbStatus").value || "active");
-      const version = safeStr($("dbVersion").value).trim() || safeStr(selected.version || "SIRE_2_0_QL");
+      const src = $("dbSourceType")?.value;
+      const status = safeStr($("dbStatus")?.value || "active");
+      const version = safeStr($("dbVersion")?.value).trim() || safeStr(selected.version || "SIRE_2_0_QL");
 
-      const xx = $("numChapter").value;
-      const yy = $("numSection").value;
-      const zz = $("numItem").value;
+      const xx = $("numChapter")?.value;
+      const yy = $("numSection")?.value;
+      const zz = $("numItem")?.value;
 
       if (!isIntLike(Number(xx)) || !isIntLike(Number(yy)) || !isIntLike(Number(zz))) {
         setText("saveStatus", "");
@@ -1077,13 +1107,13 @@
         return;
       }
 
-      const number_suffix = safeStr($("dbNumberSuffix").value).trim();
+      const number_suffix = safeStr($("dbNumberSuffix")?.value).trim();
 
-      const tagsCsv = safeStr($("dbTags").value).trim();
+      const tagsCsv = safeStr($("dbTags")?.value).trim();
       const tags = tagsCsv ? tagsCsv.split(",").map(s => s.trim()).filter(Boolean) : [];
 
       let payload = {};
-      const raw = safeStr($("pRaw").value).trim();
+      const raw = safeStr($("pRaw")?.value).trim();
       if (raw) {
         try { payload = JSON.parse(raw); }
         catch { payload = selected.payload || {}; }
@@ -1091,10 +1121,10 @@
         payload = selected.payload || {};
       }
 
-      payload.short_text = safeStr($("pShortText").value);
-      payload.question = safeStr($("pQuestion").value);
-      payload.inspection_guidance = safeStr($("pGuidance").value);
-      payload.suggested_inspector_actions = safeStr($("pActions").value);
+      payload.short_text = safeStr($("pShortText")?.value);
+      payload.question = safeStr($("pQuestion")?.value);
+      payload.inspection_guidance = safeStr($("pGuidance")?.value);
+      payload.suggested_inspector_actions = safeStr($("pActions")?.value);
 
       applyAttributesFromEditUIIntoPayload(payload);
 
@@ -1120,7 +1150,7 @@
         number_base,
         number_suffix,
         payload,
-        change_reason: safeStr($("dbChangeReason").value).trim() || null,
+        change_reason: safeStr($("dbChangeReason")?.value).trim() || null,
         updated_by: me?.user?.id || null,
       };
 
@@ -1135,7 +1165,7 @@
 
         if (error) throw error;
 
-        try { await savePgnoToDb(data.id, number_base, selected.pgno_items || []); }
+        try { await savePgnoToDb(data.id, number_base, selected.pgno_items || [], src); }
         catch (e) { showWarn("Question saved, but PGNO rows could not be saved.\n\nError: " + String(e?.message || e)); }
 
         try { await saveEeToDb(data.id, selected.ee_items || []); }
@@ -1161,7 +1191,7 @@
 
         if (error) throw error;
 
-        try { await savePgnoToDb(selected.id, number_base, selected.pgno_items || []); }
+        try { await savePgnoToDb(selected.id, number_base, selected.pgno_items || [], src); }
         catch (e) { showWarn("Question saved, but PGNO rows could not be saved.\n\nError: " + String(e?.message || e)); }
 
         try { await saveEeToDb(selected.id, selected.ee_items || []); }
@@ -1193,18 +1223,18 @@
   }
 
   function wireUI() {
-    $("reloadBtn").onclick = () => loadQuestions();
-    $("statusFilter").onchange = () => loadQuestions();
-    $("sourceFilter").onchange = () => loadQuestions();
+    onClick("reloadBtn", () => loadQuestions());
+    onChange("statusFilter", () => loadQuestions());
+    onChange("sourceFilter", () => loadQuestions());
 
     let vTimer = null;
-    $("versionFilter").oninput = () => {
+    onInput("versionFilter", () => {
       if (vTimer) clearTimeout(vTimer);
       vTimer = setTimeout(() => loadQuestions(), 450);
-    };
+    });
 
-    $("searchInput").oninput = () => renderList();
-    $("newQuestionBtn").onclick = () => newQuestion();
+    onInput("searchInput", () => renderList());
+    onClick("newQuestionBtn", () => newQuestion());
 
     const tgl = $("showFullQuestionToggle");
     if (tgl) {
@@ -1217,46 +1247,47 @@
       });
     }
 
-    $("btnEdit").onclick = () => {
+    onClick("btnEdit", () => {
       const ok = confirm("Enter edit mode for this question?");
       if (!ok) return;
       setMode("EDIT");
-    };
+      setPillsFromSelected();
+    });
 
-    $("btnView").onclick = () => setMode("VIEW");
+    onClick("btnView", () => { setMode("VIEW"); setPillsFromSelected(); });
 
-    $("btnReset").onclick = async () => {
+    onClick("btnReset", async () => {
       if (!selected) return;
       if (selected.__isNew) newQuestion();
       else {
         const r = allRows.find(x => x.id === selected.id);
         if (r) await selectRow(r);
       }
-    };
+    });
 
-    $("btnSave").onclick = () => saveSelected();
+    onClick("btnSave", () => saveSelected());
 
-    // NEW: Deactivate / Delete question (edit mode only)
-    $("btnDeactivateQuestion").onclick = () => deactivateSelected();
-    $("btnDeleteQuestion").onclick = () => deleteSelected();
+    // Deactivate / Delete (edit mode only)
+    onClick("btnDeactivateQuestion", () => deactivateSelected());
+    onClick("btnDeleteQuestion", () => deleteSelected());
 
-    $("dbSourceType").onchange = () => {
-      const st = $("dbSourceType").value;
+    onChange("dbSourceType", () => {
+      const st = $("dbSourceType")?.value;
       if (st === "SIRE") $("dbNumberSuffix").value = "";
-      if (st !== "SIRE" && !safeStr($("dbNumberSuffix").value).trim()) $("dbNumberSuffix").value = "C";
+      if (st !== "SIRE" && !safeStr($("dbNumberSuffix")?.value).trim()) $("dbNumberSuffix").value = "C";
       refreshHeaderFromNumberInputs();
-    };
+    });
 
-    $("dbNumberSuffix").oninput = () => refreshHeaderFromNumberInputs();
-    $("numChapter").oninput = () => refreshHeaderFromNumberInputs();
-    $("numSection").oninput = () => refreshHeaderFromNumberInputs();
-    $("numItem").oninput = () => refreshHeaderFromNumberInputs();
+    onInput("dbNumberSuffix", () => refreshHeaderFromNumberInputs());
+    onInput("numChapter", () => refreshHeaderFromNumberInputs());
+    onInput("numSection", () => refreshHeaderFromNumberInputs());
+    onInput("numItem", () => refreshHeaderFromNumberInputs());
 
-    $("btnToggleAdvancedView").onclick = () => toggleAdvanced("viewAdvanced");
-    $("btnToggleAdvancedEdit").onclick = () => toggleAdvanced("editAdvanced");
+    onClick("btnToggleAdvancedView", () => toggleAdvanced("viewAdvanced"));
+    onClick("btnToggleAdvancedEdit", () => toggleAdvanced("editAdvanced"));
 
-    $("btnAddPgno").onclick = () => addPgnoRow();
-    $("btnAddEe").onclick = () => addEeRow();
+    onClick("btnAddPgno", () => addPgnoRow());
+    onClick("btnAddEe", () => addEeRow());
 
     ["rtHuman","rtHardware","rtProcess","rtPhoto"].forEach(id => {
       const el = $(id);
