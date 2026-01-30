@@ -5,6 +5,35 @@
   function $(id) { return document.getElementById(id); }
   function safeStr(v) { return v === null || v === undefined ? "" : String(v); }
 
+  // Null-safe event binder
+  function onClick(id, fn) {
+    const el = $(id);
+    if (!el) {
+      console.warn(`[q-questions-editor] Missing element #${id} (HTML out of sync).`);
+      return false;
+    }
+    el.onclick = fn;
+    return true;
+  }
+  function onChange(id, fn) {
+    const el = $(id);
+    if (!el) {
+      console.warn(`[q-questions-editor] Missing element #${id} (HTML out of sync).`);
+      return false;
+    }
+    el.onchange = fn;
+    return true;
+  }
+  function onInput(id, fn) {
+    const el = $(id);
+    if (!el) {
+      console.warn(`[q-questions-editor] Missing element #${id} (HTML out of sync).`);
+      return false;
+    }
+    el.oninput = fn;
+    return true;
+  }
+
   function showWarn(msg) {
     const w = $("warnBox");
     if (!w) return;
@@ -219,7 +248,6 @@
     if (v) v.style.display = (mode === "VIEW") ? "block" : "none";
     if (e) e.style.display = (mode === "EDIT") ? "block" : "none";
 
-    // In edit mode, disable Delete/Deactivate for "new unsaved" rows
     if (mode === "EDIT") {
       const dis = !!selected.__isNew || !selected.id;
       const bDel = $("btnDeleteQuestion");
@@ -722,9 +750,10 @@
 
   function renderList() {
     const list = $("qList");
+    if (!list) return;
     list.innerHTML = "";
 
-    const term = safeStr($("searchInput").value).trim();
+    const term = safeStr($("searchInput")?.value).trim();
     const filtered = allRows.filter(r => passesSearch(r, term));
 
     filtered.sort((a, b) => {
@@ -767,9 +796,9 @@
     setText("loadHint", "Loading…");
 
     try {
-      const status = safeStr($("statusFilter").value || "");
-      const version = safeStr($("versionFilter").value).trim();
-      const src = safeStr($("sourceFilter").value || "");
+      const status = safeStr($("statusFilter")?.value || "");
+      const version = safeStr($("versionFilter")?.value).trim();
+      const src = safeStr($("sourceFilter")?.value || "");
 
       let q = sb
         .from("questions_master")
@@ -931,7 +960,7 @@
     showOk("");
     setText("saveStatus", "");
 
-    const versionFromFilter = safeStr($("versionFilter").value).trim();
+    const versionFromFilter = safeStr($("versionFilter")?.value).trim();
 
     selected = {
       __isNew: true,
@@ -994,10 +1023,9 @@
 
       if (error) throw error;
 
-      showOk(`Deactivated ${qno}. If your Status filter is set to "active", this question may disappear from the list.`);
+      showOk(`Deactivated ${qno}. If Status filter = "active", it may disappear from the list.`);
       await loadQuestions();
 
-      // Try to reselect if it is still visible (e.g. filter inactive)
       const still = allRows.find(r => r.id === selected.id);
       if (still) await selectRow(still);
       else {
@@ -1020,15 +1048,14 @@
     const ok = confirm(
       `DELETE question ${qno}?\n\n` +
       `This will permanently delete:\n` +
-      `- the question row (questions_master)\n` +
-      `- its PGNO rows (pgno_master)\n` +
-      `- its Expected Evidence rows (expected_evidence_master)\n\n` +
+      `- questions_master\n` +
+      `- pgno_master (children)\n` +
+      `- expected_evidence_master (children)\n\n` +
       `This cannot be undone.`
     );
     if (!ok) return;
 
     try {
-      // delete children first
       const { error: e1 } = await sb.from("pgno_master").delete().eq("question_id", selected.id);
       if (e1) throw e1;
 
@@ -1056,13 +1083,13 @@
     setText("saveStatus", "Saving…");
 
     try {
-      const src = $("dbSourceType").value;
-      const status = safeStr($("dbStatus").value || "active");
-      const version = safeStr($("dbVersion").value).trim() || safeStr(selected.version || "SIRE_2_0_QL");
+      const src = $("dbSourceType")?.value;
+      const status = safeStr($("dbStatus")?.value || "active");
+      const version = safeStr($("dbVersion")?.value).trim() || safeStr(selected.version || "SIRE_2_0_QL");
 
-      const xx = $("numChapter").value;
-      const yy = $("numSection").value;
-      const zz = $("numItem").value;
+      const xx = $("numChapter")?.value;
+      const yy = $("numSection")?.value;
+      const zz = $("numItem")?.value;
 
       if (!isIntLike(Number(xx)) || !isIntLike(Number(yy)) || !isIntLike(Number(zz))) {
         setText("saveStatus", "");
@@ -1077,13 +1104,13 @@
         return;
       }
 
-      const number_suffix = safeStr($("dbNumberSuffix").value).trim();
+      const number_suffix = safeStr($("dbNumberSuffix")?.value).trim();
 
-      const tagsCsv = safeStr($("dbTags").value).trim();
+      const tagsCsv = safeStr($("dbTags")?.value).trim();
       const tags = tagsCsv ? tagsCsv.split(",").map(s => s.trim()).filter(Boolean) : [];
 
       let payload = {};
-      const raw = safeStr($("pRaw").value).trim();
+      const raw = safeStr($("pRaw")?.value).trim();
       if (raw) {
         try { payload = JSON.parse(raw); }
         catch { payload = selected.payload || {}; }
@@ -1091,10 +1118,10 @@
         payload = selected.payload || {};
       }
 
-      payload.short_text = safeStr($("pShortText").value);
-      payload.question = safeStr($("pQuestion").value);
-      payload.inspection_guidance = safeStr($("pGuidance").value);
-      payload.suggested_inspector_actions = safeStr($("pActions").value);
+      payload.short_text = safeStr($("pShortText")?.value);
+      payload.question = safeStr($("pQuestion")?.value);
+      payload.inspection_guidance = safeStr($("pGuidance")?.value);
+      payload.suggested_inspector_actions = safeStr($("pActions")?.value);
 
       applyAttributesFromEditUIIntoPayload(payload);
 
@@ -1120,7 +1147,7 @@
         number_base,
         number_suffix,
         payload,
-        change_reason: safeStr($("dbChangeReason").value).trim() || null,
+        change_reason: safeStr($("dbChangeReason")?.value).trim() || null,
         updated_by: me?.user?.id || null,
       };
 
@@ -1193,18 +1220,18 @@
   }
 
   function wireUI() {
-    $("reloadBtn").onclick = () => loadQuestions();
-    $("statusFilter").onchange = () => loadQuestions();
-    $("sourceFilter").onchange = () => loadQuestions();
+    onClick("reloadBtn", () => loadQuestions());
+    onChange("statusFilter", () => loadQuestions());
+    onChange("sourceFilter", () => loadQuestions());
 
     let vTimer = null;
-    $("versionFilter").oninput = () => {
+    onInput("versionFilter", () => {
       if (vTimer) clearTimeout(vTimer);
       vTimer = setTimeout(() => loadQuestions(), 450);
-    };
+    });
 
-    $("searchInput").oninput = () => renderList();
-    $("newQuestionBtn").onclick = () => newQuestion();
+    onInput("searchInput", () => renderList());
+    onClick("newQuestionBtn", () => newQuestion());
 
     const tgl = $("showFullQuestionToggle");
     if (tgl) {
@@ -1217,51 +1244,56 @@
       });
     }
 
-    $("btnEdit").onclick = () => {
+    onClick("btnEdit", () => {
       const ok = confirm("Enter edit mode for this question?");
       if (!ok) return;
       setMode("EDIT");
-    };
+    });
 
-    $("btnView").onclick = () => setMode("VIEW");
+    onClick("btnView", () => setMode("VIEW"));
 
-    $("btnReset").onclick = async () => {
+    onClick("btnReset", async () => {
       if (!selected) return;
       if (selected.__isNew) newQuestion();
       else {
         const r = allRows.find(x => x.id === selected.id);
         if (r) await selectRow(r);
       }
-    };
+    });
 
-    $("btnSave").onclick = () => saveSelected();
+    onClick("btnSave", () => saveSelected());
 
-    // NEW: Deactivate / Delete question (edit mode only)
-    $("btnDeactivateQuestion").onclick = () => deactivateSelected();
-    $("btnDeleteQuestion").onclick = () => deleteSelected();
+    // Deactivate / Delete (edit mode only)
+    onClick("btnDeactivateQuestion", () => deactivateSelected());
+    onClick("btnDeleteQuestion", () => deleteSelected());
 
-    $("dbSourceType").onchange = () => {
-      const st = $("dbSourceType").value;
+    onChange("dbSourceType", () => {
+      const st = $("dbSourceType")?.value;
       if (st === "SIRE") $("dbNumberSuffix").value = "";
-      if (st !== "SIRE" && !safeStr($("dbNumberSuffix").value).trim()) $("dbNumberSuffix").value = "C";
+      if (st !== "SIRE" && !safeStr($("dbNumberSuffix")?.value).trim()) $("dbNumberSuffix").value = "C";
       refreshHeaderFromNumberInputs();
-    };
+    });
 
-    $("dbNumberSuffix").oninput = () => refreshHeaderFromNumberInputs();
-    $("numChapter").oninput = () => refreshHeaderFromNumberInputs();
-    $("numSection").oninput = () => refreshHeaderFromNumberInputs();
-    $("numItem").oninput = () => refreshHeaderFromNumberInputs();
+    onInput("dbNumberSuffix", () => refreshHeaderFromNumberInputs());
+    onInput("numChapter", () => refreshHeaderFromNumberInputs());
+    onInput("numSection", () => refreshHeaderFromNumberInputs());
+    onInput("numItem", () => refreshHeaderFromNumberInputs());
 
-    $("btnToggleAdvancedView").onclick = () => toggleAdvanced("viewAdvanced");
-    $("btnToggleAdvancedEdit").onclick = () => toggleAdvanced("editAdvanced");
+    onClick("btnToggleAdvancedView", () => toggleAdvanced("viewAdvanced"));
+    onClick("btnToggleAdvancedEdit", () => toggleAdvanced("editAdvanced"));
 
-    $("btnAddPgno").onclick = () => addPgnoRow();
-    $("btnAddEe").onclick = () => addEeRow();
+    onClick("btnAddPgno", () => addPgnoRow());
+    onClick("btnAddEe", () => addEeRow());
 
     ["rtHuman","rtHardware","rtProcess","rtPhoto"].forEach(id => {
       const el = $(id);
       if (el) el.addEventListener("change", refreshResponseTypePreviewFromCheckboxes);
     });
+
+    // If this shows up in console, your running HTML is not the one you edited.
+    if (!$("btnDeactivateQuestion")) {
+      console.warn("[q-questions-editor] Deactivate button not found in DOM. You are likely viewing an older/different q-questions-editor.html.");
+    }
   }
 
   async function boot() {
