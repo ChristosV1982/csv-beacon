@@ -1,4 +1,3 @@
-<!-- public/q-questions-editor.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -6,248 +5,182 @@
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>SIRE 2.0 – Questions Editor</title>
 
-  <!-- Keep your global stylesheet (optional) -->
-  <link rel="stylesheet" href="./style.css?v=20260130_1" />
-
-  <!-- Dedicated stylesheet for this module (fixes layout) -->
-  <link rel="stylesheet" href="./q-questions-editor.css?v=20260130_5" />
+  <!-- IMPORTANT: dedicated editor CSS + cache-bust -->
+  <link rel="stylesheet" href="./q-questions-editor.css?v=20260130_1" />
 </head>
 
 <body>
   <!-- Top bar -->
-  <div class="topbar">
-    <div id="modeLine" class="muted small">Role: — • Mode: — • Module: QUESTIONS_EDITOR</div>
-    <div class="authBar">
-      <span id="userBadge" class="badge muted small">—</span>
-      <button id="loginBtn" class="btn" type="button">Login</button>
-      <button id="logoutBtn" class="btn" type="button">Logout</button>
-      <button id="switchUserBtn" class="btn" type="button">Switch user</button>
+  <header class="topbar">
+    <div class="topbar-left">
+      <div class="brand">SIRE 2.0 – Questions Editor</div>
+      <div class="muted small" id="modeLine">Role: — • Mode: — • Module: —</div>
     </div>
-  </div>
 
-  <!-- Alerts -->
-  <div id="warnBox" class="warn" style="display:none;"></div>
-  <div id="okBox" class="ok" style="display:none;"></div>
+    <div class="topbar-right">
+      <div id="userBadge" class="badge">Not signed in</div>
+      <button id="loginBtn" class="btn primary" type="button">Login</button>
+      <button id="switchUserBtn" class="btn light" type="button">Switch user</button>
+      <button id="logoutBtn" class="btn" type="button">Logout</button>
+    </div>
+  </header>
 
-  <div class="qe-shell">
-    <!-- LEFT: list/filter -->
-    <div class="qe-left">
-      <div class="masterBox">
-        <div class="qe-header">
-          <div class="qe-title">Questions</div>
-          <div class="qe-actions">
+  <!-- Messages -->
+  <div class="page">
+    <div id="warnBox" class="msg warn" style="display:none;"></div>
+    <div id="okBox" class="msg ok" style="display:none;"></div>
+
+    <!-- Main layout -->
+    <div class="layout">
+      <!-- LEFT: list/filter -->
+      <aside class="sidebar">
+        <div class="card">
+          <div class="card-title">Questions</div>
+
+          <div class="row gap">
             <button id="reloadBtn" class="btn" type="button">Reload</button>
             <button id="newQuestionBtn" class="btn primary" type="button">+ New Question</button>
           </div>
-        </div>
 
-        <div style="height:12px;"></div>
+          <div class="hr"></div>
 
-        <div class="masterGrid">
-          <div class="full">
-            <label>Status</label>
-            <select id="statusFilter">
-              <option value="active" selected>active</option>
-              <option value="inactive">inactive</option>
-              <option value="">(all)</option>
-            </select>
+          <label class="lbl">Status</label>
+          <select id="statusFilter" class="inp">
+            <option value="active" selected>active</option>
+            <option value="inactive">inactive</option>
+          </select>
+
+          <label class="lbl">Source</label>
+          <select id="sourceFilter" class="inp">
+            <option value="ALL" selected>ALL</option>
+            <option value="SIRE">SIRE</option>
+            <option value="COMPANY_CUSTOM">Company (custom)</option>
+            <option value="SPARE_X">Spare X</option>
+            <option value="SPARE_Z">Spare Z</option>
+          </select>
+
+          <label class="lbl">Version filter (optional)</label>
+          <input id="versionFilter" class="inp" type="text" placeholder="e.g. SIRE_2_0_QL" />
+
+          <label class="lbl">Search</label>
+          <input id="searchInput" class="inp" type="text" placeholder="Search number / short text / question..." />
+
+          <div class="meta">
+            <div id="countLine">—</div>
+            <div id="loadedLine" class="muted">—</div>
           </div>
 
-          <div class="full">
-            <label>Source</label>
-            <select id="sourceFilter">
-              <option value="ALL" selected>ALL</option>
-              <option value="SIRE">SIRE</option>
-              <option value="COMPANY_CUSTOM">Company (custom)</option>
-              <option value="SPARE_X">Spare X</option>
-              <option value="SPARE_Z">Spare Z</option>
-            </select>
-          </div>
-
-          <div class="full">
-            <label>Version filter (optional)</label>
-            <input id="versionFilter" type="text" placeholder="e.g. SIRE_2_0_QL" />
-          </div>
-
-          <div class="full">
-            <label>Search</label>
-            <input id="searchInput" type="text" placeholder="Search number / short text / question" />
-          </div>
-        </div>
-
-        <div style="height:10px;"></div>
-
-        <div class="row muted small">
-          <div id="countLine">—</div>
-          <div style="flex:1;"></div>
-          <div id="loadedLine">—</div>
-        </div>
-
-        <div style="height:10px;"></div>
-
-        <div class="row muted small">
-          <div>Show full question in list:</div>
-          <label class="switch">
-            <input id="showFullQuestionToggle" type="checkbox">
-            <span class="slider"></span>
-          </label>
-          <div id="showFullQuestionState" style="font-weight:700;">—</div>
-        </div>
-
-        <div style="height:8px;"></div>
-        <div id="loadHint" class="muted small"></div>
-
-        <div style="height:10px;"></div>
-        <div id="qList" class="qe-list"></div>
-      </div>
-    </div>
-
-    <!-- RIGHT: view/edit panels -->
-    <div class="qe-right">
-
-      <!-- Empty state -->
-      <div id="emptyState" class="masterBox">
-        <div style="font-weight:900; font-size:16px;">No question selected</div>
-        <div class="muted" style="margin-top:6px;">
-          Select a question from the list (left), or click <b>+ New Question</b>.
-        </div>
-      </div>
-
-      <!-- VIEW panel -->
-      <div id="viewPanel" class="masterBox" style="display:none;">
-        <div class="qe-header">
-          <div>
-            <div id="vhdrNumber" class="qe-title">—</div>
-            <div id="vhdrId" class="muted small"></div>
-          </div>
-          <div class="qe-actions">
-            <button id="btnEdit" class="btn primary" type="button">Edit</button>
-          </div>
-        </div>
-
-        <div style="height:10px;"></div>
-        <div class="kv">
-          <div class="qe-pill" id="vSourcePill">source: —</div>
-          <div class="qe-pill" id="vStatusPill">status: —</div>
-          <div class="qe-pill" id="vSuffixPill">suffix: —</div>
-        </div>
-
-        <div style="height:14px;"></div>
-
-        <div class="masterBox" style="padding:12px;">
-          <div style="font-weight:950; margin-bottom:10px;">Question Content</div>
-          <div class="masterGrid">
-            <div class="full">
-              <div class="muted small">Short Text</div>
-              <div id="vShortText" class="pre" style="margin-top:6px;"></div>
+          <div class="row" style="align-items:center; justify-content:space-between;">
+            <div class="muted small">
+              Show full question in list: <b><span id="showFullQuestionState">—</span></b>
             </div>
-            <div class="full">
-              <div class="muted small">Question</div>
-              <div id="vQuestion" class="pre" style="margin-top:6px;"></div>
-            </div>
-            <div class="full">
-              <div class="muted small">Inspection guidance</div>
-              <div id="vGuidance" class="pre" style="margin-top:6px;"></div>
-            </div>
-            <div class="full">
-              <div class="muted small">Suggested inspector actions</div>
-              <div id="vActions" class="pre" style="margin-top:6px;"></div>
-            </div>
+            <label class="toggle">
+              <input id="showFullQuestionToggle" type="checkbox" />
+              <span> </span>
+            </label>
           </div>
+
+          <div id="loadHint" class="muted small" style="margin-top:8px;"></div>
         </div>
 
-        <div style="height:14px;"></div>
+        <div class="card listCard">
+          <div id="qList" class="qList"></div>
+        </div>
+      </aside>
 
-        <div class="masterBox" style="padding:12px;">
-          <div style="font-weight:950; margin-bottom:10px;">Question Attributes</div>
-          <div class="masterGrid">
+      <!-- RIGHT: view/edit -->
+      <main class="main">
+        <div id="emptyState" class="card">
+          <div class="card-title">No question selected</div>
+          <div class="muted">Select a question from the list on the left.</div>
+        </div>
+
+        <!-- VIEW PANEL -->
+        <div id="viewPanel" class="card" style="display:none;">
+          <div class="hdr">
             <div>
-              <div class="muted small">Question Type</div>
-              <div id="vAttrQuestionType" style="margin-top:6px;"></div>
+              <div class="hnum" id="vhdrNumber">—</div>
+              <div class="muted small" id="vhdrId"></div>
             </div>
-            <div>
-              <div class="muted small">Vessel Type</div>
-              <div id="vAttrVesselType" style="margin-top:6px;"></div>
+            <div class="qe-actions">
+              <button id="btnEdit" class="btn light" type="button">Edit</button>
+              <button id="btnView" class="btn" type="button">View</button>
             </div>
-            <div>
-              <div class="muted small">ROVIQ List</div>
-              <div id="vAttrRoviq" style="margin-top:6px;"></div>
+          </div>
+
+          <div class="kv">
+            <div class="qe-pill" id="vSourcePill">source: —</div>
+            <div class="qe-pill" id="vStatusPill">status: —</div>
+            <div class="qe-pill" id="vSuffixPill">suffix: —</div>
+          </div>
+
+          <div class="section">
+            <div class="section-title">Question Content</div>
+            <div class="grid2">
+              <div>
+                <div class="lbl">Short Text</div>
+                <div class="box" id="vShortText"></div>
+              </div>
+              <div>
+                <div class="lbl">Question</div>
+                <div class="box" id="vQuestion"></div>
+              </div>
+              <div>
+                <div class="lbl">Inspection guidance</div>
+                <div class="box" id="vGuidance"></div>
+              </div>
+              <div>
+                <div class="lbl">Suggested inspector actions</div>
+                <div class="box" id="vActions"></div>
+              </div>
             </div>
-            <div>
-              <div class="muted small">Company Rank Allocation</div>
-              <div id="vAttrCompanyRank" style="margin-top:6px;"></div>
+          </div>
+
+          <div class="section">
+            <div class="section-title">Question Attributes</div>
+            <div class="grid2">
+              <div><div class="lbl">Question Type</div><div class="box" id="vAttrQuestionType"></div></div>
+              <div><div class="lbl">Vessel Type</div><div class="box" id="vAttrVesselType"></div></div>
+              <div><div class="lbl">ROVIQ List</div><div class="box" id="vAttrRoviq"></div></div>
+              <div><div class="lbl">Company Rank Allocation</div><div class="box" id="vAttrCompanyRank"></div></div>
+              <div><div class="lbl">TMSA3 Reference</div><div class="box" id="vAttrTmsa3"></div></div>
+              <div><div class="lbl">TMSA4 Reference</div><div class="box" id="vAttrTmsa4"></div></div>
+              <div><div class="lbl">Response Type</div><div class="box" id="vAttrResponseType"></div></div>
+              <div><div class="lbl">Tags</div><div class="box" id="vTags"></div></div>
+              <div><div class="lbl">Version</div><div class="box" id="vVersion"></div></div>
             </div>
-            <div>
-              <div class="muted small">TMSA3 Reference</div>
-              <div id="vAttrTmsa3" style="margin-top:6px;"></div>
+          </div>
+
+          <div class="section">
+            <div class="row" style="justify-content:space-between; align-items:center;">
+              <div class="section-title">Expected Evidence</div>
+              <div class="muted small" id="vEeCount">—</div>
             </div>
-            <div>
-              <div class="muted small">TMSA4 Reference</div>
-              <div id="vAttrTmsa4" style="margin-top:6px;"></div>
+            <div id="vEeList"></div>
+          </div>
+
+          <div class="section">
+            <div class="row" style="justify-content:space-between; align-items:center;">
+              <div class="section-title">PGNOs</div>
+              <div class="muted small" id="vPgnoCount">—</div>
             </div>
-            <div class="full">
-              <div class="muted small">Question Response Type</div>
-              <div id="vAttrResponseType" style="margin-top:6px;"></div>
+            <div id="vPgnoList"></div>
+          </div>
+
+          <div class="section">
+            <button id="btnToggleAdvancedView" class="btn" type="button">Advanced (Raw JSON)</button>
+            <div id="viewAdvanced" class="adv">
+              <pre id="vRaw" class="pre"></pre>
             </div>
           </div>
         </div>
 
-        <div style="height:14px;"></div>
-
-        <div class="masterBox" style="padding:12px;">
-          <div style="font-weight:950; margin-bottom:10px;">Tags / Version</div>
-          <div class="masterGrid">
-            <div class="full">
-              <div class="muted small">Tags</div>
-              <div id="vTags" style="margin-top:6px;"></div>
-            </div>
-            <div class="full">
-              <div class="muted small">Version</div>
-              <div id="vVersion" style="margin-top:6px;"></div>
-            </div>
-          </div>
-        </div>
-
-        <div style="height:14px;"></div>
-
-        <div class="masterBox" style="padding:12px;">
-          <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
-            <div style="font-weight:950;">Expected Evidence</div>
-            <div class="muted" id="vEeCount">—</div>
-          </div>
-          <div style="height:10px;"></div>
-          <div id="vEeList"></div>
-        </div>
-
-        <div style="height:14px;"></div>
-
-        <div class="masterBox" style="padding:12px;">
-          <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
-            <div style="font-weight:950;">PGNOs</div>
-            <div class="muted" id="vPgnoCount">—</div>
-          </div>
-          <div style="height:10px;"></div>
-          <div id="vPgnoList"></div>
-        </div>
-
-        <div style="height:14px;"></div>
-
-        <div class="masterBox" style="padding:12px;">
-          <button id="btnToggleAdvancedView" class="btn" type="button">Advanced (Raw JSON)</button>
-          <div class="adv" id="viewAdvanced" style="display:none; margin-top:10px;">
-            <div class="muted small" style="margin-bottom:6px;">Raw payload JSON</div>
-            <pre id="vRaw" class="prebox"></pre>
-          </div>
-        </div>
-      </div>
-
-      <!-- EDIT panel -->
-      <div id="editPanel" style="display:none;">
-        <div class="masterBox">
-          <div class="qe-header">
+        <!-- EDIT PANEL -->
+        <div id="editPanel" class="card" style="display:none;">
+          <div class="hdr">
             <div>
-              <div id="hdrNumber" class="qe-title">—</div>
-              <div id="hdrId" class="muted small">—</div>
+              <div class="hnum" id="hdrNumber">—</div>
+              <div class="muted small" id="hdrId">—</div>
             </div>
             <div class="qe-actions">
               <button id="btnView" class="btn light" type="button">View</button>
@@ -258,23 +191,19 @@
             </div>
           </div>
 
-          <div style="height:10px;"></div>
           <div class="kv">
             <div class="qe-pill" id="pillSource">source: —</div>
             <div class="qe-pill" id="pillStatus">status: —</div>
             <div class="qe-pill" id="pillSuffix">suffix: —</div>
-            <div class="qe-pill" id="pillMode">mode: EDIT</div>
           </div>
 
-          <div style="height:14px;"></div>
-
           <div class="masterBox">
-            <div style="font-weight:950; margin-bottom:10px;">DB Fields</div>
+            <div class="masterTitle">DB Fields</div>
 
-            <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+            <div class="grid2">
               <div>
-                <label>Source Type</label>
-                <select id="dbSourceType">
+                <label class="lbl">Source Type</label>
+                <select id="dbSourceType" class="inp">
                   <option value="SIRE">SIRE</option>
                   <option value="COMPANY_CUSTOM">Company (custom)</option>
                   <option value="SPARE_X">Spare X</option>
@@ -284,79 +213,72 @@
               </div>
 
               <div>
-                <label>Status</label>
-                <select id="dbStatus">
+                <label class="lbl">Status</label>
+                <select id="dbStatus" class="inp">
                   <option value="active" selected>active</option>
                   <option value="inactive">inactive</option>
                 </select>
               </div>
             </div>
 
-            <div style="height:10px;"></div>
-
-            <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px;">
+            <div class="grid3" style="margin-top:10px;">
               <div>
-                <label>Chapter (xx)</label>
-                <input id="numChapter" type="number" min="0" step="1" />
+                <label class="lbl">Chapter (xx)</label>
+                <input id="numChapter" class="inp" type="number" min="0" step="1" />
               </div>
               <div>
-                <label>Section (yy)</label>
-                <input id="numSection" type="number" min="0" step="1" />
+                <label class="lbl">Section (yy)</label>
+                <input id="numSection" class="inp" type="number" min="0" step="1" />
               </div>
               <div>
-                <label>Item (zz / zzz)</label>
-                <input id="numItem" type="number" min="0" step="1" />
+                <label class="lbl">Item (zz / zzz)</label>
+                <input id="numItem" class="inp" type="number" min="0" step="1" />
               </div>
             </div>
 
-            <div style="height:10px;"></div>
-
-            <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+            <div class="grid2" style="margin-top:10px;">
               <div>
-                <label>Number Suffix</label>
-                <input id="dbNumberSuffix" type="text" placeholder="C / (blank for SIRE)" />
+                <label class="lbl">Number Suffix</label>
+                <input id="dbNumberSuffix" class="inp" type="text" placeholder="C / (blank for SIRE)" />
                 <div class="muted small">SIRE = xx.yy.zz, Custom/Spare = xx.yy.zzz.</div>
               </div>
 
               <div>
-                <label>Tags (comma separated)</label>
-                <input id="dbTags" type="text" placeholder="tag1, tag2, tag3" />
+                <label class="lbl">Tags (comma separated)</label>
+                <input id="dbTags" class="inp" type="text" placeholder="tag1, tag2, tag3" />
               </div>
             </div>
 
-            <div class="adv" id="editAdvanced" style="display:none;">
-              <div style="height:12px;"></div>
-              <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+            <button id="btnToggleAdvancedEdit" class="btn" type="button" style="margin-top:10px;">
+              Advanced (Version / Raw JSON)
+            </button>
+
+            <div class="adv" id="editAdvanced">
+              <div class="grid2" style="margin-top:10px;">
                 <div>
-                  <label>Version (your tag)</label>
-                  <input id="dbVersion" type="text" />
+                  <label class="lbl">Version (your tag)</label>
+                  <input id="dbVersion" class="inp" type="text" />
                 </div>
                 <div>
-                  <label>Change reason (optional)</label>
-                  <input id="dbChangeReason" type="text" placeholder="Why was this changed?" />
+                  <label class="lbl">Change reason (optional)</label>
+                  <input id="dbChangeReason" class="inp" type="text" placeholder="Why was this changed?" />
                 </div>
               </div>
 
-              <div style="height:10px;"></div>
-              <div>
-                <label>Raw JSON (advanced)</label>
-                <textarea id="pRaw"></textarea>
+              <div style="margin-top:10px;">
+                <label class="lbl">Raw JSON (advanced)</label>
+                <textarea id="pRaw" class="ta"></textarea>
               </div>
             </div>
-
-            <div style="height:10px;"></div>
-            <button id="btnToggleAdvancedEdit" class="btn" type="button">Advanced (Version / Raw JSON)</button>
           </div>
 
-          <div style="height:14px;"></div>
-
           <div class="masterBox">
-            <div style="font-weight:950; margin-bottom:10px;">Question Attributes (editable)</div>
+            <div class="masterTitle">Question Attributes (editable)</div>
 
-            <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+            <div class="grid2">
               <div>
-                <label>Question Type</label>
-                <select id="eQuestionType">
+                <label class="lbl">Question Type</label>
+                <select id="eQuestionType" class="inp">
                   <option value=""></option>
                   <option value="Core">Core</option>
                   <option value="Rotational 1">Rotational 1</option>
@@ -365,127 +287,105 @@
               </div>
 
               <div>
-                <label>Vessel Type</label>
-                <input id="eVesselType" type="text" placeholder="e.g. Chemical, LNG, LPG, Oil" />
+                <label class="lbl">Vessel Type</label>
+                <input id="eVesselType" class="inp" type="text" placeholder="e.g. Chemical, LNG, LPG, Oil" />
               </div>
             </div>
 
-            <div style="height:10px;"></div>
-
-            <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+            <div class="grid2" style="margin-top:10px;">
               <div>
-                <label>ROVIQ List</label>
-                <input id="eRoviqList" type="text" placeholder="e.g. Bridge, Cargo Control Room" />
+                <label class="lbl">ROVIQ List</label>
+                <input id="eRoviqList" class="inp" type="text" placeholder="e.g. Bridge, CCR, Documentation" />
               </div>
 
               <div>
-                <label>Company Rank Allocation</label>
-                <input id="eCompanyRankAllocation" type="text" placeholder="e.g. Master, Chief Officer, Deck Officers" />
+                <label class="lbl">Company Rank Allocation</label>
+                <input id="eCompanyRankAllocation" class="inp" type="text" placeholder="e.g. Master, Chief Officer, Deck Officers" />
               </div>
             </div>
 
-            <div style="height:10px;"></div>
-
-            <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+            <div class="grid2" style="margin-top:10px;">
               <div>
-                <label>TMSA3 Reference</label>
-                <input id="eTmsa3" type="text" />
+                <label class="lbl">TMSA3 Reference</label>
+                <input id="eTmsa3" class="inp" type="text" />
               </div>
               <div>
-                <label>TMSA4 Reference</label>
-                <input id="eTmsa4" type="text" />
+                <label class="lbl">TMSA4 Reference</label>
+                <input id="eTmsa4" class="inp" type="text" />
               </div>
             </div>
 
-            <div style="height:12px;"></div>
-
-            <div>
-              <label>Question Response Type</label>
-              <div class="chkRow" style="margin-top:8px;">
-                <div class="chk"><input id="rtHuman" type="checkbox" /> <span>Human</span></div>
-                <div class="chk"><input id="rtHardware" type="checkbox" /> <span>Hardware</span></div>
-                <div class="chk"><input id="rtProcess" type="checkbox" /> <span>Process</span></div>
-                <div class="chk"><input id="rtPhoto" type="checkbox" /> <span>Photo</span></div>
+            <div style="margin-top:12px;">
+              <label class="lbl">Question Response Type</label>
+              <div class="chkRow">
+                <label class="chk"><input id="rtHuman" type="checkbox" /> <span>Human</span></label>
+                <label class="chk"><input id="rtHardware" type="checkbox" /> <span>Hardware</span></label>
+                <label class="chk"><input id="rtProcess" type="checkbox" /> <span>Process</span></label>
+                <label class="chk"><input id="rtPhoto" type="checkbox" /> <span>Photo</span></label>
               </div>
-              <div class="muted" style="margin-top:6px;">
+              <div class="muted small" style="margin-top:6px;">
                 Preview: <span id="eAttrResponseTypePreview"></span>
               </div>
             </div>
           </div>
 
-          <div style="height:14px;"></div>
-
           <div class="masterBox">
-            <div style="font-weight:950; margin-bottom:10px;">Question Content (editable)</div>
-
-            <div class="masterGrid">
+            <div class="masterTitle">Question Content (editable)</div>
+            <div class="grid2">
               <div class="full">
-                <label>Short Text</label>
-                <textarea id="pShortText"></textarea>
+                <label class="lbl">Short Text</label>
+                <textarea id="pShortText" class="ta"></textarea>
               </div>
               <div class="full">
-                <label>Question</label>
-                <textarea id="pQuestion"></textarea>
+                <label class="lbl">Question</label>
+                <textarea id="pQuestion" class="ta"></textarea>
               </div>
               <div class="full">
-                <label>Inspection guidance</label>
-                <textarea id="pGuidance"></textarea>
+                <label class="lbl">Inspection guidance</label>
+                <textarea id="pGuidance" class="ta"></textarea>
               </div>
               <div class="full">
-                <label>Suggested inspector actions</label>
-                <textarea id="pActions"></textarea>
+                <label class="lbl">Suggested inspector actions</label>
+                <textarea id="pActions" class="ta"></textarea>
               </div>
             </div>
           </div>
 
-          <div style="height:14px;"></div>
-
           <div class="masterBox">
-            <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
-              <div style="font-weight:950;">Expected Evidence (stored as DB rows)</div>
-              <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-                <div class="muted" id="eeCountLine">—</div>
+            <div class="row" style="justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
+              <div class="masterTitle" style="margin:0;">Expected Evidence (stored as DB rows)</div>
+              <div class="row gap">
+                <div class="muted small" id="eeCountLine">—</div>
                 <button id="btnAddEe" class="btn" type="button">+ Add Expected Evidence</button>
               </div>
             </div>
-
             <div style="height:10px;"></div>
             <div id="eeEditorList"></div>
-
-            <div class="muted small">
-              One row = one bullet. Sequence is auto-saved as 1, 2, 3, ...
-            </div>
+            <div class="muted small" style="margin-top:8px;">One row = one bullet. Sequence auto-saved as 1, 2, 3, ...</div>
           </div>
 
-          <div style="height:14px;"></div>
-
           <div class="masterBox">
-            <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
-              <div style="font-weight:950;">PGNOs (stored as DB rows)</div>
-              <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-                <div class="muted" id="pgnoCountLine">—</div>
+            <div class="row" style="justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
+              <div class="masterTitle" style="margin:0;">PGNOs (stored as DB rows)</div>
+              <div class="row gap">
+                <div class="muted small" id="pgnoCountLine">—</div>
                 <button id="btnAddPgno" class="btn" type="button">+ Add PGNO</button>
               </div>
             </div>
-
             <div style="height:10px;"></div>
             <div id="pgnoEditorList"></div>
-
-            <div class="muted small">
-              Codes are auto-generated on save: <b>number_base</b> + <b>.01</b>, <b>.02</b>, etc.
-            </div>
+            <div class="muted small" style="margin-top:8px;">Codes auto-generated: <b>number_base</b> + <b>.01</b>, <b>.02</b>, ...</div>
           </div>
 
-          <div style="height:10px;"></div>
           <div class="muted small" id="saveStatus"></div>
         </div>
-      </div>
-
+      </main>
     </div>
   </div>
 
+  <!-- scripts (cache-bust) -->
   <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script defer src="./auth.js?v=20260130_1"></script>
-  <script defer src="./q-questions-editor.js?v=20260130_5"></script>
+  <script defer src="./q-questions-editor.js?v=20260130_1"></script>
 </body>
 </html>

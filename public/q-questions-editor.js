@@ -233,7 +233,6 @@
 
   function setMode(newMode) {
     mode = newMode;
-
     const empty = $("emptyState");
     const v = $("viewPanel");
     const e = $("editPanel");
@@ -248,8 +247,6 @@
     if (empty) empty.style.display = "none";
     if (v) v.style.display = (mode === "VIEW") ? "block" : "none";
     if (e) e.style.display = (mode === "EDIT") ? "block" : "none";
-
-    setText("pillMode", `mode: ${mode}`);
 
     if (mode === "EDIT") {
       const dis = !!selected.__isNew || !selected.id;
@@ -272,7 +269,6 @@
     setText("pillSource", `source: ${st}`);
     setText("pillStatus", `status: ${status}`);
     setText("pillSuffix", `suffix: ${sx || "(blank)"}`);
-    setText("pillMode", `mode: ${mode}`);
   }
 
   // ===== fallback builders from payload =====
@@ -370,12 +366,12 @@
       const t = safeStr(it.text);
       const r = safeStr(it.remarks);
       return `
-        <div class="masterBox" style="margin-bottom:10px;">
-          <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px;">
-            <div style="font-weight:900;">${escapeHtml(code)}</div>
+        <div class="masterRow">
+          <div class="masterHdr">
+            <div class="masterCode">${escapeHtml(code)}</div>
           </div>
-          <div class="pre" style="margin-top:8px;">${escapeHtml(t)}</div>
-          ${r ? `<div class="muted small" style="margin-top:8px;"><b>Remarks:</b> ${escapeHtml(r)}</div>` : ``}
+          <div class="masterTiny" style="margin-top:6px; white-space:pre-wrap;">${escapeHtml(t)}</div>
+          ${r ? `<div class="masterTiny" style="margin-top:8px;"><b>Remarks:</b> ${escapeHtml(r)}</div>` : ``}
         </div>
       `;
     }).join("");
@@ -396,46 +392,45 @@
     host.innerHTML = "";
 
     items.forEach((it, idx) => {
-      const wrap = document.createElement("div");
-      wrap.className = "masterBox";
-      wrap.style.marginBottom = "10px";
+      const row = document.createElement("div");
+      row.className = "masterRow";
 
       const code = pgnoCode(nb, idx + 1, st);
 
-      wrap.innerHTML = `
-        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px; flex-wrap:wrap;">
+      row.innerHTML = `
+        <div class="masterHdr">
           <div>
-            <div style="font-weight:900;">${escapeHtml(code)}</div>
-            <div class="muted small">Seq: ${idx + 1}</div>
+            <div class="masterCode">${escapeHtml(code)}</div>
+            <div class="masterTiny">Seq: ${idx + 1}</div>
           </div>
-          <button class="btn" type="button" data-del="${idx}">Delete</button>
+          <div>
+            <button class="btn" type="button" data-del="${idx}">Delete</button>
+          </div>
         </div>
-
-        <div style="height:10px;"></div>
 
         <div class="masterGrid">
           <div class="full">
-            <label>PGNO text</label>
-            <textarea data-text="${idx}"></textarea>
+            <label class="lbl">PGNO text</label>
+            <textarea class="ta" data-text="${idx}"></textarea>
           </div>
           <div class="full">
-            <label>Remarks (per PGNO)</label>
-            <textarea data-remarks="${idx}" placeholder="Optional remarks for this PGNO"></textarea>
+            <label class="lbl">Remarks (per PGNO)</label>
+            <textarea class="ta" data-remarks="${idx}" placeholder="Optional remarks for this PGNO"></textarea>
           </div>
         </div>
       `;
 
-      host.appendChild(wrap);
+      host.appendChild(row);
 
-      const taText = wrap.querySelector(`textarea[data-text="${idx}"]`);
-      const taRem = wrap.querySelector(`textarea[data-remarks="${idx}"]`);
+      const taText = row.querySelector(`textarea[data-text="${idx}"]`);
+      const taRem = row.querySelector(`textarea[data-remarks="${idx}"]`);
       if (taText) taText.value = safeStr(it.text);
       if (taRem) taRem.value = safeStr(it.remarks);
 
       if (taText) taText.addEventListener("input", () => { selected.pgno_items[idx].text = taText.value; });
       if (taRem) taRem.addEventListener("input", () => { selected.pgno_items[idx].remarks = taRem.value; });
 
-      const delBtn = wrap.querySelector(`button[data-del="${idx}"]`);
+      const delBtn = row.querySelector(`button[data-del="${idx}"]`);
       if (delBtn) {
         delBtn.addEventListener("click", () => {
           selected.pgno_items.splice(idx, 1);
@@ -474,15 +469,17 @@
       const r = safeStr(it.remarks);
 
       return `
-        <div class="masterBox" style="margin-bottom:10px;">
-          <div style="font-weight:900;">${i + 1}.</div>
-          <div class="pre" style="margin-top:8px;">${escapeHtml(t)}</div>
+        <div class="masterRow">
+          <div class="masterHdr">
+            <div class="masterCode">${i + 1}.</div>
+          </div>
+          <div class="masterTiny" style="margin-top:6px; white-space:pre-wrap;">${escapeHtml(t)}</div>
 
           ${(ch || form || r) ? `
             <div style="height:8px;"></div>
-            ${ch ? `<div class="muted small"><b>eSMS Reference(s):</b> ${escapeHtml(ch)}</div>` : ``}
-            ${form ? `<div class="muted small"><b>eSMS Form(s):</b> ${escapeHtml(form)}</div>` : ``}
-            ${r ? `<div class="muted small"><b>Remarks:</b> ${escapeHtml(r)}</div>` : ``}
+            ${ch ? `<div class="masterTiny"><b>eSMS Reference(s):</b> ${escapeHtml(ch)}</div>` : ``}
+            ${form ? `<div class="masterTiny"><b>eSMS Form(s):</b> ${escapeHtml(form)}</div>` : ``}
+            ${r ? `<div class="masterTiny"><b>Remarks:</b> ${escapeHtml(r)}</div>` : ``}
           ` : ``}
         </div>
       `;
@@ -501,50 +498,49 @@
     host.innerHTML = "";
 
     items.forEach((it, idx) => {
-      const wrap = document.createElement("div");
-      wrap.className = "masterBox";
-      wrap.style.marginBottom = "10px";
+      const row = document.createElement("div");
+      row.className = "masterRow";
 
-      wrap.innerHTML = `
-        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px; flex-wrap:wrap;">
+      row.innerHTML = `
+        <div class="masterHdr">
           <div>
-            <div style="font-weight:900;">${idx + 1}.</div>
-            <div class="muted small">Seq: ${idx + 1}</div>
+            <div class="masterCode">${idx + 1}.</div>
+            <div class="masterTiny">Seq: ${idx + 1}</div>
           </div>
-          <button class="btn" type="button" data-del-ee="${idx}">Delete</button>
+          <div>
+            <button class="btn" type="button" data-del-ee="${idx}">Delete</button>
+          </div>
         </div>
-
-        <div style="height:10px;"></div>
 
         <div class="masterGrid">
           <div class="full">
-            <label>Expected Evidence text</label>
-            <textarea data-ee-text="${idx}"></textarea>
+            <label class="lbl">Expected Evidence text</label>
+            <textarea class="ta" data-ee-text="${idx}"></textarea>
           </div>
 
           <div class="full">
-            <label>eSMS Reference(s)</label>
-            <textarea data-ee-ch="${idx}" placeholder="Optional (e.g. eSMS Ch. 7.3, 7.5 etc.)"></textarea>
+            <label class="lbl">eSMS Reference(s)</label>
+            <textarea class="ta" data-ee-ch="${idx}" placeholder="Optional (e.g. eSMS Ch. 7.3, 7.5 etc.)"></textarea>
           </div>
 
           <div class="full">
-            <label>eSMS Form(s)</label>
-            <textarea data-ee-form="${idx}" placeholder="Optional (e.g. CBO-04, IG-01 etc.)"></textarea>
+            <label class="lbl">eSMS Form(s)</label>
+            <textarea class="ta" data-ee-form="${idx}" placeholder="Optional (e.g. CBO-04, IG-01 etc.)"></textarea>
           </div>
 
           <div class="full">
-            <label>Remarks</label>
-            <textarea data-ee-remarks="${idx}" placeholder="Optional remarks for this Expected Evidence item"></textarea>
+            <label class="lbl">Remarks</label>
+            <textarea class="ta" data-ee-remarks="${idx}" placeholder="Optional remarks for this Expected Evidence item"></textarea>
           </div>
         </div>
       `;
 
-      host.appendChild(wrap);
+      host.appendChild(row);
 
-      const taText = wrap.querySelector(`textarea[data-ee-text="${idx}"]`);
-      const taCh = wrap.querySelector(`textarea[data-ee-ch="${idx}"]`);
-      const taForm = wrap.querySelector(`textarea[data-ee-form="${idx}"]`);
-      const taRem = wrap.querySelector(`textarea[data-ee-remarks="${idx}"]`);
+      const taText = row.querySelector(`textarea[data-ee-text="${idx}"]`);
+      const taCh = row.querySelector(`textarea[data-ee-ch="${idx}"]`);
+      const taForm = row.querySelector(`textarea[data-ee-form="${idx}"]`);
+      const taRem = row.querySelector(`textarea[data-ee-remarks="${idx}"]`);
 
       if (taText) taText.value = safeStr(it.text);
       if (taCh) taCh.value = safeStr(it.esms_references);
@@ -556,7 +552,7 @@
       if (taForm) taForm.addEventListener("input", () => { selected.ee_items[idx].esms_forms = taForm.value; });
       if (taRem) taRem.addEventListener("input", () => { selected.ee_items[idx].remarks = taRem.value; });
 
-      const delBtn = wrap.querySelector(`button[data-del-ee="${idx}"]`);
+      const delBtn = row.querySelector(`button[data-del-ee="${idx}"]`);
       if (delBtn) {
         delBtn.addEventListener("click", () => {
           selected.ee_items.splice(idx, 1);
@@ -665,6 +661,7 @@
 
     setText("vShortText", pGet(p, ["short_text", "Short Text", "ShortText", "shortText"]));
     setText("vQuestion", pGet(p, ["question", "Question"]));
+
     setText("vGuidance", pGet(p, ["inspection_guidance", "Inspection Guidance", "InspectionGuidance", "guidance"]));
     setText("vActions", pGet(p, ["suggested_inspector_actions", "Suggested Inspector Actions", "SuggestedInspectorActions", "actions"]));
 
@@ -685,33 +682,33 @@
   }
 
   function fillEditPanel(r) {
-    $("dbSourceType").value = r.source_type || "SIRE";
-    $("dbStatus").value = r.status || "active";
-    $("dbNumberSuffix").value = safeStr(r.number_suffix);
-    $("dbTags").value = Array.isArray(r.tags) ? r.tags.join(", ") : safeStr(r.tags || "");
+    if ($("dbSourceType")) $("dbSourceType").value = r.source_type || "SIRE";
+    if ($("dbStatus")) $("dbStatus").value = r.status || "active";
+    if ($("dbNumberSuffix")) $("dbNumberSuffix").value = safeStr(r.number_suffix);
+    if ($("dbTags")) $("dbTags").value = Array.isArray(r.tags) ? r.tags.join(", ") : safeStr(r.tags || "");
 
-    $("dbVersion").value = safeStr(r.version || "");
-    $("dbChangeReason").value = safeStr(r.change_reason || "");
+    if ($("dbVersion")) $("dbVersion").value = safeStr(r.version || "");
+    if ($("dbChangeReason")) $("dbChangeReason").value = safeStr(r.change_reason || "");
 
     const parts = parseNumberBase(normalizeNumberBaseRow(r));
-    $("numChapter").value = parts.xx;
-    $("numSection").value = parts.yy;
-    $("numItem").value = parts.zz;
+    if ($("numChapter")) $("numChapter").value = parts.xx;
+    if ($("numSection")) $("numSection").value = parts.yy;
+    if ($("numItem")) $("numItem").value = parts.zz;
 
     setText("hdrId", r.id ? `DB id: ${r.id}` : "Not saved yet");
     setText("hdrNumber", displayNumber(r));
 
     const p = r.payload || {};
 
-    $("pShortText").value = pGet(p, ["short_text", "Short Text", "ShortText", "shortText"]);
-    $("pQuestion").value = pGet(p, ["question", "Question"]);
-    $("pGuidance").value = pGet(p, ["inspection_guidance", "Inspection Guidance", "InspectionGuidance", "guidance"]);
-    $("pActions").value = pGet(p, ["suggested_inspector_actions", "Suggested Inspector Actions", "SuggestedInspectorActions", "actions"]);
+    if ($("pShortText")) $("pShortText").value = pGet(p, ["short_text", "Short Text", "ShortText", "shortText"]);
+    if ($("pQuestion")) $("pQuestion").value = pGet(p, ["question", "Question"]);
+    if ($("pGuidance")) $("pGuidance").value = pGet(p, ["inspection_guidance", "Inspection Guidance", "InspectionGuidance", "guidance"]);
+    if ($("pActions")) $("pActions").value = pGet(p, ["suggested_inspector_actions", "Suggested Inspector Actions", "SuggestedInspectorActions", "actions"]);
 
     fillAttributesEditFromPayload(p);
 
-    try { $("pRaw").value = JSON.stringify(p, null, 2); }
-    catch { $("pRaw").value = ""; }
+    try { if ($("pRaw")) $("pRaw").value = JSON.stringify(p, null, 2); }
+    catch { if ($("pRaw")) $("pRaw").value = ""; }
 
     setPillsFromSelected();
     renderEeEditor();
@@ -731,7 +728,7 @@
   function refreshHeaderFromNumberInputs() {
     if (!selected) return;
     const nb = previewNumberBaseForHeader();
-    const sx = safeStr($("dbNumberSuffix").value).trim();
+    const sx = safeStr($("dbNumberSuffix")?.value).trim();
     const tmp = { ...selected, number_base: nb, number_suffix: sx, number_full: "" };
 
     setText("hdrNumber", displayNumber(tmp));
@@ -847,6 +844,7 @@
     }));
   }
 
+  // FIX: sourceType must be used to format nb (SIRE vs zzz) in pgno_code
   async function savePgnoToDb(questionId, numberBase, items, sourceType) {
     const clean = (items || [])
       .map(x => ({ text: safeStr(x.text).trim(), remarks: safeStr(x.remarks).trim() }))
@@ -857,10 +855,12 @@
 
     if (!clean.length) return;
 
+    const st = sourceType || "SIRE";
+
     const rows = clean.map((x, i) => ({
       question_id: questionId,
       seq: i + 1,
-      pgno_code: pgnoCode(numberBase, i + 1, sourceType || "SIRE"),
+      pgno_code: pgnoCode(numberBase, i + 1, st),
       pgno_text: x.text,
       remarks: x.remarks,
       created_by: me?.user?.id || null,
@@ -1251,10 +1251,9 @@
       const ok = confirm("Enter edit mode for this question?");
       if (!ok) return;
       setMode("EDIT");
-      setPillsFromSelected();
     });
 
-    onClick("btnView", () => { setMode("VIEW"); setPillsFromSelected(); });
+    onClick("btnView", () => setMode("VIEW"));
 
     onClick("btnReset", async () => {
       if (!selected) return;
