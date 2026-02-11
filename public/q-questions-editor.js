@@ -299,14 +299,51 @@
     return String(Number(m[1])).padStart(2, "0");
   }
 
+  // ===== Token helpers for facets stored as comma-separated combinations =====
+  function splitCsvTokens(v) {
+    const s = safeStr(v).trim();
+    if (!s) return [];
+    return s
+      .split(",")
+      .map(x => safeStr(x).trim())
+      .map(x => x.replace(/\s+/g, " "))
+      .filter(Boolean);
+  }
+
+  function normalizeVesselToken(t) {
+    const s = safeStr(t).trim().toLowerCase();
+    if (!s) return "";
+    if (s === "oil") return "Oil";
+    if (s === "chemical" || s === "chem") return "Chemical";
+    if (s === "lng") return "LNG";
+    if (s === "lpg") return "LPG";
+    return "";
+  }
+
+  function vesselTokensFromRow(row) {
+    const p = row?.payload || {};
+    const raw = safeStr(pGet(p, ["Vessel Type", "vessel_type", "vesselType"])).trim();
+    const toks = splitCsvTokens(raw).map(normalizeVesselToken).filter(Boolean);
+    // dedupe
+    return Array.from(new Set(toks));
+  }
+
+  function companyRankTokensFromRow(row) {
+    const p = row?.payload || {};
+    const raw = safeStr(pGet(p, ["Company Rank Allocation", "company_rank_allocation", "companyRankAllocation"])).trim();
+    const toks = splitCsvTokens(raw)
+      .map(x => x.replace(/\s+/g, " ").trim())
+      .filter(Boolean);
+    return Array.from(new Set(toks));
+  }
+
   function facetValue(row, key) {
     const p = row?.payload || {};
     if (key === "status") return safeStr(row?.status).trim();
     if (key === "source") return safeStr(row?.source_type).trim();
     if (key === "version") return safeStr(row?.version).trim();
     if (key === "questionType") return safeStr(pGet(p, ["Question Type", "question_type", "questionType"])).trim();
-    if (key === "vesselType") return safeStr(pGet(p, ["Vessel Type", "vessel_type", "vesselType"])).trim();
-    if (key === "companyRank") return safeStr(pGet(p, ["Company Rank Allocation", "company_rank_allocation", "companyRankAllocation"])).trim();
+    // vesselType & companyRank are handled as token arrays (not single combined strings)
     if (key === "chapter") return chapterKey(row);
     return "";
   }
@@ -326,6 +363,22 @@
       const rt = responseTypesArray(row);
       for (const want of sel) {
         if (rt.includes(want)) return true;
+      }
+      return false;
+    }
+
+    if (key === "vesselType") {
+      const toks = vesselTokensFromRow(row);
+      for (const want of sel) {
+        if (toks.includes(want)) return true;
+      }
+      return false;
+    }
+
+    if (key === "companyRank") {
+      const toks = companyRankTokensFromRow(row);
+      for (const want of sel) {
+        if (toks.includes(want)) return true;
       }
       return false;
     }
@@ -393,6 +446,34 @@
           continue;
         }
 
+        if (f.key === "vesselType") {
+          for (const vt of vesselTokensFromRow(r)) {
+            counts.set(vt, (counts.get(vt) || 0) + 1);
+          }
+          continue;
+        }
+
+        if (f.key === "companyRank") {
+          for (const rk of companyRankTokensFromRow(r)) {
+            counts.set(rk, (counts.get(rk) || 0) + 1);
+          }
+          continue;
+        }
+
+        if (f.key === "vesselType") {
+          for (const vt of vesselTokensFromRow(r)) {
+            counts.set(vt, (counts.get(vt) || 0) + 1);
+          }
+          continue;
+        }
+
+        if (f.key === "companyRank") {
+          for (const rk of companyRankTokensFromRow(r)) {
+            counts.set(rk, (counts.get(rk) || 0) + 1);
+          }
+          continue;
+        }
+
         const v = facetValue(r, f.key);
         if (!v) continue;
         counts.set(v, (counts.get(v) || 0) + 1);
@@ -404,6 +485,21 @@
           if (f.key === "chapter") return Number(a.v) - Number(b.v);
           return a.v.localeCompare(b.v);
         });
+
+      // Defensive fallback: for Status/Source/Version, always derive options from the currently
+      // loaded rows so the UI never appears empty.
+      if (!values.length && allRows.length && (f.key === "status" || f.key === "source" || f.key === "version")) {
+        const fallback = new Map();
+        for (const r of allRows) {
+          const v = facetValue(r, f.key);
+          if (!v) continue;
+          fallback.set(v, (fallback.get(v) || 0) + 1);
+        }
+        values.push(
+          ...Array.from(fallback.entries()).map(([v,c]) => ({ v, c }))
+            .sort((a,b)=>a.v.localeCompare(b.v))
+        );
+      }
 
       if (!values.length) {
         const div = document.createElement("div");
