@@ -378,5 +378,6 @@ a{ color:inherit; }
 .facetOptions{ display:flex; flex-direction:column; gap:6px; max-height:180px; overflow:auto; padding-right:6px; }
 .facetOpt{ display:flex; align-items:center; justify-content:space-between; gap:8px; }
 .facetOpt label{ display:flex; align-items:center; gap:8px; font-size:13px; }
+.facetOptAll{ padding:6px 0; border-bottom:1px solid #eef2f7; margin-bottom:4px; }
 .facetCount{ font-size:12px; color:#94a3b8; }
 .btn.tiny{ padding:6px 10px; font-size:12px; border-radius:10px; }

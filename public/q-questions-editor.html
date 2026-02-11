@@ -44,29 +44,31 @@
 
           <div class="hr"></div>
 
-          <label class="lbl">Status</label>
-          <select id="statusFilter" class="inp">
-            <option value="active" selected>active</option>
-            <option value="inactive">inactive</option>
-                      <option value="ALL">ALL</option>
-          </select>
-
-          <label class="lbl">Source</label>
-          <select id="sourceFilter" class="inp">
-            <option value="ALL" selected>ALL</option>
-            <option value="SIRE">SIRE</option>
-            <option value="COMPANY_CUSTOM">Company (custom)</option>
-            <option value="SPARE_X">Spare X</option>
-            <option value="SPARE_Z">Spare Z</option>
-          </select>
-
           <div class="facetWrap">
+            <details class="facet" id="facet_status">
+              <summary>Status <span class="facetSummary" id="facetSummary_status"></span></summary>
+              <div class="facetBody">
+                <div class="facetOptions" id="facetOptions_status"></div>
+              </div>
+            </details>
+
+            <details class="facet" id="facet_source">
+              <summary>Source <span class="facetSummary" id="facetSummary_source"></span></summary>
+              <div class="facetBody">
+                <div class="facetOptions" id="facetOptions_source"></div>
+              </div>
+            </details>
+
+            <details class="facet" id="facet_version">
+              <summary>Version <span class="facetSummary" id="facetSummary_version"></span></summary>
+              <div class="facetBody">
+                <div class="facetOptions" id="facetOptions_version"></div>
+              </div>
+            </details>
+
             <details class="facet" id="facet_questionType">
               <summary>Question Type <span class="facetSummary" id="facetSummary_questionType"></span></summary>
               <div class="facetBody">
-                <div class="facetActions">
-                  <button class="btn tiny" type="button" id="facetClear_questionType">Clear</button>
-                </div>
                 <div class="facetOptions" id="facetOptions_questionType"></div>
               </div>
             </details>
@@ -74,9 +76,6 @@
             <details class="facet" id="facet_vesselType">
               <summary>Vessel Type <span class="facetSummary" id="facetSummary_vesselType"></span></summary>
               <div class="facetBody">
-                <div class="facetActions">
-                  <button class="btn tiny" type="button" id="facetClear_vesselType">Clear</button>
-                </div>
                 <div class="facetOptions" id="facetOptions_vesselType"></div>
               </div>
             </details>
@@ -84,9 +83,6 @@
             <details class="facet" id="facet_responseType">
               <summary>Response Type <span class="facetSummary" id="facetSummary_responseType"></span></summary>
               <div class="facetBody">
-                <div class="facetActions">
-                  <button class="btn tiny" type="button" id="facetClear_responseType">Clear</button>
-                </div>
                 <div class="facetOptions" id="facetOptions_responseType"></div>
               </div>
             </details>
@@ -94,9 +90,6 @@
             <details class="facet" id="facet_companyRank">
               <summary>Company Rank Allocation <span class="facetSummary" id="facetSummary_companyRank"></span></summary>
               <div class="facetBody">
-                <div class="facetActions">
-                  <button class="btn tiny" type="button" id="facetClear_companyRank">Clear</button>
-                </div>
                 <div class="facetOptions" id="facetOptions_companyRank"></div>
               </div>
             </details>
@@ -104,16 +97,10 @@
             <details class="facet" id="facet_chapter">
               <summary>SIRE 2.0 Chapter <span class="facetSummary" id="facetSummary_chapter"></span></summary>
               <div class="facetBody">
-                <div class="facetActions">
-                  <button class="btn tiny" type="button" id="facetClear_chapter">Clear</button>
-                </div>
                 <div class="facetOptions" id="facetOptions_chapter"></div>
               </div>
             </details>
           </div>
-
-          <label class="lbl">Version filter (optional)</label>
-          <input id="versionFilter" class="inp" type="text" placeholder="e.g. SIRE_2_0_QL" />
 
           <label class="lbl">Search</label>
           <input id="searchInput" class="inp" type="text" placeholder="Search number / short text / question..." />

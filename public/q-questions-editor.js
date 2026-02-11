@@ -233,7 +233,12 @@
 
 
   // ===== Facet filters (client-side) =====
+  // Facet filters (all tick-boxes). Empty selection = "Select All".
+  // Status/Source/Version are also used to build the DB query (server-side filtering).
   const FACETS = [
+    { key: "status", title: "Status" },
+    { key: "source", title: "Source" },
+    { key: "version", title: "Version" },
     { key: "questionType", title: "Question Type" },
     { key: "vesselType", title: "Vessel Type" },
     { key: "responseType", title: "Response Type" },
@@ -258,12 +263,34 @@
   }
 
   const facetSelected = {
+    status: loadFacetSet("status"),
+    source: loadFacetSet("source"),
+    version: loadFacetSet("version"),
     questionType: loadFacetSet("questionType"),
     vesselType: loadFacetSet("vesselType"),
     responseType: loadFacetSet("responseType"),
     companyRank: loadFacetSet("companyRank"),
     chapter: loadFacetSet("chapter"),
   };
+
+  const SERVER_FACETS = new Set(["status", "source", "version"]);
+
+  function facetDisplay(key, value) {
+    const v = safeStr(value).trim();
+    if (!v) return "";
+    if (key === "status") return v; // active / inactive
+    if (key === "source") {
+      const map = {
+        "SIRE": "SIRE",
+        "COMPANY_CUSTOM": "Company (custom)",
+        "SPARE_X": "Spare X",
+        "SPARE_Z": "Spare Z",
+      };
+      return map[v] || v;
+    }
+    if (key === "chapter") return v; // already padded 2-digit
+    return v;
+  }
 
   function chapterKey(row) {
     const nb = normalizeNumberBaseRow(row);
@@ -274,6 +301,9 @@
 
   function facetValue(row, key) {
     const p = row?.payload || {};
+    if (key === "status") return safeStr(row?.status).trim();
+    if (key === "source") return safeStr(row?.source_type).trim();
+    if (key === "version") return safeStr(row?.version).trim();
     if (key === "questionType") return safeStr(pGet(p, ["Question Type", "question_type", "questionType"])).trim();
     if (key === "vesselType") return safeStr(pGet(p, ["Vessel Type", "vessel_type", "vesselType"])).trim();
     if (key === "companyRank") return safeStr(pGet(p, ["Company Rank Allocation", "company_rank_allocation", "companyRankAllocation"])).trim();
@@ -306,6 +336,9 @@
 
   function rowMatchesAllFacets(row, excludeKey = "") {
     return (
+      rowMatchesFacet(row, "status", excludeKey) &&
+      rowMatchesFacet(row, "source", excludeKey) &&
+      rowMatchesFacet(row, "version", excludeKey) &&
       rowMatchesFacet(row, "questionType", excludeKey) &&
       rowMatchesFacet(row, "vesselType", excludeKey) &&
       rowMatchesFacet(row, "responseType", excludeKey) &&
@@ -341,11 +374,6 @@
     for (const f of FACETS) {
       const sumEl = $("facetSummary_" + f.key);
       if (sumEl) sumEl.textContent = summarizeSelected(f.key);
-
-      const clearBtn = $("facetClear_" + f.key);
-      if (clearBtn) {
-        clearBtn.style.display = (facetSelected[f.key]?.size ? "inline-flex" : "none");
-      }
 
       const host = $("facetOptions_" + f.key);
       if (!host) continue;
@@ -385,6 +413,33 @@
         continue;
       }
 
+      // ---- Select All (empty selection = all) ----
+      const allRow = document.createElement("div");
+      allRow.className = "facetOpt facetOptAll";
+      const allChecked = !(facetSelected[f.key] && facetSelected[f.key].size);
+      const allCount = values.reduce((s, it) => s + (it.c || 0), 0);
+      const allId = `facet_${f.key}__ALL`;
+
+      allRow.innerHTML = `
+        <label>
+          <input type="checkbox" id="${allId}" ${allChecked ? "checked" : ""} />
+          <span><b>Select All</b></span>
+        </label>
+        <span class="facetCount">${allCount}</span>
+      `;
+
+      const allCb = allRow.querySelector("input");
+      if (allCb) {
+        allCb.addEventListener("change", async () => {
+          // Any click on "Select All" means: clear selections (ALL)
+          facetSelected[f.key].clear();
+          saveFacetSet(f.key, facetSelected[f.key]);
+          if (SERVER_FACETS.has(f.key)) await loadQuestions();
+          else renderList();
+        });
+      }
+      host.appendChild(allRow);
+
       for (const it of values) {
         const row = document.createElement("div");
         row.className = "facetOpt";
@@ -395,31 +450,25 @@
         row.innerHTML = `
           <label>
             <input type="checkbox" id="${id}" ${checked ? "checked" : ""} />
-            <span>${escapeHtml(it.v)}</span>
+            <span>${escapeHtml(facetDisplay(f.key, it.v))}</span>
           </label>
           <span class="facetCount">${it.c}</span>
         `;
 
         const cb = row.querySelector("input");
         if (cb) {
-          cb.addEventListener("change", () => {
+          cb.addEventListener("change", async () => {
             if (cb.checked) facetSelected[f.key].add(it.v);
             else facetSelected[f.key].delete(it.v);
             saveFacetSet(f.key, facetSelected[f.key]);
-            renderList();
+            if (SERVER_FACETS.has(f.key)) await loadQuestions();
+            else renderList();
           });
         }
 
         host.appendChild(row);
       }
     }
-  }
-
-  function clearFacet(key) {
-    if (!facetSelected[key]) return;
-    facetSelected[key].clear();
-    saveFacetSet(key, facetSelected[key]);
-    renderList();
   }
 
   function setMode(newMode) {
@@ -1023,18 +1072,18 @@
     setText("loadHint", "Loading…");
 
     try {
-      const status = safeStr($("statusFilter")?.value || "");
-      const version = safeStr($("versionFilter")?.value).trim();
-      const src = safeStr($("sourceFilter")?.value || "");
+      const statusSel = facetSelected.status;
+      const sourceSel = facetSelected.source;
+      const versionSel = facetSelected.version;
 
       let q = sb
         .from("questions_master")
         .select("id, number_base, number_suffix, number_full, source_type, is_custom, status, version, tags, payload, change_reason, updated_at, created_at")
         .order("created_at", { ascending: true });
 
-      if (status && status !== "ALL") q = q.eq("status", status);
-      if (version) q = q.eq("version", version);
-      if (src && src !== "ALL") q = q.eq("source_type", src);
+      if (statusSel && statusSel.size) q = q.in("status", Array.from(statusSel));
+      if (sourceSel && sourceSel.size) q = q.in("source_type", Array.from(sourceSel));
+      if (versionSel && versionSel.size) q = q.in("version", Array.from(versionSel));
 
       const { data, error } = await q;
       if (error) throw error;
@@ -1191,7 +1240,9 @@
     showOk("");
     setText("saveStatus", "");
 
-    const versionFromFilter = safeStr($("versionFilter")?.value).trim();
+    const versionFromFilter = (facetSelected.version && facetSelected.version.size === 1)
+      ? Array.from(facetSelected.version)[0]
+      : "";
 
     selected = {
       __isNew: true,
@@ -1261,12 +1312,9 @@
 
       if (error) throw error;
 
-      // Auto-switch filter so the user can immediately see the question after toggle
-      const sf = $("statusFilter");
-      if (sf) {
-        if (next === "inactive") sf.value = "inactive";
-        if (next === "active") sf.value = "active";
-      }
+      // Auto-switch Status facet so you immediately see the question after toggle
+      facetSelected.status = new Set([next]);
+      saveFacetSet("status", facetSelected.status);
 
       selected.status = next;
       setPillsFromSelected();
@@ -1494,14 +1542,6 @@ async function deleteSelected() {
 
   function wireUI() {
     onClick("reloadBtn", () => loadQuestions());
-    onChange("statusFilter", () => loadQuestions());
-    onChange("sourceFilter", () => loadQuestions());
-
-    let vTimer = null;
-    onInput("versionFilter", () => {
-      if (vTimer) clearTimeout(vTimer);
-      vTimer = setTimeout(() => loadQuestions(), 450);
-    });
 
     onInput("searchInput", () => renderList());
     onClick("newQuestionBtn", () => newQuestion());
@@ -1521,7 +1561,6 @@ async function deleteSelected() {
       const ok = confirm("Enter edit mode for this question?");
       if (!ok) return;
       setMode("EDIT");
-    syncDeactivateButtonUI();
     });
 
     onClick("btnView", () => setMode("VIEW"));
