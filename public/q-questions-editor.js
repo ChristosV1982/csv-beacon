@@ -5,14 +5,18 @@
   function $(id) { return document.getElementById(id); }
   function safeStr(v) { return v === null || v === undefined ? "" : String(v); }
 
-  // Null-safe event binder
+  // Null-safe event binder (robust: uses addEventListener so handlers cannot be overwritten)
   function onClick(id, fn) {
     const el = $(id);
     if (!el) {
       console.warn(`[q-questions-editor] Missing element #${id} (HTML out of sync).`);
       return false;
     }
-    el.onclick = fn;
+    el.addEventListener("click", (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      fn(ev);
+    });
     return true;
   }
   function onChange(id, fn) {
@@ -21,7 +25,7 @@
       console.warn(`[q-questions-editor] Missing element #${id} (HTML out of sync).`);
       return false;
     }
-    el.onchange = fn;
+    el.addEventListener("change", fn);
     return true;
   }
   function onInput(id, fn) {
@@ -30,7 +34,7 @@
       console.warn(`[q-questions-editor] Missing element #${id} (HTML out of sync).`);
       return false;
     }
-    el.oninput = fn;
+    el.addEventListener("input", fn);
     return true;
   }
 
@@ -1092,7 +1096,7 @@
         setMode("VIEW");
       }
     } catch (e) {
-      showWarn(`${next === "inactive" ? "Deactivate" : "Activate"} failed:\n\n` + (e?.message || String(e)));
+      showWarn(`${next === "inactive" ? "Deactivate" : "Activate"} failed:\n\n" + (e?.message || String(e)));
     }
   }
 
