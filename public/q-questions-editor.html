@@ -30,57 +30,71 @@
     <div id="warnBox" class="msg warn" style="display:none;"></div>
     <div id="okBox" class="msg ok" style="display:none;"></div>
 
-    <!-- Main layout -->
-    <div class="layout">
-      <!-- TOP: horizontal filters -->
-      <div class="filterbar" id="filterbar">
-        <div class="filterbar-left">
-          <details class="facet facetTop" id="facet_status">
-            <summary>Status <span class="facetSummary" id="facetSummary_status"></span></summary>
-            <div class="facetBody"><div class="facetOptions" id="facetOptions_status"></div></div>
-          </details>
+    
+    <!-- Filters ribbon -->
+    <div class="filterRibbon" id="filterRibbon">
+      <div class="facetWrap facetWrapRibbon">
+            <details class="facet" id="facet_status">
+              <summary>Status <span class="facetSummary" id="facetSummary_status"></span></summary>
+              <div class="facetBody">
+                <div class="facetOptions" id="facetOptions_status"></div>
+              </div>
+            </details>
 
-          <details class="facet facetTop" id="facet_source">
-            <summary>Source <span class="facetSummary" id="facetSummary_source"></span></summary>
-            <div class="facetBody"><div class="facetOptions" id="facetOptions_source"></div></div>
-          </details>
+            <details class="facet" id="facet_source">
+              <summary>Source <span class="facetSummary" id="facetSummary_source"></span></summary>
+              <div class="facetBody">
+                <div class="facetOptions" id="facetOptions_source"></div>
+              </div>
+            </details>
 
-          <details class="facet facetTop" id="facet_version">
-            <summary>Version <span class="facetSummary" id="facetSummary_version"></span></summary>
-            <div class="facetBody"><div class="facetOptions" id="facetOptions_version"></div></div>
-          </details>
+            <details class="facet" id="facet_version">
+              <summary>Version <span class="facetSummary" id="facetSummary_version"></span></summary>
+              <div class="facetBody">
+                <div class="facetOptions" id="facetOptions_version"></div>
+              </div>
+            </details>
 
-          <details class="facet facetTop" id="facet_questionType">
-            <summary>Question Type <span class="facetSummary" id="facetSummary_questionType"></span></summary>
-            <div class="facetBody"><div class="facetOptions" id="facetOptions_questionType"></div></div>
-          </details>
+            <details class="facet" id="facet_questionType">
+              <summary>Question Type <span class="facetSummary" id="facetSummary_questionType"></span></summary>
+              <div class="facetBody">
+                <div class="facetOptions" id="facetOptions_questionType"></div>
+              </div>
+            </details>
 
-          <details class="facet facetTop" id="facet_vesselType">
-            <summary>Vessel Type <span class="facetSummary" id="facetSummary_vesselType"></span></summary>
-            <div class="facetBody"><div class="facetOptions" id="facetOptions_vesselType"></div></div>
-          </details>
+            <details class="facet" id="facet_vesselType">
+              <summary>Vessel Type <span class="facetSummary" id="facetSummary_vesselType"></span></summary>
+              <div class="facetBody">
+                <div class="facetOptions" id="facetOptions_vesselType"></div>
+              </div>
+            </details>
 
-          <details class="facet facetTop" id="facet_responseType">
-            <summary>Response Type <span class="facetSummary" id="facetSummary_responseType"></span></summary>
-            <div class="facetBody"><div class="facetOptions" id="facetOptions_responseType"></div></div>
-          </details>
+            <details class="facet" id="facet_responseType">
+              <summary>Response Type <span class="facetSummary" id="facetSummary_responseType"></span></summary>
+              <div class="facetBody">
+                <div class="facetOptions" id="facetOptions_responseType"></div>
+              </div>
+            </details>
 
-          <details class="facet facetTop" id="facet_companyRank">
-            <summary>Rank Allocation <span class="facetSummary" id="facetSummary_companyRank"></span></summary>
-            <div class="facetBody"><div class="facetOptions" id="facetOptions_companyRank"></div></div>
-          </details>
+            <details class="facet" id="facet_companyRank">
+              <summary>Company Rank Allocation <span class="facetSummary" id="facetSummary_companyRank"></span></summary>
+              <div class="facetBody">
+                <div class="facetOptions" id="facetOptions_companyRank"></div>
+              </div>
+            </details>
 
-          <details class="facet facetTop" id="facet_chapter">
-            <summary>Chapters <span class="facetSummary" id="facetSummary_chapter"></span></summary>
-            <div class="facetBody"><div class="facetOptions" id="facetOptions_chapter"></div></div>
-          </details>
-        </div>
-
-        <div class="filterbar-right">
-          <div class="filterbarCount" id="countTopLine">—</div>
-        </div>
+            <details class="facet" id="facet_chapter">
+              <summary>SIRE 2.0 Chapter <span class="facetSummary" id="facetSummary_chapter"></span></summary>
+              <div class="facetBody">
+                <div class="facetOptions" id="facetOptions_chapter"></div>
+              </div>
+            </details>
+          
       </div>
+    </div>
 
+<!-- Main layout -->
+    <div class="layout">
       <!-- LEFT: list/filter -->
       <aside class="sidebar">
         <div class="card">
@@ -92,6 +106,8 @@
           </div>
 
           <div class="hr"></div>
+
+          
 
           <label class="lbl">Search</label>
           <input id="searchInput" class="inp" type="text" placeholder="Search number / short text / question..." />
@@ -176,9 +192,8 @@
             </div>
           </div>
 
-          <details class="coll open" id="collAttrs">
-            <summary><span class="collTitle">Question Attributes</span></summary>
-            <div class="collBody">
+          <div class="section">
+            <div class="section-title">Question Attributes</div>
             <div class="grid2 attrGrid">
               <div><div class="lbl">Question Type</div><div class="box" id="vAttrQuestionType"></div></div>
               <div><div class="lbl">Vessel Type</div><div class="box" id="vAttrVesselType"></div></div>
@@ -190,22 +205,23 @@
               <div><div class="lbl">Tags</div><div class="box" id="vTags"></div></div>
               <div><div class="lbl">Version</div><div class="box" id="vVersion"></div></div>
             </div>
-          </details>
           </div>
 
-          <details class="coll" id="collEe">
-            <summary><span class="collTitle">Expected Evidence</span> <span class="muted small" id="vEeCount">—</span></summary>
-            <div class="collBody">
-              <div id="vEeList"></div>
+          <div class="section">
+            <div class="row" style="justify-content:space-between; align-items:center;">
+              <div class="section-title">Expected Evidence</div>
+              <div class="muted small" id="vEeCount">—</div>
             </div>
-          </details>
+            <div id="vEeList"></div>
+          </div>
 
-          <details class="coll" id="collPgno">
-            <summary><span class="collTitle">PGNOs</span> <span class="muted small" id="vPgnoCount">—</span></summary>
-            <div class="collBody">
-              <div id="vPgnoList"></div>
+          <div class="section">
+            <div class="row" style="justify-content:space-between; align-items:center;">
+              <div class="section-title">PGNOs</div>
+              <div class="muted small" id="vPgnoCount">—</div>
             </div>
-          </details>
+            <div id="vPgnoList"></div>
+          </div>
 
           <div class="section">
             <button id="btnToggleAdvancedView" class="btn" type="button">Advanced (Raw JSON)</button>
@@ -236,15 +252,6 @@
             <div class="qe-pill" id="pillStatus">status: —</div>
             <div class="qe-pill" id="pillSuffix">suffix: —</div>
           </div>
-          <details class="coll open" id="collAttrsEdit">
-            <summary><span class="collTitle">Question Attributes (editable)</span></summary>
-            <div class="collBody">
-          <details class="coll" id="collEeEdit">
-            <summary><span class="collTitle">Expected Evidence (stored as DB rows)</span></summary>
-            <div class="collBody">
-          <details class="coll" id="collPgnoEdit">
-            <summary><span class="collTitle">PGNOs (stored as DB rows)</span></summary>
-            <div class="collBody">
 
           <div class="masterBox">
             <div class="masterTitle">DB Fields</div>
@@ -335,9 +342,7 @@
                 </select>
               </div>
 
-              
-            </div>
-          </details><div>
+              <div>
                 <label class="lbl">Vessel Type</label>
                 <input id="eVesselType" class="inp" type="text" placeholder="e.g. Chemical, LNG, LPG, Oil" />
               </div>
@@ -407,9 +412,7 @@
               <div class="masterTitle" style="margin:0;">Expected Evidence (stored as DB rows)</div>
               <div class="row gap">
                 <div class="muted small" id="eeCountLine">—</div>
-                
-            </div>
-          </details><button id="btnAddEe" class="btn" type="button">+ Add Expected Evidence</button>
+                <button id="btnAddEe" class="btn" type="button">+ Add Expected Evidence</button>
               </div>
             </div>
             <div style="height:10px;"></div>
@@ -422,9 +425,7 @@
               <div class="masterTitle" style="margin:0;">PGNOs (stored as DB rows)</div>
               <div class="row gap">
                 <div class="muted small" id="pgnoCountLine">—</div>
-                
-            </div>
-          </details><button id="btnAddPgno" class="btn" type="button">+ Add PGNO</button>
+                <button id="btnAddPgno" class="btn" type="button">+ Add PGNO</button>
               </div>
             </div>
             <div style="height:10px;"></div>

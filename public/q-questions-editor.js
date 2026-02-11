@@ -1155,7 +1155,6 @@
       return ka[3].localeCompare(kb[3]);
     });
 
-    setText("countTopLine", `No of selected Questions: ${filtered.length}`);
     setText("countLine", `${filtered.length} questions`);
     setText("loadedLine", `Loaded ${allRows.length}`);
 

@@ -367,28 +367,88 @@ a{ color:inherit; }
 }
 
 
-/* ===== Top horizontal filter bar ===== */
-.layout{ display:grid; grid-template-columns: 360px 1fr; grid-template-rows: auto 1fr; gap:18px; align-items:start; }
-.sidebar{ grid-column:1; grid-row:2; }
-.main{ grid-column:2; grid-row:2; }
-.filterbar{ grid-column:1 / -1; grid-row:1; background: var(--nav); color:#fff; border-radius: 12px; padding:10px 12px; display:flex; align-items:center; justify-content:space-between; gap:14px; }
-.filterbar-left{ display:flex; align-items:center; gap:18px; flex-wrap:wrap; }
-.filterbarCount{ font-weight:700; }
-
-.facetTop{ position:relative; }
-.facetTop > summary{ list-style:none; cursor:pointer; font-weight:700; color:#fff; padding:6px 6px; border-radius:8px; user-select:none; }
-.facetTop > summary::-webkit-details-marker{ display:none; }
-.facetTop > summary::after{ content:" ▼"; font-weight:700; opacity:.85; }
-.facetTop[open] > summary{ background: rgba(255,255,255,.12); }
-.facetTop .facetBody{ position:absolute; top: calc(100% + 8px); left:0; width: 320px; max-height: 320px; overflow:auto; background:#fff; color:#0f172a; border:1px solid #e5e7eb; border-radius:12px; box-shadow:0 12px 30px rgba(0,0,0,.18); padding:10px; z-index:50; }
-
-/* ===== Generic collapsible blocks ===== */
-details.coll{ background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:0; margin: 12px 0; }
-details.coll > summary{ list-style:none; cursor:pointer; padding:10px 12px; font-weight:800; display:flex; align-items:center; justify-content:space-between; }
-details.coll > summary::-webkit-details-marker{ display:none; }
-details.coll > summary::after{ content:"▾"; opacity:.7; }
-details.coll[open] > summary::after{ content:"▴"; }
-details.coll .collBody{ padding:12px; border-top:1px solid #eef2f7; }
-
-/* ensure section-title inside details doesn't look duplicated */
-.collBody .section-title{ margin-top:0; }
+/* === Filters ribbon layout (horizontal, collapsible) === */
+.filterRibbon{
+  margin: 10px 0 14px;
+  padding: 10px 10px;
+  background: #f6f9ff;
+  border: 1px solid #d9e4ff;
+  border-radius: 14px;
+}
+.facetWrapRibbon{
+  display:flex;
+  flex-wrap:wrap;
+  gap:10px;
+  align-items:flex-start;
+}
+details.facet{
+  position: relative;
+  display: inline-block;
+}
+details.facet > summary{
+  list-style:none;
+  cursor:pointer;
+  padding: 8px 12px;
+  border: 1px solid #d0d7e2;
+  border-radius: 999px;
+  background: #ffffff;
+  font-weight: 700;
+  user-select:none;
+  white-space: nowrap;
+}
+details.facet > summary::-webkit-details-marker{ display:none; }
+details.facet[open] > summary{
+  background: #e9f0ff;
+  border-color: #b8c7e6;
+}
+.facetSummary{
+  margin-left: 6px;
+  font-weight: 700;
+  color: #53657e;
+}
+.facetBody{
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  min-width: 280px;
+  max-width: 420px;
+  background: #ffffff;
+  border: 1px solid #d0d7e2;
+  border-radius: 14px;
+  box-shadow: 0 14px 40px rgba(0,0,0,.12);
+  padding: 10px;
+  z-index: 80;
+}
+.facetOptions{
+  max-height: 280px;
+  overflow: auto;
+  padding-right: 6px;
+}
+.facetOpt{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap: 10px;
+  padding: 6px 4px;
+}
+.facetOpt label{
+  display:flex;
+  align-items:center;
+  gap: 10px;
+  line-height: 1.2;
+}
+.facetOpt input[type="checkbox"]{
+  width: 16px;
+  height: 16px;
+}
+.facetOptAll{
+  border-bottom: 1px solid #eef2f7;
+  margin-bottom: 6px;
+  padding-bottom: 8px;
+}
+.facetCount{
+  color: #64748b;
+  font-size: 12px;
+  min-width: 26px;
+  text-align: right;
+}
