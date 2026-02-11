@@ -1155,6 +1155,7 @@
       return ka[3].localeCompare(kb[3]);
     });
 
+    setText("countTopLine", `No of selected Questions: ${filtered.length}`);
     setText("countLine", `${filtered.length} questions`);
     setText("loadedLine", `Loaded ${allRows.length}`);
 
@@ -1728,8 +1729,8 @@ async function deleteSelected() {
     onClick("btnToggleAdvancedView", () => toggleAdvanced("viewAdvanced"));
     onClick("btnToggleAdvancedEdit", () => toggleAdvanced("editAdvanced"));
 
-    onClick("btnAddPgno", (e) => { if (e) e.stopPropagation(); addPgnoRow(); });
-    onClick("btnAddEe", (e) => { if (e) e.stopPropagation(); addEeRow(); });
+    onClick("btnAddPgno", () => addPgnoRow());
+    onClick("btnAddEe", () => addEeRow());
 
     ["rtHuman","rtHardware","rtProcess","rtPhoto"].forEach(id => {
       const el = $(id);
