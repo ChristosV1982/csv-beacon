@@ -255,6 +255,8 @@
       if (bDel) bDel.disabled = dis;
       if (bDea) bDea.disabled = dis;
     }
+
+    syncDeactivateButtonUI();
   }
 
   function setPillsFromSelected() {
@@ -269,6 +271,35 @@
     setText("pillSource", `source: ${st}`);
     setText("pillStatus", `status: ${status}`);
     setText("pillSuffix", `suffix: ${sx || "(blank)"}`);
+  }
+
+  // ===== Deactivate button toggle UI =====
+  function syncDeactivateButtonUI() {
+    const btn = $("btnDeactivateQuestion");
+    if (!btn) return;
+
+    // default presentation
+    btn.classList.add("warn");
+    btn.classList.remove("primary");
+    btn.title = "Toggle active/inactive";
+
+    if (!selected || selected.__isNew || !selected.id) {
+      btn.textContent = "Deactivate";
+      return;
+    }
+
+    const st = safeStr(selected.status).trim().toLowerCase() || "active";
+    if (st === "inactive") {
+      btn.textContent = "Activate";
+      btn.classList.remove("warn");
+      btn.classList.add("primary");
+      btn.title = "Set status to active";
+    } else {
+      btn.textContent = "Deactivate";
+      btn.classList.add("warn");
+      btn.classList.remove("primary");
+      btn.title = "Set status to inactive";
+    }
   }
 
   // ===== fallback builders from payload =====
@@ -679,6 +710,8 @@
     setPillsFromSelected();
     renderEeView();
     renderPgnoView();
+
+    syncDeactivateButtonUI();
   }
 
   function fillEditPanel(r) {
@@ -713,6 +746,8 @@
     setPillsFromSelected();
     renderEeEditor();
     renderPgnoEditor();
+
+    syncDeactivateButtonUI();
   }
 
   function previewNumberBaseForHeader() {
@@ -805,7 +840,9 @@
         .select("id, number_base, number_suffix, number_full, source_type, is_custom, status, version, tags, payload, change_reason, updated_at, created_at")
         .order("created_at", { ascending: true });
 
-      if (status) q = q.eq("status", status);
+      // IMPORTANT: allow ALL
+      if (status && status !== "ALL") q = q.eq("status", status);
+
       if (version) q = q.eq("version", version);
       if (src && src !== "ALL") q = q.eq("source_type", src);
 
@@ -955,6 +992,7 @@
     fillEditPanel(selected);
     setMode("VIEW");
     renderList();
+    syncDeactivateButtonUI();
   }
 
   // ===== new question =====
@@ -1004,29 +1042,47 @@
     setMode("EDIT");
     setPillsFromSelected();
     refreshHeaderFromNumberInputs();
+    syncDeactivateButtonUI();
   }
 
-  // ===== deactivate / delete =====
-  async function deactivateSelected() {
+  // ===== deactivate (TOGGLE) =====
+  async function toggleActiveSelected() {
     if (!selected || selected.__isNew || !selected.id) return;
 
     showWarn("");
     showOk("");
     setText("saveStatus", "");
 
+    const current = safeStr(selected.status).trim().toLowerCase() || "active";
+    const next = (current === "inactive") ? "active" : "inactive";
+
     const qno = displayNumber(selected);
-    const ok = confirm(`Deactivate question ${qno}?\n\nThis will set status = inactive.`);
+    const ok = confirm(
+      `${next === "inactive" ? "Deactivate" : "Activate"} question ${qno}?\n\n` +
+      `This will set status = ${next}.`
+    );
     if (!ok) return;
 
     try {
       const { error } = await sb
         .from("questions_master")
-        .update({ status: "inactive", updated_by: me?.user?.id || null })
+        .update({ status: next, updated_by: me?.user?.id || null })
         .eq("id", selected.id);
 
       if (error) throw error;
 
-      showOk(`Deactivated ${qno}. If Status filter = "active", it may disappear from the list.`);
+      // Auto-switch filter so the user can immediately see the question after toggle
+      const sf = $("statusFilter");
+      if (sf) {
+        if (next === "inactive") sf.value = "inactive";
+        if (next === "active") sf.value = "active";
+      }
+
+      selected.status = next;
+      setPillsFromSelected();
+      syncDeactivateButtonUI();
+
+      showOk(`${next === "inactive" ? "Deactivated" : "Activated"} ${qno}.`);
       await loadQuestions();
 
       const still = allRows.find(r => r.id === selected.id);
@@ -1036,10 +1092,11 @@
         setMode("VIEW");
       }
     } catch (e) {
-      showWarn("Deactivate failed:\n\n" + (e?.message || String(e)));
+      showWarn(`${next === "inactive" ? "Deactivate" : "Activate"} failed:\n\n` + (e?.message || String(e)));
     }
   }
 
+  // ===== delete =====
   async function deleteSelected() {
     if (!selected || selected.__isNew || !selected.id) return;
 
@@ -1073,7 +1130,26 @@
       await loadQuestions();
       setMode("VIEW");
     } catch (e) {
-      showWarn("Delete failed:\n\n" + (e?.message || String(e)));
+      // Make the failure reason obvious (RLS is the common cause)
+      const msg = (e?.message || String(e));
+      const low = msg.toLowerCase();
+
+      let extra = "";
+      if (
+        low.includes("row-level security") ||
+        low.includes("rls") ||
+        low.includes("permission denied") ||
+        low.includes("not allowed")
+      ) {
+        extra =
+          "\n\nDELETE is being blocked by Supabase RLS/policies.\n" +
+          "To make DELETE actually work, you must add DELETE policies for:\n" +
+          "- questions_master\n" +
+          "- pgno_master\n" +
+          "- expected_evidence_master";
+      }
+
+      showWarn("Delete failed:\n\n" + msg + extra);
     }
   }
 
@@ -1267,7 +1343,7 @@
     onClick("btnSave", () => saveSelected());
 
     // Deactivate / Delete (edit mode only)
-    onClick("btnDeactivateQuestion", () => deactivateSelected());
+    onClick("btnDeactivateQuestion", () => toggleActiveSelected());
     onClick("btnDeleteQuestion", () => deleteSelected());
 
     onChange("dbSourceType", () => {
@@ -1275,6 +1351,13 @@
       if (st === "SIRE") $("dbNumberSuffix").value = "";
       if (st !== "SIRE" && !safeStr($("dbNumberSuffix")?.value).trim()) $("dbNumberSuffix").value = "C";
       refreshHeaderFromNumberInputs();
+    });
+
+    onChange("dbStatus", () => {
+      // This dropdown is saved with Save button, but we keep UI consistent
+      // with the real DB status shown on the toggle button.
+      // (Do not change selected.status here.)
+      syncDeactivateButtonUI();
     });
 
     onInput("dbNumberSuffix", () => refreshHeaderFromNumberInputs());
