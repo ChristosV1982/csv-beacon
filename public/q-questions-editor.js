@@ -222,13 +222,6 @@
   let selected = null; // cloned copy
   let mode = "VIEW";   // VIEW | EDIT
 
-  // Prevent double-actions (the main cause of your "null id" crash)
-  const OP_LOCK = {
-    deleting: false,
-    toggling: false,
-    saving: false,
-  };
-
   // list preference: short vs full question
   const LS_SHOW_FULL = "qe_show_full_question_in_list";
   function getShowFullInList() {
@@ -263,6 +256,7 @@
       if (bDea) bDea.disabled = dis;
     }
 
+    // keep Deactivate button label in sync
     syncDeactivateButtonUI();
   }
 
@@ -278,24 +272,25 @@
     setText("pillSource", `source: ${st}`);
     setText("pillStatus", `status: ${status}`);
     setText("pillSuffix", `suffix: ${sx || "(blank)"}`);
-
-    syncDeactivateButtonUI();
   }
+
 
   // ===== Deactivate button toggle UI =====
   function syncDeactivateButtonUI() {
     const btn = $("btnDeactivateQuestion");
     if (!btn) return;
 
-    // default presentation
+    // disabled if new/unsaved
+    const dis = !selected || !!selected.__isNew || !selected.id;
+    btn.disabled = dis;
+
+    // default appearance = Deactivate
     btn.classList.add("warn");
     btn.classList.remove("primary");
-    btn.title = "Toggle active/inactive";
+    btn.title = "Set status to inactive";
+    btn.textContent = "Deactivate";
 
-    if (!selected || selected.__isNew || !selected.id) {
-      btn.textContent = "Deactivate";
-      return;
-    }
+    if (dis) return;
 
     const st = safeStr(selected.status).trim().toLowerCase() || "active";
     if (st === "inactive") {
@@ -303,11 +298,6 @@
       btn.classList.remove("warn");
       btn.classList.add("primary");
       btn.title = "Set status to active";
-    } else {
-      btn.textContent = "Deactivate";
-      btn.classList.add("warn");
-      btn.classList.remove("primary");
-      btn.title = "Set status to inactive";
     }
   }
 
@@ -845,7 +835,7 @@
         .select("id, number_base, number_suffix, number_full, source_type, is_custom, status, version, tags, payload, change_reason, updated_at, created_at")
         .order("created_at", { ascending: true });
 
-      if (status && status !== "ALL") q = q.eq("status", status);
+      if (status) q = q.eq("status", status);
       if (version) q = q.eq("version", version);
       if (src && src !== "ALL") q = q.eq("source_type", src);
 
@@ -1043,49 +1033,49 @@
     fillViewPanel(selected);
     fillEditPanel(selected);
     setMode("EDIT");
-    syncDeactivateButtonUI();
     setPillsFromSelected();
     refreshHeaderFromNumberInputs();
+    syncDeactivateButtonUI();
   }
 
   // ===== deactivate / delete =====
+
+  // ===== deactivate (TOGGLE) =====
   async function toggleActiveSelected() {
     if (!selected || selected.__isNew || !selected.id) return;
-    if (OP_LOCK.toggling) return;
-    OP_LOCK.toggling = true;
+
+    showWarn("");
+    showOk("");
+    setText("saveStatus", "");
+
+    const id = selected.id; // snapshot
+    const qno = displayNumber(selected);
+    const current = safeStr(selected.status).trim().toLowerCase() || "active";
+    const next = (current === "inactive") ? "active" : "inactive";
+
+    const ok = confirm(
+      `${next === "inactive" ? "Deactivate" : "Activate"} question ${qno}?
+
+` +
+      `This will set status = ${next}.`
+    );
+    if (!ok) return;
 
     try {
-      showWarn("");
-      showOk("");
-      setText("saveStatus", "");
-
-      const current = safeStr(selected.status).trim().toLowerCase() || "active";
-      const next = (current === "inactive") ? "active" : "inactive";
-
-      const qno = displayNumber(selected);
-      const ok = confirm(
-        `${next === "inactive" ? "Deactivate" : "Activate"} question ${qno}?\n\n` +
-        `This will set status = ${next}.`
-      );
-      if (!ok) return;
-
-      const selectedId = selected.id;
-
       const { error } = await sb
         .from("questions_master")
         .update({ status: next, updated_by: me?.user?.id || null })
-        .eq("id", selectedId);
+        .eq("id", id);
 
       if (error) throw error;
 
-      // Auto-switch filter so the user can immediately see the question after toggle
+      // Auto-switch filter so you can immediately SEE the question after the toggle
       const sf = $("statusFilter");
-      if (sf) {
-        if (next === "inactive") sf.value = "inactive";
-        if (next === "active") sf.value = "active";
-      }
+      if (sf) sf.value = (next === "inactive") ? "inactive" : "active";
 
-      selected.status = next;
+      // update local selected copy
+      if (selected && selected.id === id) selected.status = next;
+
       setPillsFromSelected();
       syncDeactivateButtonUI();
 
@@ -1093,84 +1083,91 @@
 
       await loadQuestions();
 
-      // Re-select the same row if it still exists in the filtered list
-      const still = allRows.find(r => r.id === selectedId);
+      const still = allRows.find(r => r.id === id);
       if (still) await selectRow(still);
       else {
         selected = null;
         setMode("VIEW");
       }
     } catch (e) {
-      showWarn(`${"Toggle"} failed:\n\n` + (e?.message || String(e)));
-    } finally {
-      OP_LOCK.toggling = false;
+      showWarn(`${next === "inactive" ? "Deactivate" : "Activate"} failed:
+
+` + (e?.message || String(e)));
     }
   }
 
+  // ===== delete =====
   async function deleteSelected() {
     if (!selected || selected.__isNew || !selected.id) return;
-    if (OP_LOCK.deleting) return;
-    OP_LOCK.deleting = true;
+
+    showWarn("");
+    showOk("");
+    setText("saveStatus", "");
+
+    const id = selected.id; // snapshot
+    const qno = displayNumber(selected);
+
+    const ok = confirm(
+      `DELETE question ${qno}?
+
+` +
+      `This will permanently delete:
+` +
+      `- questions_master
+` +
+      `- pgno_master (children)
+` +
+      `- expected_evidence_master (children)
+
+` +
+      `This cannot be undone.`
+    );
+    if (!ok) return;
 
     try {
-      showWarn("");
-      showOk("");
-      setText("saveStatus", "");
-
-      const qno = displayNumber(selected);
-      const selectedId = selected.id;
-
-      const ok = confirm(
-        `DELETE question ${qno}?\n\n` +
-        `This will permanently delete:\n` +
-        `- questions_master\n` +
-        `- pgno_master (children)\n` +
-        `- expected_evidence_master (children)\n\n` +
-        `This cannot be undone.`
-      );
-      if (!ok) return;
-
-      // Children can be 0 rows; we don't treat that as an error.
-      const { error: e1 } = await sb.from("pgno_master").delete().eq("question_id", selectedId);
+      // child deletes: 0 rows is OK (question may have none)
+      const { error: e1 } = await sb.from("pgno_master").delete().eq("question_id", id).select("id");
       if (e1) throw e1;
 
-      const { error: e2 } = await sb.from("expected_evidence_master").delete().eq("question_id", selectedId);
+      const { error: e2 } = await sb.from("expected_evidence_master").delete().eq("question_id", id).select("id");
       if (e2) throw e2;
 
-      // IMPORTANT:
-      // With Supabase RLS, a DELETE that is blocked often returns *no error* but deletes 0 rows.
-      // So we request the deleted row back and verify we actually deleted something.
-      const { data: delRows, error: e3 } = await sb
-        .from("questions_master")
-        .delete()
-        .eq("id", selectedId)
-        .select("id");
+      // parent delete: MUST delete 1 row
+      const { data: delRows, error: e3 } = await sb.from("questions_master").delete().eq("id", id).select("id");
       if (e3) throw e3;
 
-      const deletedCount = Array.isArray(delRows) ? delRows.length : 0;
-      if (deletedCount === 0) {
+      if (!delRows || delRows.length === 0) {
         showWarn(
-          "Delete did not remove any row. This is almost always caused by Supabase RLS policies blocking DELETE.\n\n" +
-          "You can still SELECT the question, but the database refuses to DELETE it.\n\n" +
-          "Fix: add DELETE policies for these tables:\n" +
-          "- questions_master\n" +
-          "- pgno_master\n" +
+          "Delete did not remove any row. This is almost always caused by Supabase RLS policies blocking DELETE.
+
+" +
+          "You can still SELECT the question, but the database refuses to DELETE it.
+
+" +
+          "Fix: add DELETE policies for these tables:
+" +
+          "- questions_master
+" +
+          "- pgno_master
+" +
           "- expected_evidence_master"
         );
-        setText("saveStatus", "");
         return;
       }
 
       showOk(`Deleted ${qno}.`);
+
+      // clear selection safely
       selected = null;
-      await loadQuestions();
       setMode("VIEW");
+      await loadQuestions();
     } catch (e) {
-      showWarn("Delete failed:\n\n" + (e?.message || String(e)));
-    } finally {
-      OP_LOCK.deleting = false;
+      showWarn("Delete failed:
+
+" + (e?.message || String(e)));
     }
   }
+
 
   // ===== save =====
   async function saveSelected() {
@@ -1346,7 +1343,6 @@
       const ok = confirm("Enter edit mode for this question?");
       if (!ok) return;
       setMode("EDIT");
-      syncDeactivateButtonUI();
     });
 
     onClick("btnView", () => setMode("VIEW"));
@@ -1365,10 +1361,6 @@
     // Deactivate / Delete (edit mode only)
     onClick("btnDeactivateQuestion", () => toggleActiveSelected());
     onClick("btnDeleteQuestion", () => deleteSelected());
-
-    // IMPORTANT:
-    // Removed the document-level click delegation that caused double execution
-    // and the "Cannot read properties of null (reading 'id')" crash.
 
     onChange("dbSourceType", () => {
       const st = $("dbSourceType")?.value;
