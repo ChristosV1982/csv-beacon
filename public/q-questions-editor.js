@@ -222,6 +222,13 @@
   let selected = null; // cloned copy
   let mode = "VIEW";   // VIEW | EDIT
 
+  // Prevent double-actions (the main cause of your "null id" crash)
+  const OP_LOCK = {
+    deleting: false,
+    toggling: false,
+    saving: false,
+  };
+
   // list preference: short vs full question
   const LS_SHOW_FULL = "qe_show_full_question_in_list";
   function getShowFullInList() {
@@ -274,7 +281,6 @@
 
     syncDeactivateButtonUI();
   }
-
 
   // ===== Deactivate button toggle UI =====
   function syncDeactivateButtonUI() {
@@ -1045,26 +1051,30 @@
   // ===== deactivate / delete =====
   async function toggleActiveSelected() {
     if (!selected || selected.__isNew || !selected.id) return;
-
-    showWarn("");
-    showOk("");
-    setText("saveStatus", "");
-
-    const current = safeStr(selected.status).trim().toLowerCase() || "active";
-    const next = (current === "inactive") ? "active" : "inactive";
-
-    const qno = displayNumber(selected);
-    const ok = confirm(
-      `${next === "inactive" ? "Deactivate" : "Activate"} question ${qno}?\n\n` +
-      `This will set status = ${next}.`
-    );
-    if (!ok) return;
+    if (OP_LOCK.toggling) return;
+    OP_LOCK.toggling = true;
 
     try {
+      showWarn("");
+      showOk("");
+      setText("saveStatus", "");
+
+      const current = safeStr(selected.status).trim().toLowerCase() || "active";
+      const next = (current === "inactive") ? "active" : "inactive";
+
+      const qno = displayNumber(selected);
+      const ok = confirm(
+        `${next === "inactive" ? "Deactivate" : "Activate"} question ${qno}?\n\n` +
+        `This will set status = ${next}.`
+      );
+      if (!ok) return;
+
+      const selectedId = selected.id;
+
       const { error } = await sb
         .from("questions_master")
         .update({ status: next, updated_by: me?.user?.id || null })
-        .eq("id", selected.id);
+        .eq("id", selectedId);
 
       if (error) throw error;
 
@@ -1084,41 +1094,47 @@
       await loadQuestions();
 
       // Re-select the same row if it still exists in the filtered list
-      const still = allRows.find(r => r.id === selected.id);
+      const still = allRows.find(r => r.id === selectedId);
       if (still) await selectRow(still);
       else {
         selected = null;
         setMode("VIEW");
       }
     } catch (e) {
-      showWarn(`${next === "inactive" ? "Deactivate" : "Activate"} failed:\n\n` + (e?.message || String(e)));
+      showWarn(`${"Toggle"} failed:\n\n` + (e?.message || String(e)));
+    } finally {
+      OP_LOCK.toggling = false;
     }
   }
 
-async function deleteSelected() {
+  async function deleteSelected() {
     if (!selected || selected.__isNew || !selected.id) return;
-
-    showWarn("");
-    showOk("");
-    setText("saveStatus", "");
-
-    const qno = displayNumber(selected);
-    const ok = confirm(
-      `DELETE question ${qno}?\n\n` +
-      `This will permanently delete:\n` +
-      `- questions_master\n` +
-      `- pgno_master (children)\n` +
-      `- expected_evidence_master (children)\n\n` +
-      `This cannot be undone.`
-    );
-    if (!ok) return;
+    if (OP_LOCK.deleting) return;
+    OP_LOCK.deleting = true;
 
     try {
+      showWarn("");
+      showOk("");
+      setText("saveStatus", "");
+
+      const qno = displayNumber(selected);
+      const selectedId = selected.id;
+
+      const ok = confirm(
+        `DELETE question ${qno}?\n\n` +
+        `This will permanently delete:\n` +
+        `- questions_master\n` +
+        `- pgno_master (children)\n` +
+        `- expected_evidence_master (children)\n\n` +
+        `This cannot be undone.`
+      );
+      if (!ok) return;
+
       // Children can be 0 rows; we don't treat that as an error.
-      const { error: e1 } = await sb.from("pgno_master").delete().eq("question_id", selected.id);
+      const { error: e1 } = await sb.from("pgno_master").delete().eq("question_id", selectedId);
       if (e1) throw e1;
 
-      const { error: e2 } = await sb.from("expected_evidence_master").delete().eq("question_id", selected.id);
+      const { error: e2 } = await sb.from("expected_evidence_master").delete().eq("question_id", selectedId);
       if (e2) throw e2;
 
       // IMPORTANT:
@@ -1127,7 +1143,7 @@ async function deleteSelected() {
       const { data: delRows, error: e3 } = await sb
         .from("questions_master")
         .delete()
-        .eq("id", selected.id)
+        .eq("id", selectedId)
         .select("id");
       if (e3) throw e3;
 
@@ -1151,6 +1167,8 @@ async function deleteSelected() {
       setMode("VIEW");
     } catch (e) {
       showWarn("Delete failed:\n\n" + (e?.message || String(e)));
+    } finally {
+      OP_LOCK.deleting = false;
     }
   }
 
@@ -1328,7 +1346,7 @@ async function deleteSelected() {
       const ok = confirm("Enter edit mode for this question?");
       if (!ok) return;
       setMode("EDIT");
-    syncDeactivateButtonUI();
+      syncDeactivateButtonUI();
     });
 
     onClick("btnView", () => setMode("VIEW"));
@@ -1348,21 +1366,9 @@ async function deleteSelected() {
     onClick("btnDeactivateQuestion", () => toggleActiveSelected());
     onClick("btnDeleteQuestion", () => deleteSelected());
 
-
-    // Robust click delegation (prevents "nothing happens" if HTML is slightly out of sync)
-    document.addEventListener("click", (ev) => {
-      const t = ev.target;
-      if (!t) return;
-
-      if (t.id === "btnDeleteQuestion") {
-        ev.preventDefault();
-        deleteSelected();
-      }
-      if (t.id === "btnDeactivateQuestion") {
-        ev.preventDefault();
-        toggleActiveSelected();
-      }
-    }, true);
+    // IMPORTANT:
+    // Removed the document-level click delegation that caused double execution
+    // and the "Cannot read properties of null (reading 'id')" crash.
 
     onChange("dbSourceType", () => {
       const st = $("dbSourceType")?.value;
