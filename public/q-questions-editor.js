@@ -1162,10 +1162,11 @@
 
     for (const r of filtered) {
       const div = document.createElement("div");
+      const p = r.payload || {};
       const desCls = designationClassFromPayload(p);
       div.className = "qitem" + (desCls ? " " + desCls : "") + (selected && !selected.__isNew && selected.id === r.id ? " active" : "");
 
-      const p = r.payload || {};
+
       const shortText = pGet(p, ["short_text", "Short Text", "ShortText", "shortText"]);
       const questionText = pGet(p, ["question", "Question"]);
       const sub = showFull ? (questionText || shortText) : (shortText || questionText);
