@@ -1114,14 +1114,36 @@ async function deleteSelected() {
     if (!ok) return;
 
     try {
+      // Children can be 0 rows; we don't treat that as an error.
       const { error: e1 } = await sb.from("pgno_master").delete().eq("question_id", selected.id);
       if (e1) throw e1;
 
       const { error: e2 } = await sb.from("expected_evidence_master").delete().eq("question_id", selected.id);
       if (e2) throw e2;
 
-      const { error: e3 } = await sb.from("questions_master").delete().eq("id", selected.id);
+      // IMPORTANT:
+      // With Supabase RLS, a DELETE that is blocked often returns *no error* but deletes 0 rows.
+      // So we request the deleted row back and verify we actually deleted something.
+      const { data: delRows, error: e3 } = await sb
+        .from("questions_master")
+        .delete()
+        .eq("id", selected.id)
+        .select("id");
       if (e3) throw e3;
+
+      const deletedCount = Array.isArray(delRows) ? delRows.length : 0;
+      if (deletedCount === 0) {
+        showWarn(
+          "Delete did not remove any row. This is almost always caused by Supabase RLS policies blocking DELETE.\n\n" +
+          "You can still SELECT the question, but the database refuses to DELETE it.\n\n" +
+          "Fix: add DELETE policies for these tables:\n" +
+          "- questions_master\n" +
+          "- pgno_master\n" +
+          "- expected_evidence_master"
+        );
+        setText("saveStatus", "");
+        return;
+      }
 
       showOk(`Deleted ${qno}.`);
       selected = null;
