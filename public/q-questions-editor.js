@@ -1728,8 +1728,8 @@ async function deleteSelected() {
     onClick("btnToggleAdvancedView", () => toggleAdvanced("viewAdvanced"));
     onClick("btnToggleAdvancedEdit", () => toggleAdvanced("editAdvanced"));
 
-    onClick("btnAddPgno", () => addPgnoRow());
-    onClick("btnAddEe", () => addEeRow());
+    onClick("btnAddPgno", (e) => { if (e) e.stopPropagation(); addPgnoRow(); });
+    onClick("btnAddEe", (e) => { if (e) e.stopPropagation(); addEeRow(); });
 
     ["rtHuman","rtHardware","rtProcess","rtPhoto"].forEach(id => {
       const el = $(id);
