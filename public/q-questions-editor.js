@@ -5,18 +5,14 @@
   function $(id) { return document.getElementById(id); }
   function safeStr(v) { return v === null || v === undefined ? "" : String(v); }
 
-  // Null-safe event binder (robust: uses addEventListener so handlers cannot be overwritten)
+  // Null-safe event binder
   function onClick(id, fn) {
     const el = $(id);
     if (!el) {
       console.warn(`[q-questions-editor] Missing element #${id} (HTML out of sync).`);
       return false;
     }
-    el.addEventListener("click", (ev) => {
-      ev.preventDefault();
-      ev.stopPropagation();
-      fn(ev);
-    });
+    el.onclick = fn;
     return true;
   }
   function onChange(id, fn) {
@@ -25,7 +21,7 @@
       console.warn(`[q-questions-editor] Missing element #${id} (HTML out of sync).`);
       return false;
     }
-    el.addEventListener("change", fn);
+    el.onchange = fn;
     return true;
   }
   function onInput(id, fn) {
@@ -34,7 +30,7 @@
       console.warn(`[q-questions-editor] Missing element #${id} (HTML out of sync).`);
       return false;
     }
-    el.addEventListener("input", fn);
+    el.oninput = fn;
     return true;
   }
 
@@ -275,7 +271,10 @@
     setText("pillSource", `source: ${st}`);
     setText("pillStatus", `status: ${status}`);
     setText("pillSuffix", `suffix: ${sx || "(blank)"}`);
+
+    syncDeactivateButtonUI();
   }
+
 
   // ===== Deactivate button toggle UI =====
   function syncDeactivateButtonUI() {
@@ -714,8 +713,6 @@
     setPillsFromSelected();
     renderEeView();
     renderPgnoView();
-
-    syncDeactivateButtonUI();
   }
 
   function fillEditPanel(r) {
@@ -750,8 +747,6 @@
     setPillsFromSelected();
     renderEeEditor();
     renderPgnoEditor();
-
-    syncDeactivateButtonUI();
   }
 
   function previewNumberBaseForHeader() {
@@ -844,9 +839,7 @@
         .select("id, number_base, number_suffix, number_full, source_type, is_custom, status, version, tags, payload, change_reason, updated_at, created_at")
         .order("created_at", { ascending: true });
 
-      // IMPORTANT: allow ALL
       if (status && status !== "ALL") q = q.eq("status", status);
-
       if (version) q = q.eq("version", version);
       if (src && src !== "ALL") q = q.eq("source_type", src);
 
@@ -885,6 +878,7 @@
     }));
   }
 
+  // FIX: sourceType must be used to format nb (SIRE vs zzz) in pgno_code
   async function savePgnoToDb(questionId, numberBase, items, sourceType) {
     const clean = (items || [])
       .map(x => ({ text: safeStr(x.text).trim(), remarks: safeStr(x.remarks).trim() }))
@@ -1043,12 +1037,12 @@
     fillViewPanel(selected);
     fillEditPanel(selected);
     setMode("EDIT");
+    syncDeactivateButtonUI();
     setPillsFromSelected();
     refreshHeaderFromNumberInputs();
-    syncDeactivateButtonUI();
   }
 
-  // ===== deactivate (TOGGLE) =====
+  // ===== deactivate / delete =====
   async function toggleActiveSelected() {
     if (!selected || selected.__isNew || !selected.id) return;
 
@@ -1086,8 +1080,10 @@
       syncDeactivateButtonUI();
 
       showOk(`${next === "inactive" ? "Deactivated" : "Activated"} ${qno}.`);
+
       await loadQuestions();
 
+      // Re-select the same row if it still exists in the filtered list
       const still = allRows.find(r => r.id === selected.id);
       if (still) await selectRow(still);
       else {
@@ -1095,13 +1091,11 @@
         setMode("VIEW");
       }
     } catch (e) {
-      // ✅ FIXED: no broken quote in template literal
       showWarn(`${next === "inactive" ? "Deactivate" : "Activate"} failed:\n\n` + (e?.message || String(e)));
     }
   }
 
-  // ===== delete =====
-  async function deleteSelected() {
+async function deleteSelected() {
     if (!selected || selected.__isNew || !selected.id) return;
 
     showWarn("");
@@ -1134,25 +1128,7 @@
       await loadQuestions();
       setMode("VIEW");
     } catch (e) {
-      const msg = (e?.message || String(e));
-      const low = msg.toLowerCase();
-
-      let extra = "";
-      if (
-        low.includes("row-level security") ||
-        low.includes("rls") ||
-        low.includes("permission denied") ||
-        low.includes("not allowed")
-      ) {
-        extra =
-          "\n\nDELETE is being blocked by Supabase RLS/policies.\n" +
-          "To make DELETE actually work, you must add DELETE policies for:\n" +
-          "- questions_master\n" +
-          "- pgno_master\n" +
-          "- expected_evidence_master";
-      }
-
-      showWarn("Delete failed:\n\n" + msg + extra);
+      showWarn("Delete failed:\n\n" + (e?.message || String(e)));
     }
   }
 
@@ -1330,6 +1306,7 @@
       const ok = confirm("Enter edit mode for this question?");
       if (!ok) return;
       setMode("EDIT");
+    syncDeactivateButtonUI();
     });
 
     onClick("btnView", () => setMode("VIEW"));
@@ -1349,15 +1326,27 @@
     onClick("btnDeactivateQuestion", () => toggleActiveSelected());
     onClick("btnDeleteQuestion", () => deleteSelected());
 
+
+    // Robust click delegation (prevents "nothing happens" if HTML is slightly out of sync)
+    document.addEventListener("click", (ev) => {
+      const t = ev.target;
+      if (!t) return;
+
+      if (t.id === "btnDeleteQuestion") {
+        ev.preventDefault();
+        deleteSelected();
+      }
+      if (t.id === "btnDeactivateQuestion") {
+        ev.preventDefault();
+        toggleActiveSelected();
+      }
+    }, true);
+
     onChange("dbSourceType", () => {
       const st = $("dbSourceType")?.value;
       if (st === "SIRE") $("dbNumberSuffix").value = "";
       if (st !== "SIRE" && !safeStr($("dbNumberSuffix")?.value).trim()) $("dbNumberSuffix").value = "C";
       refreshHeaderFromNumberInputs();
-    });
-
-    onChange("dbStatus", () => {
-      syncDeactivateButtonUI();
     });
 
     onInput("dbNumberSuffix", () => refreshHeaderFromNumberInputs());

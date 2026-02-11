@@ -5,10 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>SIRE 2.0 – Questions Editor</title>
 
-  <link rel="stylesheet" href="./q-questions-editor.css?v=20260211_1" />
+  <!-- IMPORTANT: dedicated editor CSS + cache-bust -->
+  <link rel="stylesheet" href="./q-questions-editor.css?v=20260130_1" />
 </head>
 
 <body>
+  <!-- Top bar -->
   <header class="topbar">
     <div class="topbar-left">
       <div class="brand">SIRE 2.0 – Questions Editor</div>
@@ -23,11 +25,14 @@
     </div>
   </header>
 
+  <!-- Messages -->
   <div class="page">
     <div id="warnBox" class="msg warn" style="display:none;"></div>
     <div id="okBox" class="msg ok" style="display:none;"></div>
 
+    <!-- Main layout -->
     <div class="layout">
+      <!-- LEFT: list/filter -->
       <aside class="sidebar">
         <div class="card">
           <div class="card-title">Questions</div>
@@ -41,10 +46,11 @@
 
           <label class="lbl">Status</label>
           <select id="statusFilter" class="inp">
+            <select id="statusFilter" class="inp">
             <option value="active" selected>active</option>
             <option value="inactive">inactive</option>
             <option value="ALL">ALL</option>
-          </select>
+          </select></select>
 
           <label class="lbl">Source</label>
           <select id="sourceFilter" class="inp">
@@ -84,6 +90,7 @@
         </div>
       </aside>
 
+      <!-- RIGHT: view/edit -->
       <main class="main">
         <div id="emptyState" class="card">
           <div class="card-title">No question selected</div>
@@ -99,7 +106,7 @@
             </div>
             <div class="qe-actions">
               <button id="btnEdit" class="btn light" type="button">Edit</button>
-              <button id="btnViewTop" class="btn" type="button">View</button>
+              <button id="btnView" class="btn" type="button">View</button>
             </div>
           </div>
 
@@ -181,7 +188,7 @@
               <button id="btnView" class="btn light" type="button">View</button>
               <button id="btnSave" class="btn primary" type="button">Save</button>
               <button id="btnReset" class="btn" type="button">Reset</button>
-              <button id="btnDeactivateQuestion" class="btn warn" type="button" title="Toggle active/inactive">Deactivate</button>
+              <button id="btnDeactivateQuestion" class="btn warn" type="button" title="Set status to inactive">Deactivate</button>
               <button id="btnDeleteQuestion" class="btn danger" type="button" title="Permanently delete this question">Delete</button>
             </div>
           </div>
@@ -191,10 +198,6 @@
             <div class="qe-pill" id="pillStatus">status: —</div>
             <div class="qe-pill" id="pillSuffix">suffix: —</div>
           </div>
-
-          <!-- (rest of your existing edit form remains unchanged) -->
-          <!-- KEEP EVERYTHING BELOW AS-IS FROM YOUR CURRENT FILE -->
-          <!-- I’m including the remainder exactly as your current file has it. -->
 
           <div class="masterBox">
             <div class="masterTitle">DB Fields</div>
@@ -382,8 +385,9 @@
     </div>
   </div>
 
+  <!-- scripts (cache-bust) -->
   <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script defer src="./auth.js?v=20260211_1"></script>
-  <script defer src="./q-questions-editor.js?v=20260211_1"></script>
+  <script defer src="./auth.js?v=20260130_1"></script>
+  <script defer src="./q-questions-editor.js?v=20260130_1"></script>
 </body>
 </html>
