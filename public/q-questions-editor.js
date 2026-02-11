@@ -885,7 +885,6 @@
     }));
   }
 
-  // FIX: sourceType must be used to format nb (SIRE vs zzz) in pgno_code
   async function savePgnoToDb(questionId, numberBase, items, sourceType) {
     const clean = (items || [])
       .map(x => ({ text: safeStr(x.text).trim(), remarks: safeStr(x.remarks).trim() }))
@@ -1096,7 +1095,8 @@
         setMode("VIEW");
       }
     } catch (e) {
-      showWarn(`${next === "inactive" ? "Deactivate" : "Activate"} failed:\n\n" + (e?.message || String(e)));
+      // ✅ FIXED: no broken quote in template literal
+      showWarn(`${next === "inactive" ? "Deactivate" : "Activate"} failed:\n\n` + (e?.message || String(e)));
     }
   }
 
@@ -1134,7 +1134,6 @@
       await loadQuestions();
       setMode("VIEW");
     } catch (e) {
-      // Make the failure reason obvious (RLS is the common cause)
       const msg = (e?.message || String(e));
       const low = msg.toLowerCase();
 
@@ -1358,9 +1357,6 @@
     });
 
     onChange("dbStatus", () => {
-      // This dropdown is saved with Save button, but we keep UI consistent
-      // with the real DB status shown on the toggle button.
-      // (Do not change selected.status here.)
       syncDeactivateButtonUI();
     });
 
