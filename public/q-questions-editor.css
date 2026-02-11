@@ -381,3 +381,68 @@ a{ color:inherit; }
 .facetOptAll{ padding:6px 0; border-bottom:1px solid #eef2f7; margin-bottom:4px; }
 .facetCount{ font-size:12px; color:#94a3b8; }
 .btn.tiny{ padding:6px 10px; font-size:12px; border-radius:10px; }
+
+
+/* === VISUAL STACKING (20260211) === */
+.vhdr-left{ display:flex; flex-direction:column; gap:4px; }
+.vhdr-top{ display:flex; align-items:flex-end; gap:14px; flex-wrap:wrap; }
+.vhdr-short{ min-width: 220px; }
+.box-inline{ padding:8px 10px; min-height: 38px; }
+
+.box-wide{ white-space: pre-wrap; }
+
+/* Collapsible sections (View mode) */
+.coll{ margin-top:10px; border:1px solid var(--line); border-radius:12px; background:#fff; }
+.coll > summary{ cursor:pointer; padding:10px 12px; font-weight:700; list-style:none; }
+.coll > summary::-webkit-details-marker{ display:none; }
+.coll[open] > summary{ border-bottom:1px solid var(--line); }
+.coll > .box{ border:none; border-radius:0; }
+
+/* Condensed attributes */
+.attrGrid{ display:grid; grid-template-columns: 1fr 1fr; gap:10px 12px; }
+.attrGrid .lbl{ font-size:12px; }
+.attrGrid .box{ padding:8px 10px; font-size:13px; min-height: 34px; }
+
+/* Expected Evidence + PGNO text: larger, black, not bold */
+#vEeList .masterTiny, #vPgnoList .masterTiny{ color:#111; font-size:14px; font-weight:400; }
+#vEeList .masterCode, #vPgnoList .masterCode{ font-weight:700; }
+
+/* List colouring by designation */
+.qitem.q-core{ background:#e7f7e7; }
+.qitem.q-rot1{ background:#fff7d6; }
+.qitem.q-rot2{ background:#ffe9d6; }
+.qitem.active{ outline:2px solid #2f6fed; }
+
+
+/* Visual stack layout */
+.vhdr-top{display:flex; gap:14px; align-items:flex-end; flex-wrap:wrap;}
+.vhdr-left{min-width:0;}
+.vhdr-short{min-width:240px; max-width:520px; flex:1;}
+.box-inline{min-height:40px; display:flex; align-items:center;}
+.box-big{min-height:56px; font-size:15px; color:#111;}
+
+.qstack{display:flex; flex-direction:column; gap:12px;}
+
+/* Collapsible blocks in VIEW */
+.coll{border:1px solid var(--line); border-radius:12px; background:#fff; overflow:hidden;}
+.coll > summary{cursor:pointer; list-style:none; padding:10px 12px; font-weight:700;}
+.coll > summary::-webkit-details-marker{display:none;}
+.coll > summary:before{content:"▸"; display:inline-block; margin-right:8px; transform:translateY(-1px);} 
+.coll[open] > summary:before{content:"▾";}
+.coll-body{padding:0 12px 12px 12px;}
+
+/* Attributes condensed */
+.attrGrid .lbl{font-size:12px;}
+.attrGrid .box{padding:8px 10px; font-size:13px; color:#111;}
+
+/* Expected Evidence + PGNO text styling */
+#vEeList .masterTiny,
+#vPgnoList .masterTiny{font-size:14px; color:#111; font-weight:400;}
+
+/* Question list coloring by designation */
+.qitem.q-core{background:#e9f7ea;}
+.qitem.q-rot1{background:#fff7db;}
+.qitem.q-rot2{background:#fff0e1;}
+.qitem.q-core.active,
+.qitem.q-rot1.active,
+.qitem.q-rot2.active{outline:2px solid rgba(26,65,112,0.25);} 

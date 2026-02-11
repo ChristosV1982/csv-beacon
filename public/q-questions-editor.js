@@ -1118,6 +1118,25 @@
     return n.includes(t) || st.includes(t) || qu.includes(t);
   }
 
+  function designationClassFromPayload(p){
+    // Using Question Type (common in SIRE 2.0 payload) to infer designation.
+    const qt = safeStr(pGet(p, ["Question Type","question_type","questionType"]))
+      .trim()
+      .toLowerCase();
+    if (!qt) return "";
+
+    // tolerant matching
+    if (qt.includes("core")) return "q-core";
+    if (qt.includes("rotational 1") || qt.includes("rotational i") || qt.includes("rot 1") || qt.includes("r1")) return "q-rot1";
+    if (qt.includes("rotational 2") || qt.includes("rotational ii") || qt.includes("rot 2") || qt.includes("r2")) return "q-rot2";
+
+    // sometimes stored as single letter
+    if (qt === "r1") return "q-rot1";
+    if (qt === "r2") return "q-rot2";
+
+    return "";
+  }
+
   function renderList() {
     const list = $("qList");
     if (!list) return;
@@ -1143,7 +1162,8 @@
 
     for (const r of filtered) {
       const div = document.createElement("div");
-      div.className = "qitem" + (selected && !selected.__isNew && selected.id === r.id ? " active" : "");
+      const desCls = designationClassFromPayload(p);
+      div.className = "qitem" + (desCls ? " " + desCls : "") + (selected && !selected.__isNew && selected.id === r.id ? " active" : "");
 
       const p = r.payload || {};
       const shortText = pGet(p, ["short_text", "Short Text", "ShortText", "shortText"]);

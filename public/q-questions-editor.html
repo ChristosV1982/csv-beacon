@@ -138,8 +138,14 @@
         <!-- VIEW PANEL -->
         <div id="viewPanel" class="card" style="display:none;">
           <div class="hdr">
-            <div>
-              <div class="hnum" id="vhdrNumber">—</div>
+            <div class="vhdr-left">
+              <div class="vhdr-top">
+                <div class="hnum" id="vhdrNumber">—</div>
+                <div class="vhdr-short">
+                  <div class="lbl">Short Text</div>
+                  <div class="box box-inline" id="vShortText"></div>
+                </div>
+              </div>
               <div class="muted small" id="vhdrId"></div>
             </div>
             <div class="qe-actions">
@@ -155,30 +161,33 @@
           </div>
 
           <div class="section">
-            <div class="section-title">Question Content</div>
-            <div class="grid2">
+            <div class="section-title">Question</div>
+
+            <div class="qstack">
               <div>
-                <div class="lbl">Short Text</div>
-                <div class="box" id="vShortText"></div>
+                <div class="lbl">Question Text</div>
+                <div class="box qbox" id="vQuestion"></div>
               </div>
-              <div>
-                <div class="lbl">Question</div>
-                <div class="box" id="vQuestion"></div>
-              </div>
-              <div>
-                <div class="lbl">Inspection guidance</div>
-                <div class="box" id="vGuidance"></div>
-              </div>
-              <div>
-                <div class="lbl">Suggested inspector actions</div>
-                <div class="box" id="vActions"></div>
-              </div>
+
+              <details class="coll">
+                <summary><span class="collTitle">Question Guidance</span></summary>
+                <div class="collBody">
+                  <div class="box" id="vGuidance"></div>
+                </div>
+              </details>
+
+              <details class="coll">
+                <summary><span class="collTitle">Suggested inspector actions</span></summary>
+                <div class="collBody">
+                  <div class="box" id="vActions"></div>
+                </div>
+              </details>
             </div>
           </div>
 
           <div class="section">
             <div class="section-title">Question Attributes</div>
-            <div class="grid2">
+            <div class="grid2 attrGrid">
               <div><div class="lbl">Question Type</div><div class="box" id="vAttrQuestionType"></div></div>
               <div><div class="lbl">Vessel Type</div><div class="box" id="vAttrVesselType"></div></div>
               <div><div class="lbl">ROVIQ List</div><div class="box" id="vAttrRoviq"></div></div>
