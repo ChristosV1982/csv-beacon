@@ -231,6 +231,197 @@
     localStorage.setItem(LS_SHOW_FULL, v ? "1" : "0");
   }
 
+
+  // ===== Facet filters (client-side) =====
+  const FACETS = [
+    { key: "questionType", title: "Question Type" },
+    { key: "vesselType", title: "Vessel Type" },
+    { key: "responseType", title: "Response Type" },
+    { key: "companyRank", title: "Company Rank Allocation" },
+    { key: "chapter", title: "SIRE 2.0 Chapter" },
+  ];
+
+  const LS_FACET_PREFIX = "qe_facet_";
+  function loadFacetSet(key) {
+    try {
+      const raw = localStorage.getItem(LS_FACET_PREFIX + key);
+      const arr = raw ? JSON.parse(raw) : [];
+      return new Set(Array.isArray(arr) ? arr.map(String) : []);
+    } catch {
+      return new Set();
+    }
+  }
+  function saveFacetSet(key, set) {
+    try {
+      localStorage.setItem(LS_FACET_PREFIX + key, JSON.stringify(Array.from(set)));
+    } catch {}
+  }
+
+  const facetSelected = {
+    questionType: loadFacetSet("questionType"),
+    vesselType: loadFacetSet("vesselType"),
+    responseType: loadFacetSet("responseType"),
+    companyRank: loadFacetSet("companyRank"),
+    chapter: loadFacetSet("chapter"),
+  };
+
+  function chapterKey(row) {
+    const nb = normalizeNumberBaseRow(row);
+    const m = nb.match(/^(\d+)\.(\d+)\.(\d+)$/);
+    if (!m) return "";
+    return String(Number(m[1])).padStart(2, "0");
+  }
+
+  function facetValue(row, key) {
+    const p = row?.payload || {};
+    if (key === "questionType") return safeStr(pGet(p, ["Question Type", "question_type", "questionType"])).trim();
+    if (key === "vesselType") return safeStr(pGet(p, ["Vessel Type", "vessel_type", "vesselType"])).trim();
+    if (key === "companyRank") return safeStr(pGet(p, ["Company Rank Allocation", "company_rank_allocation", "companyRankAllocation"])).trim();
+    if (key === "chapter") return chapterKey(row);
+    return "";
+  }
+
+  function responseTypesArray(row) {
+    const p = row?.payload || {};
+    return computeResponseTypesFromPayload(p);
+  }
+
+  function rowMatchesFacet(row, key, excludeKey) {
+    if (excludeKey && key === excludeKey) return true;
+
+    const sel = facetSelected[key];
+    if (!sel || sel.size === 0) return true;
+
+    if (key === "responseType") {
+      const rt = responseTypesArray(row);
+      for (const want of sel) {
+        if (rt.includes(want)) return true;
+      }
+      return false;
+    }
+
+    const v = facetValue(row, key);
+    return sel.has(v);
+  }
+
+  function rowMatchesAllFacets(row, excludeKey = "") {
+    return (
+      rowMatchesFacet(row, "questionType", excludeKey) &&
+      rowMatchesFacet(row, "vesselType", excludeKey) &&
+      rowMatchesFacet(row, "responseType", excludeKey) &&
+      rowMatchesFacet(row, "companyRank", excludeKey) &&
+      rowMatchesFacet(row, "chapter", excludeKey)
+    );
+  }
+
+  function summarizeSelected(key) {
+    const sel = facetSelected[key];
+    if (!sel || sel.size === 0) return "";
+    const arr = Array.from(sel);
+    arr.sort((a,b)=>a.localeCompare(b));
+    const head = arr.slice(0, 2).join(", ");
+    const more = arr.length > 2 ? ` +${arr.length - 2}` : "";
+    return head + more;
+  }
+
+  function ensureFacetOpenState() {
+    for (const f of FACETS) {
+      const det = $("facet_" + f.key);
+      if (!det) continue;
+      det.open = facetSelected[f.key]?.size > 0;
+    }
+  }
+
+  function rebuildFacetUI() {
+    // called after loadQuestions() and after each list render
+    ensureFacetOpenState();
+
+    const term = safeStr($("searchInput")?.value).trim();
+
+    for (const f of FACETS) {
+      const sumEl = $("facetSummary_" + f.key);
+      if (sumEl) sumEl.textContent = summarizeSelected(f.key);
+
+      const clearBtn = $("facetClear_" + f.key);
+      if (clearBtn) {
+        clearBtn.style.display = (facetSelected[f.key]?.size ? "inline-flex" : "none");
+      }
+
+      const host = $("facetOptions_" + f.key);
+      if (!host) continue;
+      host.innerHTML = "";
+
+      // counts are computed on the current data set, respecting: search term + other facet selections
+      const counts = new Map();
+
+      for (const r of allRows) {
+        if (!passesSearch(r, term)) continue;
+        if (!rowMatchesAllFacets(r, f.key)) continue;
+
+        if (f.key === "responseType") {
+          for (const rt of responseTypesArray(r)) {
+            counts.set(rt, (counts.get(rt) || 0) + 1);
+          }
+          continue;
+        }
+
+        const v = facetValue(r, f.key);
+        if (!v) continue;
+        counts.set(v, (counts.get(v) || 0) + 1);
+      }
+
+      const values = Array.from(counts.entries())
+        .map(([v,c]) => ({ v, c }))
+        .sort((a,b) => {
+          if (f.key === "chapter") return Number(a.v) - Number(b.v);
+          return a.v.localeCompare(b.v);
+        });
+
+      if (!values.length) {
+        const div = document.createElement("div");
+        div.className = "muted small";
+        div.textContent = "No options";
+        host.appendChild(div);
+        continue;
+      }
+
+      for (const it of values) {
+        const row = document.createElement("div");
+        row.className = "facetOpt";
+
+        const id = `facet_${f.key}_${it.v.replace(/[^a-zA-Z0-9]/g, "_")}`;
+        const checked = facetSelected[f.key]?.has(it.v);
+
+        row.innerHTML = `
+          <label>
+            <input type="checkbox" id="${id}" ${checked ? "checked" : ""} />
+            <span>${escapeHtml(it.v)}</span>
+          </label>
+          <span class="facetCount">${it.c}</span>
+        `;
+
+        const cb = row.querySelector("input");
+        if (cb) {
+          cb.addEventListener("change", () => {
+            if (cb.checked) facetSelected[f.key].add(it.v);
+            else facetSelected[f.key].delete(it.v);
+            saveFacetSet(f.key, facetSelected[f.key]);
+            renderList();
+          });
+        }
+
+        host.appendChild(row);
+      }
+    }
+  }
+
+  function clearFacet(key) {
+    if (!facetSelected[key]) return;
+    facetSelected[key].clear();
+    saveFacetSet(key, facetSelected[key]);
+    renderList();
+  }
+
   function setMode(newMode) {
     mode = newMode;
     const empty = $("emptyState");
@@ -247,6 +438,16 @@
     if (empty) empty.style.display = "none";
     if (v) v.style.display = (mode === "VIEW") ? "block" : "none";
     if (e) e.style.display = (mode === "EDIT") ? "block" : "none";
+
+    if (mode === "EDIT") {
+      const dis = !!selected.__isNew || !selected.id;
+      const bDel = $("btnDeleteQuestion");
+      const bDea = $("btnDeactivateQuestion");
+      if (bDel) bDel.disabled = dis;
+      if (bDea) bDea.disabled = dis;
+    }
+
+    syncDeactivateButtonUI();
   }
 
   function setPillsFromSelected() {
@@ -261,7 +462,10 @@
     setText("pillSource", `source: ${st}`);
     setText("pillStatus", `status: ${status}`);
     setText("pillSuffix", `suffix: ${sx || "(blank)"}`);
+
+    syncDeactivateButtonUI();
   }
+
 
   // ===== Deactivate button toggle UI =====
   function syncDeactivateButtonUI() {
@@ -700,7 +904,6 @@
     setPillsFromSelected();
     renderEeView();
     renderPgnoView();
-    syncDeactivateButtonUI();
   }
 
   function fillEditPanel(r) {
@@ -735,7 +938,6 @@
     setPillsFromSelected();
     renderEeEditor();
     renderPgnoEditor();
-    syncDeactivateButtonUI();
   }
 
   function previewNumberBaseForHeader() {
@@ -758,179 +960,6 @@
     renderPgnoEditor();
   }
 
-  // ===== Facet filters (left panel) =====
-  const LS_F_QTYPE = "qe_f_question_type";
-  const LS_F_VTYPE = "qe_f_vessel_type";
-  const LS_F_RTYPE = "qe_f_response_type";
-  const LS_F_CRANK = "qe_f_company_rank";
-  const LS_F_CHAPTER = "qe_f_chapter";
-
-  function lsGetSet(key) {
-    try {
-      const raw = localStorage.getItem(key);
-      const arr = raw ? JSON.parse(raw) : [];
-      return new Set(Array.isArray(arr) ? arr : []);
-    } catch {
-      return new Set();
-    }
-  }
-  function lsSetSet(key, setObj) {
-    try { localStorage.setItem(key, JSON.stringify(Array.from(setObj))); } catch {}
-  }
-
-  let fQuestionType = lsGetSet(LS_F_QTYPE);
-  let fVesselType = lsGetSet(LS_F_VTYPE);
-  let fResponseType = lsGetSet(LS_F_RTYPE); // Human/Hardware/Process/Photo
-  let fCompanyRank = lsGetSet(LS_F_CRANK);
-  let fChapter = lsGetSet(LS_F_CHAPTER); // "01","02",...
-
-  function chapterKeyFromRow(r) {
-    const nb = normalizeNumberBaseRow(r);
-    const m = safeStr(nb).trim().match(/^(\d+)\./);
-    if (!m) return "";
-    return String(Number(m[1])).padStart(2, "0");
-  }
-
-  function responseTypesFromRow(r) {
-    const p = r?.payload || {};
-    return computeResponseTypesFromPayload(p);
-  }
-
-  function facetSummaryText(setObj) {
-    const arr = Array.from(setObj);
-    if (!arr.length) return "";
-    arr.sort((a,b)=> String(a).localeCompare(String(b), undefined, {numeric:true}));
-    if (arr.length <= 3) return arr.join(", ");
-    return arr.slice(0, 3).join(", ") + ` +${arr.length - 3}`;
-  }
-
-  function setFacetSummary(id, setObj) {
-    const el = $(id);
-    if (!el) return;
-    const txt = facetSummaryText(setObj);
-    el.textContent = txt;
-    el.style.display = txt ? "inline" : "none";
-  }
-
-  function ensureFacetOpen(detailsId, setObj) {
-    const d = $(detailsId);
-    if (!d || d.tagName !== "DETAILS") return;
-    if (setObj.size) d.open = true;
-  }
-
-  function renderFacetCheckboxList(hostId, summaryId, detailsId, options, setObj, lsKey) {
-    const host = $(hostId);
-    if (!host) return;
-
-    // Ensure checked values still appear even if not in options (e.g. after server-side filters)
-    const merged = new Set([...(options || []), ...Array.from(setObj)]);
-    const list = Array.from(merged).filter(v => safeStr(v).trim() !== "");
-
-    list.sort((a, b) => String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: "base" }));
-
-    host.innerHTML = "";
-
-    if (!list.length) {
-      host.innerHTML = `<div class="muted small">No values</div>`;
-      setFacetSummary(summaryId, setObj);
-      return;
-    }
-
-    for (const val of list) {
-      const id = `${hostId}__${btoa(unescape(encodeURIComponent(String(val)))).replace(/=+$/,"")}`;
-
-      const row = document.createElement("label");
-      row.className = "facetOpt";
-      row.innerHTML = `
-        <input type="checkbox" id="${id}">
-        <span class="facetText"></span>
-      `;
-      const cb = row.querySelector("input");
-      const tx = row.querySelector(".facetText");
-
-      if (tx) tx.textContent = String(val);
-      if (cb) cb.checked = setObj.has(val);
-
-      if (cb) {
-        cb.addEventListener("change", () => {
-          if (cb.checked) setObj.add(val);
-          else setObj.delete(val);
-
-          lsSetSet(lsKey, setObj);
-          setFacetSummary(summaryId, setObj);
-          ensureFacetOpen(detailsId, setObj);
-          renderList();
-        });
-      }
-
-      host.appendChild(row);
-    }
-
-    setFacetSummary(summaryId, setObj);
-    ensureFacetOpen(detailsId, setObj);
-  }
-
-  function buildFacetOptionsFromRows(rows) {
-    const qtypes = new Set();
-    const vtypes = new Set();
-    const cranks = new Set();
-    const chapters = new Set();
-
-    for (const r of (rows || [])) {
-      const p = r.payload || {};
-      const qt = pGet(p, ["Question Type", "question_type", "questionType"]);
-      const vt = pGet(p, ["Vessel Type", "vessel_type", "vesselType"]);
-      const cr = pGet(p, ["Company Rank Allocation", "Company_Rank_Allocation", "company_rank_allocation", "companyRankAllocation"]);
-
-      if (safeStr(qt).trim()) qtypes.add(safeStr(qt).trim());
-      if (safeStr(vt).trim()) vtypes.add(safeStr(vt).trim());
-      if (safeStr(cr).trim()) cranks.add(safeStr(cr).trim());
-
-      const ch = chapterKeyFromRow(r);
-      if (ch) chapters.add(ch);
-    }
-
-    renderFacetCheckboxList("fltQuestionType", "sumQuestionType", "detQuestionType", Array.from(qtypes), fQuestionType, LS_F_QTYPE);
-    renderFacetCheckboxList("fltVesselType", "sumVesselType", "detVesselType", Array.from(vtypes), fVesselType, LS_F_VTYPE);
-    renderFacetCheckboxList("fltCompanyRank", "sumCompanyRank", "detCompanyRank", Array.from(cranks), fCompanyRank, LS_F_CRANK);
-    renderFacetCheckboxList("fltChapter", "sumChapter", "detChapter", Array.from(chapters), fChapter, LS_F_CHAPTER);
-
-    // Response Type: fixed options
-    renderFacetCheckboxList("fltResponseType", "sumResponseType", "detResponseType", ["Human","Hardware","Process","Photo"], fResponseType, LS_F_RTYPE);
-  }
-
-  function passesFacetFilters(r) {
-    const p = r.payload || {};
-
-    if (fQuestionType.size) {
-      const qt = safeStr(pGet(p, ["Question Type", "question_type", "questionType"])).trim();
-      if (!fQuestionType.has(qt)) return false;
-    }
-
-    if (fVesselType.size) {
-      const vt = safeStr(pGet(p, ["Vessel Type", "vessel_type", "vesselType"])).trim();
-      if (!fVesselType.has(vt)) return false;
-    }
-
-    if (fCompanyRank.size) {
-      const cr = safeStr(pGet(p, ["Company Rank Allocation", "Company_Rank_Allocation", "company_rank_allocation", "companyRankAllocation"])).trim();
-      if (!fCompanyRank.has(cr)) return false;
-    }
-
-    if (fChapter.size) {
-      const ch = chapterKeyFromRow(r);
-      if (!fChapter.has(ch)) return false;
-    }
-
-    if (fResponseType.size) {
-      const rt = responseTypesFromRow(r);
-      const ok = rt.some(x => fResponseType.has(x));
-      if (!ok) return false;
-    }
-
-    return true;
-  }
-
   // ===== list =====
   function passesSearch(r, term) {
     if (!term) return true;
@@ -950,7 +979,7 @@
     list.innerHTML = "";
 
     const term = safeStr($("searchInput")?.value).trim();
-    const filtered = allRows.filter(r => passesSearch(r, term) && passesFacetFilters(r));
+    const filtered = allRows.filter(r => passesSearch(r, term) && rowMatchesAllFacets(r));
 
     filtered.sort((a, b) => {
       const ka = numberKey(a);
@@ -963,7 +992,7 @@
     });
 
     setText("countLine", `${filtered.length} questions`);
-    setText("loadHint", `Loaded ${allRows.length}`);
+    setText("loadedLine", `Loaded ${allRows.length}`);
 
     const showFull = getShowFullInList();
 
@@ -983,6 +1012,8 @@
       div.onclick = () => selectRow(r);
       list.appendChild(div);
     }
+
+    rebuildFacetUI();
   }
 
   // ===== DB load =====
@@ -1010,7 +1041,6 @@
 
       allRows = data || [];
       setText("loadHint", `Loaded ${allRows.length}`);
-      buildFacetOptionsFromRows(allRows);
       renderList();
 
       if (allRows.length) await selectRow(allRows[0]);
@@ -1041,6 +1071,7 @@
     }));
   }
 
+  // FIX: sourceType must be used to format nb (SIRE vs zzz) in pgno_code
   async function savePgnoToDb(questionId, numberBase, items, sourceType) {
     const clean = (items || [])
       .map(x => ({ text: safeStr(x.text).trim(), remarks: safeStr(x.remarks).trim() }))
@@ -1067,6 +1098,7 @@
     if (insErr) throw insErr;
   }
 
+  // ===== Expected Evidence DB operations =====
   async function loadEeFromDb(questionId) {
     const { data, error } = await sb
       .from("expected_evidence_master")
@@ -1115,6 +1147,7 @@
     if (insErr) throw insErr;
   }
 
+  // ===== select =====
   async function selectRow(row) {
     selected = JSON.parse(JSON.stringify(row));
     selected.__isNew = false;
@@ -1152,6 +1185,7 @@
     syncDeactivateButtonUI();
   }
 
+  // ===== new question =====
   function newQuestion() {
     showWarn("");
     showOk("");
@@ -1196,11 +1230,12 @@
     fillViewPanel(selected);
     fillEditPanel(selected);
     setMode("EDIT");
+    syncDeactivateButtonUI();
     setPillsFromSelected();
     refreshHeaderFromNumberInputs();
-    syncDeactivateButtonUI();
   }
 
+  // ===== deactivate / delete =====
   async function toggleActiveSelected() {
     if (!selected || selected.__isNew || !selected.id) return;
 
@@ -1238,8 +1273,10 @@
       syncDeactivateButtonUI();
 
       showOk(`${next === "inactive" ? "Deactivated" : "Activated"} ${qno}.`);
+
       await loadQuestions();
 
+      // Re-select the same row if it still exists in the filtered list
       const still = allRows.find(r => r.id === selected.id);
       if (still) await selectRow(still);
       else {
@@ -1251,7 +1288,7 @@
     }
   }
 
-  async function deleteSelected() {
+async function deleteSelected() {
     if (!selected || selected.__isNew || !selected.id) return;
 
     showWarn("");
@@ -1270,16 +1307,25 @@
     if (!ok) return;
 
     try {
+      // Children can be 0 rows; we don't treat that as an error.
       const { error: e1 } = await sb.from("pgno_master").delete().eq("question_id", selected.id);
       if (e1) throw e1;
 
       const { error: e2 } = await sb.from("expected_evidence_master").delete().eq("question_id", selected.id);
       if (e2) throw e2;
 
-      const { data: delData, error: e3 } = await sb.from("questions_master").delete().eq("id", selected.id).select("id");
+      // IMPORTANT:
+      // With Supabase RLS, a DELETE that is blocked often returns *no error* but deletes 0 rows.
+      // So we request the deleted row back and verify we actually deleted something.
+      const { data: delRows, error: e3 } = await sb
+        .from("questions_master")
+        .delete()
+        .eq("id", selected.id)
+        .select("id");
       if (e3) throw e3;
 
-      if (!delData || !delData.length) {
+      const deletedCount = Array.isArray(delRows) ? delRows.length : 0;
+      if (deletedCount === 0) {
         showWarn(
           "Delete did not remove any row. This is almost always caused by Supabase RLS policies blocking DELETE.\n\n" +
           "You can still SELECT the question, but the database refuses to DELETE it.\n\n" +
@@ -1288,6 +1334,7 @@
           "- pgno_master\n" +
           "- expected_evidence_master"
         );
+        setText("saveStatus", "");
         return;
       }
 
@@ -1300,6 +1347,7 @@
     }
   }
 
+  // ===== save =====
   async function saveSelected() {
     if (!selected) return;
 
@@ -1473,6 +1521,7 @@
       const ok = confirm("Enter edit mode for this question?");
       if (!ok) return;
       setMode("EDIT");
+    syncDeactivateButtonUI();
     });
 
     onClick("btnView", () => setMode("VIEW"));
@@ -1488,18 +1537,31 @@
 
     onClick("btnSave", () => saveSelected());
 
+    // Deactivate / Delete (edit mode only)
     onClick("btnDeactivateQuestion", () => toggleActiveSelected());
     onClick("btnDeleteQuestion", () => deleteSelected());
+
+
+    // Robust click delegation (prevents "nothing happens" if HTML is slightly out of sync)
+    document.addEventListener("click", (ev) => {
+      const t = ev.target;
+      if (!t) return;
+
+      if (t.id === "btnDeleteQuestion") {
+        ev.preventDefault();
+        deleteSelected();
+      }
+      if (t.id === "btnDeactivateQuestion") {
+        ev.preventDefault();
+        toggleActiveSelected();
+      }
+    }, true);
 
     onChange("dbSourceType", () => {
       const st = $("dbSourceType")?.value;
       if (st === "SIRE") $("dbNumberSuffix").value = "";
       if (st !== "SIRE" && !safeStr($("dbNumberSuffix")?.value).trim()) $("dbNumberSuffix").value = "C";
       refreshHeaderFromNumberInputs();
-    });
-
-    onChange("dbStatus", () => {
-      syncDeactivateButtonUI();
     });
 
     onInput("dbNumberSuffix", () => refreshHeaderFromNumberInputs());
@@ -1517,7 +1579,15 @@
       const el = $(id);
       if (el) el.addEventListener("change", refreshResponseTypePreviewFromCheckboxes);
     });
-  }
+
+
+    // Facet clear buttons
+    onClick("facetClear_questionType", () => clearFacet("questionType"));
+    onClick("facetClear_vesselType", () => clearFacet("vesselType"));
+    onClick("facetClear_responseType", () => clearFacet("responseType"));
+    onClick("facetClear_companyRank", () => clearFacet("companyRank"));
+    onClick("facetClear_chapter", () => clearFacet("chapter"));
+ }
 
   async function boot() {
     showWarn("");
