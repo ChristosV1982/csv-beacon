@@ -372,6 +372,9 @@ function renderReportSelect() {
 function loadReportIntoHeader(r) {
   el("vesselSelect").value = r.vessel_id || "";
   el("inspectionDate").value = r.inspection_date || "";
+  el("portName").value = r.port_name || "";
+  el("portCode").value = r.port_code || "";
+  el("inspectingCompany").value = r.inspecting_company || "";
   el("reportRef").value = r.report_ref || "";
   el("reportTitle").value = r.title || "";
   setActivePill("Active: " + reportLabel(r));
@@ -736,9 +739,12 @@ function renderDetailPane(qno) {
 function headerInputs() {
   const vessel_id = String(el("vesselSelect").value || "").trim();
   const inspection_date = String(el("inspectionDate").value || "").trim();
+  const port_name = String(el("portName").value || "").trim();
+  const port_code = String(el("portCode").value || "").trim();
+  const inspecting_company = String(el("inspectingCompany").value || "").trim();
   const report_ref = String(el("reportRef").value || "").trim();
   const title = String(el("reportTitle").value || "").trim();
-  return { vessel_id, inspection_date, report_ref, title };
+  return { vessel_id, inspection_date, port_name, port_code, inspecting_company, report_ref, title };
 }
 
 async function setActiveReportById(id) {
