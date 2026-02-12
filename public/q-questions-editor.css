@@ -215,8 +215,32 @@ a{ color:inherit; }
 .qsub{
   margin-top:4px;
   font-size:12px;
-  color:var(--muted);
+  /* keep list text readable (requested: black) */
+  color:#0f172a;
   line-height:1.25;
+}
+
+/* View header: number + short text on the same row */
+.vhdr-top{
+  display:flex;
+  align-items:flex-start;
+  gap:14px;
+  flex-wrap:wrap;
+}
+.vhdr-short{
+  flex:1 1 320px;
+  min-width:240px;
+}
+
+/* Reduce vertical gaps between collapsed sections */
+.coll{ margin:6px 0; }
+.coll + .coll{ margin-top:2px; }
+
+/* EE/PGNO body text in view: slightly larger + black (numbering untouched) */
+.masterBody{
+  font-size:13px;
+  color:#0f172a;
+  line-height:1.35;
 }
 
 .main .card{ margin-bottom:14px; }
@@ -338,6 +362,12 @@ a{ color:inherit; }
 .masterTiny{
   font-size:12px;
   color:var(--muted);
+}
+
+/* View-only body text for Expected Evidence / PGNOs (requested: a bit larger + black) */
+.masterBody{
+  font-size:13px;
+  color:#000;
 }
 
 .masterGrid{

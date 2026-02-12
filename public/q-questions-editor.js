@@ -743,8 +743,8 @@
           <div class="masterHdr">
             <div class="masterCode">${escapeHtml(code)}</div>
           </div>
-          <div class="masterTiny" style="margin-top:6px; white-space:pre-wrap;">${escapeHtml(t)}</div>
-          ${r ? `<div class="masterTiny" style="margin-top:8px;"><b>Remarks:</b> ${escapeHtml(r)}</div>` : ``}
+          <div class="masterBody" style="margin-top:6px; white-space:pre-wrap;">${escapeHtml(t)}</div>
+          ${r ? `<div class="masterBody" style="margin-top:8px;"><b>Remarks:</b> ${escapeHtml(r)}</div>` : ``}
         </div>
       `;
     }).join("");
@@ -846,7 +846,7 @@
           <div class="masterHdr">
             <div class="masterCode">${i + 1}.</div>
           </div>
-          <div class="masterTiny" style="margin-top:6px; white-space:pre-wrap;">${escapeHtml(t)}</div>
+          <div class="masterBody" style="margin-top:6px; white-space:pre-wrap;">${escapeHtml(t)}</div>
 
           ${(ch || form || r) ? `
             <div style="height:8px;"></div>
@@ -1778,6 +1778,10 @@ async function deleteSelected() {
       setText("modeLine", `Role: ${role} • Mode: Admin • Module: QUESTIONS_EDITOR`);
 
       wireUI();
+
+      // Ensure facets are closed on initial load (browser sometimes restores <details> open state)
+      document.querySelectorAll('.facet').forEach(d => { try { d.open = false; } catch(_){} });
+
       await loadQuestions();
     } catch (e) {
       showWarn("Boot failed:\n\n" + (e?.message || String(e)));
