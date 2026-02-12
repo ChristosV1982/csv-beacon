@@ -202,36 +202,44 @@
             </div>
           </div>
 
-          <div class="section">
-            <div class="section-title">Question Attributes</div>
-            <div class="grid2 attrGrid">
-              <div><div class="lbl">Question Type</div><div class="box" id="vAttrQuestionType"></div></div>
-              <div><div class="lbl">Vessel Type</div><div class="box" id="vAttrVesselType"></div></div>
-              <div><div class="lbl">ROVIQ List</div><div class="box" id="vAttrRoviq"></div></div>
-              <div><div class="lbl">Company Rank Allocation</div><div class="box" id="vAttrCompanyRank"></div></div>
-              <div><div class="lbl">TMSA3 Reference</div><div class="box" id="vAttrTmsa3"></div></div>
-              <div><div class="lbl">TMSA4 Reference</div><div class="box" id="vAttrTmsa4"></div></div>
-              <div><div class="lbl">Response Type</div><div class="box" id="vAttrResponseType"></div></div>
-              <div><div class="lbl">Tags</div><div class="box" id="vTags"></div></div>
-              <div><div class="lbl">Version</div><div class="box" id="vVersion"></div></div>
+          
+          <details class="coll" id="vCollAttrs">
+            <summary><span class="collTitle">Question Attributes</span></summary>
+            <div class="collBody">
+              <div class="grid2 attrGrid">
+                <div><div class="lbl">Question Type</div><div class="box" id="vAttrQuestionType"></div></div>
+                <div><div class="lbl">Vessel Type</div><div class="box" id="vAttrVesselType"></div></div>
+                <div><div class="lbl">ROVIQ List</div><div class="box" id="vAttrRoviq"></div></div>
+                <div><div class="lbl">Company Rank Allocation</div><div class="box" id="vAttrCompanyRank"></div></div>
+                <div><div class="lbl">TMSA3 Reference</div><div class="box" id="vAttrTmsa3"></div></div>
+                <div><div class="lbl">TMSA4 Reference</div><div class="box" id="vAttrTmsa4"></div></div>
+                <div><div class="lbl">Response Type</div><div class="box" id="vAttrResponseType"></div></div>
+                <div><div class="lbl">Tags</div><div class="box" id="vTags"></div></div>
+                <div><div class="lbl">Version</div><div class="box" id="vVersion"></div></div>
+              </div>
             </div>
-          </div>
+          </details>
 
-          <div class="section">
-            <div class="row" style="justify-content:space-between; align-items:center;">
-              <div class="section-title">Expected Evidence</div>
-              <div class="muted small" id="vEeCount">—</div>
-            </div>
-            <div id="vEeList"></div>
-          </div>
 
-          <div class="section">
-            <div class="row" style="justify-content:space-between; align-items:center;">
-              <div class="section-title">PGNOs</div>
-              <div class="muted small" id="vPgnoCount">—</div>
+          <details class="coll" id="vCollEe">
+            <summary>
+              <span class="collTitle">Expected Evidence</span>
+              <span class="muted small" id="vEeCount" style="margin-left:10px;">—</span>
+            </summary>
+            <div class="collBody">
+              <div id="vEeList"></div>
             </div>
-            <div id="vPgnoList"></div>
-          </div>
+          </details>
+
+<details class="coll" id="vCollPgno">
+            <summary>
+              <span class="collTitle">PGNOs</span>
+              <span class="muted small" id="vPgnoCount" style="margin-left:10px;">—</span>
+            </summary>
+            <div class="collBody">
+              <div id="vPgnoList"></div>
+            </div>
+          </details>
 
           <div class="section">
             <!-- Advanced raw JSON not required in view mode (kept for JS, hidden) -->

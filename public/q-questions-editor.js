@@ -411,10 +411,13 @@
   }
 
   function ensureFacetOpenState() {
-    for (const f of FACETS) {
-      const det = $("facet_" + f.key);
-      if (!det) continue;
-      det.open = facetSelected[f.key]?.size > 0;
+    // Do NOT auto-expand facets. On first render we force all facets closed.
+    if (!__facetsInitClosed) {
+      for (const f of FACETS) {
+        const det = $("facet_" + f.key);
+        if (det) det.open = false;
+      }
+      __facetsInitClosed = true;
     }
   }
 
@@ -1783,3 +1786,4 @@ async function deleteSelected() {
 
   boot();
 })();
+let __facetsInitClosed = false;

@@ -189,7 +189,7 @@ a{ color:inherit; }
 .qitem{
   border:1px solid var(--line);
   border-radius:12px;
-  padding:10px 10px;
+  padding:6px 8px;
   margin-bottom:8px;
   cursor:pointer;
   background:#fff;
@@ -199,6 +199,14 @@ a{ color:inherit; }
   border-color:#93c5fd;
   background:#eff6ff;
 }
+
+/* List item background by designation */
+.qitem.q-core{ background:#eaf7ea; }         /* light green */
+.qitem.q-rot1{ background:#fdecec; }         /* light red */
+.qitem.q-rot2{ background:#fff2e0; }         /* light orange */
+.qitem.q-core.active{ background:#dff3df; }
+.qitem.q-rot1.active{ background:#fbdcdc; }
+.qitem.q-rot2.active{ background:#ffe6c7; }
 .qno{
   font-weight:900;
   font-size:12px;
@@ -475,3 +483,10 @@ details.coll{ margin:4px 0; }
 .attrGrid .lbl{ font-weight:700; }
 .attrGrid .box{ padding:6px 8px; min-height:30px; }
 
+
+
+/* Ensure primary content text is solid (not muted) */
+.box, .qbox, .pre, #vQuestion, #vGuidance, #vActions, #vShortText,
+#vAttrQuestionType,#vAttrVesselType,#vAttrRoviq,#vAttrCompanyRank,#vAttrTmsa3,#vAttrTmsa4,#vAttrResponseType,#vTags,#vVersion{
+  color:#000;
+}
