@@ -9,7 +9,7 @@
   <link rel="stylesheet" href="./tekmerion-theme.css?v=20260212_1" />
 
   <!-- IMPORTANT: dedicated editor CSS + cache-bust -->
-  <link rel="stylesheet" href="./q-questions-editor.css?v=20260212_1" />
+  <link rel="stylesheet" href="./q-questions-editor.css?v=20260130_1" />
 </head>
 
 <body>
@@ -159,11 +159,11 @@
               <div class="vhdr-top">
                 <div class="hnum" id="vhdrNumber">—</div>
                 <div class="vhdr-short">
-                  <div class="lbl">Short Text</div>
-                  <div class="box box-inline" id="vShortText"></div>
+                  <div class="box box-inline" id="vShortText" title="Short Text"></div>
                 </div>
               </div>
-              <div class="muted small" id="vhdrId"></div>
+              <!-- keep for JS, but hide in view mode -->
+              <div class="muted small" id="vhdrId" style="display:none;"></div>
             </div>
             <div class="qe-actions">
               <button id="btnEdit" class="btn light" type="button">Edit</button>
@@ -171,7 +171,8 @@
             </div>
           </div>
 
-          <div class="kv">
+          <!-- keep for JS, but hide in view mode -->
+          <div class="kv" style="display:none;">
             <div class="qe-pill" id="vSourcePill">source: —</div>
             <div class="qe-pill" id="vStatusPill">status: —</div>
             <div class="qe-pill" id="vSuffixPill">suffix: —</div>
@@ -182,8 +183,7 @@
 
             <div class="qstack">
               <div>
-                <div class="lbl">Question Text</div>
-                <div class="box qbox" id="vQuestion"></div>
+                <div class="box qbox qtext" id="vQuestion"></div>
               </div>
 
               <details class="coll">
@@ -203,10 +203,8 @@
           </div>
 
           <div class="section">
-            <details class="coll">
-              <summary><span class="collTitle">Question Attributes</span></summary>
-              <div class="collBody">
-<div class="grid2 attrGrid">
+            <div class="section-title">Question Attributes</div>
+            <div class="grid2 attrGrid">
               <div><div class="lbl">Question Type</div><div class="box" id="vAttrQuestionType"></div></div>
               <div><div class="lbl">Vessel Type</div><div class="box" id="vAttrVesselType"></div></div>
               <div><div class="lbl">ROVIQ List</div><div class="box" id="vAttrRoviq"></div></div>
@@ -217,35 +215,26 @@
               <div><div class="lbl">Tags</div><div class="box" id="vTags"></div></div>
               <div><div class="lbl">Version</div><div class="box" id="vVersion"></div></div>
             </div>
-              </div>
-            </details>
           </div>
 
           <div class="section">
-            <details class="coll">
-              <summary>
-                <span class="collTitle">Expected Evidence</span>
-                <span class="collMeta muted small" id="vEeCount">—</span>
-              </summary>
-              <div class="collBody">
-                <div id="vEeList"></div>
-              </div>
-            </details>
+            <div class="row" style="justify-content:space-between; align-items:center;">
+              <div class="section-title">Expected Evidence</div>
+              <div class="muted small" id="vEeCount">—</div>
+            </div>
+            <div id="vEeList"></div>
           </div>
 
           <div class="section">
-            <details class="coll">
-              <summary>
-                <span class="collTitle">PGNOs</span>
-                <span class="collMeta muted small" id="vPgnoCount">—</span>
-              </summary>
-              <div class="collBody">
-                <div id="vPgnoList"></div>
-              </div>
-            </details>
+            <div class="row" style="justify-content:space-between; align-items:center;">
+              <div class="section-title">PGNOs</div>
+              <div class="muted small" id="vPgnoCount">—</div>
+            </div>
+            <div id="vPgnoList"></div>
           </div>
 
           <div class="section">
+            <!-- Advanced raw JSON not required in view mode (kept for JS, hidden) -->
             <button id="btnToggleAdvancedView" class="btn" type="button" style="display:none;">Advanced (Raw JSON)</button>
             <div id="viewAdvanced" class="adv" style="display:none;">
               <pre id="vRaw" class="pre"></pre>
@@ -275,16 +264,7 @@
             <div class="qe-pill" id="pillSuffix">suffix: —</div>
           </div>
 
-          <details class="coll" open id="editAttrColl">
-            <summary><span class="collTitle">Question Attributes (editable)</span></summary>
-            <div class="collBody">
-<details class="coll" open id="editEeColl">
-            <summary><span class="collTitle">Expected Evidence (stored as DB rows)</span></summary>
-            <div class="collBody">
-<details class="coll" open id="editPgnoColl">
-            <summary><span class="collTitle">PGNOs (stored as DB rows)</span></summary>
-            <div class="collBody">
-<div class="masterBox">
+          <div class="masterBox">
             <div class="masterTitle">DB Fields</div>
 
             <div class="grid2">
@@ -336,11 +316,11 @@
               </div>
             </div>
 
-            <button id="btnToggleAdvancedEdit" class="btn" type="button" style="margin-top:10px; display:none;">
+            <button id="btnToggleAdvancedEdit" class="btn" type="button" style="margin-top:10px;">
               Advanced (Version / Raw JSON)
             </button>
 
-            <div class="adv" id="editAdvanced" style="display:none;">
+            <div class="adv" id="editAdvanced">
               <div class="grid2" style="margin-top:10px;">
                 <div>
                   <label class="lbl">Version (your tag)</label>
@@ -378,8 +358,6 @@
                 <input id="eVesselType" class="inp" type="text" placeholder="e.g. Chemical, LNG, LPG, Oil" />
               </div>
             </div>
-            </div>
-          </details>
 
             <div class="grid2" style="margin-top:10px;">
               <div>
@@ -448,8 +426,6 @@
                 <button id="btnAddEe" class="btn" type="button">+ Add Expected Evidence</button>
               </div>
             </div>
-            </div>
-          </details>
             <div style="height:10px;"></div>
             <div id="eeEditorList"></div>
             <div class="muted small" style="margin-top:8px;">One row = one bullet. Sequence auto-saved as 1, 2, 3, ...</div>
@@ -463,8 +439,6 @@
                 <button id="btnAddPgno" class="btn" type="button">+ Add PGNO</button>
               </div>
             </div>
-            </div>
-          </details>
             <div style="height:10px;"></div>
             <div id="pgnoEditorList"></div>
             <div class="muted small" style="margin-top:8px;">Codes auto-generated: <b>number_base</b> + <b>.01</b>, <b>.02</b>, ...</div>
@@ -483,6 +457,6 @@
   <script defer src="./theme.js?v=20260212_1"></script>
 
   <script defer src="./auth.js?v=20260130_1"></script>
-  <script defer src="./q-questions-editor.js?v=20260212_1"></script>
+  <script defer src="./q-questions-editor.js?v=20260130_1"></script>
 </body>
 </html>
