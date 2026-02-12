@@ -414,7 +414,9 @@
     for (const f of FACETS) {
       const det = $("facet_" + f.key);
       if (!det) continue;
-      det.open = facetSelected[f.key]?.size > 0;
+      // Always start collapsed (user opens what they want).
+      // Selection counts are still shown in the summary.
+      det.open = false;
     }
   }
 
