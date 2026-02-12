@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>SIRE 2.0 – Questions Editor</title>
 
+  <!-- TEKMERION global theme (Light/Dark) -->
+  <link rel="stylesheet" href="./tekmerion-theme.css?v=20260212_1" />
+
   <!-- IMPORTANT: dedicated editor CSS + cache-bust -->
   <link rel="stylesheet" href="./q-questions-editor.css?v=20260130_1" />
 </head>
@@ -18,6 +21,17 @@
     </div>
 
     <div class="topbar-right">
+
+      <!-- THEME DROPDOWN (System / Light / Dark) -->
+      <label class="themeCtl" for="themeSelect" title="Theme">
+        <span class="themeCtl-label">Theme</span>
+        <select id="themeSelect" class="btn light themeCtl-select">
+          <option value="system">System</option>
+          <option value="light">Light</option>
+          <option value="dark">Dark</option>
+        </select>
+      </label>
+
       <div id="userBadge" class="badge">Not signed in</div>
       <button id="loginBtn" class="btn primary" type="button">Login</button>
       <button id="switchUserBtn" class="btn light" type="button">Switch user</button>
@@ -30,70 +44,68 @@
     <div id="warnBox" class="msg warn" style="display:none;"></div>
     <div id="okBox" class="msg ok" style="display:none;"></div>
 
-    
     <!-- Filters ribbon -->
     <div class="filterRibbon" id="filterRibbon">
       <div class="facetWrap facetWrapRibbon">
-            <details class="facet" id="facet_status">
-              <summary>Status <span class="facetSummary" id="facetSummary_status"></span></summary>
-              <div class="facetBody">
-                <div class="facetOptions" id="facetOptions_status"></div>
-              </div>
-            </details>
+        <details class="facet" id="facet_status">
+          <summary>Status <span class="facetSummary" id="facetSummary_status"></span></summary>
+          <div class="facetBody">
+            <div class="facetOptions" id="facetOptions_status"></div>
+          </div>
+        </details>
 
-            <details class="facet" id="facet_source">
-              <summary>Source <span class="facetSummary" id="facetSummary_source"></span></summary>
-              <div class="facetBody">
-                <div class="facetOptions" id="facetOptions_source"></div>
-              </div>
-            </details>
+        <details class="facet" id="facet_source">
+          <summary>Source <span class="facetSummary" id="facetSummary_source"></span></summary>
+          <div class="facetBody">
+            <div class="facetOptions" id="facetOptions_source"></div>
+          </div>
+        </details>
 
-            <details class="facet" id="facet_version">
-              <summary>Version <span class="facetSummary" id="facetSummary_version"></span></summary>
-              <div class="facetBody">
-                <div class="facetOptions" id="facetOptions_version"></div>
-              </div>
-            </details>
+        <details class="facet" id="facet_version">
+          <summary>Version <span class="facetSummary" id="facetSummary_version"></span></summary>
+          <div class="facetBody">
+            <div class="facetOptions" id="facetOptions_version"></div>
+          </div>
+        </details>
 
-            <details class="facet" id="facet_questionType">
-              <summary>Question Type <span class="facetSummary" id="facetSummary_questionType"></span></summary>
-              <div class="facetBody">
-                <div class="facetOptions" id="facetOptions_questionType"></div>
-              </div>
-            </details>
+        <details class="facet" id="facet_questionType">
+          <summary>Question Type <span class="facetSummary" id="facetSummary_questionType"></span></summary>
+          <div class="facetBody">
+            <div class="facetOptions" id="facetOptions_questionType"></div>
+          </div>
+        </details>
 
-            <details class="facet" id="facet_vesselType">
-              <summary>Vessel Type <span class="facetSummary" id="facetSummary_vesselType"></span></summary>
-              <div class="facetBody">
-                <div class="facetOptions" id="facetOptions_vesselType"></div>
-              </div>
-            </details>
+        <details class="facet" id="facet_vesselType">
+          <summary>Vessel Type <span class="facetSummary" id="facetSummary_vesselType"></span></summary>
+          <div class="facetBody">
+            <div class="facetOptions" id="facetOptions_vesselType"></div>
+          </div>
+        </details>
 
-            <details class="facet" id="facet_responseType">
-              <summary>Response Type <span class="facetSummary" id="facetSummary_responseType"></span></summary>
-              <div class="facetBody">
-                <div class="facetOptions" id="facetOptions_responseType"></div>
-              </div>
-            </details>
+        <details class="facet" id="facet_responseType">
+          <summary>Response Type <span class="facetSummary" id="facetSummary_responseType"></span></summary>
+          <div class="facetBody">
+            <div class="facetOptions" id="facetOptions_responseType"></div>
+          </div>
+        </details>
 
-            <details class="facet" id="facet_companyRank">
-              <summary>Company Rank Allocation <span class="facetSummary" id="facetSummary_companyRank"></span></summary>
-              <div class="facetBody">
-                <div class="facetOptions" id="facetOptions_companyRank"></div>
-              </div>
-            </details>
+        <details class="facet" id="facet_companyRank">
+          <summary>Company Rank Allocation <span class="facetSummary" id="facetSummary_companyRank"></span></summary>
+          <div class="facetBody">
+            <div class="facetOptions" id="facetOptions_companyRank"></div>
+          </div>
+        </details>
 
-            <details class="facet" id="facet_chapter">
-              <summary>SIRE 2.0 Chapter <span class="facetSummary" id="facetSummary_chapter"></span></summary>
-              <div class="facetBody">
-                <div class="facetOptions" id="facetOptions_chapter"></div>
-              </div>
-            </details>
-          
+        <details class="facet" id="facet_chapter">
+          <summary>SIRE 2.0 Chapter <span class="facetSummary" id="facetSummary_chapter"></span></summary>
+          <div class="facetBody">
+            <div class="facetOptions" id="facetOptions_chapter"></div>
+          </div>
+        </details>
       </div>
     </div>
 
-<!-- Main layout -->
+    <!-- Main layout -->
     <div class="layout">
       <!-- LEFT: list/filter -->
       <aside class="sidebar">
@@ -106,8 +118,6 @@
           </div>
 
           <div class="hr"></div>
-
-          
 
           <label class="lbl">Search</label>
           <input id="searchInput" class="inp" type="text" placeholder="Search number / short text / question..." />
@@ -441,6 +451,10 @@
 
   <!-- scripts (cache-bust) -->
   <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <!-- Theme dropdown logic -->
+  <script defer src="./theme.js?v=20260212_1"></script>
+
   <script defer src="./auth.js?v=20260130_1"></script>
   <script defer src="./q-questions-editor.js?v=20260130_1"></script>
 </body>

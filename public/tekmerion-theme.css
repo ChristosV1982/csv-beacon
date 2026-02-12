@@ -1,0 +1,121 @@
+/* TEKMERION — Global Theme Tokens (Light + Dark)
+   Dark mode is enabled via:  html[data-theme="dark"]
+*/
+
+:root{
+  /* Brand */
+  --navy-900:#0B2A4A;
+  --navy-800:#103558;
+  --ocean-600:#0E6BA8;
+  --ocean-500:#1788C7;
+  --tanker-red:#B21F2D;
+
+  /* Fonts (offline-friendly) */
+  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, Arial, "Noto Sans", sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+
+  /* Light theme */
+  --bg:#F6F8FB;
+  --surface:#FFFFFF;
+  --surface-2:#F1F5F9;
+  --border:#D6DEE8;
+
+  --text:#0F172A;
+  --muted:#475569;
+
+  --link: var(--ocean-600);
+
+  /* Buttons */
+  --btn-primary-bg: var(--ocean-600);
+  --btn-primary-text:#FFFFFF;
+  --btn-primary-bg-hover: var(--ocean-500);
+
+  --btn-secondary-bg:#FFFFFF;
+  --btn-secondary-text: var(--navy-900);
+  --btn-secondary-border: var(--border);
+  --btn-secondary-bg-hover:#F1F5F9;
+
+  /* Status */
+  --success:#1F7A4D;
+  --warning:#B7791F;
+  --danger:#B42318;
+  --info:#2563EB;
+
+  --focus:#93C5FD;
+}
+
+html[data-theme="dark"]{
+  --bg:#071A2E;
+  --surface:#0C2540;
+  --surface-2:#0A1F36;
+  --border:#1E3A5F;
+
+  --text:#E6EEF7;
+  --muted:#B7C7DA;
+
+  --link:#6FB6FF;
+
+  /* Buttons tuned for dark */
+  --btn-primary-bg:#1788C7;
+  --btn-primary-text:#071A2E;
+  --btn-primary-bg-hover:#37A4E0;
+
+  --btn-secondary-bg:#0C2540;
+  --btn-secondary-text:#E6EEF7;
+  --btn-secondary-border:#1E3A5F;
+  --btn-secondary-bg-hover:#102E4E;
+
+  /* Status tuned for dark */
+  --success:#34D399;
+  --warning:#FBBF24;
+  --danger:#FB7185;
+  --info:#60A5FA;
+
+  --focus:#60A5FA;
+}
+
+html, body{
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+}
+
+a{ color: var(--link); }
+
+:focus-visible{
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* Theme dropdown (matches your .btn look) */
+.themeCtl{
+  display:flex;
+  align-items:center;
+  gap:10px;
+}
+
+.themeCtl-label{
+  font-size:12px;
+  font-weight:600;
+  color: var(--muted);
+  user-select:none;
+}
+
+.themeCtl-select{
+  padding: 8px 12px;
+  border-radius: 12px;
+  min-width: 140px;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image:
+    linear-gradient(45deg, transparent 50%, currentColor 50%),
+    linear-gradient(135deg, currentColor 50%, transparent 50%),
+    linear-gradient(to right, transparent, transparent);
+  background-position:
+    calc(100% - 18px) 50%,
+    calc(100% - 12px) 50%,
+    0 0;
+  background-size: 6px 6px, 6px 6px, 100% 100%;
+  background-repeat: no-repeat;
+}
