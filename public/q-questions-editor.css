@@ -1,3 +1,11 @@
+
+/* =========================
+   Compact view tweaks (requested)
+   ========================= */
+html, body{
+  font-size: 10px;
+}
+
 :root{
   --bg:#f3f6fb;
   --card:#ffffff;
@@ -452,3 +460,41 @@ details.facet[open] > summary{
   min-width: 26px;
   text-align: right;
 }
+
+
+
+/* =========================
+   Tekmerion editor — list designation colors
+   ========================= */
+.qitem.q-core{ background:#e3f8e3; }      /* light green */
+.qitem.q-rot1{ background:#ffe3e3; }      /* light red/pink */
+.qitem.q-rot2{ background:#ffe9d6; }      /* light orange */
+.qitem.q-core, .qitem.q-rot1, .qitem.q-rot2{
+  border-left: 6px solid rgba(0,0,0,.08);
+}
+
+/* Condense spacing to gain screen real estate */
+.card{ padding:10px; }
+.masterBox{ padding:10px; }
+.box{ padding:8px 10px; }
+.ta{ padding:8px 10px; min-height:80px; }
+.inp{ padding:6px 8px; }
+.hdr{ padding:10px 10px; }
+.section{ padding:10px 0; }
+.section-title{ font-weight:700; }
+.lbl{ font-weight:700; }
+
+/* Collapsible blocks */
+details.coll summary{
+  padding:8px 10px;
+}
+details.coll .collBody{
+  padding:10px;
+}
+details.coll .collMeta{
+  margin-left:10px;
+}
+
+
+.qitem.q-core:hover, .qitem.q-rot1:hover, .qitem.q-rot2:hover{ filter: brightness(0.98); }
+.qitem.active{ outline:2px solid rgba(14,107,168,.25); }
