@@ -8,8 +8,12 @@ import { loadLockedLibraryJson } from "./question_library_loader.js";
 
 const LOCKED_LIBRARY_JSON = "./sire_questions_all_columns_named.json";
 
+const PDF_BUCKET_DEFAULT = "inspection-reports"; // must match your Storage bucket name
+const PDF_FOLDER_PREFIX = "post_inspections";
+
 const OBS_TYPES = [
   { value: "negative_observation", label: "Negative observation" },
+  { value: "positive_observation", label: "Positive observation" },
   { value: "observation_comment", label: "Observation / comment" },
   { value: "note_improvement", label: "Note / improvement" },
   { value: "best_practice", label: "Best practice" },
@@ -29,6 +33,74 @@ function esc(s) {
 }
 
 function nowIso() { return new Date().toISOString(); }
+
+
+function ddmmyyyyToIso(ddmmyyyy) {
+  const s = String(ddmmyyyy || "").trim();
+  // expects dd.mm.yyyy
+  const m = s.match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
+  if (!m) return "";
+  const dd = m[1], mm = m[2], yyyy = m[3];
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function normalizeQnoParts(qno, pad2) {
+  const parts = String(qno || "").trim().split(".").filter(Boolean);
+  if (parts.length < 2) return String(qno || "").trim();
+  const norm = parts.map(p => {
+    const n = p.replace(/^0+/, "") || "0";
+    return pad2 ? n.padStart(2, "0") : String(Number(n));
+  });
+  return norm.join(".");
+}
+
+function findLibraryQno(qbase) {
+  const raw = String(qbase || "").trim();
+  if (!raw) return null;
+
+  // direct hit
+  if (state.libByNo.has(raw)) return raw;
+
+  // try padded (02.02.01) and non-padded (2.2.1)
+  const padded = normalizeQnoParts(raw, true);
+  if (state.libByNo.has(padded)) return padded;
+
+  const nonPadded = normalizeQnoParts(raw, false);
+  if (state.libByNo.has(nonPadded)) return nonPadded;
+
+  // sometimes library may contain leading zeros in some segments only
+  for (const candidate of [raw, padded, nonPadded]) {
+    // also try trimming leading zeros per segment but keep original digits
+    const alt = candidate.split(".").map(p => p.replace(/^0+/, "") || "0").join(".");
+    if (state.libByNo.has(alt)) return alt;
+  }
+
+  return null;
+}
+
+async function ensureActiveReportExists() {
+  if (state.activeReport?.id) return state.activeReport;
+  // Create report using current header inputs
+  const inputs = headerInputs();
+  const created = await createReportHeader(inputs);
+  state.reports.unshift(created);
+  state.activeReport = created;
+  await refreshReportSelect();
+  el("reportSelect").value = created.id;
+  setSaveStatus("Report created");
+  return created;
+}
+
+async function upsertObservationsDirect(reportId, rows) {
+  const chunkSize = 100;
+  for (let i = 0; i < rows.length; i += chunkSize) {
+    const chunk = rows.slice(i, i + chunkSize);
+    const { error } = await state.supabase
+      .from("post_inspection_observations")
+      .upsert(chunk, { onConflict: "report_id,question_no" });
+    if (error) throw error;
+  }
+}
 
 const state = {
   me: null,
@@ -1101,6 +1173,111 @@ function finalizeCheck() {
 // -------------------------
 // Init
 // -------------------------
+
+async function importReportPdfAiFromFile(file) {
+  if (!file) return;
+
+  // 1) ensure report exists
+  const report = await ensureActiveReportExists();
+
+  // 2) upload PDF to Storage
+  const bucket = PDF_BUCKET_DEFAULT;
+  const safeName = String(file.name || "report.pdf").replace(/[^a-zA-Z0-9._-]+/g, "_");
+  const path = `${PDF_FOLDER_PREFIX}/${report.id}/${Date.now()}_${safeName}`;
+
+  setSaveStatus("Uploading PDF…");
+  const { error: upErr } = await state.supabase
+    .storage
+    .from(bucket)
+    .upload(path, file, { upsert: true, contentType: "application/pdf" });
+
+  if (upErr) throw upErr;
+
+  // 3) call Edge Function
+  setSaveStatus("Extracting via AI…");
+  const { data, error } = await state.supabase.functions.invoke("import-post-inspection-pdf", {
+    body: { report_id: report.id, pdf_storage_path: path },
+  });
+
+  if (error) throw error;
+  if (!data?.ok) throw new Error(data?.error || "AI import failed");
+
+  const extracted = data.extracted;
+
+  // 4) apply header (best-effort mapping)
+  const h = extracted?.header || {};
+  const isoDate = ddmmyyyyToIso(h.inspection_date);
+
+  // match vessel by name if possible (else keep current selection)
+  let vessel_id = el("vesselSelect").value || null;
+  if (h.vessel_name) {
+    const hit = (state.vessels || []).find(v =>
+      String(v.name || "").trim().toLowerCase() === String(h.vessel_name).trim().toLowerCase()
+    );
+    if (hit?.id) vessel_id = hit.id;
+  }
+
+  // set UI fields
+  if (vessel_id) el("vesselSelect").value = vessel_id;
+  if (isoDate) el("inspectionDate").value = isoDate;
+  if (h.port_name) el("portName").value = h.port_name;
+  if (h.port_code) el("portCode").value = h.port_code;
+  if (h.ocimf_inspecting_company) el("inspectingCompany").value = h.ocimf_inspecting_company;
+  if (h.report_reference) el("reportRef").value = h.report_reference;
+
+  // persist header
+  const updatedHeader = await updateReportHeader(report.id, headerInputs());
+  state.activeReport = updatedHeader;
+  await refreshReportSelect();
+  el("reportSelect").value = updatedHeader.id;
+
+  // 5) map observations into DB rows
+  const obs = Array.isArray(extracted?.observations) ? extracted.observations : [];
+  const rows = [];
+  const newMap = { ...(state.observations || {}) };
+
+  for (const item of obs) {
+    const qbase = item?.question_base;
+    const qno = findLibraryQno(qbase);
+    if (!qno) continue;
+
+    const isNeg = String(item?.obs_type || "").toLowerCase() === "negative";
+    const isPos = String(item?.obs_type || "").toLowerCase() === "positive";
+
+    const observation_type = isNeg
+      ? "negative_observation"
+      : isPos
+        ? "positive_observation"
+        : "observation_comment";
+
+    const remarks = String(item?.observation_text || "").trim();
+
+    const row = {
+      report_id: report.id,
+      question_no: qno,
+      has_observation: true,
+      observation_type,
+      pgno_selected: [], // PGNO selection remains manual
+      remarks,
+      updated_at: nowIso(),
+    };
+
+    rows.push(row);
+    newMap[qno] = { ...row };
+  }
+
+  if (rows.length) {
+    setSaveStatus(`Saving ${rows.length} observation(s)…`);
+    await upsertObservationsDirect(report.id, rows);
+  }
+
+  // reload to be consistent
+  state.observations = await loadObservationsForReport(report.id);
+  renderQuestionList();
+  renderObservationEditor();
+  setSaveStatus(`AI import done (${rows.length} observation(s))`);
+}
+
 async function init() {
   const R = window.AUTH?.ROLES;
   state.me = await window.AUTH.requireAuth([R.SUPER_ADMIN, R.COMPANY_ADMIN]);
@@ -1167,6 +1344,16 @@ async function init() {
     const f = e.target.files && e.target.files[0];
     if (f) await importReportJsonFromFile(f);
     e.target.value = "";
+  });
+
+  el("importPdfBtn").addEventListener("click", () => el("importPdfFile").click());
+  el("importPdfFile").addEventListener("change", async (e) => {
+    const f = e.target.files && e.target.files[0];
+    try {
+      if (f) await importReportPdfAiFromFile(f);
+    } finally {
+      e.target.value = "";
+    }
   });
 
   el("statsBtn").addEventListener("click", renderStatsDialog);
