@@ -863,26 +863,32 @@ async function setActiveReportById(id) {
 }
 
 async function handleNewReport() {
-  const { vessel_id, inspection_date, port_name, port_code, ocimf_inspecting_company, report_ref, title } = headerInputs();
+  // IMPORTANT:
+  // The database has a UNIQUE constraint on report_ref.
+  // "New Report" should NOT auto-insert a row (it can easily collide on report_ref).
+  // Instead, it resets the form for manual entry. Use "Save Report Header" to create/update.
+  await setActiveReportById(null);
 
-  if (!vessel_id) { alert("Please select a vessel first."); return; }
-  if (!inspection_date) { alert("Please set an inspection date."); return; }
+  // Reset header inputs (manual mode)
+  el("reportSelect").value = "";
+  el("vesselSelect").value = "";
+  el("portName").value = "";
+  el("portCode").value = "";
+  el("inspectingCompany").value = "";
+  el("reportRef").value = "";
+  el("reportTitle").value = "";
 
-  setSaveStatus("Saving…");
+  // Default date to today
+  const d = new Date();
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  el("inspectionDate").value = `${yyyy}-${mm}-${dd}`;
 
-  try {
-    const created = await createReportHeader({ vessel_id, inspection_date, port_name, port_code, ocimf_inspecting_company, report_ref, title });
-
-    // refresh list from DB (source of truth)
-    state.reports = await loadReportsFromDb();
-
-    await setActiveReportById(created.id);
-    setSaveStatus("Saved");
-  } catch (e) {
-    console.error(e);
-    alert("Create report failed: " + (e?.message || String(e)));
-    setSaveStatus("Error");
-  }
+  setActivePill("No active report");
+  clearDetailPane();
+  renderQuestionList();
+  setSaveStatus("Not saved");
 }
 
 async function handleSaveHeader() {
@@ -1177,64 +1183,117 @@ function finalizeCheck() {
 async function importReportPdfAiFromFile(file) {
   if (!file) return;
 
-  // 1) ensure report exists
-  const report = await ensureActiveReportExists();
+  // This flow is designed so that:
+  // - You can import a PDF WITHOUT manually creating a report first.
+  // - Header fields (vessel/date/port/company/report ref) come from the PDF.
+  // - Inspector name remains manual (not stored in this module yet).
 
-  // 2) upload PDF to Storage
+  // 1) Upload PDF to Storage (temporary path is fine)
   const bucket = PDF_BUCKET_DEFAULT;
   const safeName = String(file.name || "report.pdf").replace(/[^a-zA-Z0-9._-]+/g, "_");
-  const path = `${PDF_FOLDER_PREFIX}/${report.id}/${Date.now()}_${safeName}`;
+  const tempPath = `${PDF_FOLDER_PREFIX}/tmp/${Date.now()}_${safeName}`;
 
   setSaveStatus("Uploading PDF…");
   const { error: upErr } = await state.supabase
     .storage
     .from(bucket)
-    .upload(path, file, { upsert: true, contentType: "application/pdf" });
+    .upload(tempPath, file, { upsert: true, contentType: "application/pdf" });
 
   if (upErr) throw upErr;
 
-  // 3) call Edge Function
+  // 2) Call Edge Function (report_id is only used for correlation; function does not need a real DB id)
   setSaveStatus("Extracting via AI…");
   const { data, error } = await state.supabase.functions.invoke("import-post-inspection-pdf", {
-    body: { report_id: report.id, pdf_storage_path: path },
+    body: { report_id: "temp", pdf_storage_path: tempPath },
   });
 
   if (error) throw error;
   if (!data?.ok) throw new Error(data?.error || "AI import failed");
 
   const extracted = data.extracted;
-
-  // 4) apply header (best-effort mapping)
   const h = extracted?.header || {};
-  const isoDate = ddmmyyyyToIso(h.inspection_date);
 
-  // match vessel by name if possible (else keep current selection)
-  let vessel_id = el("vesselSelect").value || null;
-  if (h.vessel_name) {
-    const hit = (state.vessels || []).find(v =>
-      String(v.name || "").trim().toLowerCase() === String(h.vessel_name).trim().toLowerCase()
+  // 3) Resolve vessel_id from extracted vessel_name (required)
+  const extractedVesselName = String(h.vessel_name || "").trim();
+  const vesselHit = extractedVesselName
+    ? (state.vessels || []).find(v =>
+        String(v.name || "").trim().toLowerCase() === extractedVesselName.toLowerCase()
+      )
+    : null;
+
+  if (!vesselHit?.id) {
+    throw new Error(
+      `AI import: vessel not found in your vessels table: "${extractedVesselName}". ` +
+      `Add it first in vessels, or use manual mode.`
     );
-    if (hit?.id) vessel_id = hit.id;
   }
 
-  // set UI fields
-  if (vessel_id) el("vesselSelect").value = vessel_id;
-  if (isoDate) el("inspectionDate").value = isoDate;
-  if (h.port_name) el("portName").value = h.port_name;
-  if (h.port_code) el("portCode").value = h.port_code;
-  if (h.ocimf_inspecting_company) el("inspectingCompany").value = h.ocimf_inspecting_company;
-  if (h.report_reference) el("reportRef").value = h.report_reference;
+  // 4) Resolve inspection date dd.mm.yyyy -> yyyy-mm-dd (required)
+  const isoDate = ddmmyyyyToIso(h.inspection_date);
+  if (!isoDate) {
+    throw new Error(`AI import: inspection_date not parsed from PDF (got "${String(h.inspection_date || "")}").`);
+  }
 
-  // persist header
-  const updatedHeader = await updateReportHeader(report.id, headerInputs());
-  state.activeReport = updatedHeader;
-  await refreshReportSelect();
-  el("reportSelect").value = updatedHeader.id;
+  // 5) Resolve report reference (recommended; your DB has UNIQUE constraint)
+  const report_ref = String(h.report_reference || "").trim();
+  if (!report_ref) {
+    throw new Error("AI import: report_reference missing from PDF extraction (cannot satisfy unique constraint safely).");
+  }
 
-  // 5) map observations into DB rows
+  // 6) Create or reuse report by report_ref
+  // If report_ref already exists, we import into that existing report (upsert observations).
+  const { data: existingRep, error: findErr } = await state.supabase
+    .from("post_inspection_reports")
+    .select("id")
+    .eq("report_ref", report_ref)
+    .maybeSingle();
+
+  if (findErr) throw findErr;
+
+  const headerPayload = {
+    vessel_id: vesselHit.id,
+    inspection_date: isoDate,
+    port_name: String(h.port_name || "").trim() || null,
+    port_code: String(h.port_code || "").trim() || null,
+    ocimf_inspecting_company: String(h.ocimf_inspecting_company || "").trim() || null,
+    report_ref,
+    title: String(el("reportTitle").value || "").trim() || null,
+  };
+
+  let report;
+  if (existingRep?.id) {
+    const ok = confirm(
+      `A report with this reference already exists:
+
+${report_ref}
+
+` +
+      `Import into the existing report and overwrite observations for matching question numbers?`
+    );
+    if (!ok) {
+      setSaveStatus("Cancelled");
+      return;
+    }
+    report = await updateReportHeader(existingRep.id, headerPayload);
+  } else {
+    report = await createReportHeader(headerPayload);
+  }
+
+  // 7) Make it active + update UI fields
+  state.reports = await loadReportsFromDb();
+  await setActiveReportById(report.id);
+
+  // Ensure header UI reflects extracted values
+  el("vesselSelect").value = headerPayload.vessel_id;
+  el("inspectionDate").value = headerPayload.inspection_date;
+  el("portName").value = headerPayload.port_name || "";
+  el("portCode").value = headerPayload.port_code || "";
+  el("inspectingCompany").value = headerPayload.ocimf_inspecting_company || "";
+  el("reportRef").value = headerPayload.report_ref || "";
+
+  // 8) Map observations to your locked question library and upsert
   const obs = Array.isArray(extracted?.observations) ? extracted.observations : [];
   const rows = [];
-  const newMap = { ...(state.observations || {}) };
 
   for (const item of obs) {
     const qbase = item?.question_base;
@@ -1252,7 +1311,7 @@ async function importReportPdfAiFromFile(file) {
 
     const remarks = String(item?.observation_text || "").trim();
 
-    const row = {
+    rows.push({
       report_id: report.id,
       question_no: qno,
       has_observation: true,
@@ -1260,10 +1319,7 @@ async function importReportPdfAiFromFile(file) {
       pgno_selected: [], // PGNO selection remains manual
       remarks,
       updated_at: nowIso(),
-    };
-
-    rows.push(row);
-    newMap[qno] = { ...row };
+    });
   }
 
   if (rows.length) {
@@ -1271,10 +1327,10 @@ async function importReportPdfAiFromFile(file) {
     await upsertObservationsDirect(report.id, rows);
   }
 
-  // reload to be consistent
+  // 9) Reload observations from DB for consistency
   state.observations = await loadObservationsForReport(report.id);
   renderQuestionList();
-  renderObservationEditor();
+  clearDetailPane();
   setSaveStatus(`AI import done (${rows.length} observation(s))`);
 }
 
