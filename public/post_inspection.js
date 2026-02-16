@@ -11,6 +11,8 @@ const LOCKED_LIBRARY_JSON = "./sire_questions_all_columns_named.json";
 const PDF_BUCKET_DEFAULT = "inspection-reports"; // must match your Storage bucket name
 const PDF_FOLDER_PREFIX = "post_inspections";
 
+let REPORT_COMPANY_COL = "inspecting_company";
+
 const OBS_TYPES = [
   { value: "negative_observation", label: "Negative observation" },
   { value: "positive_observation", label: "Positive observation" },
@@ -80,8 +82,25 @@ function findLibraryQno(qbase) {
 
 async function ensureActiveReportExists() {
   if (state.activeReport?.id) return state.activeReport;
-  // Create report using current header inputs
-  const inputs = headerInputs();
+
+  // Create report using current header inputs.
+  // If user is importing a PDF first (no manual entry), we still need required fields for DB insert.
+  let inputs = headerInputs();
+
+  if (!inputs.vessel_id) {
+    inputs.vessel_id = state.vessels?.[0]?.id || "";
+    if (inputs.vessel_id) el("vesselSelect").value = inputs.vessel_id;
+  }
+
+  if (!inputs.inspection_date) {
+    const d = new Date();
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    inputs.inspection_date = `${yyyy}-${mm}-${dd}`;
+    el("inspectionDate").value = inputs.inspection_date;
+  }
+
   const created = await createReportHeader(inputs);
   state.reports.unshift(created);
   state.activeReport = created;
@@ -200,6 +219,35 @@ function getMissingPgnoQnos() {
 // -------------------------
 // Supabase access
 // -------------------------
+
+async function detectReportCompanyColumn() {
+  // Support older DB schema ("inspecting_company") and newer ("ocimf_inspecting_company").
+  const tryCols = ["inspecting_company", "ocimf_inspecting_company"];
+
+  for (const col of tryCols) {
+    const { error } = await state.supabase
+      .from("post_inspection_reports")
+      .select(`id, ${col}`)
+      .limit(1);
+
+    if (!error) {
+      REPORT_COMPANY_COL = col;
+      return col;
+    }
+
+    const msg = (error && (error.message || error.details || String(error))) || "";
+    if (!String(msg).toLowerCase().includes("does not exist")) {
+      throw error;
+    }
+  }
+
+  throw new Error("Neither column inspecting_company nor ocimf_inspecting_company exists in post_inspection_reports.");
+}
+
+function getReportCompanyValue(r) {
+  return r?.[REPORT_COMPANY_COL] ?? "";
+}
+
 async function loadVessels() {
   const { data, error } = await state.supabase
     .from("vessels")
@@ -213,7 +261,7 @@ async function loadVessels() {
 async function loadReportsFromDb() {
   const { data, error } = await state.supabase
     .from("post_inspection_reports")
-    .select("id, vessel_id, inspection_date, port_name, port_code, ocimf_inspecting_company, report_ref, title, created_at, updated_at")
+    .select(`id, vessel_id, inspection_date, port_name, port_code, ${REPORT_COMPANY_COL}, report_ref, title, created_at, updated_at`)
     .order("updated_at", { ascending: false });
 
   if (error) throw error;
@@ -251,23 +299,23 @@ async function loadObservationsForReport(reportId) {
   return map;
 }
 
-async function createReportHeader({ vessel_id, inspection_date, port_name, port_code, ocimf_inspecting_company, report_ref, title }) {
+async function createReportHeader({  vessel_id, inspection_date, port_name, port_code, inspecting_company, report_ref, title  }) {
   const { data, error } = await state.supabase
     .from("post_inspection_reports")
-    .insert([{ vessel_id, inspection_date, port_name, port_code, ocimf_inspecting_company, report_ref, title }])
-    .select("id, vessel_id, inspection_date, port_name, port_code, ocimf_inspecting_company, report_ref, title, created_at, updated_at")
+    .insert([{ vessel_id, inspection_date, port_name, port_code, [REPORT_COMPANY_COL]: inspecting_company, report_ref, title }])
+    .select(`id, vessel_id, inspection_date, port_name, port_code, ${REPORT_COMPANY_COL}, report_ref, title, created_at, updated_at`)
     .single();
 
   if (error) throw error;
   return data;
 }
 
-async function updateReportHeader(reportId, { vessel_id, inspection_date, port_name, port_code, ocimf_inspecting_company, report_ref, title }) {
+async function updateReportHeader(reportId, {  vessel_id, inspection_date, port_name, port_code, inspecting_company, report_ref, title  }) {
   const { data, error } = await state.supabase
     .from("post_inspection_reports")
-    .update({ vessel_id, inspection_date, port_name, port_code, ocimf_inspecting_company, report_ref, title })
+    .update({ vessel_id, inspection_date, port_name, port_code, [REPORT_COMPANY_COL]: inspecting_company, report_ref, title })
     .eq("id", reportId)
-    .select("id, vessel_id, inspection_date, port_name, port_code, ocimf_inspecting_company, report_ref, title, created_at, updated_at")
+    .select(`id, vessel_id, inspection_date, port_name, port_code, ${REPORT_COMPANY_COL}, report_ref, title, created_at, updated_at`)
     .single();
 
   if (error) throw error;
@@ -446,7 +494,7 @@ function loadReportIntoHeader(r) {
   el("inspectionDate").value = r.inspection_date || "";
   el("portName").value = r.port_name || "";
   el("portCode").value = r.port_code || "";
-  el("inspectingCompany").value = r.ocimf_inspecting_company || "";
+  el("inspectingCompany").value = getReportCompanyValue(r) || "";
   el("reportRef").value = r.report_ref || "";
   el("reportTitle").value = r.title || "";
   setActivePill("Active: " + reportLabel(r));
@@ -811,12 +859,17 @@ function renderDetailPane(qno) {
 function headerInputs() {
   const vessel_id = String(el("vesselSelect").value || "").trim();
   const inspection_date = String(el("inspectionDate").value || "").trim();
-  const port_name = String(el("portName").value || "").trim();
-  const port_code = String(el("portCode").value || "").trim();
-  const ocimf_inspecting_company = String(el("inspectingCompany").value || "").trim();
-  const report_ref = String(el("reportRef").value || "").trim();
-  const title = String(el("reportTitle").value || "").trim();
-  return { vessel_id, inspection_date, port_name, port_code, ocimf_inspecting_company, report_ref, title };
+  const port_name_raw = String(el("portName").value || "").trim();
+  const port_name = port_name_raw ? port_name_raw : null;
+  const port_code_raw = String(el("portCode").value || "").trim();
+  const port_code = port_code_raw ? port_code_raw : null;
+  const inspecting_company_raw = String(el("inspectingCompany").value || "").trim();
+  const inspecting_company = inspecting_company_raw ? inspecting_company_raw : null;
+  const report_ref_raw = String(el("reportRef").value || "").trim();
+  const report_ref = report_ref_raw ? report_ref_raw : null;
+  const title_raw = String(el("reportTitle").value || "").trim();
+  const title = title_raw ? title_raw : null;
+  return { vessel_id, inspection_date, port_name, port_code, inspecting_company, report_ref, title };
 }
 
 async function setActiveReportById(id) {
@@ -863,36 +916,37 @@ async function setActiveReportById(id) {
 }
 
 async function handleNewReport() {
-  // IMPORTANT:
-  // The database has a UNIQUE constraint on report_ref.
-  // "New Report" should NOT auto-insert a row (it can easily collide on report_ref).
-  // Instead, it resets the form for manual entry. Use "Save Report Header" to create/update.
-  await setActiveReportById(null);
+  let { vessel_id, inspection_date, port_name, port_code, inspecting_company, report_ref, title } = headerInputs();
 
-  // Reset header inputs (manual mode)
-  el("reportSelect").value = "";
-  el("vesselSelect").value = "";
-  el("portName").value = "";
-  el("portCode").value = "";
-  el("inspectingCompany").value = "";
-  el("reportRef").value = "";
-  el("reportTitle").value = "";
+  // If user clicks New Report while an existing report is loaded, the form may still contain the old report_ref.
+  // post_inspection_reports has a UNIQUE constraint on report_ref, so reusing it will fail.
+  if (state.activeReport?.report_ref && report_ref && String(report_ref) === String(state.activeReport.report_ref)) {
+    report_ref = null;
+    el("reportRef").value = "";
+  }
 
-  // Default date to today
-  const d = new Date();
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  el("inspectionDate").value = `${yyyy}-${mm}-${dd}`;
+  if (!vessel_id) { alert("Please select a vessel first."); return; }
+  if (!inspection_date) { alert("Please set an inspection date."); return; }
 
-  setActivePill("No active report");
-  clearDetailPane();
-  renderQuestionList();
-  setSaveStatus("Not saved");
+  setSaveStatus("Saving…");
+
+  try {
+    const created = await createReportHeader({ vessel_id, inspection_date, port_name, port_code, inspecting_company, report_ref, title });
+
+    // refresh list from DB (source of truth)
+    state.reports = await loadReportsFromDb();
+
+    await setActiveReportById(created.id);
+    setSaveStatus("Saved");
+  } catch (e) {
+    console.error(e);
+    alert("Create report failed: " + (e?.message || String(e)));
+    setSaveStatus("Error");
+  }
 }
 
 async function handleSaveHeader() {
-  const { vessel_id, inspection_date, port_name, port_code, ocimf_inspecting_company, report_ref, title } = headerInputs();
+  const { vessel_id, inspection_date, port_name, port_code, inspecting_company, report_ref, title } = headerInputs();
 
   if (!vessel_id) { alert("Please select a vessel first."); return; }
   if (!inspection_date) { alert("Please set an inspection date."); return; }
@@ -901,14 +955,14 @@ async function handleSaveHeader() {
 
   try {
     if (!state.activeReport) {
-      const created = await createReportHeader({ vessel_id, inspection_date, port_name, port_code, ocimf_inspecting_company, report_ref, title });
+      const created = await createReportHeader({ vessel_id, inspection_date, port_name, port_code, inspecting_company, report_ref, title });
       state.reports = await loadReportsFromDb();
       await setActiveReportById(created.id);
       setSaveStatus("Saved");
       return;
     }
 
-    const updated = await updateReportHeader(state.activeReport.id, { vessel_id, inspection_date, port_name, port_code, ocimf_inspecting_company, report_ref, title });
+    const updated = await updateReportHeader(state.activeReport.id, { vessel_id, inspection_date, port_name, port_code, inspecting_company, report_ref, title });
     state.reports = await loadReportsFromDb();
     await setActiveReportById(updated.id);
     setSaveStatus("Saved");
@@ -1009,7 +1063,7 @@ async function importReportJsonFromFile(file) {
     setSaveStatus("Importing…");
 
     // Create a NEW report record
-    const created = await createReportHeader({ vessel_id, inspection_date, port_name, port_code, ocimf_inspecting_company, report_ref, title });
+    const created = await createReportHeader({ vessel_id, inspection_date, port_name, port_code, inspecting_company, report_ref, title });
 
     // Insert observations in batches
     const rows = Array.isArray(obs) ? obs : [];
@@ -1183,117 +1237,64 @@ function finalizeCheck() {
 async function importReportPdfAiFromFile(file) {
   if (!file) return;
 
-  // This flow is designed so that:
-  // - You can import a PDF WITHOUT manually creating a report first.
-  // - Header fields (vessel/date/port/company/report ref) come from the PDF.
-  // - Inspector name remains manual (not stored in this module yet).
+  // 1) ensure report exists
+  const report = await ensureActiveReportExists();
 
-  // 1) Upload PDF to Storage (temporary path is fine)
+  // 2) upload PDF to Storage
   const bucket = PDF_BUCKET_DEFAULT;
   const safeName = String(file.name || "report.pdf").replace(/[^a-zA-Z0-9._-]+/g, "_");
-  const tempPath = `${PDF_FOLDER_PREFIX}/tmp/${Date.now()}_${safeName}`;
+  const path = `${PDF_FOLDER_PREFIX}/${report.id}/${Date.now()}_${safeName}`;
 
   setSaveStatus("Uploading PDF…");
   const { error: upErr } = await state.supabase
     .storage
     .from(bucket)
-    .upload(tempPath, file, { upsert: true, contentType: "application/pdf" });
+    .upload(path, file, { upsert: true, contentType: "application/pdf" });
 
   if (upErr) throw upErr;
 
-  // 2) Call Edge Function (report_id is only used for correlation; function does not need a real DB id)
+  // 3) call Edge Function
   setSaveStatus("Extracting via AI…");
   const { data, error } = await state.supabase.functions.invoke("import-post-inspection-pdf", {
-    body: { report_id: "temp", pdf_storage_path: tempPath },
+    body: { report_id: report.id, pdf_storage_path: path },
   });
 
   if (error) throw error;
   if (!data?.ok) throw new Error(data?.error || "AI import failed");
 
   const extracted = data.extracted;
+
+  // 4) apply header (best-effort mapping)
   const h = extracted?.header || {};
-
-  // 3) Resolve vessel_id from extracted vessel_name (required)
-  const extractedVesselName = String(h.vessel_name || "").trim();
-  const vesselHit = extractedVesselName
-    ? (state.vessels || []).find(v =>
-        String(v.name || "").trim().toLowerCase() === extractedVesselName.toLowerCase()
-      )
-    : null;
-
-  if (!vesselHit?.id) {
-    throw new Error(
-      `AI import: vessel not found in your vessels table: "${extractedVesselName}". ` +
-      `Add it first in vessels, or use manual mode.`
-    );
-  }
-
-  // 4) Resolve inspection date dd.mm.yyyy -> yyyy-mm-dd (required)
   const isoDate = ddmmyyyyToIso(h.inspection_date);
-  if (!isoDate) {
-    throw new Error(`AI import: inspection_date not parsed from PDF (got "${String(h.inspection_date || "")}").`);
-  }
 
-  // 5) Resolve report reference (recommended; your DB has UNIQUE constraint)
-  const report_ref = String(h.report_reference || "").trim();
-  if (!report_ref) {
-    throw new Error("AI import: report_reference missing from PDF extraction (cannot satisfy unique constraint safely).");
-  }
-
-  // 6) Create or reuse report by report_ref
-  // If report_ref already exists, we import into that existing report (upsert observations).
-  const { data: existingRep, error: findErr } = await state.supabase
-    .from("post_inspection_reports")
-    .select("id")
-    .eq("report_ref", report_ref)
-    .maybeSingle();
-
-  if (findErr) throw findErr;
-
-  const headerPayload = {
-    vessel_id: vesselHit.id,
-    inspection_date: isoDate,
-    port_name: String(h.port_name || "").trim() || null,
-    port_code: String(h.port_code || "").trim() || null,
-    ocimf_inspecting_company: String(h.ocimf_inspecting_company || "").trim() || null,
-    report_ref,
-    title: String(el("reportTitle").value || "").trim() || null,
-  };
-
-  let report;
-  if (existingRep?.id) {
-    const ok = confirm(
-      `A report with this reference already exists:
-
-${report_ref}
-
-` +
-      `Import into the existing report and overwrite observations for matching question numbers?`
+  // match vessel by name if possible (else keep current selection)
+  let vessel_id = el("vesselSelect").value || null;
+  if (h.vessel_name) {
+    const hit = (state.vessels || []).find(v =>
+      String(v.name || "").trim().toLowerCase() === String(h.vessel_name).trim().toLowerCase()
     );
-    if (!ok) {
-      setSaveStatus("Cancelled");
-      return;
-    }
-    report = await updateReportHeader(existingRep.id, headerPayload);
-  } else {
-    report = await createReportHeader(headerPayload);
+    if (hit?.id) vessel_id = hit.id;
   }
 
-  // 7) Make it active + update UI fields
-  state.reports = await loadReportsFromDb();
-  await setActiveReportById(report.id);
+  // set UI fields
+  if (vessel_id) el("vesselSelect").value = vessel_id;
+  if (isoDate) el("inspectionDate").value = isoDate;
+  if (h.port_name) el("portName").value = h.port_name;
+  if (h.port_code) el("portCode").value = h.port_code;
+  if (h.ocimf_inspecting_company) el("inspectingCompany").value = h.ocimf_inspecting_company;
+  if (h.report_reference) el("reportRef").value = h.report_reference;
 
-  // Ensure header UI reflects extracted values
-  el("vesselSelect").value = headerPayload.vessel_id;
-  el("inspectionDate").value = headerPayload.inspection_date;
-  el("portName").value = headerPayload.port_name || "";
-  el("portCode").value = headerPayload.port_code || "";
-  el("inspectingCompany").value = headerPayload.ocimf_inspecting_company || "";
-  el("reportRef").value = headerPayload.report_ref || "";
+  // persist header
+  const updatedHeader = await updateReportHeader(report.id, headerInputs());
+  state.activeReport = updatedHeader;
+  await refreshReportSelect();
+  el("reportSelect").value = updatedHeader.id;
 
-  // 8) Map observations to your locked question library and upsert
+  // 5) map observations into DB rows
   const obs = Array.isArray(extracted?.observations) ? extracted.observations : [];
   const rows = [];
+  const newMap = { ...(state.observations || {}) };
 
   for (const item of obs) {
     const qbase = item?.question_base;
@@ -1311,7 +1312,7 @@ ${report_ref}
 
     const remarks = String(item?.observation_text || "").trim();
 
-    rows.push({
+    const row = {
       report_id: report.id,
       question_no: qno,
       has_observation: true,
@@ -1319,7 +1320,10 @@ ${report_ref}
       pgno_selected: [], // PGNO selection remains manual
       remarks,
       updated_at: nowIso(),
-    });
+    };
+
+    rows.push(row);
+    newMap[qno] = { ...row };
   }
 
   if (rows.length) {
@@ -1327,10 +1331,10 @@ ${report_ref}
     await upsertObservationsDirect(report.id, rows);
   }
 
-  // 9) Reload observations from DB for consistency
+  // reload to be consistent
   state.observations = await loadObservationsForReport(report.id);
   renderQuestionList();
-  clearDetailPane();
+  renderObservationEditor();
   setSaveStatus(`AI import done (${rows.length} observation(s))`);
 }
 
@@ -1369,6 +1373,9 @@ async function init() {
   }
   state.chapters = [...chSet].sort((a, b) => String(a).localeCompare(String(b)));
   renderChapterFilter();
+
+  // Detect DB schema differences
+  await detectReportCompanyColumn();
 
   // Reports from DB
   state.reports = await loadReportsFromDb();
