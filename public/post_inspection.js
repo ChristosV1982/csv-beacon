@@ -213,7 +213,7 @@ async function loadVessels() {
 async function loadReportsFromDb() {
   const { data, error } = await state.supabase
     .from("post_inspection_reports")
-    .select("id, vessel_id, inspection_date, port_name, port_code, inspecting_company, report_ref, title, created_at, updated_at")
+    .select("id, vessel_id, inspection_date, port_name, port_code, ocimf_inspecting_company, report_ref, title, created_at, updated_at")
     .order("updated_at", { ascending: false });
 
   if (error) throw error;
@@ -251,23 +251,23 @@ async function loadObservationsForReport(reportId) {
   return map;
 }
 
-async function createReportHeader({ vessel_id, inspection_date, port_name, port_code, inspecting_company, report_ref, title }) {
+async function createReportHeader({ vessel_id, inspection_date, port_name, port_code, ocimf_inspecting_company, report_ref, title }) {
   const { data, error } = await state.supabase
     .from("post_inspection_reports")
-    .insert([{ vessel_id, inspection_date, port_name, port_code, inspecting_company, report_ref, title }])
-    .select("id, vessel_id, inspection_date, port_name, port_code, inspecting_company, report_ref, title, created_at, updated_at")
+    .insert([{ vessel_id, inspection_date, port_name, port_code, ocimf_inspecting_company, report_ref, title }])
+    .select("id, vessel_id, inspection_date, port_name, port_code, ocimf_inspecting_company, report_ref, title, created_at, updated_at")
     .single();
 
   if (error) throw error;
   return data;
 }
 
-async function updateReportHeader(reportId, { vessel_id, inspection_date, port_name, port_code, inspecting_company, report_ref, title }) {
+async function updateReportHeader(reportId, { vessel_id, inspection_date, port_name, port_code, ocimf_inspecting_company, report_ref, title }) {
   const { data, error } = await state.supabase
     .from("post_inspection_reports")
-    .update({ vessel_id, inspection_date, port_name, port_code, inspecting_company, report_ref, title })
+    .update({ vessel_id, inspection_date, port_name, port_code, ocimf_inspecting_company, report_ref, title })
     .eq("id", reportId)
-    .select("id, vessel_id, inspection_date, port_name, port_code, inspecting_company, report_ref, title, created_at, updated_at")
+    .select("id, vessel_id, inspection_date, port_name, port_code, ocimf_inspecting_company, report_ref, title, created_at, updated_at")
     .single();
 
   if (error) throw error;
@@ -446,7 +446,7 @@ function loadReportIntoHeader(r) {
   el("inspectionDate").value = r.inspection_date || "";
   el("portName").value = r.port_name || "";
   el("portCode").value = r.port_code || "";
-  el("inspectingCompany").value = r.inspecting_company || "";
+  el("inspectingCompany").value = r.ocimf_inspecting_company || "";
   el("reportRef").value = r.report_ref || "";
   el("reportTitle").value = r.title || "";
   setActivePill("Active: " + reportLabel(r));
@@ -813,10 +813,10 @@ function headerInputs() {
   const inspection_date = String(el("inspectionDate").value || "").trim();
   const port_name = String(el("portName").value || "").trim();
   const port_code = String(el("portCode").value || "").trim();
-  const inspecting_company = String(el("inspectingCompany").value || "").trim();
+  const ocimf_inspecting_company = String(el("inspectingCompany").value || "").trim();
   const report_ref = String(el("reportRef").value || "").trim();
   const title = String(el("reportTitle").value || "").trim();
-  return { vessel_id, inspection_date, port_name, port_code, inspecting_company, report_ref, title };
+  return { vessel_id, inspection_date, port_name, port_code, ocimf_inspecting_company, report_ref, title };
 }
 
 async function setActiveReportById(id) {
@@ -863,7 +863,7 @@ async function setActiveReportById(id) {
 }
 
 async function handleNewReport() {
-  const { vessel_id, inspection_date, port_name, port_code, inspecting_company, report_ref, title } = headerInputs();
+  const { vessel_id, inspection_date, port_name, port_code, ocimf_inspecting_company, report_ref, title } = headerInputs();
 
   if (!vessel_id) { alert("Please select a vessel first."); return; }
   if (!inspection_date) { alert("Please set an inspection date."); return; }
@@ -871,7 +871,7 @@ async function handleNewReport() {
   setSaveStatus("Saving…");
 
   try {
-    const created = await createReportHeader({ vessel_id, inspection_date, port_name, port_code, inspecting_company, report_ref, title });
+    const created = await createReportHeader({ vessel_id, inspection_date, port_name, port_code, ocimf_inspecting_company, report_ref, title });
 
     // refresh list from DB (source of truth)
     state.reports = await loadReportsFromDb();
@@ -886,7 +886,7 @@ async function handleNewReport() {
 }
 
 async function handleSaveHeader() {
-  const { vessel_id, inspection_date, port_name, port_code, inspecting_company, report_ref, title } = headerInputs();
+  const { vessel_id, inspection_date, port_name, port_code, ocimf_inspecting_company, report_ref, title } = headerInputs();
 
   if (!vessel_id) { alert("Please select a vessel first."); return; }
   if (!inspection_date) { alert("Please set an inspection date."); return; }
@@ -895,14 +895,14 @@ async function handleSaveHeader() {
 
   try {
     if (!state.activeReport) {
-      const created = await createReportHeader({ vessel_id, inspection_date, port_name, port_code, inspecting_company, report_ref, title });
+      const created = await createReportHeader({ vessel_id, inspection_date, port_name, port_code, ocimf_inspecting_company, report_ref, title });
       state.reports = await loadReportsFromDb();
       await setActiveReportById(created.id);
       setSaveStatus("Saved");
       return;
     }
 
-    const updated = await updateReportHeader(state.activeReport.id, { vessel_id, inspection_date, port_name, port_code, inspecting_company, report_ref, title });
+    const updated = await updateReportHeader(state.activeReport.id, { vessel_id, inspection_date, port_name, port_code, ocimf_inspecting_company, report_ref, title });
     state.reports = await loadReportsFromDb();
     await setActiveReportById(updated.id);
     setSaveStatus("Saved");
@@ -993,7 +993,7 @@ async function importReportJsonFromFile(file) {
     const inspection_date = String(rep.inspection_date || "").trim();
     const port_name = String(rep.port_name || "").trim();
     const port_code = String(rep.port_code || "").trim();
-    const inspecting_company = String(rep.inspecting_company || "").trim();
+    const ocimf_inspecting_company = String(rep.ocimf_inspecting_company || rep.inspecting_company || "").trim();
     const report_ref = String(rep.report_ref || "").trim();
     const title = String(rep.title || "").trim();
 
@@ -1003,7 +1003,7 @@ async function importReportJsonFromFile(file) {
     setSaveStatus("Importing…");
 
     // Create a NEW report record
-    const created = await createReportHeader({ vessel_id, inspection_date, port_name, port_code, inspecting_company, report_ref, title });
+    const created = await createReportHeader({ vessel_id, inspection_date, port_name, port_code, ocimf_inspecting_company, report_ref, title });
 
     // Insert observations in batches
     const rows = Array.isArray(obs) ? obs : [];
