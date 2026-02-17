@@ -6,6 +6,7 @@
 
 import { loadLockedLibraryJson } from "./question_library_loader.js";
 
+const POST_INSPECTION_BUILD = "post_inspection_v7_2026-02-17";
 const LOCKED_LIBRARY_JSON = "./sire_questions_all_columns_named.json";
 
 const POST_INSPECTION_BUILD = "post_inspection_v6_2026-02-17";
@@ -864,16 +865,25 @@ function headerInputs() {
   const vessel_id = String(el("vesselSelect").value || "").trim();
   const inspection_date = String(el("inspectionDate").value || "").trim();
   const port_name_raw = String(el("portName").value || "").trim();
-  const port_name = port_name_raw ? port_name_raw : null;
   const port_code_raw = String(el("portCode").value || "").trim();
-  const port_code = port_code_raw ? port_code_raw : null;
   const ocimf_company_raw = String(el("inspectingCompany").value || "").trim();
-  const ocimf_company = ocimf_company_raw ? ocimf_company_raw : null;
+  const inspector_name_raw = String(el("inspectorName").value || "").trim();
   const report_ref_raw = String(el("reportRef").value || "").trim();
-  const report_ref = report_ref_raw ? report_ref_raw : null;
   const title_raw = String(el("reportTitle").value || "").trim();
-  const title = title_raw ? title_raw : null;
-  return { vessel_id, inspection_date, port_name, port_code, ocimf_company, report_ref, title };
+
+  // Important: avoid empty-string for UNIQUE columns (Postgres allows many NULLs but not many "")
+  const report_ref = report_ref_raw ? report_ref_raw : null;
+
+  return {
+    vessel_id,
+    inspection_date,
+    port_name: port_name_raw || null,
+    port_code: port_code_raw || null,
+    ocimf_company: ocimf_company_raw || null,
+    inspector_name: inspector_name_raw || null,
+    report_ref,
+    title: title_raw || null,
+  };
 }
 
 async function setActiveReportById(id) {
@@ -1238,50 +1248,15 @@ function finalizeCheck() {
 // Init
 // -------------------------
 
+
 async function importReportPdfAiFromFile(file) {
   if (!file) return;
 
-  // 1) Ensure we have a report row to attach the PDF to.
-  //    If user hasn't created/selected one, create a minimal "shell" report first.
-  let report = state.activeReport;
-
-  if (!report?.id) {
-    const d = new Date();
-    const yyyy = d.getFullYear();
-    const mm = String(d.getMonth() + 1).padStart(2, "0");
-    const dd = String(d.getDate()).padStart(2, "0");
-    const today = `${yyyy}-${mm}-${dd}`;
-
-    const defaultVesselId = state.vessels?.[0]?.id || null;
-    if (!defaultVesselId) {
-      alert("No vessels found. Please create at least one vessel first.");
-      return;
-    }
-
-    setSaveStatus("Creating report shell…");
-    const created = await createReportHeader({
-      vessel_id: defaultVesselId,
-      inspection_date: today,
-      port_name: null,
-      port_code: null,
-      ocimf_company: null,
-      report_ref: null,
-      title: null,
-      inspector_name: null,
-      pdf_bucket: null,
-      pdf_path: null,
-      pdf_filename: null,
-    });
-
-    state.reports = await loadReportsFromDb();
-    await setActiveReportById(created.id);
-    report = state.activeReport;
-  }
-
-  // 2) Upload PDF to Storage
+  // Upload first to a TEMP path (we don't have report_id yet because vessel_id is required in DB)
   const bucket = PDF_BUCKET_DEFAULT;
   const safeName = String(file.name || "report.pdf").replace(/[^a-zA-Z0-9._-]+/g, "_");
-  const path = `${PDF_FOLDER_PREFIX}/${report.id}/${Date.now()}_${safeName}`;
+  const tmpId = crypto?.randomUUID ? crypto.randomUUID() : (String(Date.now()) + "_" + Math.random().toString(16).slice(2));
+  const path = `${PDF_FOLDER_PREFIX}/tmp/${tmpId}_${Date.now()}_${safeName}`;
 
   setSaveStatus("Uploading PDF…");
   const { error: upErr } = await state.supabase
@@ -1291,38 +1266,20 @@ async function importReportPdfAiFromFile(file) {
 
   if (upErr) throw upErr;
 
-
-  // Store PDF location on the report (so we can reprocess later if needed)
-  try {
-    const updatedPdf = await updateReportHeader(report.id, {
-      ...headerInputs(),
-      pdf_bucket: bucket,
-      pdf_path: path,
-      pdf_filename: safeName,
-    });
-    state.activeReport = updatedPdf;
-  } catch (e) {
-    // Non-fatal: keep going; AI extraction can still run
-    console.warn("Failed to store PDF fields on report:", e);
-  }
-
-  // 3) call Edge Function
+  // Call Edge Function to extract
   setSaveStatus("Extracting via AI…");
   const { data, error } = await state.supabase.functions.invoke("import-post-inspection-pdf", {
-    body: { report_id: report.id, pdf_storage_path: path },
+    body: { report_id: "tmp", pdf_storage_path: path },
   });
 
   if (error) throw error;
   if (!data?.ok) throw new Error(data?.error || "AI import failed");
 
-  const extracted = data.extracted;
+  const extracted = data.extracted || {};
+  const h = extracted.header || {};
 
-  // 4) apply header (best-effort mapping)
-  const h = extracted?.header || {};
-  const isoDate = ddmmyyyyToIso(h.inspection_date);
-
-  // match vessel by name if possible (else keep current selection)
-  let vessel_id = el("vesselSelect").value || null;
+  // Map vessel name -> vessels.id (required)
+  let vessel_id = null;
   if (h.vessel_name) {
     const hit = (state.vessels || []).find(v =>
       String(v.name || "").trim().toLowerCase() === String(h.vessel_name).trim().toLowerCase()
@@ -1330,54 +1287,61 @@ async function importReportPdfAiFromFile(file) {
     if (hit?.id) vessel_id = hit.id;
   }
 
-  // set UI fields
-  if (vessel_id) el("vesselSelect").value = vessel_id;
-  if (isoDate) el("inspectionDate").value = isoDate;
-  if (h.port_name) el("portName").value = h.port_name;
-  if (h.port_code) el("portCode").value = h.port_code;
-  if (h.ocimf_inspecting_company) el("inspectingCompany").value = h.ocimf_inspecting_company;
-  // report_ref is UNIQUE; make it unique if this report already exists in DB
-  if (h.report_reference) {
-    const uniq = await makeUniqueReportRef(h.report_reference);
-    if (uniq) el("reportRef").value = uniq;
-    else console.warn("[Post-Inspection] Could not set report_ref (duplicate or check failed)");
+  if (!vessel_id) {
+    alert(
+      "AI import extracted vessel name: " + (h.vessel_name || "(blank)") + "
+
+" +
+      "But it does NOT match any vessel in your vessels table.
+" +
+      "Please add the vessel (or fix its name) in Supabase table 'vessels', then try again."
+    );
+    setSaveStatus("Error");
+    return;
   }
 
-
-  // If the PDF contains a report reference that already exists, stop to avoid violating the unique constraint.
-  if (h.report_reference) {
-    const { data: dup, error: dupErr } = await state.supabase
-      .from("post_inspection_reports")
-      .select("id")
-      .eq("report_ref", h.report_reference)
-      .neq("id", report.id)
-      .limit(1);
-
-    if (dupErr) {
-      console.warn("Duplicate check failed:", dupErr);
-    } else if (dup && dup.length) {
-      alert(
-        `A post-inspection report with reference '${h.report_reference}' already exists.\n\nSelect it from the report dropdown and import into that report (or delete the existing one).`
-      );
-      setSaveStatus("Stopped");
-      return;
-    }
+  // Map date dd.mm.yyyy -> yyyy-mm-dd for DB date column
+  const isoDate = ddmmyyyyToIso(h.inspection_date);
+  if (!isoDate) {
+    alert("AI import could not parse inspection date from the PDF (expected dd.mm.yyyy).");
+    setSaveStatus("Error");
+    return;
   }
 
-  // persist header
-  const updatedHeader = await updateReportHeader(report.id, { ...headerInputs(), pdf_bucket: bucket, pdf_path: path, pdf_filename: safeName });
-  state.activeReport = updatedHeader;
-  await refreshReportSelect();
-  el("reportSelect").value = updatedHeader.id;
+  // Prepare header fields for DB
+  const headerPayload = {
+    vessel_id,
+    inspection_date: isoDate,
+    port_name: h.port_name || null,
+    port_code: h.port_code || null,
+    ocimf_company: h.ocimf_inspecting_company || null,
+    inspector_name: null, // manual
+    report_ref: (h.report_reference || null),
+    title: null,
+    pdf_bucket: bucket,
+    pdf_path: path,
+    pdf_filename: safeName,
+  };
 
-  // 5) map observations into DB rows
-  const obs = Array.isArray(extracted?.observations) ? extracted.observations : [];
+  setSaveStatus("Creating report…");
+  const created = await createReportHeader(headerPayload);
+
+  // Reflect into UI fields
+  el("vesselSelect").value = vessel_id;
+  el("inspectionDate").value = isoDate;
+  el("portName").value = headerPayload.port_name || "";
+  el("portCode").value = headerPayload.port_code || "";
+  el("inspectingCompany").value = headerPayload.ocimf_company || "";
+  el("inspectorName").value = "";
+  el("reportRef").value = headerPayload.report_ref || "";
+  el("reportTitle").value = "";
+
+  // Map observations -> DB rows
+  const obs = Array.isArray(extracted.observations) ? extracted.observations : [];
   const rows = [];
-  const newMap = { ...(state.observations || {}) };
 
   for (const item of obs) {
-    const qbase = item?.question_base;
-    const qno = findLibraryQno(qbase);
+    const qno = findLibraryQno(item?.question_base);
     if (!qno) continue;
 
     const isNeg = String(item?.obs_type || "").toLowerCase() === "negative";
@@ -1389,35 +1353,32 @@ async function importReportPdfAiFromFile(file) {
         ? "positive_observation"
         : "observation_comment";
 
-    const remarks = String(item?.observation_text || "").trim();
-
-    const row = {
-      report_id: report.id,
+    rows.push({
+      report_id: created.id,
       question_no: qno,
       has_observation: true,
       observation_type,
       pgno_selected: [], // PGNO selection remains manual
-      remarks,
-      updated_at: nowIso(),
-    };
-
-    rows.push(row);
-    newMap[qno] = { ...row };
+      remarks: String(item?.observation_text || "").trim() || null,
+    });
   }
 
   if (rows.length) {
     setSaveStatus(`Saving ${rows.length} observation(s)…`);
-    await upsertObservationsDirect(report.id, rows);
+    await upsertObservationsDirect(created.id, rows);
   }
 
-  // reload to be consistent
-  state.observations = await loadObservationsForReport(report.id);
-  renderQuestionList();
-  renderObservationEditor();
+  // Refresh local lists and select this report
+  state.reports = await loadReportsFromDb();
+  await setActiveReportById(created.id);
+
   setSaveStatus(`AI import done (${rows.length} observation(s))`);
 }
 
+
 async function init() {
+  console.log("[Post-Inspection] Loaded", POST_INSPECTION_BUILD);
+
   const R = window.AUTH?.ROLES;
   state.me = await window.AUTH.requireAuth([R.SUPER_ADMIN, R.COMPANY_ADMIN]);
   if (!state.me) return;
