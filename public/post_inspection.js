@@ -6,10 +6,9 @@
 
 import { loadLockedLibraryJson } from "./question_library_loader.js";
 
-const UI_VERSION = 'post_inspection_v4_2026-02-17';
-console.log('[Post-Inspection] Loaded', UI_VERSION);
-
 const LOCKED_LIBRARY_JSON = "./sire_questions_all_columns_named.json";
+
+const POST_INSPECTION_BUILD = "post_inspection_v6_2026-02-17";
 
 const PDF_BUCKET_DEFAULT = "inspection-reports"; // must match your Storage bucket name
 const PDF_FOLDER_PREFIX = "post_inspections";
@@ -112,6 +111,31 @@ async function ensureActiveReportExists() {
   setSaveStatus("Report created");
   return created;
 }
+
+async function makeUniqueReportRef(baseRef) {
+  const raw = String(baseRef || "").trim();
+  if (!raw) return null;
+
+  let candidate = raw;
+  for (let i = 1; i <= 25; i++) {
+    const { data, error } = await state.supabase
+      .from("post_inspection_reports")
+      .select("id")
+      .eq("report_ref", candidate)
+      .limit(1);
+
+    if (error) {
+      console.warn("[Post-Inspection] report_ref uniqueness check failed", error);
+      return null;
+    }
+
+    if (!data || data.length === 0) return candidate;
+    candidate = `${raw}-${i + 1}`;
+  }
+
+  return null;
+}
+
 
 async function upsertObservationsDirect(reportId, rows) {
   const chunkSize = 100;
@@ -223,10 +247,6 @@ function getMissingPgnoQnos() {
 // Supabase access
 // -------------------------
 
-async function detectReportCompanyColumn() {
-  return 'ocimf_company';
-}
-
 function getReportCompanyValue(r) {
   return r?.[REPORT_COMPANY_COL] ?? "";
 }
@@ -244,7 +264,7 @@ async function loadVessels() {
 async function loadReportsFromDb() {
   const { data, error } = await state.supabase
     .from("post_inspection_reports")
-    .select(`id, vessel_id, inspection_date, port_name, port_code, ${REPORT_COMPANY_COL}, report_ref, title, created_at, updated_at`)
+    .select(`id, vessel_id, inspection_date, port_name, port_code, ${REPORT_COMPANY_COL}, report_ref, title, inspector_name, pdf_bucket, pdf_path, pdf_filename, created_at, updated_at`)
     .order("updated_at", { ascending: false });
 
   if (error) throw error;
@@ -282,23 +302,23 @@ async function loadObservationsForReport(reportId) {
   return map;
 }
 
-async function createReportHeader({  vessel_id, inspection_date, port_name, port_code, ocimf_company, report_ref, title  }) {
+async function createReportHeader({ vessel_id, inspection_date, port_name, port_code, ocimf_company, report_ref, title, inspector_name, pdf_bucket, pdf_path, pdf_filename }) {
   const { data, error } = await state.supabase
     .from("post_inspection_reports")
-    .insert([sanitizeReportPayload({ vessel_id, inspection_date, port_name, port_code, [REPORT_COMPANY_COL]: ocimf_company, report_ref, title })])
-    .select(`id, vessel_id, inspection_date, port_name, port_code, ${REPORT_COMPANY_COL}, report_ref, title, created_at, updated_at`)
+    .insert([{ vessel_id, inspection_date, port_name, port_code, [REPORT_COMPANY_COL]: ocimf_company, report_ref, title }])
+    .select(`id, vessel_id, inspection_date, port_name, port_code, ${REPORT_COMPANY_COL}, report_ref, title, inspector_name, pdf_bucket, pdf_path, pdf_filename, created_at, updated_at`)
     .single();
 
   if (error) throw error;
   return data;
 }
 
-async function updateReportHeader(reportId, {  vessel_id, inspection_date, port_name, port_code, ocimf_company, report_ref, title  }) {
+async function updateReportHeader(reportId, { vessel_id, inspection_date, port_name, port_code, ocimf_company, report_ref, title, inspector_name, pdf_bucket, pdf_path, pdf_filename }) {
   const { data, error } = await state.supabase
     .from("post_inspection_reports")
-    .update(sanitizeReportPayload({ vessel_id, inspection_date, port_name, port_code, [REPORT_COMPANY_COL]: ocimf_company, report_ref, title }))
+    .update({ vessel_id, inspection_date, port_name, port_code, [REPORT_COMPANY_COL]: ocimf_company, report_ref, title })
     .eq("id", reportId)
-    .select(`id, vessel_id, inspection_date, port_name, port_code, ${REPORT_COMPANY_COL}, report_ref, title, created_at, updated_at`)
+    .select(`id, vessel_id, inspection_date, port_name, port_code, ${REPORT_COMPANY_COL}, report_ref, title, inspector_name, pdf_bucket, pdf_path, pdf_filename, created_at, updated_at`)
     .single();
 
   if (error) throw error;
@@ -478,6 +498,7 @@ function loadReportIntoHeader(r) {
   el("portName").value = r.port_name || "";
   el("portCode").value = r.port_code || "";
   el("inspectingCompany").value = getReportCompanyValue(r) || "";
+  if (el("inspectorName")) el("inspectorName").value = r.inspector_name || "";
   el("reportRef").value = r.report_ref || "";
   el("reportTitle").value = r.title || "";
   setActivePill("Active: " + reportLabel(r));
@@ -855,15 +876,6 @@ function headerInputs() {
   return { vessel_id, inspection_date, port_name, port_code, ocimf_company, report_ref, title };
 }
 
-function sanitizeReportPayload(p) {
-  const out = { ...p };
-  // Empty strings => null (important for UNIQUE columns like report_ref)
-  for (const k of ['report_ref','title','port_name','port_code','ocimf_company','inspector_name','pdf_bucket','pdf_path','pdf_filename']) {
-    if (out[k] === '') out[k] = null;
-  }
-  return out;
-}
-
 async function setActiveReportById(id) {
   // ensure pending changes are flushed before changing report
   if (state.activeReport && hasPending()) {
@@ -908,7 +920,7 @@ async function setActiveReportById(id) {
 }
 
 async function handleNewReport() {
-  let { vessel_id, inspection_date, port_name, port_code, ocimf_company, report_ref, title } = headerInputs();
+  let { vessel_id, inspection_date, port_name, port_code, ocimf_company, report_ref, title, inspector_name } = headerInputs();
 
   // If user clicks New Report while an existing report is loaded, the form may still contain the old report_ref.
   // post_inspection_reports has a UNIQUE constraint on report_ref, so reusing it will fail.
@@ -923,7 +935,7 @@ async function handleNewReport() {
   setSaveStatus("Saving…");
 
   try {
-    const created = await createReportHeader({ vessel_id, inspection_date, port_name, port_code, ocimf_company, report_ref, title });
+    const created = await createReportHeader({ vessel_id, inspection_date, port_name, port_code, ocimf_company, report_ref, title, inspector_name });
 
     // refresh list from DB (source of truth)
     state.reports = await loadReportsFromDb();
@@ -938,7 +950,7 @@ async function handleNewReport() {
 }
 
 async function handleSaveHeader() {
-  const { vessel_id, inspection_date, port_name, port_code, ocimf_company, report_ref, title } = headerInputs();
+  const { vessel_id, inspection_date, port_name, port_code, ocimf_company, report_ref, title, inspector_name } = headerInputs();
 
   if (!vessel_id) { alert("Please select a vessel first."); return; }
   if (!inspection_date) { alert("Please set an inspection date."); return; }
@@ -947,14 +959,14 @@ async function handleSaveHeader() {
 
   try {
     if (!state.activeReport) {
-      const created = await createReportHeader({ vessel_id, inspection_date, port_name, port_code, ocimf_company, report_ref, title });
+      const created = await createReportHeader({ vessel_id, inspection_date, port_name, port_code, ocimf_company, report_ref, title, inspector_name });
       state.reports = await loadReportsFromDb();
       await setActiveReportById(created.id);
       setSaveStatus("Saved");
       return;
     }
 
-    const updated = await updateReportHeader(state.activeReport.id, { vessel_id, inspection_date, port_name, port_code, ocimf_company, report_ref, title });
+    const updated = await updateReportHeader(state.activeReport.id, { vessel_id, inspection_date, port_name, port_code, ocimf_company, report_ref, title, inspector_name, pdf_bucket: state.activeReport?.pdf_bucket ?? null, pdf_path: state.activeReport?.pdf_path ?? null, pdf_filename: state.activeReport?.pdf_filename ?? null });
     state.reports = await loadReportsFromDb();
     await setActiveReportById(updated.id);
     setSaveStatus("Saved");
@@ -1045,7 +1057,7 @@ async function importReportJsonFromFile(file) {
     const inspection_date = String(rep.inspection_date || "").trim();
     const port_name = String(rep.port_name || "").trim();
     const port_code = String(rep.port_code || "").trim();
-    const ocimf_company = String(rep.ocimf_company || rep.ocimf_company || "").trim();
+    const ocimf_ocimf_company = String(rep.ocimf_ocimf_company || rep.ocimf_company || "").trim();
     const report_ref = String(rep.report_ref || "").trim();
     const title = String(rep.title || "").trim();
 
@@ -1229,10 +1241,44 @@ function finalizeCheck() {
 async function importReportPdfAiFromFile(file) {
   if (!file) return;
 
-  // 1) ensure report exists
-  const report = await ensureActiveReportExists();
+  // 1) Ensure we have a report row to attach the PDF to.
+  //    If user hasn't created/selected one, create a minimal "shell" report first.
+  let report = state.activeReport;
 
-  // 2) upload PDF to Storage
+  if (!report?.id) {
+    const d = new Date();
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    const today = `${yyyy}-${mm}-${dd}`;
+
+    const defaultVesselId = state.vessels?.[0]?.id || null;
+    if (!defaultVesselId) {
+      alert("No vessels found. Please create at least one vessel first.");
+      return;
+    }
+
+    setSaveStatus("Creating report shell…");
+    const created = await createReportHeader({
+      vessel_id: defaultVesselId,
+      inspection_date: today,
+      port_name: null,
+      port_code: null,
+      ocimf_company: null,
+      report_ref: null,
+      title: null,
+      inspector_name: null,
+      pdf_bucket: null,
+      pdf_path: null,
+      pdf_filename: null,
+    });
+
+    state.reports = await loadReportsFromDb();
+    await setActiveReportById(created.id);
+    report = state.activeReport;
+  }
+
+  // 2) Upload PDF to Storage
   const bucket = PDF_BUCKET_DEFAULT;
   const safeName = String(file.name || "report.pdf").replace(/[^a-zA-Z0-9._-]+/g, "_");
   const path = `${PDF_FOLDER_PREFIX}/${report.id}/${Date.now()}_${safeName}`;
@@ -1244,6 +1290,21 @@ async function importReportPdfAiFromFile(file) {
     .upload(path, file, { upsert: true, contentType: "application/pdf" });
 
   if (upErr) throw upErr;
+
+
+  // Store PDF location on the report (so we can reprocess later if needed)
+  try {
+    const updatedPdf = await updateReportHeader(report.id, {
+      ...headerInputs(),
+      pdf_bucket: bucket,
+      pdf_path: path,
+      pdf_filename: safeName,
+    });
+    state.activeReport = updatedPdf;
+  } catch (e) {
+    // Non-fatal: keep going; AI extraction can still run
+    console.warn("Failed to store PDF fields on report:", e);
+  }
 
   // 3) call Edge Function
   setSaveStatus("Extracting via AI…");
@@ -1274,11 +1335,37 @@ async function importReportPdfAiFromFile(file) {
   if (isoDate) el("inspectionDate").value = isoDate;
   if (h.port_name) el("portName").value = h.port_name;
   if (h.port_code) el("portCode").value = h.port_code;
-  if (h.ocimf_company) el("inspectingCompany").value = h.ocimf_company;
-  if (h.report_reference) el("reportRef").value = h.report_reference;
+  if (h.ocimf_inspecting_company) el("inspectingCompany").value = h.ocimf_inspecting_company;
+  // report_ref is UNIQUE; make it unique if this report already exists in DB
+  if (h.report_reference) {
+    const uniq = await makeUniqueReportRef(h.report_reference);
+    if (uniq) el("reportRef").value = uniq;
+    else console.warn("[Post-Inspection] Could not set report_ref (duplicate or check failed)");
+  }
+
+
+  // If the PDF contains a report reference that already exists, stop to avoid violating the unique constraint.
+  if (h.report_reference) {
+    const { data: dup, error: dupErr } = await state.supabase
+      .from("post_inspection_reports")
+      .select("id")
+      .eq("report_ref", h.report_reference)
+      .neq("id", report.id)
+      .limit(1);
+
+    if (dupErr) {
+      console.warn("Duplicate check failed:", dupErr);
+    } else if (dup && dup.length) {
+      alert(
+        `A post-inspection report with reference '${h.report_reference}' already exists.\n\nSelect it from the report dropdown and import into that report (or delete the existing one).`
+      );
+      setSaveStatus("Stopped");
+      return;
+    }
+  }
 
   // persist header
-  const updatedHeader = await updateReportHeader(report.id, headerInputs());
+  const updatedHeader = await updateReportHeader(report.id, { ...headerInputs(), pdf_bucket: bucket, pdf_path: path, pdf_filename: safeName });
   state.activeReport = updatedHeader;
   await refreshReportSelect();
   el("reportSelect").value = updatedHeader.id;
@@ -1336,6 +1423,7 @@ async function init() {
   if (!state.me) return;
 
   window.AUTH.fillUserBadge(state.me, "userBadge");
+  console.info("[Post-Inspection] Loaded", POST_INSPECTION_BUILD);
   el("logoutBtn").addEventListener("click", window.AUTH.logoutAndGoLogin);
 
   state.supabase = window.__supabaseClient;
@@ -1365,9 +1453,6 @@ async function init() {
   }
   state.chapters = [...chSet].sort((a, b) => String(a).localeCompare(String(b)));
   renderChapterFilter();
-
-  // Detect DB schema differences
-  await detectReportCompanyColumn();
 
   // Reports from DB
   state.reports = await loadReportsFromDb();
