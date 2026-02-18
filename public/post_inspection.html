@@ -1,460 +1,247 @@
-<!-- public/post_inspection.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>SIRE 2.0 – Post-Inspection Observations</title>
-  <link rel="stylesheet" href="./style.css" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SIRE 2.0 – Post-Inspection Observations (Company)</title>
+  <link rel="stylesheet" href="style.css" />
   <style>
-    :root{
-      --nav:#1a4170;
-      --nav2:#0f2f55;
-      --card:#ffffff;
-      --line:#d5deef;
-      --muted:#5a6d86;
-      --ink:#123a63;
-      --btn:#1e63b6;
-      --btn2:#164f93;
-      --warn:#a94b00;
-      --danger:#b72a2a;
-      --ok:#1e7b34;
+    /* Keep same look & feel as Questions Editor (dark header + soft cards) */
+    .pi-shell{ max-width: 1400px; margin: 22px auto; padding: 0 16px; }
+    .pi-hero{
+      background: linear-gradient(180deg, #0e3a63 0%, #082a46 100%);
+      border-radius: 18px;
+      padding: 18px 18px 14px;
+      border: 1px solid rgba(255,255,255,.15);
+      box-shadow: 0 8px 22px rgba(0,0,0,.25);
+      color:#eaf2ff;
     }
-    body{ background:#0b1a2a; }
-    .wrap{ max-width:1400px; margin:22px auto; padding:0 14px; }
-    .topbar{
-      background:linear-gradient(180deg,var(--nav),var(--nav2));
-      border:1px solid rgba(255,255,255,.18);
-      border-radius:18px;
-      padding:18px 18px 14px;
-      color:#fff;
-      box-shadow:0 10px 40px rgba(0,0,0,.35);
-    }
-    .title{ font-size:20px; font-weight:950; letter-spacing:.3px; }
-    .subtitle{ margin-top:4px; opacity:.92; font-weight:700; }
-    .row{
-      display:flex; gap:10px; flex-wrap:wrap; align-items:center;
-      margin-top:14px;
-    }
-    .pill{
-      background:rgba(255,255,255,.12);
-      border:1px solid rgba(255,255,255,.18);
-      border-radius:999px;
-      padding:8px 12px;
-      font-weight:850;
-    }
-    .btn{
-      border:0; cursor:pointer;
-      background:var(--btn);
-      color:#fff; font-weight:900;
-      padding:10px 14px;
-      border-radius:12px;
-      transition:.15s transform, .15s opacity;
-    }
-    .btn:hover{ opacity:.96; transform:translateY(-1px); }
-    .btn:active{ transform:translateY(0px); }
-    .btn-muted{
-      background:#eaf1fb; color:var(--ink);
-      border:1px solid #cfe0fb;
-    }
-    .btn-danger{
-      background:var(--danger);
-      color:#fff;
-    }
-    .btn-ghost{
-      background:rgba(255,255,255,.12);
-      border:1px solid rgba(255,255,255,.22);
-      color:#fff;
-    }
+    .pi-hero h1{ margin:0; font-size: 22px; font-weight: 950; letter-spacing:.2px; }
+    .pi-hero p{ margin:6px 0 0; opacity:.9; font-weight: 750; }
+    .pi-topbar{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top: 12px; }
+    .pi-pill{ padding:8px 12px; border-radius: 999px; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.16); font-weight: 900; }
+    .pi-pill.muted{ opacity:.9; }
+    .pi-pill.ok{ background: rgba(47, 160, 90, .18); border-color: rgba(47,160,90,.35); }
+    .pi-pill.warn{ background: rgba(200, 130, 10, .18); border-color: rgba(200,130,10,.35); }
+    .pi-pill.err{ background: rgba(200, 40, 60, .18); border-color: rgba(200,40,60,.35); }
 
-    .grid{
-      margin-top:14px;
-      display:grid;
-      grid-template-columns: 1fr;
-      gap:14px;
-    }
+    .pi-card{ margin-top: 16px; background:#fff; border-radius: 18px; padding: 16px; border:1px solid rgba(0,0,0,.08); box-shadow: 0 10px 22px rgba(0,0,0,.10); }
+    .pi-grid{ display:grid; grid-template-columns: 220px 220px 220px 1fr 220px 280px; gap: 10px; }
+    .pi-grid2{ display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-top: 10px; }
+    .pi-grid3{ display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-top: 10px; }
 
-    .card{
-      background:rgba(255,255,255,.92);
-      border:1px solid rgba(255,255,255,.28);
-      border-radius:18px;
-      padding:16px;
-      box-shadow:0 12px 40px rgba(0,0,0,.28);
-      color:var(--ink);
-    }
-
-    .sectionTitle{
-      font-weight:950;
-      color:var(--ink);
-      margin-bottom:10px;
-      font-size:16px;
-    }
-
-    .formGrid{
-      display:grid;
-      grid-template-columns: 220px 220px 220px 1fr 220px 260px;
-      gap:10px;
-      align-items:end;
-    }
-
-    .formGrid2{
-      display:grid;
-      grid-template-columns: 1fr 1fr;
-      gap:10px;
-      margin-top:10px;
-      align-items:end;
-    }
-
-    label{ display:block; font-weight:900; color:var(--ink); margin-bottom:6px; }
-    input, select, textarea{
+    .pi-field label{ display:block; font-weight: 900; color:#143a63; margin: 2px 0 6px; }
+    .pi-field input, .pi-field select{
       width:100%;
-      border-radius:12px;
-      border:1px solid #cfe0fb;
-      padding:10px 12px;
-      background:#fff;
-      outline:none;
-      color:var(--ink);
-      font-weight:700;
-    }
-    textarea{ min-height:110px; resize:vertical; }
-
-    .actions{ display:flex; gap:10px; flex-wrap:wrap; margin-top:12px; align-items:center; }
-
-    .notes{
-      margin-top:10px;
-      color:#274a74;
-      font-weight:750;
-      line-height:1.45;
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid #cfdaf0;
+      background: #ffffff;
+      font-weight: 800;
+      outline: none;
     }
 
-    .split{
-      display:grid;
-      grid-template-columns: 420px 1fr;
-      gap:14px;
-      margin-top:14px;
-    }
+    .pi-actions{ display:flex; gap:10px; flex-wrap:wrap; margin-top: 12px; }
 
-    .filters{
-      display:grid;
-      grid-template-columns: 1fr 180px;
-      gap:10px;
-      align-items:end;
-    }
+    .pi-notes{ margin-top: 12px; color:#24486f; font-weight: 850; }
+    .pi-notes ul{ margin: 8px 0 0 18px; }
 
-    .list{
-      margin-top:10px;
-      border:1px solid var(--line);
-      border-radius:14px;
-      background:#f7fbff;
-      overflow:hidden;
-      max-height:520px;
-      overflow:auto;
-    }
-    .item{
-      padding:10px 12px;
-      border-bottom:1px solid #e6eefc;
-      cursor:pointer;
-      background:#f7fbff;
-    }
-    .item:hover{ background:#eef6ff; }
-    .item.active{ background:#dcecff; }
-    .itemTop{ display:flex; justify-content:space-between; gap:10px; }
-    .qno{ font-weight:950; }
-    .qst{ color:var(--muted); font-weight:800; margin-top:2px; }
-    .badge{
-      display:inline-block;
-      padding:6px 10px;
-      border-radius:999px;
-      font-weight:950;
-      font-size:12px;
-      border:1px solid #cfe0fb;
-      background:#fff;
-      color:#35507b;
-      white-space:nowrap;
-    }
-    .badge.obs{ border-color:#bfe7c8; background:#e9fff0; color:var(--ok); }
-    .badge.warn{ border-color:#ffd4a6; background:#fff3e6; color:var(--warn); }
+    /* left / right panes */
+    .pi-main{ display:grid; grid-template-columns: 420px 1fr; gap: 14px; margin-top: 14px; }
+    .pi-pane{ background:#fff; border-radius: 18px; padding: 12px; border:1px solid rgba(0,0,0,.08); box-shadow: 0 10px 22px rgba(0,0,0,.10); }
+    .pi-pane h3{ margin: 2px 0 10px; font-weight: 950; color:#143a63; }
 
-    .detailTitle{ margin:0; font-size:18px; font-weight:950; color:var(--ink); }
-    .meta{ margin-top:6px; color:#2c527e; font-weight:850; }
-    .qtext{ margin-top:10px; background:#fff; border:1px solid #dbe7fb; border-radius:14px; padding:12px; font-weight:750; }
-    .toggleRow{ margin-top:12px; display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
-    .pgnoBox{ margin-top:12px; border:1px solid #dbe7fb; border-radius:14px; padding:12px; background:#ffffff; }
-    .pgnoTitle{ font-weight:950; color:var(--ink); margin-bottom:6px; }
-    .pgnoList{ margin-top:10px; display:flex; flex-direction:column; gap:8px; }
-    .pgnoRow{
-      display:grid;
-      grid-template-columns: 22px 90px 1fr;
-      gap:10px;
-      align-items:start;
-      border:1px solid #e6eefc;
-      background:#f8fbff;
-      border-radius:12px;
-      padding:10px;
-    }
-    .pgnoIdx{ font-weight:950; color:#274a74; }
-    .pgnoTxt{ color:#1e3c5f; font-weight:750; line-height:1.35; }
+    /* question list styling is driven by post_inspection.js + shared CSS in style.css */
 
-    .statusBar{
-      margin-top:8px;
-      display:flex;
-      gap:10px;
-      flex-wrap:wrap;
-      align-items:center;
-      color:#fff;
-      opacity:.95;
-    }
-    .status{
-      background:rgba(0,0,0,.22);
-      border:1px solid rgba(255,255,255,.18);
-      padding:8px 12px;
-      border-radius:999px;
-      font-weight:850;
-    }
-    .mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
-
-    dialog{
-      border:1px solid rgba(0,0,0,.2);
-      border-radius:16px;
-      padding:0;
-      width:min(980px, 92vw);
-      box-shadow:0 20px 70px rgba(0,0,0,.35);
-    }
-    dialog::backdrop{ background:rgba(0,0,0,.55); }
-    .dlgHead{
-      padding:14px 16px;
-      border-bottom:1px solid #e6eefc;
-      background:#f7fbff;
-      border-top-left-radius:16px;
-      border-top-right-radius:16px;
-      font-weight:950;
-      color:var(--ink);
-      display:flex;
-      justify-content:space-between;
-      align-items:center;
-      gap:10px;
-    }
-    .dlgBody{ padding:14px 16px; }
-    .statGrid{
-      display:grid;
-      grid-template-columns: 1fr 1fr;
-      gap:10px;
-    }
-    .stat{
-      border:1px solid #dbe7fb;
-      background:#ffffff;
-      border-radius:14px;
-      padding:12px;
-    }
-    .statL{ font-weight:900; color:#274a74; }
-    .statV{ font-weight:950; font-size:22px; margin-top:6px; }
+    dialog{ border:none; border-radius: 16px; padding: 0; width:min(980px, 96vw); }
+    .dlg{ padding: 14px; }
+    .dlg h3{ margin: 0 0 10px; font-weight: 950; color:#143a63; }
+    .dlg pre{ white-space: pre-wrap; background:#f6f9ff; border:1px solid #d9e4fb; border-radius: 12px; padding:10px; font-weight: 800; color:#143a63; }
   </style>
 </head>
 
 <body>
-  <div class="wrap">
+  <div class="pi-shell">
+    <div class="pi-hero">
+      <h1>Post-Inspection Observations (Company)</h1>
+      <p>Import SIRE 2.0 inspection report PDF → extract observed questions & observations → then complete PGNO selection and run statistics.</p>
 
-    <div class="topbar">
-      <div class="title">Post-Inspection Observations (Company)</div>
-      <div class="subtitle">Import SIRE 2.0 inspection report PDF, extract observed questions & observations, then complete PGNO selection and run statistics.</div>
+      <div class="pi-topbar">
+        <span class="pi-pill" id="userBadge">Not signed in</span>
+        <button class="btn" type="button" onclick="location.href='4q-dashboard.html'">Dashboard</button>
+        <button class="btn" type="button" onclick="location.href='mode_selection.html'">Mode Selection</button>
+        <button class="btn primary" id="logoutBtn" type="button">Logout</button>
 
-      <div class="row">
-        <div class="pill" id="userBadge">—</div>
-        <button class="btn-ghost btn" type="button" id="dashboardBtn">Dashboard</button>
-        <button class="btn-ghost btn" type="button" id="modeBtn">Mode Selection</button>
-        <button class="btn" type="button" id="logoutBtn">Logout</button>
-      </div>
-
-      <div class="statusBar">
-        <div class="status" id="activeReportPill">No active report</div>
-        <div class="status" id="saveStatus">Not saved</div>
-        <div class="status mono" id="buildPill">build: —</div>
+        <span class="pi-pill muted" id="activeReportPill">No active report</span>
+        <span class="pi-pill muted" id="saveStatus">Not saved</span>
+        <span class="pi-pill muted" id="buildPill">build: —</span>
       </div>
     </div>
 
-    <div class="grid">
+    <div class="pi-card">
+      <h3 style="margin:0 0 10px; font-weight:950; color:#143a63;">Inspection Header</h3>
 
-      <div class="card">
-        <div class="sectionTitle">Inspection Header</div>
-
-        <div class="formGrid">
-          <div>
-            <label for="reportSelect">Existing Reports</label>
-            <select id="reportSelect"></select>
-          </div>
-
-          <div>
-            <label for="vesselSelect">Vessel</label>
-            <select id="vesselSelect"></select>
-          </div>
-
-          <div>
-            <label for="inspectionDate">Inspection Date</label>
-            <input id="inspectionDate" type="date" />
-          </div>
-
-          <div>
-            <label for="portName">Port (official name)</label>
-            <input id="portName" type="text" placeholder="e.g. Rotterdam" />
-          </div>
-
-          <div>
-            <label for="portCode">Port Code</label>
-            <input id="portCode" type="text" placeholder="e.g. NLRTM" />
-          </div>
-
-          <div>
-            <label for="ocimfCompany">OCIMF Inspecting Company</label>
-            <input id="ocimfCompany" type="text" placeholder="Company name" />
-          </div>
+      <div class="pi-grid">
+        <div class="pi-field">
+          <label>Existing Reports</label>
+          <select id="reportSelect"></select>
         </div>
 
-        <div class="formGrid2">
-          <div>
-            <label for="reportRef">Report Reference (optional)</label>
-            <input id="reportRef" type="text" placeholder="e.g. LSHB-4402-3851-7649" />
-          </div>
-          <div>
-            <label for="reportTitle">Title (optional)</label>
-            <input id="reportTitle" type="text" placeholder="e.g. OCIMF SIRE 2.0 – Discharge Call – Terminal XYZ" />
-          </div>
+        <div class="pi-field">
+          <label>Vessel</label>
+          <select id="vesselSelect"></select>
         </div>
 
-        <div class="formGrid2">
-          <div>
-            <label for="inspectorName">Inspector Name (manual)</label>
-            <input id="inspectorName" type="text" placeholder="Enter inspector name (not in PDF)" />
-          </div>
-          <div>
-            <label>PDF Report (stored)</label>
-            <div class="actions" style="margin-top:0;">
-              <button class="btn btn-muted" type="button" id="downloadPdfBtn" title="Download the stored PDF for this inspection">Download PDF</button>
-              <div style="font-weight:850; color:#274a74;" id="pdfInfo">No PDF linked</div>
-            </div>
-          </div>
+        <div class="pi-field">
+          <label>Inspection Date</label>
+          <input id="inspectionDate" type="date" />
         </div>
 
-        <div class="actions">
-          <button class="btn btn-muted" type="button" id="newReportBtn">New Report</button>
-          <button class="btn" type="button" id="saveHeaderBtn">Save Report Header</button>
-          <button class="btn btn-danger" type="button" id="deleteReportBtn">Delete Report</button>
-
-          <button class="btn btn-muted" type="button" id="exportBtn">Export Report JSON</button>
-          <button class="btn btn-muted" type="button" id="importBtn">Import Report JSON</button>
-
-          <button class="btn btn-muted" type="button" id="importPdfBtn" title="Upload PDF, extract header/observations via Edge Function, and populate this report">
-            Import Report PDF (AI)
-          </button>
-
-          <button class="btn btn-muted" type="button" id="statsBtn">View Statistics</button>
-          <button class="btn btn-muted" type="button" id="finalizeBtn">Finalize check</button>
-
-          <input id="importFile" type="file" accept="application/json" style="display:none;" />
-          <input id="importPdfFile" type="file" accept="application/pdf" style="display:none;" />
+        <div class="pi-field">
+          <label>Port (official name)</label>
+          <input id="portName" type="text" placeholder="e.g. Rotterdam" />
         </div>
 
-        <div class="notes">
-          <div>• Preferred flow: <b>Import Report PDF (AI)</b> → header auto-fills → observations created → you then select PGNO(s) for negatives.</div>
-          <div>• Manual header entry is allowed only when you do not have the PDF; inspector name is always manual.</div>
+        <div class="pi-field">
+          <label>Port Code</label>
+          <input id="portCode" type="text" placeholder="e.g. NLRTM" />
+        </div>
+
+        <div class="pi-field">
+          <label>OCIMF Inspecting Company</label>
+          <input id="ocimfCompany" type="text" placeholder="Company name" />
         </div>
       </div>
 
-      <div class="split">
-
-        <div class="card">
-          <div class="sectionTitle">Question Filters</div>
-          <div class="filters">
-            <div>
-              <label for="searchInput">Search (No / Short Text / Question / Section)</label>
-              <input id="searchInput" type="text" placeholder="e.g. 8.99.2 / mooring / permit" />
-            </div>
-            <div>
-              <label for="chapterFilter">Chapter</label>
-              <select id="chapterFilter"></select>
-            </div>
-          </div>
-
-          <div class="actions" style="margin-top:10px;">
-            <label style="display:flex; align-items:center; gap:10px; font-weight:900;">
-              <input id="onlyObsFilter" type="checkbox" />
-              Only Observed
-            </label>
-
-            <label style="display:flex; align-items:center; gap:10px; font-weight:900;">
-              <input id="missingPgnoFilter" type="checkbox" />
-              Missing PGNO tick
-            </label>
-          </div>
-
-          <div class="list" id="questionList"></div>
+      <div class="pi-grid2">
+        <div class="pi-field">
+          <label>Report Reference</label>
+          <input id="reportRef" type="text" placeholder="e.g. LSHB-4402-3851-7649" />
         </div>
-
-        <div class="card">
-          <div class="sectionTitle">Observation Entry</div>
-          <div id="detailPane" style="min-height:520px;">
-            <div style="font-weight:950; color:#35507b;">
-              Select a question from the list to record post-inspection observations and tick PGNO(s).
-            </div>
-          </div>
+        <div class="pi-field">
+          <label>Title (optional)</label>
+          <input id="reportTitle" type="text" placeholder="e.g. OCIMF SIRE 2.0 – Discharge Call – Terminal XYZ" />
         </div>
-
       </div>
 
-      <dialog id="statsDialog">
-        <div class="dlgHead">
-          <div>Statistics</div>
-          <div class="actions" style="margin-top:0;">
-            <button class="btn btn-muted" type="button" id="exportCsvBtn">Export CSV</button>
-            <button class="btn btn-muted" type="button" id="closeStatsBtn">Close</button>
+      <div class="pi-grid3">
+        <div class="pi-field">
+          <label>Inspector Name (manual)</label>
+          <input id="inspectorName" type="text" placeholder="Enter inspector name (not in PDF)" />
+        </div>
+
+        <div class="pi-field">
+          <label>PDF Report (stored)</label>
+          <div style="display:flex; gap:10px; align-items:center;">
+            <button class="btn btn-muted" id="downloadPdfBtn" type="button">Download PDF</button>
+            <span id="pdfStatus" style="font-weight:900; color:#143a63;">No PDF linked</span>
           </div>
         </div>
-        <div class="dlgBody">
-          <div class="statGrid">
-            <div class="stat">
-              <div class="statL">Total Questions in Library</div>
-              <div class="statV" id="statTotalQ">-</div>
-            </div>
-            <div class="stat">
-              <div class="statL">Observed Questions</div>
-              <div class="statV" id="statObservedQ">-</div>
-            </div>
-            <div class="stat">
-              <div class="statL">Missing PGNO tick</div>
-              <div class="statV" id="statMissingPgno">-</div>
-            </div>
-            <div class="stat">
-              <div class="statL">% Observed</div>
-              <div class="statV" id="statPct">-</div>
-            </div>
-          </div>
+      </div>
 
-          <div class="stat" style="margin-top:10px;">
-            <div class="statL" style="font-weight:950;">Observed count by Chapter</div>
-            <div class="statL mono" id="statByChapter" style="margin-top:8px;">-</div>
-          </div>
+      <div class="pi-actions">
+        <button class="btn btn-muted" id="newReportBtn" type="button">New Report</button>
+        <button class="btn primary" id="saveHeaderBtn" type="button">Save Report Header</button>
+        <button class="btn warn" id="deleteReportBtn" type="button">Delete Report</button>
 
-          <div class="stat" style="margin-top:10px;">
-            <div class="statL" style="font-weight:950;">Observed count by Type</div>
-            <div class="statL mono" id="statByType" style="margin-top:8px;">-</div>
-          </div>
+        <button class="btn btn-muted" id="exportBtn" type="button">Export Report JSON</button>
+        <button class="btn btn-muted" id="importBtn" type="button">Import Report JSON</button>
+        <input id="importFile" type="file" accept="application/json" style="display:none" />
 
-          <div class="stat" style="margin-top:10px;">
-            <div class="statL" style="font-weight:950;">Observed Question Nos.</div>
-            <div class="statL mono" id="statObsList" style="margin-top:8px;">-</div>
-          </div>
+        <button class="btn btn-muted" id="importPdfBtn" type="button" title="Upload PDF, extract header/observations via Edge Function, and populate this report">Import Report PDF (AI)</button>
+        <input id="importPdfFile" type="file" accept="application/pdf" style="display:none" />
 
-          <div class="stat" style="margin-top:10px;">
-            <div class="statL" style="font-weight:950;">Missing PGNO tick — Question Nos.</div>
-            <div class="statL mono" id="statMissingList" style="margin-top:8px;">-</div>
-          </div>
-        </div>
-      </dialog>
+        <button class="btn btn-muted" id="statsBtn" type="button">View Statistics</button>
+        <button class="btn btn-muted" id="finalizeBtn" type="button">Finalize check</button>
+      </div>
 
+      <div class="pi-notes">
+        <ul>
+          <li><b>Preferred flow:</b> <b>Import Report PDF (AI)</b> → header auto-fills → observations created → then you select PGNO(s) for negatives.</li>
+          <li><b>Manual entry:</b> use <b>New Report</b> only when you do <b>not</b> have the PDF. Inspector name is always manual.</li>
+        </ul>
+      </div>
     </div>
+
+    <div class="pi-main">
+      <div class="pi-pane">
+        <h3>Search & Filters</h3>
+        <div class="pi-field">
+          <label>Search (No / Short Text / Question / Section)</label>
+          <input id="searchInput" type="text" placeholder="e.g. 8.99.2 / mooring / permit" />
+        </div>
+
+        <div class="pi-field" style="margin-top:10px;">
+          <label>Chapter</label>
+          <select id="chapterFilter"></select>
+        </div>
+
+        <div style="display:flex; gap:14px; margin-top:10px; align-items:center;">
+          <label style="display:flex; gap:8px; align-items:center; font-weight:900; color:#143a63;">
+            <input id="onlyObsFilter" type="checkbox" />
+            Only observed
+          </label>
+
+          <label style="display:flex; gap:8px; align-items:center; font-weight:900; color:#143a63;">
+            <input id="missingPgnoFilter" type="checkbox" />
+            Missing PGNO tick
+          </label>
+        </div>
+
+        <div id="questionList" style="margin-top: 12px;"></div>
+      </div>
+
+      <div class="pi-pane">
+        <h3>Observation Editor</h3>
+        <div id="detailPane" style="min-height: 280px;"></div>
+      </div>
+    </div>
+
+    <dialog id="statsDialog">
+      <div class="dlg">
+        <h3>Report Statistics</h3>
+
+        <div style="display:grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap:10px;">
+          <div class="pi-field"><label>Total questions</label><input id="statTotalQ" readonly /></div>
+          <div class="pi-field"><label>Observed questions</label><input id="statObservedQ" readonly /></div>
+          <div class="pi-field"><label>Missing PGNO tick</label><input id="statMissingPgno" readonly /></div>
+          <div class="pi-field"><label>Observed %</label><input id="statPct" readonly /></div>
+        </div>
+
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-top:10px;">
+          <div>
+            <div style="font-weight:950; color:#143a63;">Observed by chapter</div>
+            <pre id="statByChapter">-</pre>
+          </div>
+          <div>
+            <div style="font-weight:950; color:#143a63;">Observed by type</div>
+            <pre id="statByType">-</pre>
+          </div>
+        </div>
+
+        <div style="margin-top:10px;">
+          <div style="font-weight:950; color:#143a63;">Observed question numbers</div>
+          <pre id="statObsList">-</pre>
+        </div>
+
+        <div style="margin-top:10px;">
+          <div style="font-weight:950; color:#143a63;">Questions missing PGNO tick</div>
+          <pre id="statMissingList">-</pre>
+        </div>
+
+        <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:10px;">
+          <button class="btn btn-muted" id="exportCsvBtn" type="button">Export CSV</button>
+          <button class="btn primary" id="closeStatsBtn" type="button">Close</button>
+        </div>
+      </div>
+    </dialog>
+
   </div>
 
+  <!-- Important: keep module scripts at the END so elements exist before JS runs -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="./auth.js"></script>
+  <script type="module" src="./auth.js"></script>
+  <script type="module" src="./question_library_loader.js"></script>
   <script type="module" src="./post_inspection.js"></script>
 </body>
 </html>
