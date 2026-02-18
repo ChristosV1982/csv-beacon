@@ -1,523 +1,460 @@
+<!-- public/post_inspection.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>SIRE 2.0 – Post-Inspection Observations</title>
-
-  <link rel="stylesheet" href="./tekmerion-theme.css?v=20260212_1" />
   <link rel="stylesheet" href="./style.css" />
-
   <style>
-    body{
-      margin:0; min-height:100vh;
-      font-family:"Segoe UI", Arial, sans-serif;
-      background: radial-gradient(1200px 700px at 20% 10%, #1a4170 0%, #0b1c33 55%, #071426 100%);
-      color:#fff;
-      padding:18px 14px;
-      box-sizing:border-box;
+    :root{
+      --nav:#1a4170;
+      --nav2:#0f2f55;
+      --card:#ffffff;
+      --line:#d5deef;
+      --muted:#5a6d86;
+      --ink:#123a63;
+      --btn:#1e63b6;
+      --btn2:#164f93;
+      --warn:#a94b00;
+      --danger:#b72a2a;
+      --ok:#1e7b34;
     }
-    .wrap{ max-width: 1650px; margin: 0 auto; }
-
+    body{ background:#0b1a2a; }
+    .wrap{ max-width:1400px; margin:22px auto; padding:0 14px; }
     .topbar{
-      display:flex;
-      gap:12px;
-      flex-wrap:wrap;
-      align-items:center;
-      justify-content:space-between;
-      margin-bottom: 12px;
-
-      background: rgba(12,33,58,0.68);
-      border: 1px solid rgba(213,222,239,0.35);
-      border-radius: 16px;
-      padding:12px 14px;
-      box-shadow: 0 10px 46px rgba(0,0,0,0.35);
-      backdrop-filter: blur(3px);
-    }
-    .title{
-      margin:0;
-      font-weight:900;
-      letter-spacing:0.03em;
-      font-size:1.15rem;
-      text-shadow: 0 3px 12px rgba(0,0,0,0.35);
-    }
-    .sub{
-      margin-top:4px;
-      opacity:0.92;
-      font-weight:800;
-      line-height:1.35;
-      font-size:0.95rem;
-    }
-    .actions{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
-
-    .btn{
-      border:none; border-radius:10px;
-      padding:10px 14px;
-      font-weight:900;
-      cursor:pointer;
-      text-decoration:none;
-      display:inline-block;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.15);
-      background:#295eb0;
+      background:linear-gradient(180deg,var(--nav),var(--nav2));
+      border:1px solid rgba(255,255,255,.18);
+      border-radius:18px;
+      padding:18px 18px 14px;
       color:#fff;
-      white-space: nowrap;
+      box-shadow:0 10px 40px rgba(0,0,0,.35);
     }
-    .btn:hover{ filter:brightness(0.96); }
-    .btn-outline{ background:transparent; border:1px solid rgba(255,255,255,0.65); color:#fff; box-shadow:none; }
-    .btn-muted{ background:#eaf1fb; border:1px solid #d5deef; color:#1a4170; box-shadow:none; }
-    .btn-danger{ background:#b03939; color:#fff; }
-    .btn:disabled{ opacity:0.55; cursor:not-allowed; filter:none; }
-
-    .panel{
-      background: rgba(12,33,58,0.68);
-      border: 1px solid rgba(213,222,239,0.35);
-      border-radius: 18px;
-      padding: 14px;
-      box-shadow: 0 10px 46px rgba(0,0,0,0.35);
-      backdrop-filter: blur(3px);
-      margin-bottom:12px;
+    .title{ font-size:20px; font-weight:950; letter-spacing:.3px; }
+    .subtitle{ margin-top:4px; opacity:.92; font-weight:700; }
+    .row{
+      display:flex; gap:10px; flex-wrap:wrap; align-items:center;
+      margin-top:14px;
+    }
+    .pill{
+      background:rgba(255,255,255,.12);
+      border:1px solid rgba(255,255,255,.18);
+      border-radius:999px;
+      padding:8px 12px;
+      font-weight:850;
+    }
+    .btn{
+      border:0; cursor:pointer;
+      background:var(--btn);
+      color:#fff; font-weight:900;
+      padding:10px 14px;
+      border-radius:12px;
+      transition:.15s transform, .15s opacity;
+    }
+    .btn:hover{ opacity:.96; transform:translateY(-1px); }
+    .btn:active{ transform:translateY(0px); }
+    .btn-muted{
+      background:#eaf1fb; color:var(--ink);
+      border:1px solid #cfe0fb;
+    }
+    .btn-danger{
+      background:var(--danger);
+      color:#fff;
+    }
+    .btn-ghost{
+      background:rgba(255,255,255,.12);
+      border:1px solid rgba(255,255,255,.22);
+      color:#fff;
     }
 
     .grid{
+      margin-top:14px;
       display:grid;
-      grid-template-columns: 520px 1fr;
-      gap:12px;
-      align-items:start;
-    }
-    @media (max-width: 1200px){
-      .grid{ grid-template-columns: 1fr; }
+      grid-template-columns: 1fr;
+      gap:14px;
     }
 
     .card{
-      background:#fff;
-      color:#1a4170;
-      border:1px solid #d5deef;
-      border-radius:16px;
-      padding:14px;
-      box-shadow: 0 4px 18px rgba(18, 44, 87, 0.16);
+      background:rgba(255,255,255,.92);
+      border:1px solid rgba(255,255,255,.28);
+      border-radius:18px;
+      padding:16px;
+      box-shadow:0 12px 40px rgba(0,0,0,.28);
+      color:var(--ink);
     }
 
-    .row{ display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; }
-    .field{ min-width: 220px; flex: 1; }
-    label{
-      display:block;
-      margin: 10px 0 6px 0;
-      font-weight: 900;
-      color:#1a4170;
-      font-size: 0.95rem;
+    .sectionTitle{
+      font-weight:950;
+      color:var(--ink);
+      margin-bottom:10px;
+      font-size:16px;
     }
-    input, select{
-      width: 100%;
-      box-sizing:border-box;
-      border-radius:10px;
-      border:1px solid #cbd7ee;
-      padding: 10px 12px;
-      font-size: 1rem;
-      font-family:"Segoe UI", Arial, sans-serif;
+
+    .formGrid{
+      display:grid;
+      grid-template-columns: 220px 220px 220px 1fr 220px 260px;
+      gap:10px;
+      align-items:end;
+    }
+
+    .formGrid2{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap:10px;
+      margin-top:10px;
+      align-items:end;
+    }
+
+    label{ display:block; font-weight:900; color:var(--ink); margin-bottom:6px; }
+    input, select, textarea{
+      width:100%;
+      border-radius:12px;
+      border:1px solid #cfe0fb;
+      padding:10px 12px;
       background:#fff;
-      color:#1a4170;
       outline:none;
+      color:var(--ink);
+      font-weight:700;
     }
-    input:focus, select:focus{
-      border-color:#2e68c7;
-      box-shadow: 0 0 0 3px rgba(46, 104, 199, 0.15);
+    textarea{ min-height:110px; resize:vertical; }
+
+    .actions{ display:flex; gap:10px; flex-wrap:wrap; margin-top:12px; align-items:center; }
+
+    .notes{
+      margin-top:10px;
+      color:#274a74;
+      font-weight:750;
+      line-height:1.45;
     }
 
-    .minor{
-      font-weight:800;
-      color:#35507b;
-      opacity:0.95;
-      line-height:1.35;
-      margin-top:8px;
+    .split{
+      display:grid;
+      grid-template-columns: 420px 1fr;
+      gap:14px;
+      margin-top:14px;
+    }
+
+    .filters{
+      display:grid;
+      grid-template-columns: 1fr 180px;
+      gap:10px;
+      align-items:end;
     }
 
     .list{
       margin-top:10px;
-      max-height: calc(100vh - 370px);
+      border:1px solid var(--line);
+      border-radius:14px;
+      background:#f7fbff;
+      overflow:hidden;
+      max-height:520px;
       overflow:auto;
-      padding-right:6px;
-      display:flex;
-      flex-direction:column;
-      gap:8px;
     }
     .item{
-      border:1px solid #d5deef;
-      border-radius:14px;
-      padding:10px;
-      background:#f8fbff;
+      padding:10px 12px;
+      border-bottom:1px solid #e6eefc;
       cursor:pointer;
+      background:#f7fbff;
     }
-    .item:hover{ background:#eef5ff; }
-    .item.active{ outline:2px solid rgba(41, 94, 176, 0.65); }
-    .itemTop{ display:flex; gap:10px; align-items:flex-start; justify-content:space-between; }
+    .item:hover{ background:#eef6ff; }
+    .item.active{ background:#dcecff; }
+    .itemTop{ display:flex; justify-content:space-between; gap:10px; }
     .qno{ font-weight:950; }
-    .qst{ font-weight:800; color:#35507b; margin-top:5px; line-height:1.25; }
+    .qst{ color:var(--muted); font-weight:800; margin-top:2px; }
     .badge{
       display:inline-block;
-      padding:3px 10px;
+      padding:6px 10px;
       border-radius:999px;
       font-weight:950;
-      font-size:0.82rem;
-      border:1px solid #d5deef;
-      background:#eaf1fb;
-      color:#1a4170;
+      font-size:12px;
+      border:1px solid #cfe0fb;
+      background:#fff;
+      color:#35507b;
       white-space:nowrap;
     }
-    .badge.obs{
-      background:#e9fff0;
-      border-color:#bce9c9;
-      color:#11612b;
-    }
-    .badge.warn{
-      background:#fff3e0;
-      border-color:#ffd8a8;
-      color:#8a4b00;
-    }
+    .badge.obs{ border-color:#bfe7c8; background:#e9fff0; color:var(--ok); }
+    .badge.warn{ border-color:#ffd4a6; background:#fff3e6; color:var(--warn); }
 
-    .detailTitle{
-      margin:0;
-      font-size:1.1rem;
-      font-weight:950;
-    }
-    .meta{
-      margin-top:6px;
-      color:#35507b;
-      font-weight:850;
-      line-height:1.35;
-    }
-    .qtext{
-      margin-top:10px;
-      padding:10px;
-      border-radius:12px;
-      border:1px solid #d5deef;
-      background:#f7fbff;
-      font-weight:850;
-      color:#223a66;
-      line-height:1.4;
-      white-space:pre-wrap;
-    }
-
-    .toggleRow{
-      display:flex;
-      gap:10px;
-      align-items:center;
-      margin-top:12px;
-      flex-wrap:wrap;
-    }
-    .toggleRow label{
-      margin:0;
-      display:flex;
-      gap:10px;
-      align-items:center;
-      font-weight:950;
-      color:#1a4170;
-    }
-    .toggleRow input[type="checkbox"]{ width:auto; }
-
-    .pgnoBox{
-      margin-top:12px;
-      border:1px solid #d5deef;
-      border-radius:12px;
-      padding:12px;
-      background:#f8fbff;
-    }
-    .pgnoTitle{
-      font-weight:950;
-      margin:0 0 8px 0;
-    }
-    .pgnoList{
-      display:flex;
-      flex-direction:column;
-      gap:8px;
-      margin-top:8px;
-    }
+    .detailTitle{ margin:0; font-size:18px; font-weight:950; color:var(--ink); }
+    .meta{ margin-top:6px; color:#2c527e; font-weight:850; }
+    .qtext{ margin-top:10px; background:#fff; border:1px solid #dbe7fb; border-radius:14px; padding:12px; font-weight:750; }
+    .toggleRow{ margin-top:12px; display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+    .pgnoBox{ margin-top:12px; border:1px solid #dbe7fb; border-radius:14px; padding:12px; background:#ffffff; }
+    .pgnoTitle{ font-weight:950; color:var(--ink); margin-bottom:6px; }
+    .pgnoList{ margin-top:10px; display:flex; flex-direction:column; gap:8px; }
     .pgnoRow{
-      display:flex;
+      display:grid;
+      grid-template-columns: 22px 90px 1fr;
       gap:10px;
-      align-items:flex-start;
-      padding:8px;
+      align-items:start;
+      border:1px solid #e6eefc;
+      background:#f8fbff;
       border-radius:12px;
-      border:1px solid #e6eefb;
-      background:#fff;
+      padding:10px;
     }
-    .pgnoRow input{ width:auto; margin-top:3px; }
-    .pgnoIdx{
-      font-weight:950;
-      color:#1a4170;
-      min-width:48px;
-    }
-    .pgnoTxt{
-      font-weight:850;
-      color:#223a66;
-      line-height:1.35;
-      white-space:pre-wrap;
-      flex:1;
-    }
+    .pgnoIdx{ font-weight:950; color:#274a74; }
+    .pgnoTxt{ color:#1e3c5f; font-weight:750; line-height:1.35; }
 
-    textarea{
-      width:100%;
-      box-sizing:border-box;
-      margin-top:10px;
-      border-radius:10px;
-      border:1px solid #cbd7ee;
-      padding:10px 12px;
-      font-family:"Segoe UI", Arial, sans-serif;
-      font-size:0.98rem;
-      min-height:110px;
-      resize:vertical;
-      color:#1a4170;
-      background:#fff;
-    }
-
-    .statusLine{
-      margin-top:10px;
-      font-weight:950;
-      color: rgba(255,255,255,0.92);
+    .statusBar{
+      margin-top:8px;
       display:flex;
       gap:10px;
-      align-items:center;
       flex-wrap:wrap;
-    }
-    .statusPill{
-      display:inline-block;
-      padding:3px 10px;
-      border-radius:999px;
-      font-weight:950;
-      font-size:0.85rem;
-      border:1px solid rgba(255,255,255,0.35);
-      background: rgba(255,255,255,0.10);
+      align-items:center;
       color:#fff;
+      opacity:.95;
     }
+    .status{
+      background:rgba(0,0,0,.22);
+      border:1px solid rgba(255,255,255,.18);
+      padding:8px 12px;
+      border-radius:999px;
+      font-weight:850;
+    }
+    .mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
 
     dialog{
-      border:none;
+      border:1px solid rgba(0,0,0,.2);
       border-radius:16px;
-      width: min(980px, 94vw);
       padding:0;
-      background:#0b1c33;
-      color:#fff;
-      box-shadow: 0 14px 60px rgba(0,0,0,0.55);
+      width:min(980px, 92vw);
+      box-shadow:0 20px 70px rgba(0,0,0,.35);
     }
+    dialog::backdrop{ background:rgba(0,0,0,.55); }
     .dlgHead{
-      padding:12px 14px;
-      border-bottom:1px solid rgba(255,255,255,0.16);
+      padding:14px 16px;
+      border-bottom:1px solid #e6eefc;
+      background:#f7fbff;
+      border-top-left-radius:16px;
+      border-top-right-radius:16px;
+      font-weight:950;
+      color:var(--ink);
       display:flex;
       justify-content:space-between;
       align-items:center;
       gap:10px;
-      flex-wrap:wrap;
     }
-    .dlgBody{ padding:12px 14px; }
-    .dlgTitle{ margin:0; font-weight:950; }
+    .dlgBody{ padding:14px 16px; }
     .statGrid{
       display:grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
+      grid-template-columns: 1fr 1fr;
       gap:10px;
-      margin-top:10px;
-    }
-    @media (max-width: 980px){
-      .statGrid{ grid-template-columns: 1fr; }
     }
     .stat{
-      border:1px solid rgba(255,255,255,0.18);
+      border:1px solid #dbe7fb;
+      background:#ffffff;
       border-radius:14px;
-      padding:10px;
-      background: rgba(255,255,255,0.06);
+      padding:12px;
     }
-    .statN{ font-size:1.4rem; font-weight:950; }
-    .statL{ margin-top:6px; opacity:0.92; font-weight:850; line-height:1.35; white-space:pre-wrap; }
-    .mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
+    .statL{ font-weight:900; color:#274a74; }
+    .statV{ font-weight:950; font-size:22px; margin-top:6px; }
   </style>
 </head>
 
 <body>
   <div class="wrap">
+
     <div class="topbar">
-      <div>
-        <div class="title">Post-Inspection Observations (Company)</div>
-        <div class="sub">Record vetting inspection report observations against the locked SIRE question library, with PGNO tick selection.</div>
+      <div class="title">Post-Inspection Observations (Company)</div>
+      <div class="subtitle">Import SIRE 2.0 inspection report PDF, extract observed questions & observations, then complete PGNO selection and run statistics.</div>
+
+      <div class="row">
+        <div class="pill" id="userBadge">—</div>
+        <button class="btn-ghost btn" type="button" id="dashboardBtn">Dashboard</button>
+        <button class="btn-ghost btn" type="button" id="modeBtn">Mode Selection</button>
+        <button class="btn" type="button" id="logoutBtn">Logout</button>
       </div>
-      <div class="actions">
-        <div id="userBadge" style="font-weight:900; opacity:0.95;"></div>
-        <a class="btn btn-outline" href="./q-dashboard.html">Dashboard</a>
-        <a class="btn btn-outline" href="./post_inspection_stats.html">Stats</a>
-        <a class="btn btn-outline" href="./library.html">Read Only</a>
-        <a class="btn btn-outline" href="./index.html">Mode Selection</a>
-        <button class="btn" id="logoutBtn">Logout</button>
+
+      <div class="statusBar">
+        <div class="status" id="activeReportPill">No active report</div>
+        <div class="status" id="saveStatus">Not saved</div>
+        <div class="status mono" id="buildPill">build: —</div>
       </div>
     </div>
 
-    <div class="panel">
+    <div class="grid">
+
       <div class="card">
-        <div class="row">
-          <div class="field">
-            <label for="reportSelect">Existing Post-Inspection Reports</label>
+        <div class="sectionTitle">Inspection Header</div>
+
+        <div class="formGrid">
+          <div>
+            <label for="reportSelect">Existing Reports</label>
             <select id="reportSelect"></select>
           </div>
-          <div class="field">
+
+          <div>
             <label for="vesselSelect">Vessel</label>
             <select id="vesselSelect"></select>
           </div>
-          <div class="field">
+
+          <div>
             <label for="inspectionDate">Inspection Date</label>
             <input id="inspectionDate" type="date" />
           </div>
-          <div class="field" style="min-width:260px; flex:1.5;">
+
+          <div>
             <label for="portName">Port (official name)</label>
             <input id="portName" type="text" placeholder="e.g. Rotterdam" />
           </div>
-          <div class="field" style="min-width:160px;">
+
+          <div>
             <label for="portCode">Port Code</label>
             <input id="portCode" type="text" placeholder="e.g. NLRTM" />
           </div>
-          <div class="field" style="min-width:260px; flex:1.5;">
-            <label for="inspectingCompany">OCIMF Inspecting Company</label>
-            <input id="inspectingCompany" type="text" placeholder="Company name" />
-          </div>
 
-          <div class="field">
-            <label for="inspectorName">Inspector Name (manual)</label>
-            <input id="inspectorName" type="text" placeholder="Inspector name (manual entry)" />
+          <div>
+            <label for="ocimfCompany">OCIMF Inspecting Company</label>
+            <input id="ocimfCompany" type="text" placeholder="Company name" />
           </div>
+        </div>
 
-          <div class="field">
+        <div class="formGrid2">
+          <div>
             <label for="reportRef">Report Reference (optional)</label>
-            <input id="reportRef" type="text" placeholder="e.g. SIRE 2.0 Report No / Vetting Ref" />
+            <input id="reportRef" type="text" placeholder="e.g. LSHB-4402-3851-7649" />
           </div>
-          <div class="field" style="min-width:320px; flex:2;">
+          <div>
             <label for="reportTitle">Title (optional)</label>
             <input id="reportTitle" type="text" placeholder="e.g. OCIMF SIRE 2.0 – Discharge Call – Terminal XYZ" />
           </div>
         </div>
 
-        <div class="row" style="margin-top:10px;">
-          <button class="btn btn-muted" id="newReportBtn">New Report</button>
-          <button class="btn" id="saveHeaderBtn">Save Report Header</button>
-          <button class="btn btn-danger" id="deleteReportBtn">Delete Report</button>
-
-          <button class="btn btn-muted" id="exportBtn">Export Report JSON</button>
-          <button class="btn btn-muted" id="importBtn">Import Report JSON</button>
-          <input id="importFile" type="file" accept="application/json" style="display:none;" />
-
-          <button class="btn btn-muted" id="importPdfBtn" title="Upload PDF, extract header/observations via Edge Function, and populate this report">Import Report PDF (AI)</button>
-          <input id="importPdfFile" type="file" accept="application/pdf" style="display:none;" />
-
-          <button class="btn btn-muted" id="statsBtn">View Statistics</button>
-          <button class="btn btn-muted" id="finalizeBtn">Finalize check</button>
-
-          <div class="statusLine" style="margin-left:auto;">
-            <span class="statusPill" id="activeReportPill">No active report</span>
-            <span class="statusPill" id="saveStatus">Not saved</span>
+        <div class="formGrid2">
+          <div>
+            <label for="inspectorName">Inspector Name (manual)</label>
+            <input id="inspectorName" type="text" placeholder="Enter inspector name (not in PDF)" />
+          </div>
+          <div>
+            <label>PDF Report (stored)</label>
+            <div class="actions" style="margin-top:0;">
+              <button class="btn btn-muted" type="button" id="downloadPdfBtn" title="Download the stored PDF for this inspection">Download PDF</button>
+              <div style="font-weight:850; color:#274a74;" id="pdfInfo">No PDF linked</div>
+            </div>
           </div>
         </div>
 
-        <div class="minor">
-          Notes:
-          <ul style="margin:8px 0 0 18px; padding:0;">
-            <li>Only <b>super_admin</b> and <b>company_admin</b> can access this module (RLS enforced).</li>
-            <li>For each question with an observation, tick the applicable PGNO(s). Full PGNO answering is not required.</li>
-            <li>Use <b>Finalize check</b> to find observed questions that have <b>no PGNO ticks</b>.</li>
-          </ul>
+        <div class="actions">
+          <button class="btn btn-muted" type="button" id="newReportBtn">New Report</button>
+          <button class="btn" type="button" id="saveHeaderBtn">Save Report Header</button>
+          <button class="btn btn-danger" type="button" id="deleteReportBtn">Delete Report</button>
+
+          <button class="btn btn-muted" type="button" id="exportBtn">Export Report JSON</button>
+          <button class="btn btn-muted" type="button" id="importBtn">Import Report JSON</button>
+
+          <button class="btn btn-muted" type="button" id="importPdfBtn" title="Upload PDF, extract header/observations via Edge Function, and populate this report">
+            Import Report PDF (AI)
+          </button>
+
+          <button class="btn btn-muted" type="button" id="statsBtn">View Statistics</button>
+          <button class="btn btn-muted" type="button" id="finalizeBtn">Finalize check</button>
+
+          <input id="importFile" type="file" accept="application/json" style="display:none;" />
+          <input id="importPdfFile" type="file" accept="application/pdf" style="display:none;" />
+        </div>
+
+        <div class="notes">
+          <div>• Preferred flow: <b>Import Report PDF (AI)</b> → header auto-fills → observations created → you then select PGNO(s) for negatives.</div>
+          <div>• Manual header entry is allowed only when you do not have the PDF; inspector name is always manual.</div>
         </div>
       </div>
-    </div>
 
-    <div class="grid">
-      <div class="panel">
+      <div class="split">
+
         <div class="card">
-          <div class="row">
-            <div class="field">
+          <div class="sectionTitle">Question Filters</div>
+          <div class="filters">
+            <div>
               <label for="searchInput">Search (No / Short Text / Question / Section)</label>
-              <input id="searchInput" type="text" placeholder="e.g. 8.99.2 / mooring / permits..." />
+              <input id="searchInput" type="text" placeholder="e.g. 8.99.2 / mooring / permit" />
             </div>
-            <div class="field">
+            <div>
               <label for="chapterFilter">Chapter</label>
               <select id="chapterFilter"></select>
             </div>
+          </div>
 
-            <div class="field" style="min-width:170px; flex:0.8;">
-              <label>&nbsp;</label>
-              <label style="margin:0; display:flex; gap:10px; align-items:center; font-weight:950; color:#1a4170;">
-                <input id="onlyObsFilter" type="checkbox" />
-                Only Observed
-              </label>
+          <div class="actions" style="margin-top:10px;">
+            <label style="display:flex; align-items:center; gap:10px; font-weight:900;">
+              <input id="onlyObsFilter" type="checkbox" />
+              Only Observed
+            </label>
+
+            <label style="display:flex; align-items:center; gap:10px; font-weight:900;">
+              <input id="missingPgnoFilter" type="checkbox" />
+              Missing PGNO tick
+            </label>
+          </div>
+
+          <div class="list" id="questionList"></div>
+        </div>
+
+        <div class="card">
+          <div class="sectionTitle">Observation Entry</div>
+          <div id="detailPane" style="min-height:520px;">
+            <div style="font-weight:950; color:#35507b;">
+              Select a question from the list to record post-inspection observations and tick PGNO(s).
             </div>
+          </div>
+        </div>
 
-            <div class="field" style="min-width:220px; flex:1;">
-              <label>&nbsp;</label>
-              <label style="margin:0; display:flex; gap:10px; align-items:center; font-weight:950; color:#1a4170;">
-                <input id="missingPgnoFilter" type="checkbox" />
-                Missing PGNO tick
-              </label>
+      </div>
+
+      <dialog id="statsDialog">
+        <div class="dlgHead">
+          <div>Statistics</div>
+          <div class="actions" style="margin-top:0;">
+            <button class="btn btn-muted" type="button" id="exportCsvBtn">Export CSV</button>
+            <button class="btn btn-muted" type="button" id="closeStatsBtn">Close</button>
+          </div>
+        </div>
+        <div class="dlgBody">
+          <div class="statGrid">
+            <div class="stat">
+              <div class="statL">Total Questions in Library</div>
+              <div class="statV" id="statTotalQ">-</div>
+            </div>
+            <div class="stat">
+              <div class="statL">Observed Questions</div>
+              <div class="statV" id="statObservedQ">-</div>
+            </div>
+            <div class="stat">
+              <div class="statL">Missing PGNO tick</div>
+              <div class="statV" id="statMissingPgno">-</div>
+            </div>
+            <div class="stat">
+              <div class="statL">% Observed</div>
+              <div class="statV" id="statPct">-</div>
             </div>
           </div>
 
-          <div class="list" id="questionList" aria-label="Question list"></div>
-        </div>
-      </div>
+          <div class="stat" style="margin-top:10px;">
+            <div class="statL" style="font-weight:950;">Observed count by Chapter</div>
+            <div class="statL mono" id="statByChapter" style="margin-top:8px;">-</div>
+          </div>
 
-      <div class="panel">
-        <div class="card" id="detailPane">
-          <div style="font-weight:950; color:#35507b;">
-            Select a question from the list to record post-inspection observations and tick PGNO(s).
+          <div class="stat" style="margin-top:10px;">
+            <div class="statL" style="font-weight:950;">Observed count by Type</div>
+            <div class="statL mono" id="statByType" style="margin-top:8px;">-</div>
+          </div>
+
+          <div class="stat" style="margin-top:10px;">
+            <div class="statL" style="font-weight:950;">Observed Question Nos.</div>
+            <div class="statL mono" id="statObsList" style="margin-top:8px;">-</div>
+          </div>
+
+          <div class="stat" style="margin-top:10px;">
+            <div class="statL" style="font-weight:950;">Missing PGNO tick — Question Nos.</div>
+            <div class="statL mono" id="statMissingList" style="margin-top:8px;">-</div>
           </div>
         </div>
-      </div>
+      </dialog>
+
     </div>
-
-    <dialog id="statsDialog">
-      <div class="dlgHead">
-        <h3 class="dlgTitle">Post-Inspection Statistics (Active Report)</h3>
-        <div style="display:flex; gap:10px; flex-wrap:wrap;">
-          <button class="btn btn-muted" id="exportCsvBtn">Export Observations CSV</button>
-          <button class="btn" id="closeStatsBtn">Close</button>
-        </div>
-      </div>
-      <div class="dlgBody">
-        <div class="statGrid">
-          <div class="stat">
-            <div class="statN" id="statTotalQ">0</div>
-            <div class="statL">Total questions in library</div>
-          </div>
-          <div class="stat">
-            <div class="statN" id="statObservedQ">0</div>
-            <div class="statL">Questions marked with observations</div>
-          </div>
-          <div class="stat">
-            <div class="statN" id="statMissingPgno">0</div>
-            <div class="statL">Observed questions missing PGNO tick</div>
-          </div>
-          <div class="stat">
-            <div class="statN" id="statPct">0%</div>
-            <div class="statL">Observed / Total</div>
-          </div>
-        </div>
-
-        <div class="stat" style="margin-top:10px;">
-          <div class="statL" style="font-weight:950;">Observed by Chapter</div>
-          <div class="statL mono" id="statByChapter">-</div>
-        </div>
-
-        <div class="stat" style="margin-top:10px;">
-          <div class="statL" style="font-weight:950;">Observed by Observation Type</div>
-          <div class="statL mono" id="statByType">-</div>
-        </div>
-
-        <div class="stat" style="margin-top:10px;">
-          <div class="statL" style="font-weight:950;">Observed Question Nos.</div>
-          <div class="statL mono" id="statObsList">-</div>
-        </div>
-
-        <div class="stat" style="margin-top:10px;">
-          <div class="statL" style="font-weight:950;">Missing PGNO tick — Question Nos.</div>
-          <div class="statL mono" id="statMissingList">-</div>
-        </div>
-      </div>
-    </dialog>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="./auth.js"></script>
-  <script type="module" src="./post_inspection.js?v=20260218v8"></script>
+  <script type="module" src="./post_inspection.js"></script>
 </body>
 </html>
