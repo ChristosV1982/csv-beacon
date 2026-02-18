@@ -6,10 +6,9 @@
 
 import { loadLockedLibraryJson } from "./question_library_loader.js";
 
-const POST_INSPECTION_BUILD = "post_inspection_v7_2026-02-17";
+const POST_INSPECTION_BUILD = "post_inspection_v8_2026-02-18";
 const LOCKED_LIBRARY_JSON = "./sire_questions_all_columns_named.json";
 
-const POST_INSPECTION_BUILD = "post_inspection_v6_2026-02-17";
 
 const PDF_BUCKET_DEFAULT = "inspection-reports"; // must match your Storage bucket name
 const PDF_FOLDER_PREFIX = "post_inspections";
@@ -306,7 +305,7 @@ async function loadObservationsForReport(reportId) {
 async function createReportHeader({ vessel_id, inspection_date, port_name, port_code, ocimf_company, report_ref, title, inspector_name, pdf_bucket, pdf_path, pdf_filename }) {
   const { data, error } = await state.supabase
     .from("post_inspection_reports")
-    .insert([{ vessel_id, inspection_date, port_name, port_code, [REPORT_COMPANY_COL]: ocimf_company, report_ref, title }])
+    .insert([{ vessel_id, inspection_date, port_name, port_code, [REPORT_COMPANY_COL]: ocimf_company, report_ref, title, inspector_name, pdf_bucket, pdf_path, pdf_filename }])
     .select(`id, vessel_id, inspection_date, port_name, port_code, ${REPORT_COMPANY_COL}, report_ref, title, inspector_name, pdf_bucket, pdf_path, pdf_filename, created_at, updated_at`)
     .single();
 
@@ -317,7 +316,7 @@ async function createReportHeader({ vessel_id, inspection_date, port_name, port_
 async function updateReportHeader(reportId, { vessel_id, inspection_date, port_name, port_code, ocimf_company, report_ref, title, inspector_name, pdf_bucket, pdf_path, pdf_filename }) {
   const { data, error } = await state.supabase
     .from("post_inspection_reports")
-    .update({ vessel_id, inspection_date, port_name, port_code, [REPORT_COMPANY_COL]: ocimf_company, report_ref, title })
+    .update({ vessel_id, inspection_date, port_name, port_code, [REPORT_COMPANY_COL]: ocimf_company, report_ref, title, inspector_name, pdf_bucket, pdf_path, pdf_filename })
     .eq("id", reportId)
     .select(`id, vessel_id, inspection_date, port_name, port_code, ${REPORT_COMPANY_COL}, report_ref, title, inspector_name, pdf_bucket, pdf_path, pdf_filename, created_at, updated_at`)
     .single();
