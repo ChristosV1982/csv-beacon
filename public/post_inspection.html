@@ -292,6 +292,15 @@
   </div>
 
   <!-- IMPORTANT: this must exist -->
+
+  <!-- Required for Supabase auth (must load before auth.js) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="./auth.js"></script>
+
+  <!-- Post-Inspection module (ESM) -->
   <script type="module" src="./post_inspection.js"></script>
+
+  <!-- Replit pill -->
+  <script src="https://replit-cdn.com/replit-pill/replit-pill.global.js" data-referral-code="egynmh4rs69e" data-repl-id="020e7e71-9671-4cf8-a6f8-da5ea1cdf9c8"></script>
 </body>
 </html>
