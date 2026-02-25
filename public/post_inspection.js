@@ -1,7 +1,7 @@
 // public/post_inspection.js
 import { loadLockedLibraryJson } from "./question_library_loader.js";
 
-const POST_INSPECTION_BUILD = "post_inspection_fixed_2026-02-18";
+const POST_INSPECTION_BUILD = "post_inspection_fixed_2026-02-25";
 
 // IMPORTANT: must match your bucket name
 const PDF_BUCKET_DEFAULT = "inspection-reports";
@@ -249,7 +249,6 @@ async function createReportHeader({ vessel_id, inspection_date, port_name, port_
 }
 
 async function updateReportHeader(reportId, fields) {
-  // normalize blanks
   const payload = {
     vessel_id: fields.vessel_id,
     inspection_date: fields.inspection_date,
@@ -402,7 +401,7 @@ function ensureActiveReportOrWarn() {
 }
 
 // -------------------------
-// Question list + detail pane (same logic you already had)
+// Question list + detail pane
 // -------------------------
 function renderQuestionList() {
   const list = mustEl("questionList");
@@ -475,7 +474,9 @@ function renderQuestionList() {
     empty.style.background = "#f8fbff";
     empty.style.color = "#35507b";
     empty.style.fontWeight = "900";
-    empty.textContent = "No questions match current filters.";
+    empty.textContent = onlyObs
+      ? "No observed questions were found for this report."
+      : "No questions match current filters.";
     list.appendChild(empty);
   }
 }
@@ -1082,7 +1083,6 @@ async function downloadActivePdf() {
 async function ensureDraftReportExists() {
   if (state.activeReport?.id) return state.activeReport;
 
-  // Create a draft report (we will overwrite with PDF header)
   const v = String(mustEl("vesselSelect").value || "").trim() || (state.vessels[0]?.id || "");
   if (!v) throw new Error("No vessels exist in DB.");
 
@@ -1115,16 +1115,35 @@ async function upsertObservationsDirect(reportId, rows) {
   }
 }
 
+function focusObservedAfterImport() {
+  // make it obvious to the user where the imported items are
+  const onlyObs = mustEl("onlyObsFilter");
+  const missing = mustEl("missingPgnoFilter");
+  const search = mustEl("searchInput");
+  onlyObs.checked = true;
+  missing.checked = false;
+  search.value = "";
+
+  const observed = getObservedQnos().sort((a, b) => String(a).localeCompare(String(b)));
+  if (observed.length) {
+    state.selectedQno = observed[0];
+    renderQuestionList();
+    renderDetailPane(observed[0]);
+  } else {
+    renderQuestionList();
+    clearDetailPane();
+  }
+}
+
 async function importReportPdfAiFromFile(file) {
   if (!file) return;
 
   setExtracting(true);
 
   try {
-    // 1) ensure report exists (draft ok)
     const report = await ensureDraftReportExists();
 
-    // 2) upload PDF to Storage
+    // upload PDF
     const bucket = PDF_BUCKET_DEFAULT;
     const safeName = String(file.name || "report.pdf").replace(/[^a-zA-Z0-9._-]+/g, "_");
     const path = `${PDF_FOLDER_PREFIX}/${report.id}/${Date.now()}_${safeName}`;
@@ -1136,7 +1155,6 @@ async function importReportPdfAiFromFile(file) {
       .upload(path, file, { upsert: true, contentType: "application/pdf" });
     if (upErr) throw upErr;
 
-    // store pdf fields into report
     await updateReportPdfFields(report.id, { pdf_bucket: bucket, pdf_path: path, pdf_filename: safeName });
 
     // refresh active report row
@@ -1148,7 +1166,7 @@ async function importReportPdfAiFromFile(file) {
       renderReportSelect();
     }
 
-    // 3) call Edge Function
+    // call edge function
     setSaveStatus("Extracting via AI…");
     const { data, error } = await state.supabase.functions.invoke("import-post-inspection-pdf", {
       body: { report_id: report.id, pdf_storage_path: path },
@@ -1158,11 +1176,10 @@ async function importReportPdfAiFromFile(file) {
 
     const extracted = data.extracted;
 
-    // 4) apply header mapping
+    // apply header
     const h = extracted?.header || {};
     const isoDate = ddmmyyyyToIso(h.inspection_date);
 
-    // vessel by name
     let vessel_id = mustEl("vesselSelect").value || null;
     if (h.vessel_name) {
       const hit = (state.vessels || []).find(v =>
@@ -1175,14 +1192,10 @@ async function importReportPdfAiFromFile(file) {
     if (isoDate) mustEl("inspectionDate").value = isoDate;
     if (h.port_name) mustEl("portName").value = h.port_name;
     if (h.port_code) mustEl("portCode").value = h.port_code;
-
-    // IMPORTANT fields you asked:
     if (h.ocimf_inspecting_company) mustEl("ocimfCompany").value = h.ocimf_inspecting_company;
     if (h.report_reference) mustEl("reportRef").value = h.report_reference;
 
-    // inspector is manual → do not overwrite inspectorName
-
-    // persist header; handle UNIQUE report_ref collisions
+    // persist header
     try {
       const updated = await updateReportHeader(report.id, headerInputs());
       state.activeReport = updated;
@@ -1210,34 +1223,40 @@ async function importReportPdfAiFromFile(file) {
     mustEl("reportSelect").value = report.id;
     updatePdfStatus(state.reports.find(r => r.id === report.id));
 
-    // 5) map observations into DB rows
+    // observations
     const obs = Array.isArray(extracted?.observations) ? extracted.observations : [];
     const rows = [];
-    const newMap = { ...(state.observations || {}) };
 
     for (const item of obs) {
       const qbase = item?.question_base;
       const qno = findLibraryQno(qbase, state.libByNo);
       if (!qno) continue;
 
-      const isNeg = String(item?.obs_type || "").toLowerCase() === "negative";
-      const isPos = String(item?.obs_type || "").toLowerCase() === "positive";
+      const obsType = String(item?.obs_type || "").toLowerCase();
+      const isNeg = obsType === "negative";
+      const isPos = obsType === "positive";
 
-      const observation_type = isNeg ? "negative_observation" : (isPos ? "positive_observation" : "observation_comment");
-      const remarks = String(item?.observation_text || "").trim();
+      // IMPORTANT:
+      // - keep observation_type compatible with your existing UI + DB constraint
+      // - store obs_type separately for future reporting
+      const observation_type = isNeg ? "negative_observation" : (isPos ? "best_practice" : "observation_comment");
+      const observation_text = String(item?.observation_text || item?.source_excerpt || "").trim();
 
       const row = {
         report_id: report.id,
         question_no: qno,
         has_observation: true,
         observation_type,
+        obs_type: isNeg ? "negative" : (isPos ? "positive" : null),
+        question_base: qbase ? String(qbase) : null,
+        observation_text: observation_text || null,
+        negative_category: item?.negative_category ? String(item.negative_category) : null,
+        positive_rank: item?.positive_rank ? String(item.positive_rank) : null,
         pgno_selected: [],
-        remarks,
-        updated_at: nowIso(),
+        remarks: observation_text || null,
       };
 
       rows.push(row);
-      newMap[qno] = { ...row };
     }
 
     if (rows.length) {
@@ -1246,9 +1265,21 @@ async function importReportPdfAiFromFile(file) {
     }
 
     state.observations = await loadObservationsForReport(report.id);
-    renderQuestionList();
-    clearDetailPane();
-    setSaveStatus(`AI import done (${rows.length} observation(s))`);
+
+    // If DB rejected columns (because they don't exist), surface it clearly:
+    const observedNow = getObservedQnos();
+
+    setSaveStatus(`AI import done (${observedNow.length} observation(s))`);
+
+    // Make imported items visible immediately
+    focusObservedAfterImport();
+
+    if (!observedNow.length && obs.length) {
+      alert(
+        "AI returned observations but none were saved/loaded.\n\n" +
+        "Next check: in Supabase table post_inspection_observations, confirm rows exist for this report_id."
+      );
+    }
   } finally {
     setExtracting(false);
   }
@@ -1258,7 +1289,6 @@ async function importReportPdfAiFromFile(file) {
 // Init
 // -------------------------
 async function init() {
-  // Ensure required DOM exists
   [
     "reportSelect","vesselSelect","inspectionDate","portName","portCode",
     "ocimfCompany","reportRef","reportTitle","inspectorName",
@@ -1273,13 +1303,14 @@ async function init() {
   ].forEach(mustEl);
 
   const R = window.AUTH?.ROLES;
+  if (!R) throw new Error("AUTH roles missing (window.AUTH.ROLES not found)");
+
   state.me = await window.AUTH.requireAuth([R.SUPER_ADMIN, R.COMPANY_ADMIN]);
   if (!state.me) return;
 
   window.AUTH.fillUserBadge(state.me, "userBadge");
   mustEl("logoutBtn").addEventListener("click", window.AUTH.logoutAndGoLogin);
 
-  // Optional buttons if present in your app shell
   el("dashboardBtn")?.addEventListener("click", () => window.location.href = "./dashboard.html");
   el("modeSelectBtn")?.addEventListener("click", () => window.location.href = "./mode_selection.html");
 
@@ -1289,11 +1320,9 @@ async function init() {
   setBuildPill();
   setSaveStatus("Loading…");
 
-  // Vessels
   state.vessels = await loadVessels();
   renderVesselsSelect();
 
-  // Library
   state.lib = await loadLockedLibraryJson(LOCKED_LIBRARY_JSON);
   state.libByNo = new Map();
   for (const q of state.lib) {
@@ -1301,7 +1330,6 @@ async function init() {
     if (qno) state.libByNo.set(qno, q);
   }
 
-  // Chapters
   const chSet = new Set();
   for (const q of state.lib) {
     const ch = getChap(q);
@@ -1310,16 +1338,13 @@ async function init() {
   state.chapters = [...chSet].sort((a, b) => String(a).localeCompare(String(b)));
   renderChapterFilter();
 
-  // Reports
   state.reports = await loadReportsFromDb();
   renderReportSelect();
 
-  // Default date
   if (!mustEl("inspectionDate").value) {
     mustEl("inspectionDate").value = new Date().toISOString().slice(0,10);
   }
 
-  // Events
   mustEl("reportSelect").addEventListener("change", async () => {
     const id = mustEl("reportSelect").value || null;
     await setActiveReportById(id);
@@ -1351,9 +1376,8 @@ async function init() {
   mustEl("finalizeBtn").addEventListener("click", finalizeCheck);
   mustEl("closeStatsBtn").addEventListener("click", () => mustEl("statsDialog").close());
 
-  // CSV export (kept simple: same fields as before)
   mustEl("exportCsvBtn").addEventListener("click", () => {
-    alert("CSV export: not enabled in this build yet. (We can add it next.)");
+    alert("CSV export: not enabled in this build yet.");
   });
 
   mustEl("searchInput").addEventListener("input", renderQuestionList);
@@ -1361,7 +1385,6 @@ async function init() {
   mustEl("onlyObsFilter").addEventListener("change", renderQuestionList);
   mustEl("missingPgnoFilter").addEventListener("change", renderQuestionList);
 
-  // Auto-load first report
   if (state.reports.length) {
     await setActiveReportById(state.reports[0].id);
   } else {
