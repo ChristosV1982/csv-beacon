@@ -26,13 +26,6 @@ function ddmmyyyyToIso(ddmmyyyy) {
   return `${yyyy}-${mm}-${dd}`;
 }
 
-function isoToDdmmyyyy(iso) {
-  const s = String(iso || "").trim();
-  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-  if (!m) return "";
-  return `${m[3]}.${m[2]}.${m[1]}`;
-}
-
 function normalizeQnoParts(qno, pad2) {
   const parts = String(qno || "").trim().split(".").filter(Boolean);
   if (parts.length < 2) return String(qno || "").trim();
@@ -103,13 +96,9 @@ const state = {
   reports: [],
   activeReport: null,
 
-  // Stored DB rows for this report (keyed by question_no)
   observationsByQno: {},
-
-  // Cache list items rendered in table
   extractedItems: [],
 
-  // currently open item in dialog
   dialogItem: null,
 };
 
@@ -237,7 +226,6 @@ function loadReportIntoHeader(r) {
   el("reportTitle").value = r.title || "";
   setActivePill("Active: " + reportLabel(r));
 
-  // PDF status
   if (r.pdf_storage_path) {
     el("pdfStatus").textContent = `Stored: ${r.pdf_storage_path.split("/").pop()}`;
   } else {
@@ -276,7 +264,7 @@ function renderObsSummary() {
 
 function applyObsFilters(items) {
   const term = String(el("obsSearch").value || "").trim().toLowerCase();
-  const type = String(el("obsTypeFilter").value || "").trim(); // negative/positive/largely
+  const type = String(el("obsTypeFilter").value || "").trim();
   const onlyMissing = !!el("onlyMissingPgno").checked;
 
   return (items || []).filter(it => {
@@ -284,9 +272,7 @@ function applyObsFilters(items) {
     if (onlyMissing && !(it.kind === "negative" && missingPgnoForQno(it.qno))) return false;
 
     if (term) {
-      const hay = [
-        it.qno, it.kind, it.rankOrCat || "", it.text || "",
-      ].join(" ").toLowerCase();
+      const hay = [it.qno, it.kind, it.rankOrCat || "", it.text || ""].join(" ").toLowerCase();
       if (!hay.includes(term)) return false;
     }
 
@@ -400,7 +386,6 @@ function openObsDialog(item) {
     ${isNegative ? `<div id="dlgMissingHint" class="hint" style="display:none;">Missing PGNO tick (Finalize will flag this).</div>` : ``}
   `;
 
-  // show missing hint if negative and no PGNO selected
   if (isNegative) {
     const hint = el("dlgMissingHint");
     const pg = Array.isArray(existing?.pgno_selected) ? existing.pgno_selected : [];
@@ -443,10 +428,6 @@ async function saveObsDialog() {
     });
   }
 
-  // Map DB observation_type:
-  // - negative => negative_observation (PGNO required)
-  // - positive => positive_observation
-  // - largely  => note_improvement (KPI, not observation)
   const observation_type =
     item.kind === "negative" ? "negative_observation" :
     item.kind === "positive" ? "positive_observation" :
@@ -465,7 +446,6 @@ async function saveObsDialog() {
     pgno_selected,
     remarks: remarks || null,
 
-    // helpful fields for KPI/debugging
     obs_type,
     question_base: qno,
     observation_text: String(item.text || "").trim() || null,
@@ -553,7 +533,6 @@ function handleNewReport() {
   setActivePill("No active report");
   setSaveStatus("Not saved");
 
-  // reset fields
   el("vesselSelect").value = "";
   const d = new Date();
   const yyyy = d.getFullYear();
@@ -616,7 +595,7 @@ async function handleDeleteReport() {
 }
 
 // -------------------------
-// Build extracted list from DB (what you see below header)
+// Build extracted list from DB
 // -------------------------
 function buildExtractedItemsFromDb() {
   const out = [];
@@ -632,18 +611,10 @@ function buildExtractedItemsFromDb() {
     else if (ot === "positive_observation") kind = "positive";
     else kind = "largely";
 
-    // derive rank/category field
     let rankOrCat = "—";
-    if (kind === "negative") {
-      rankOrCat = row?.obs_type ? String(row.obs_type) : "Negative";
-    }
-    if (kind === "positive") {
-      // store rank if present in remarks prefix? (we keep just "—" unless you add later)
-      rankOrCat = "Human";
-    }
-    if (kind === "largely") {
-      rankOrCat = "KPI";
-    }
+    if (kind === "negative") rankOrCat = row?.obs_type ? String(row.obs_type) : "Negative";
+    if (kind === "positive") rankOrCat = "Human";
+    if (kind === "largely") rankOrCat = "KPI";
 
     out.push({
       qno,
@@ -653,13 +624,12 @@ function buildExtractedItemsFromDb() {
     });
   }
 
-  // sort by qno
   out.sort((a, b) => String(a.qno).localeCompare(String(b.qno)));
   state.extractedItems = out;
 }
 
 // -------------------------
-// PDF AI import: parse via edge function + upsert rows
+// PDF AI import
 // -------------------------
 async function importReportPdfAiFromFile(file) {
   if (!file) return;
@@ -685,7 +655,6 @@ async function importReportPdfAiFromFile(file) {
   const extracted = data.extracted;
   const h = extracted?.header || {};
 
-  // Vessel resolve
   const extractedVesselName = String(h.vessel_name || "").trim();
   const vesselHit = extractedVesselName
     ? (state.vessels || []).find(v => String(v.name || "").trim().toLowerCase() === extractedVesselName.toLowerCase())
@@ -694,18 +663,12 @@ async function importReportPdfAiFromFile(file) {
     throw new Error(`AI import: vessel not found in vessels table: "${extractedVesselName}". Add it first, or use manual mode.`);
   }
 
-  // Date resolve (dd.mm.yyyy -> iso)
   const isoDate = ddmmyyyyToIso(h.inspection_date);
-  if (!isoDate) {
-    throw new Error(`AI import: inspection_date not parsed (got "${String(h.inspection_date || "")}").`);
-  }
+  if (!isoDate) throw new Error(`AI import: inspection_date not parsed (got "${String(h.inspection_date || "")}").`);
 
   const report_ref = String(h.report_reference || "").trim();
-  if (!report_ref) {
-    throw new Error("AI import: report_reference missing (required).");
-  }
+  if (!report_ref) throw new Error("AI import: report_reference missing (required).");
 
-  // create or reuse by report_ref (unique)
   const { data: existingRep, error: findErr } = await state.supabase
     .from("post_inspection_reports")
     .select("id")
@@ -733,11 +696,9 @@ async function importReportPdfAiFromFile(file) {
     report = await createReportHeader(headerPayload);
   }
 
-  // activate report
   state.reports = await loadReportsFromDb();
   await setActiveReportById(report.id);
 
-  // Fill header UI
   el("vesselSelect").value = headerPayload.vessel_id;
   el("inspectionDate").value = headerPayload.inspection_date;
   el("portName").value = headerPayload.port_name || "";
@@ -746,12 +707,7 @@ async function importReportPdfAiFromFile(file) {
   el("reportRef").value = headerPayload.report_ref || "";
   el("pdfStatus").textContent = `Stored: ${tempPath.split("/").pop()}`;
 
-  // Upsert extracted findings into DB:
-  // - negative => negative_observation (PGNO empty initially)
-  // - positive => positive_observation (PGNO empty + not required)
-  // - largely  => note_improvement (KPI item, not observation)
   const obs = Array.isArray(extracted?.observations) ? extracted.observations : [];
-
   setSaveStatus(`Saving ${obs.length} item(s)…`);
 
   for (const item of obs) {
@@ -759,7 +715,7 @@ async function importReportPdfAiFromFile(file) {
     const qno = findLibraryQno(qbase);
     if (!qno) continue;
 
-    const kind = String(item?.obs_type || "").toLowerCase(); // negative/positive/largely
+    const kind = String(item?.obs_type || "").toLowerCase();
     const observation_text = String(item?.observation_text || "").trim();
 
     const observation_type =
@@ -780,7 +736,7 @@ async function importReportPdfAiFromFile(file) {
       obs_type,
       question_base: qbase || qno,
       observation_text: observation_text || null,
-      pgno_selected: [], // user completes PGNO only for negatives
+      pgno_selected: [],
       remarks: observation_text || null,
       updated_at: nowIso(),
     };
@@ -796,7 +752,7 @@ async function importReportPdfAiFromFile(file) {
 }
 
 // -------------------------
-// KPI dialog + finalize
+// KPI + finalize
 // -------------------------
 function renderKpis() {
   const items = state.extractedItems || [];
@@ -826,33 +782,26 @@ function finalizeCheck() {
 }
 
 // -------------------------
-// Init helpers (AUTH guard)
+// Init (FIXED)
 // -------------------------
-async function waitForAuthGlobals(timeoutMs = 3000) {
+async function waitForAuth(timeoutMs = 4000) {
   const started = Date.now();
   while (Date.now() - started < timeoutMs) {
-    const ok =
-      !!window.AUTH &&
-      typeof window.AUTH.requireAuth === "function" &&
-      !!window.AUTH.ROLES &&
-      !!window.__supabaseClient;
-    if (ok) return true;
+    if (window.AUTH && typeof window.AUTH.requireAuth === "function") return true;
     await new Promise(r => setTimeout(r, 50));
   }
   return false;
 }
 
-// -------------------------
-// Init
-// -------------------------
 async function init() {
-  // Ensure auth/config scripts actually ran
-  const ok = await waitForAuthGlobals(3000);
+  const ok = await waitForAuth(4000);
   if (!ok) {
-    throw new Error(
-      "AUTH/Supabase globals not loaded. Ensure post_inspection.html includes ./app-config.js and ./auth.js BEFORE ./post_inspection.js (module)."
-    );
+    throw new Error("AUTH not loaded. Ensure ./auth.js is included BEFORE ./post_inspection.js.");
   }
+
+  // IMPORTANT: create Supabase client NOW (auth.js only creates it when asked)
+  // This will also set window.__SUPABASE_CLIENT + window.__supabaseClient.
+  state.supabase = window.AUTH.ensureSupabase();
 
   const R = window.AUTH.ROLES;
   state.me = await window.AUTH.requireAuth([R.SUPER_ADMIN, R.COMPANY_ADMIN]);
@@ -861,19 +810,13 @@ async function init() {
   window.AUTH.fillUserBadge(state.me, "userBadge");
   el("logoutBtn").addEventListener("click", window.AUTH.logoutAndGoLogin);
 
-  state.supabase = window.__supabaseClient;
-  if (!state.supabase) throw new Error("Supabase client missing (auth.js + supabase-js must be loaded).");
-
-  // Optional build pill
-  try { el("buildPill").textContent = "build: post_inspection_ui_2026-02-xx"; } catch {}
+  try { el("buildPill").textContent = "build: post_inspection_bootfix_2026-02-26"; } catch {}
 
   setSaveStatus("Loading…");
 
-  // Vessels
   state.vessels = await loadVessels();
   renderVesselsSelect();
 
-  // Library
   state.lib = await loadLockedLibraryJson(LOCKED_LIBRARY_JSON);
   state.libByNo = new Map();
   for (const q of state.lib) {
@@ -881,11 +824,9 @@ async function init() {
     if (qno) state.libByNo.set(qno, q);
   }
 
-  // Reports
   state.reports = await loadReportsFromDb();
   renderReportSelect();
 
-  // Default date
   if (!el("inspectionDate").value) {
     const d = new Date();
     const yyyy = d.getFullYear();
@@ -894,7 +835,6 @@ async function init() {
     el("inspectionDate").value = `${yyyy}-${mm}-${dd}`;
   }
 
-  // Events
   el("reportSelect").addEventListener("change", async () => {
     await setActiveReportById(el("reportSelect").value || null);
   });
@@ -921,11 +861,9 @@ async function init() {
   el("obsTypeFilter").addEventListener("change", renderObsTable);
   el("onlyMissingPgno").addEventListener("change", renderObsTable);
 
-  // Modal buttons
   el("dlgCancelBtn").addEventListener("click", closeObsDialog);
   el("dlgSaveBtn").addEventListener("click", saveObsDialog);
 
-  // Auto-load first report
   if (state.reports.length) {
     await setActiveReportById(state.reports[0].id);
   } else {

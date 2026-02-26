@@ -348,11 +348,16 @@
 
   </div>
 
-  <!-- CRITICAL: auth + config must load before the module that calls window.AUTH.requireAuth -->
+  <!-- 1) Supabase UMD library (required by auth.js -> window.supabase.createClient) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js" defer></script>
+
+  <!-- 2) App runtime config -->
   <script src="./app-config.js" defer></script>
+
+  <!-- 3) Auth (defines window.AUTH; creates supabase client when AUTH.ensureSupabase() is called) -->
   <script src="./auth.js" defer></script>
 
-  <!-- Your module last -->
+  <!-- 4) Page module last -->
   <script type="module" src="./post_inspection.js"></script>
 </body>
 </html>
