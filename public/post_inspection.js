@@ -826,10 +826,35 @@ function finalizeCheck() {
 }
 
 // -------------------------
+// Init helpers (AUTH guard)
+// -------------------------
+async function waitForAuthGlobals(timeoutMs = 3000) {
+  const started = Date.now();
+  while (Date.now() - started < timeoutMs) {
+    const ok =
+      !!window.AUTH &&
+      typeof window.AUTH.requireAuth === "function" &&
+      !!window.AUTH.ROLES &&
+      !!window.__supabaseClient;
+    if (ok) return true;
+    await new Promise(r => setTimeout(r, 50));
+  }
+  return false;
+}
+
+// -------------------------
 // Init
 // -------------------------
 async function init() {
-  const R = window.AUTH?.ROLES;
+  // Ensure auth/config scripts actually ran
+  const ok = await waitForAuthGlobals(3000);
+  if (!ok) {
+    throw new Error(
+      "AUTH/Supabase globals not loaded. Ensure post_inspection.html includes ./app-config.js and ./auth.js BEFORE ./post_inspection.js (module)."
+    );
+  }
+
+  const R = window.AUTH.ROLES;
   state.me = await window.AUTH.requireAuth([R.SUPER_ADMIN, R.COMPANY_ADMIN]);
   if (!state.me) return;
 

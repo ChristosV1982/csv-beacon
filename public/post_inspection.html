@@ -348,6 +348,11 @@
 
   </div>
 
+  <!-- CRITICAL: auth + config must load before the module that calls window.AUTH.requireAuth -->
+  <script src="./app-config.js" defer></script>
+  <script src="./auth.js" defer></script>
+
+  <!-- Your module last -->
   <script type="module" src="./post_inspection.js"></script>
 </body>
 </html>
