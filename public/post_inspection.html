@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>SIRE 2.0 – Post-Inspection Observations</title>
   <link rel="stylesheet" href="style.css" />
+
   <style>
     :root{
       --pi-navy:#0b2a4a;
@@ -13,9 +14,11 @@
       --pi-border:#cfe0f4;
       --pi-text:#0c1b2a;
       --pi-muted:#55708f;
+      --pi-bg:#08131f;
     }
-    body{ background:#08131f; color:var(--pi-text); }
-    .pi-wrap{ max-width:1400px; margin:20px auto 40px; padding:0 14px; }
+    body{ background:var(--pi-bg); color:var(--pi-text); }
+    .pi-wrap{ max-width:1600px; margin:20px auto 40px; padding:0 14px; }
+
     .pi-hero{
       background:linear-gradient(180deg,var(--pi-navy2),var(--pi-navy));
       border:1px solid rgba(255,255,255,.10);
@@ -25,7 +28,8 @@
       box-shadow:0 10px 30px rgba(0,0,0,.30);
     }
     .pi-hero h1{ margin:0 0 6px; font-size:24px; letter-spacing:.2px; }
-    .pi-hero p{ margin:0; color:rgba(255,255,255,.85); font-weight:700; }
+    .pi-hero p{ margin:0; color:rgba(255,255,255,.85); font-weight:800; }
+
     .pi-toprow{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:12px; }
     .pi-pill{
       display:inline-flex; align-items:center; gap:8px;
@@ -35,10 +39,7 @@
       font-weight:900; color:#fff;
     }
     .pi-pill.muted{ color:rgba(255,255,255,.9); opacity:.95; }
-    .pi-grid{
-      display:grid; grid-template-columns: 1.1fr 1.4fr; gap:18px;
-      margin-top:16px;
-    }
+
     .pi-card{
       background:var(--pi-card);
       border:1px solid var(--pi-border);
@@ -47,10 +48,19 @@
       box-shadow:0 10px 24px rgba(0,0,0,.20);
     }
     .pi-card h2{ margin:0 0 12px; color:#113a63; }
+
+    .pi-grid{
+      display:grid;
+      grid-template-columns: 1fr;
+      gap:18px;
+      margin-top:16px;
+    }
+
+    /* HEADER FULL WIDTH GRID */
     .pi-fields{
       display:grid;
-      grid-template-columns: 220px 1fr 220px 1fr 220px 1fr;
-      gap:10px 10px;
+      grid-template-columns: 220px 1fr 200px 1fr 200px 1fr;
+      gap:10px 12px;
       align-items:end;
     }
     .pi-field label{
@@ -63,63 +73,111 @@
       border-radius:12px;
       font-weight:800;
       outline:none;
+      background:#fff;
     }
-    .pi-field input:focus, .pi-field select:focus{ border-color:#5aa2ff; box-shadow:0 0 0 3px rgba(90,162,255,.2); }
+    .pi-field input:focus, .pi-field select:focus{
+      border-color:#5aa2ff; box-shadow:0 0 0 3px rgba(90,162,255,.2);
+    }
     .pi-span2{ grid-column: span 2; }
     .pi-span3{ grid-column: span 3; }
+    .pi-span6{ grid-column: 1 / -1; }
 
-    .pi-actions{ display:flex; gap:10px; flex-wrap:wrap; margin-top:12px; }
-    .pi-hints{ margin-top:10px; color:#0f3a63; font-weight:800; }
-    .pi-hints li{ margin:6px 0; }
-
-    /* left filters */
-    .pi-filters label{ font-weight:900; color:#143a63; display:block; margin:10px 0 6px; }
-    .pi-filters input, .pi-filters select{
-      width:100%; padding:10px 12px;
-      border:1px solid #cfe0f4; border-radius:12px; font-weight:800;
+    .pi-actions{
+      display:flex; gap:10px; flex-wrap:wrap;
+      margin-top:12px;
+      padding-top:12px;
+      border-top:1px solid #e5eefc;
     }
-    #questionList .item{
-      border:1px solid #d5deef;
-      border-radius:14px;
-      padding:10px 12px;
+
+    /* OBS LIST */
+    .obs-toolbar{
+      display:flex; gap:10px; flex-wrap:wrap; align-items:center; justify-content:space-between;
+      margin:8px 0 10px;
+    }
+    .obs-filters{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+    .obs-filters input, .obs-filters select{
+      padding:10px 12px; border:1px solid #cfe0f4; border-radius:12px; font-weight:800;
+      background:#fff;
+    }
+    .obs-summary{
+      display:flex; gap:10px; flex-wrap:wrap; align-items:center;
+      color:#143a63; font-weight:950;
+    }
+
+    .obs-badge{
+      display:inline-flex; align-items:center;
+      font-weight:950; font-size:12px; padding:6px 10px; border-radius:999px;
+      border:1px solid #cfe0f4; background:#eef6ff; color:#143a63;
+      white-space:nowrap;
+    }
+    .obs-badge.neg{ background:#fff2e0; border-color:#ffd7a3; color:#7a4a00; }
+    .obs-badge.pos{ background:#e9fff0; border-color:#bfeccc; color:#145c2a; }
+    .obs-badge.lae{ background:#f3f0ff; border-color:#d9cffc; color:#3a2a7a; }
+
+    table{ border-collapse:separate; border-spacing:0; width:100%; }
+    .obs-table thead th{
+      text-align:left;
+      font-weight:950;
+      color:#143a63;
+      padding:10px 10px;
+      border-bottom:1px solid #e5eefc;
       background:#f8fbff;
-      cursor:pointer;
-      margin-bottom:10px;
     }
-    #questionList .item.active{ outline:3px solid rgba(90,162,255,.25); border-color:#5aa2ff; }
-    #questionList .qno{ font-weight:950; color:#143a63; }
-    #questionList .qst{ color:#55708f; font-weight:850; margin-top:3px; }
-    .badge{ font-weight:950; font-size:12px; padding:6px 10px; border-radius:999px; background:#e6f0ff; color:#143a63; border:1px solid #cfe0f4; }
-    .badge.obs{ background:#e9fff0; border-color:#bfeccc; color:#145c2a; }
-    .badge.warn{ background:#fff2e0; border-color:#ffd7a3; color:#7a4a00; }
+    .obs-table tbody td{
+      padding:10px 10px;
+      border-bottom:1px solid #eef4ff;
+      vertical-align:top;
+      font-weight:800;
+      color:#0c1b2a;
+    }
+    .obs-row{ cursor:pointer; }
+    .obs-row:hover td{ background:#f8fbff; }
+    .muted{ color:#55708f; font-weight:800; }
 
-    .pgnoRow{ display:grid; grid-template-columns: 22px 90px 1fr; gap:10px; align-items:start; padding:10px 0; border-bottom:1px dashed #d5deef; }
-    .pgnoIdx{ font-weight:950; color:#143a63; }
-    .pgnoTxt{ color:#0c1b2a; font-weight:800; line-height:1.35; }
+    /* MODALS */
+    dialog{ border:none; border-radius:18px; padding:0; max-width:1100px; width: calc(100vw - 40px); }
+    .dlg{ padding:16px; }
+    .dlg h3{ margin:0 0 8px; color:#143a63; }
+    .dlg-sub{ font-weight:900; color:#55708f; margin-bottom:12px; }
+    .dlg-grid{ display:grid; grid-template-columns: 1fr 1fr; gap:12px; }
+    .pgnoRow{
+      display:grid; grid-template-columns: 22px 90px 1fr;
+      gap:10px; align-items:start; padding:10px 0; border-bottom:1px dashed #d5deef;
+    }
     textarea{
       width:100%;
-      min-height:110px;
+      min-height:120px;
       padding:10px 12px;
       border:1px solid #cfe0f4;
       border-radius:12px;
       font-weight:800;
       resize:vertical;
+      background:#fff;
     }
-    dialog{ border:none; border-radius:16px; padding:0; max-width:900px; width: calc(100vw - 40px); }
-    .dlg{ padding:16px; }
-    .dlg h3{ margin:0 0 10px; color:#143a63; }
-    .dlg-grid{ display:grid; grid-template-columns: 1fr 1fr; gap:12px; }
-    .dlg pre{ background:#0b1622; color:#e7f0ff; padding:10px; border-radius:12px; overflow:auto; }
-    .dlg-actions{ display:flex; gap:10px; justify-content:flex-end; margin-top:12px; }
+    .dlg-actions{
+      display:flex; gap:10px; justify-content:flex-end;
+      margin-top:12px; padding-top:12px; border-top:1px solid #e5eefc;
+    }
+    .hint{
+      font-weight:900; color:#7a4a00;
+      background:#fff2e0; border:1px solid #ffd7a3;
+      padding:10px 12px; border-radius:14px;
+      margin-top:12px;
+    }
+
+    @media (max-width: 1100px){
+      .pi-fields{ grid-template-columns: 1fr 1fr; }
+      .pi-span2, .pi-span3, .pi-span6{ grid-column:auto; }
+      .dlg-grid{ grid-template-columns: 1fr; }
+    }
   </style>
 </head>
 
 <body>
   <div class="pi-wrap">
-
     <div class="pi-hero">
       <h1>Post-Inspection Observations (Company)</h1>
-      <p>Import SIRE 2.0 inspection report PDF → extract observed questions & observations → then complete PGNO selection and run statistics.</p>
+      <p>Import SIRE 2.0 inspection report PDF → extract items → open each row to complete details → KPI.</p>
 
       <div class="pi-toprow">
         <span class="pi-pill" id="userBadge">Not signed in</span>
@@ -134,8 +192,7 @@
     </div>
 
     <div class="pi-grid">
-
-      <div class="pi-card">
+      <div class="pi-card" id="headerCard">
         <h2>Inspection Header</h2>
 
         <div class="pi-fields">
@@ -156,27 +213,27 @@
 
           <div class="pi-field">
             <label>Port (official name)</label>
-            <input id="portName" type="text" placeholder="e.g. Rotterdam" />
+            <input id="portName" type="text" placeholder="e.g. Greece - Agio Theodoroi" />
           </div>
 
           <div class="pi-field">
             <label>Port Code</label>
-            <input id="portCode" type="text" placeholder="e.g. NLRTM" />
+            <input id="portCode" type="text" placeholder="e.g. GRAGT" />
           </div>
 
           <div class="pi-field">
             <label>OCIMF Inspecting Company</label>
-            <input id="ocimfCompany" type="text" placeholder="Company name" />
+            <input id="ocimfCompany" type="text" placeholder="MOTOR OIL HELLAS S.A." />
           </div>
 
           <div class="pi-field pi-span2">
             <label>Report Reference</label>
-            <input id="reportRef" type="text" placeholder="e.g. LSHB-4402-3851-7649" />
+            <input id="reportRef" type="text" placeholder="LDSS-2560-2968-7649" />
           </div>
 
           <div class="pi-field pi-span3">
             <label>Title (optional)</label>
-            <input id="reportTitle" type="text" placeholder="e.g. OCIMF SIRE 2.0 – Discharge Call – Terminal XYZ" />
+            <input id="reportTitle" type="text" placeholder="OCIMF SIRE 2.0 – Discharge Call – Terminal XYZ" />
           </div>
 
           <div class="pi-field pi-span3">
@@ -191,116 +248,106 @@
               <span id="pdfStatus" style="font-weight:900; color:#143a63;">No PDF linked</span>
             </div>
           </div>
-        </div>
 
-        <div class="pi-actions">
-          <button class="btn btn-muted" id="newReportBtn" type="button">New Report</button>
-          <button class="btn primary" id="saveHeaderBtn" type="button">Save Report Header</button>
-          <button class="btn warn" id="deleteReportBtn" type="button">Delete Report</button>
+          <div class="pi-field pi-span6">
+            <div class="pi-actions">
+              <button class="btn btn-muted" id="newReportBtn" type="button">New Report</button>
+              <button class="btn primary" id="saveHeaderBtn" type="button">Save Header</button>
+              <button class="btn warn" id="deleteReportBtn" type="button">Delete Report</button>
 
-          <button class="btn btn-muted" id="exportBtn" type="button">Export Report JSON</button>
-          <button class="btn btn-muted" id="importBtn" type="button">Import Report JSON</button>
-          <input id="importFile" type="file" accept="application/json" style="display:none" />
+              <button class="btn btn-muted" id="exportBtn" type="button">Export JSON</button>
+              <button class="btn btn-muted" id="importBtn" type="button">Import JSON</button>
+              <input id="importFile" type="file" accept="application/json" style="display:none" />
 
-          <button class="btn btn-muted" id="importPdfBtn" type="button">Import Report PDF (AI)</button>
-          <input id="importPdfFile" type="file" accept="application/pdf" style="display:none" />
+              <button class="btn btn-muted" id="importPdfBtn" type="button">Import PDF (AI)</button>
+              <input id="importPdfFile" type="file" accept="application/pdf" style="display:none" />
 
-          <button class="btn btn-muted" id="statsBtn" type="button">View Statistics</button>
-          <button class="btn btn-muted" id="finalizeBtn" type="button">Finalize check</button>
-        </div>
-
-        <ul class="pi-hints">
-          <li><b>Preferred flow:</b> Import Report PDF (AI) → header auto-fills → observations created → you then select PGNO(s) for negatives.</li>
-          <li><b>Manual entry:</b> use New Report only when you do not have the PDF. Inspector name is always manual.</li>
-        </ul>
-      </div>
-
-      <div class="pi-card">
-        <h2>Observation Editor</h2>
-        <div id="detailPane" style="min-height:280px;">
-          <div style="font-weight:950; color:#35507b;">
-            Select a question from the list to record post-inspection observations and tick PGNO(s).
-          </div>
-        </div>
-      </div>
-
-      <div class="pi-card">
-        <h2>Search & Filters</h2>
-        <div class="pi-filters">
-          <label>Search (No / Short Text / Question / Section)</label>
-          <input id="searchInput" type="text" placeholder="e.g. 8.99.2 / mooring / permit" />
-
-          <label>Chapter</label>
-          <select id="chapterFilter"></select>
-
-          <div style="display:flex; gap:18px; margin-top:12px;">
-            <label style="display:flex; gap:8px; align-items:center;">
-              <input id="onlyObsFilter" type="checkbox" />
-              Only Observed
-            </label>
-
-            <label style="display:flex; gap:8px; align-items:center;">
-              <input id="missingPgnoFilter" type="checkbox" />
-              Missing PGNO tick
-            </label>
+              <button class="btn btn-muted" id="statsBtn" type="button">KPIs</button>
+              <button class="btn btn-muted" id="finalizeBtn" type="button">Finalize check</button>
+            </div>
           </div>
         </div>
 
-        <div id="questionList" style="margin-top:12px;"></div>
+        <div style="margin-top:10px; color:#0f3a63; font-weight:850;">
+          <ul style="margin:0; padding-left:18px;">
+            <li><b>Negative</b>: contains “Not as expected” (Human/Process/Hardware/Photo). Requires PGNO selection.</li>
+            <li><b>Positive</b>: contains “Exceeded normal expectation” (Human). No PGNOs.</li>
+            <li><b>Largely as expected</b>: countable KPI item, but not a negative observation.</li>
+          </ul>
+        </div>
       </div>
 
+      <div class="pi-card" id="obsCard">
+        <h2>Extracted Items</h2>
+
+        <div class="obs-toolbar">
+          <div class="obs-filters">
+            <input id="obsSearch" type="text" placeholder="Search (qno / text / rank / category)" />
+            <select id="obsTypeFilter">
+              <option value="">All types</option>
+              <option value="negative">Negative</option>
+              <option value="positive">Positive</option>
+              <option value="largely">Largely as expected</option>
+            </select>
+            <label style="display:flex; gap:8px; align-items:center; font-weight:900; color:#143a63;">
+              <input id="onlyMissingPgno" type="checkbox" />
+              Missing PGNO (negatives)
+            </label>
+          </div>
+
+          <div class="obs-summary" id="obsSummary">No report loaded.</div>
+        </div>
+
+        <div style="overflow:auto;">
+          <table class="obs-table">
+            <thead>
+              <tr>
+                <th style="width:110px;">Question</th>
+                <th style="width:150px;">Type</th>
+                <th style="width:180px;">Rank / Category</th>
+                <th>Extracted text</th>
+                <th style="width:160px;">PGNO</th>
+              </tr>
+            </thead>
+            <tbody id="obsTableBody">
+              <tr><td colspan="5" class="muted">No items yet.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
 
     <dialog id="statsDialog">
       <div class="dlg">
-        <h3>Statistics</h3>
+        <h3>KPIs</h3>
         <div class="dlg-grid">
-          <div class="pi-field"><label>Total questions</label><input id="statTotalQ" readonly /></div>
-          <div class="pi-field"><label>Observed questions</label><input id="statObservedQ" readonly /></div>
-          <div class="pi-field"><label>Missing PGNO tick</label><input id="statMissingPgno" readonly /></div>
-          <div class="pi-field"><label>Observed %</label><input id="statPct" readonly /></div>
-        </div>
-
-        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-top:12px;">
-          <div>
-            <div style="font-weight:950; color:#143a63; margin-bottom:6px;">Observed by Chapter</div>
-            <pre id="statByChapter">-</pre>
-          </div>
-          <div>
-            <div style="font-weight:950; color:#143a63; margin-bottom:6px;">Observed by Type</div>
-            <pre id="statByType">-</pre>
-          </div>
-        </div>
-
-        <div style="margin-top:12px;">
-          <div style="font-weight:950; color:#143a63; margin-bottom:6px;">Observed question list</div>
-          <pre id="statObsList">-</pre>
-        </div>
-
-        <div style="margin-top:12px;">
-          <div style="font-weight:950; color:#143a63; margin-bottom:6px;">Missing PGNO list</div>
-          <pre id="statMissingList">-</pre>
+          <div class="pi-field"><label>Total extracted items</label><input id="kpiTotal" readonly /></div>
+          <div class="pi-field"><label>Negative (Not as expected)</label><input id="kpiNeg" readonly /></div>
+          <div class="pi-field"><label>Positive (Exceeded normal expectation)</label><input id="kpiPos" readonly /></div>
+          <div class="pi-field"><label>Largely as expected</label><input id="kpiLae" readonly /></div>
+          <div class="pi-field"><label>Negatives missing PGNO</label><input id="kpiMissingPgno" readonly /></div>
         </div>
 
         <div class="dlg-actions">
-          <button class="btn btn-muted" id="exportCsvBtn" type="button">Export CSV</button>
           <button class="btn primary" id="closeStatsBtn" type="button">Close</button>
+        </div>
+      </div>
+    </dialog>
+
+    <dialog id="obsDialog">
+      <div class="dlg">
+        <h3 id="dlgTitle">Item</h3>
+        <div class="dlg-sub" id="dlgSub">—</div>
+        <div id="dlgBody"></div>
+        <div class="dlg-actions">
+          <button class="btn btn-muted" id="dlgCancelBtn" type="button">Cancel</button>
+          <button class="btn primary" id="dlgSaveBtn" type="button">Save</button>
         </div>
       </div>
     </dialog>
 
   </div>
 
-  <!-- IMPORTANT: this must exist -->
-
-  <!-- Required for Supabase auth (must load before auth.js) -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="./auth.js"></script>
-
-  <!-- Post-Inspection module (ESM) -->
   <script type="module" src="./post_inspection.js"></script>
-
-  <!-- Replit pill -->
-  <script src="https://replit-cdn.com/replit-pill/replit-pill.global.js" data-referral-code="egynmh4rs69e" data-repl-id="020e7e71-9671-4cf8-a6f8-da5ea1cdf9c8"></script>
 </body>
 </html>
