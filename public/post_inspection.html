@@ -56,7 +56,6 @@
       margin-top:16px;
     }
 
-    /* HEADER FULL WIDTH GRID */
     .pi-fields{
       display:grid;
       grid-template-columns: 220px 1fr 200px 1fr 200px 1fr;
@@ -89,7 +88,6 @@
       border-top:1px solid #e5eefc;
     }
 
-    /* OBS LIST */
     .obs-toolbar{
       display:flex; gap:10px; flex-wrap:wrap; align-items:center; justify-content:space-between;
       margin:8px 0 10px;
@@ -122,6 +120,9 @@
       padding:10px 10px;
       border-bottom:1px solid #e5eefc;
       background:#f8fbff;
+      position:sticky;
+      top:0;
+      z-index:1;
     }
     .obs-table tbody td{
       padding:10px 10px;
@@ -134,8 +135,7 @@
     .obs-row:hover td{ background:#f8fbff; }
     .muted{ color:#55708f; font-weight:800; }
 
-    /* MODALS */
-    dialog{ border:none; border-radius:18px; padding:0; max-width:1100px; width: calc(100vw - 40px); }
+    dialog{ border:none; border-radius:18px; padding:0; max-width:1200px; width: calc(100vw - 40px); }
     .dlg{ padding:16px; }
     .dlg h3{ margin:0 0 8px; color:#143a63; }
     .dlg-sub{ font-weight:900; color:#55708f; margin-bottom:12px; }
@@ -270,9 +270,9 @@
 
         <div style="margin-top:10px; color:#0f3a63; font-weight:850;">
           <ul style="margin:0; padding-left:18px;">
-            <li><b>Negative</b>: contains “Not as expected” (Human/Process/Hardware/Photo). Requires PGNO selection.</li>
-            <li><b>Positive</b>: contains “Exceeded normal expectation” (Human). No PGNOs.</li>
-            <li><b>Largely as expected</b>: countable KPI item, but not a negative observation.</li>
+            <li><b>Negative</b>: designation + Nature of Concern (Not as expected … / Observable or detectable deficiency). Requires PGNO.</li>
+            <li><b>Positive</b>: Human + Nature of Concern (Exceeded normal expectation). No PGNO.</li>
+            <li><b>Largely as expected</b>: designation + Nature of Concern (Largely as expected). KPI item.</li>
           </ul>
         </div>
       </div>
@@ -282,13 +282,24 @@
 
         <div class="obs-toolbar">
           <div class="obs-filters">
-            <input id="obsSearch" type="text" placeholder="Search (qno / text / rank / category)" />
+            <input id="obsSearch" type="text" placeholder="Search (qno / designation / nature / coding / text)" />
+
             <select id="obsTypeFilter">
               <option value="">All types</option>
               <option value="negative">Negative</option>
               <option value="positive">Positive</option>
               <option value="largely">Largely as expected</option>
             </select>
+
+            <!-- designation filter -->
+            <select id="obsDesignationFilter">
+              <option value="">All categories</option>
+              <option value="Human">Human</option>
+              <option value="Process">Process</option>
+              <option value="Hardware">Hardware</option>
+              <option value="Photo">Photo</option>
+            </select>
+
             <label style="display:flex; gap:8px; align-items:center; font-weight:900; color:#143a63;">
               <input id="onlyMissingPgno" type="checkbox" />
               Missing PGNO (negatives)
@@ -298,19 +309,21 @@
           <div class="obs-summary" id="obsSummary">No report loaded.</div>
         </div>
 
-        <div style="overflow:auto;">
+        <div style="overflow:auto; max-height: 60vh;">
           <table class="obs-table">
             <thead>
               <tr>
                 <th style="width:110px;">Question</th>
-                <th style="width:150px;">Type</th>
-                <th style="width:180px;">Rank / Category</th>
-                <th>Extracted text</th>
+                <th style="width:140px;">Type</th>
+                <th style="width:180px;">Category</th>
+                <th style="width:320px;">Nature of concern</th>
+                <th style="width:360px;">Classification coding</th>
+                <th>Observation text</th>
                 <th style="width:160px;">PGNO</th>
               </tr>
             </thead>
             <tbody id="obsTableBody">
-              <tr><td colspan="5" class="muted">No items yet.</td></tr>
+              <tr><td colspan="7" class="muted">No items yet.</td></tr>
             </tbody>
           </table>
         </div>
@@ -322,8 +335,8 @@
         <h3>KPIs</h3>
         <div class="dlg-grid">
           <div class="pi-field"><label>Total extracted items</label><input id="kpiTotal" readonly /></div>
-          <div class="pi-field"><label>Negative (Not as expected)</label><input id="kpiNeg" readonly /></div>
-          <div class="pi-field"><label>Positive (Exceeded normal expectation)</label><input id="kpiPos" readonly /></div>
+          <div class="pi-field"><label>Negative</label><input id="kpiNeg" readonly /></div>
+          <div class="pi-field"><label>Positive</label><input id="kpiPos" readonly /></div>
           <div class="pi-field"><label>Largely as expected</label><input id="kpiLae" readonly /></div>
           <div class="pi-field"><label>Negatives missing PGNO</label><input id="kpiMissingPgno" readonly /></div>
         </div>
@@ -348,16 +361,9 @@
 
   </div>
 
-  <!-- 1) Supabase UMD library (required by auth.js -> window.supabase.createClient) -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js" defer></script>
-
-  <!-- 2) App runtime config -->
   <script src="./app-config.js" defer></script>
-
-  <!-- 3) Auth (defines window.AUTH; creates supabase client when AUTH.ensureSupabase() is called) -->
   <script src="./auth.js" defer></script>
-
-  <!-- 4) Page module last -->
   <script type="module" src="./post_inspection.js"></script>
 </body>
 </html>

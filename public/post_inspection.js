@@ -85,6 +85,18 @@ function getPgnoBullets(q) {
   return usable.slice(0, 120);
 }
 
+/** NEW: normalize designation to allowed values only */
+function normalizeDesignation(val) {
+  const s = String(val || "").trim();
+  if (!s) return null;
+  const u = s.toLowerCase();
+  if (u === "human") return "Human";
+  if (u === "process") return "Process";
+  if (u === "hardware") return "Hardware";
+  if (u === "photo") return "Photo";
+  return null; // rejects "negative", "positive", etc.
+}
+
 const state = {
   me: null,
   supabase: null,
@@ -152,7 +164,7 @@ async function loadReportsFromDb() {
 async function loadObservationsForReport(reportId) {
   const { data, error } = await state.supabase
     .from("post_inspection_observations")
-    .select("report_id, question_no, has_observation, observation_type, pgno_selected, remarks, updated_at, obs_type, observation_text, question_base, pgno_full")
+    .select("report_id, question_no, has_observation, observation_type, pgno_selected, remarks, updated_at, obs_type, observation_text, question_base, pgno_full, designation, nature_of_concern, classification_coding, positive_rank")
     .eq("report_id", reportId);
 
   if (error) throw error;
@@ -265,14 +277,29 @@ function renderObsSummary() {
 function applyObsFilters(items) {
   const term = String(el("obsSearch").value || "").trim().toLowerCase();
   const type = String(el("obsTypeFilter").value || "").trim();
+  const designationFilter = String(el("obsDesignationFilter").value || "").trim();
   const onlyMissing = !!el("onlyMissingPgno").checked;
 
   return (items || []).filter(it => {
     if (type && it.kind !== type) return false;
+
+    if (designationFilter) {
+      const d = String(it.designation || "").trim();
+      if (designationFilter !== d) return false;
+    }
+
     if (onlyMissing && !(it.kind === "negative" && missingPgnoForQno(it.qno))) return false;
 
     if (term) {
-      const hay = [it.qno, it.kind, it.rankOrCat || "", it.text || ""].join(" ").toLowerCase();
+      const hay = [
+        it.qno,
+        it.kind,
+        it.designation || "",
+        it.positive_rank || "",
+        it.nature_of_concern || "",
+        it.classification_coding || "",
+        it.text || ""
+      ].join(" ").toLowerCase();
       if (!hay.includes(term)) return false;
     }
 
@@ -285,13 +312,13 @@ function renderObsTable() {
   const items = applyObsFilters(state.extractedItems);
 
   if (!state.activeReport) {
-    body.innerHTML = `<tr><td colspan="5" class="muted">No report loaded.</td></tr>`;
+    body.innerHTML = `<tr><td colspan="7" class="muted">No report loaded.</td></tr>`;
     el("obsSummary").textContent = "No report loaded.";
     return;
   }
 
   if (!items.length) {
-    body.innerHTML = `<tr><td colspan="5" class="muted">No items match the current filters.</td></tr>`;
+    body.innerHTML = `<tr><td colspan="7" class="muted">No items match the current filters.</td></tr>`;
     renderObsSummary();
     return;
   }
@@ -302,11 +329,17 @@ function renderObsTable() {
       ? `PGNO ${pg.map(x => x.idx).join(", ")}`
       : (it.kind === "negative" ? `<span class="muted">—</span>` : `<span class="muted">n/a</span>`);
 
+    const designationDisplay = it.kind === "positive"
+      ? (it.positive_rank ? `Human (${it.positive_rank})` : "Human")
+      : (it.designation || "—");
+
     return `
       <tr class="obs-row" data-qno="${esc(it.qno)}">
         <td><b>${esc(it.qno)}</b></td>
         <td>${obsRowTypeLabel(it)}</td>
-        <td class="muted">${esc(it.rankOrCat || "—")}</td>
+        <td class="muted">${esc(designationDisplay)}</td>
+        <td>${esc(it.nature_of_concern || "")}</td>
+        <td class="muted">${esc(it.classification_coding || "")}</td>
         <td>${esc(it.text || "")}</td>
         <td>${pgTxt}</td>
       </tr>
@@ -369,11 +402,37 @@ function openObsDialog(item) {
         : `<div class="hint">No PGNO bullets found in your locked library JSON for this question.</div>`
     );
 
+  const designationDisplay = item.kind === "positive"
+    ? (item.positive_rank ? `Human (${item.positive_rank})` : "Human")
+    : (item.designation || "—");
+
   el("dlgBody").innerHTML = `
     <div style="font-weight:900; color:#143a63; margin-bottom:10px;">Question</div>
     <div style="font-weight:850; color:#0c1b2a; line-height:1.35; margin-bottom:12px;">${esc(qText)}</div>
 
-    <div style="font-weight:900; color:#143a63; margin-bottom:6px;">Extracted text</div>
+    <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:10px;">
+      <div style="flex:1 1 240px;">
+        <div style="font-weight:900; color:#143a63; margin-bottom:6px;">Category</div>
+        <div style="font-weight:850; background:#f8fbff; border:1px solid #e5eefc; padding:10px 12px; border-radius:14px;">
+          ${esc(designationDisplay)}
+        </div>
+      </div>
+      <div style="flex:2 1 520px;">
+        <div style="font-weight:900; color:#143a63; margin-bottom:6px;">Nature of concern</div>
+        <div style="font-weight:850; background:#f8fbff; border:1px solid #e5eefc; padding:10px 12px; border-radius:14px;">
+          ${esc(item.nature_of_concern || "")}
+        </div>
+      </div>
+    </div>
+
+    ${(item.classification_coding || "").trim() ? `
+      <div style="font-weight:900; color:#143a63; margin-bottom:6px;">Classification coding</div>
+      <div style="font-weight:850; background:#f8fbff; border:1px solid #e5eefc; padding:10px 12px; border-radius:14px; margin-bottom:10px;">
+        ${esc(item.classification_coding)}
+      </div>
+    ` : ``}
+
+    <div style="font-weight:900; color:#143a63; margin-bottom:6px;">Observation text</div>
     <div style="font-weight:850; background:#f8fbff; border:1px solid #e5eefc; padding:10px 12px; border-radius:14px; line-height:1.35;">
       ${esc(item.text || "")}
     </div>
@@ -436,7 +495,7 @@ async function saveObsDialog() {
   const obs_type =
     item.kind === "negative" ? "negative" :
     item.kind === "positive" ? "positive" :
-    null;
+    "largely";
 
   const row = {
     report_id: state.activeReport.id,
@@ -448,16 +507,24 @@ async function saveObsDialog() {
 
     obs_type,
     question_base: qno,
+
     observation_text: String(item.text || "").trim() || null,
+
+    designation: normalizeDesignation(item.designation) || (item.kind === "positive" ? "Human" : null),
+    positive_rank: String(item.positive_rank || "").trim() || null,
+    nature_of_concern: String(item.nature_of_concern || "").trim() || null,
+    classification_coding: String(item.classification_coding || "").trim() || null,
+
     updated_at: nowIso(),
   };
 
   setSaveStatus("Saving…");
   try {
     await upsertObservationRow(row);
-    state.observationsByQno[qno] = { ...row };
+    state.observationsByQno[qno] = { ...state.observationsByQno[qno], ...row };
     setSaveStatus("Saved");
     closeObsDialog();
+    buildExtractedItemsFromDb();
     renderObsTable();
   } catch (e) {
     console.error(e);
@@ -611,16 +678,18 @@ function buildExtractedItemsFromDb() {
     else if (ot === "positive_observation") kind = "positive";
     else kind = "largely";
 
-    let rankOrCat = "—";
-    if (kind === "negative") rankOrCat = row?.obs_type ? String(row.obs_type) : "Negative";
-    if (kind === "positive") rankOrCat = "Human";
-    if (kind === "largely") rankOrCat = "KPI";
+    const normalized = normalizeDesignation(row.designation);
 
     out.push({
       qno,
       kind,
-      rankOrCat,
-      text: String(row.observation_text || row.remarks || "").trim(),
+
+      designation: normalized || (kind === "positive" ? "Human" : null),
+      positive_rank: String(row.positive_rank || "").trim() || null,
+      nature_of_concern: String(row.nature_of_concern || "").trim() || null,
+      classification_coding: String(row.classification_coding || "").trim() || null,
+
+      text: String(row.observation_text || "").trim(),
     });
   }
 
@@ -726,7 +795,7 @@ async function importReportPdfAiFromFile(file) {
     const obs_type =
       kind === "negative" ? "negative" :
       kind === "positive" ? "positive" :
-      null;
+      "largely";
 
     const row = {
       report_id: report.id,
@@ -734,10 +803,17 @@ async function importReportPdfAiFromFile(file) {
       has_observation: true,
       observation_type,
       obs_type,
-      question_base: qbase || qno,
+      question_base: qno,
+
       observation_text: observation_text || null,
       pgno_selected: [],
       remarks: observation_text || null,
+
+      designation: normalizeDesignation(item?.designation) || (kind === "positive" ? "Human" : null),
+      positive_rank: String(item?.positive_rank || "").trim() || null,
+      nature_of_concern: String(item?.nature_of_concern || "").trim() || null,
+      classification_coding: String(item?.classification_coding || "").trim() || null,
+
       updated_at: nowIso(),
     };
 
@@ -782,7 +858,7 @@ function finalizeCheck() {
 }
 
 // -------------------------
-// Init (FIXED)
+// Init
 // -------------------------
 async function waitForAuth(timeoutMs = 4000) {
   const started = Date.now();
@@ -799,8 +875,6 @@ async function init() {
     throw new Error("AUTH not loaded. Ensure ./auth.js is included BEFORE ./post_inspection.js.");
   }
 
-  // IMPORTANT: create Supabase client NOW (auth.js only creates it when asked)
-  // This will also set window.__SUPABASE_CLIENT + window.__supabaseClient.
   state.supabase = window.AUTH.ensureSupabase();
 
   const R = window.AUTH.ROLES;
@@ -810,7 +884,7 @@ async function init() {
   window.AUTH.fillUserBadge(state.me, "userBadge");
   el("logoutBtn").addEventListener("click", window.AUTH.logoutAndGoLogin);
 
-  try { el("buildPill").textContent = "build: post_inspection_bootfix_2026-02-26"; } catch {}
+  try { el("buildPill").textContent = "build: post_inspection_category_fix_2026-02-27"; } catch {}
 
   setSaveStatus("Loading…");
 
@@ -859,10 +933,14 @@ async function init() {
 
   el("obsSearch").addEventListener("input", renderObsTable);
   el("obsTypeFilter").addEventListener("change", renderObsTable);
+  el("obsDesignationFilter").addEventListener("change", renderObsTable);
   el("onlyMissingPgno").addEventListener("change", renderObsTable);
 
   el("dlgCancelBtn").addEventListener("click", closeObsDialog);
   el("dlgSaveBtn").addEventListener("click", saveObsDialog);
+
+  el("dashboardBtn")?.addEventListener("click", () => { window.location.href = "dashboard.html"; });
+  el("modeSelectBtn")?.addEventListener("click", () => { window.location.href = "mode_selection.html"; });
 
   if (state.reports.length) {
     await setActiveReportById(state.reports[0].id);
