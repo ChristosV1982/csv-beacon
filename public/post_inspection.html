@@ -81,22 +81,76 @@
       border-top:1px solid #e5eefc;
     }
 
-    .stored-grid{ display:grid; grid-template-columns: 360px 1fr; gap:14px; align-items:start; }
-    .stored-box{ border:1px solid #e5eefc; border-radius:14px; padding:12px; background:#f8fbff; }
-    .stored-title{ font-weight:950; color:#143a63; margin:0 0 10px; }
-    .stored-controls{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:10px; }
-    .stored-controls input{
-      padding:10px 12px; border:1px solid #cfe0f4; border-radius:12px; font-weight:800; background:#fff; width:100%;
+    /* Stored inspections (full width table) */
+    .si-wrap{
+      border:1px solid #e5eefc;
+      border-radius:16px;
+      background:#f8fbff;
+      padding:12px;
     }
-    #reportSelect{
+    .si-toolbar{
+      display:flex; gap:10px; flex-wrap:wrap; align-items:center; justify-content:space-between;
+      margin-bottom:10px;
+    }
+    .si-title{
+      font-weight:950; color:#143a63;
+    }
+    .si-hint{
+      color:#55708f; font-weight:700;
+    }
+    .si-table{
       width:100%;
+      border-collapse:separate;
+      border-spacing:0;
+      background:#fff;
+      border:1px solid #e5eefc;
+      border-radius:14px;
+      overflow:hidden;
+    }
+    .si-table thead th{
+      position:sticky;
+      top:0;
+      z-index:2;
+      background:#f3f8ff;
+      border-bottom:1px solid #e5eefc;
+      padding:10px 10px;
+      color:#143a63;
+      font-weight:950;
+      text-align:left;
+      vertical-align:bottom;
+      white-space:nowrap;
+    }
+    .si-filter-row th{
+      background:#f8fbff;
+      padding:8px 10px 10px;
+      border-bottom:1px solid #e5eefc;
+    }
+    .si-filter-row input, .si-filter-row select{
+      width:100%;
+      padding:8px 10px;
       border:1px solid #cfe0f4;
       border-radius:12px;
-      padding:8px;
       font-weight:800;
       background:#fff;
-      height: 178px; /* ~5 rows */
+      outline:none;
     }
+    .si-body-wrap{
+      max-height: 220px; /* ~5 rows visible then scroll */
+      overflow:auto;
+      border-radius:14px;
+    }
+    .si-table tbody td{
+      padding:10px 10px;
+      border-bottom:1px solid #eef4ff;
+      font-weight:600;
+      color:#0c1b2a;
+      vertical-align:top;
+      white-space:nowrap;
+    }
+    .si-table tbody tr{ cursor:pointer; }
+    .si-table tbody tr:hover td{ background:#f8fbff; }
+    .si-vessel{ font-weight:950; } /* ONLY vessel bold */
+    .si-muted{ color:#55708f; }
 
     .obs-toolbar{
       display:flex; gap:10px; flex-wrap:wrap; align-items:center; justify-content:space-between;
@@ -134,6 +188,7 @@
       position:sticky;
       top:0;
       z-index:1;
+      white-space:nowrap;
     }
     .obs-table tbody td{
       padding:10px 10px;
@@ -146,7 +201,6 @@
     .obs-row:hover td{ background:#f8fbff; }
     .muted{ color:#55708f; font-weight:600; }
 
-    /* Reduce wrapping in long text columns: show single-line with ellipsis, full text on hover (title). */
     .cell-ellipsis{
       white-space:nowrap;
       overflow:hidden;
@@ -200,7 +254,8 @@
       .pi-fields{ grid-template-columns: 1fr 1fr; }
       .pi-span2, .pi-span3, .pi-span6{ grid-column:auto; }
       .dlg-grid{ grid-template-columns: 1fr; }
-      .stored-grid{ grid-template-columns: 1fr; }
+      .si-body-wrap{ max-height: 260px; }
+      .si-table tbody td{ white-space:normal; } /* allow wrap on small screens only */
     }
   </style>
 </head>
@@ -225,32 +280,52 @@
 
     <div class="pi-grid">
 
-      <!-- Stored Inspections (scrollable list) -->
+      <!-- Stored Inspections (FULL WIDTH + COLUMN FILTERS) -->
       <div class="pi-card" id="storedCard">
         <h2>Stored Inspections</h2>
 
-        <div class="stored-grid">
-          <div class="stored-box">
-            <div class="stored-title">List (most recent on top)</div>
-            <div class="stored-controls">
-              <input id="reportSearch" type="text" placeholder="Search (vessel / date / ref / company / inspector)" />
-            </div>
-            <select id="reportSelect" size="5" aria-label="Stored inspections list"></select>
-            <div class="muted" style="margin-top:10px;">
-              Tip: click an inspection to load it. The list is scrollable.
-            </div>
+        <div class="si-wrap">
+          <div class="si-toolbar">
+            <div class="si-title">Most recent on top • click a row to load</div>
+            <div class="si-hint" id="siCount">0 inspections</div>
           </div>
 
-          <div class="stored-box">
-            <div class="stored-title">Filters</div>
-            <div class="muted">
-              Advanced filters (multi-select by vessel / month / year / OCIMF / inspector / inspector company) will be added here.
-              For now, use the search box above.
-            </div>
+          <div class="si-body-wrap">
+            <table class="si-table">
+              <thead>
+                <tr>
+                  <th style="width:220px;">Vessel</th>
+                  <th style="width:140px;">Date</th>
+                  <th style="width:200px;">Report Ref</th>
+                  <th style="width:220px;">Title</th>
+                  <th style="width:280px;">OCIMF Inspecting Company</th>
+                  <th style="width:220px;">Inspector</th>
+                  <th style="width:220px;">Inspector’s Company</th>
+                </tr>
+                <tr class="si-filter-row">
+                  <th><input id="siFilterVessel" type="text" placeholder="Filter vessel..." /></th>
+                  <th>
+                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px;">
+                      <select id="siFilterYear"><option value="">Year</option></select>
+                      <select id="siFilterMonth"><option value="">Month</option></select>
+                    </div>
+                  </th>
+                  <th><input id="siFilterRef" type="text" placeholder="Filter ref..." /></th>
+                  <th><input id="siFilterTitle" type="text" placeholder="Filter title..." /></th>
+                  <th><input id="siFilterOcimf" type="text" placeholder="Filter OCIMF..." /></th>
+                  <th><input id="siFilterInspector" type="text" placeholder="Filter inspector..." /></th>
+                  <th><input id="siFilterInspectorCompany" type="text" placeholder="Filter inspector company..." /></th>
+                </tr>
+              </thead>
+              <tbody id="storedTbody">
+                <tr><td colspan="7" class="si-muted" style="padding:12px 10px;">No inspections loaded.</td></tr>
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
 
+      <!-- Header -->
       <div class="pi-card" id="headerCard">
         <h2>Inspection Header</h2>
 
@@ -344,6 +419,7 @@
         </div>
       </div>
 
+      <!-- Extracted Items -->
       <div class="pi-card" id="obsCard">
         <h2>Extracted Items</h2>
 
