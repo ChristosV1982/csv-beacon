@@ -125,16 +125,27 @@
       z-index:1;
       white-space:nowrap;
     }
+
+    /* IMPORTANT: body cells are NOT bold */
     .obs-table tbody td{
       padding:10px 10px;
       border-bottom:1px solid #eef4ff;
       vertical-align:top;
-      font-weight:800;
+      font-weight:500;
       color:#0c1b2a;
     }
+
     .obs-row{ cursor:pointer; }
     .obs-row:hover td{ background:#f8fbff; }
-    .muted{ color:#55708f; font-weight:800; }
+    .muted{ color:#55708f; font-weight:500; }
+
+    /* Reduce wrapping in Observation text: single-line, ellipsis */
+    .td-nowrap{
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      max-width:560px;
+    }
 
     dialog{ border:none; border-radius:18px; padding:0; max-width:1200px; width: calc(100vw - 40px); }
     .dlg{ padding:16px; }
@@ -188,6 +199,7 @@
       .rb-wrap{ grid-template-columns: 1fr; }
       .rb-left{ border-right:none; padding-right:0; border-bottom:1px solid #e5eefc; padding-bottom:12px; }
       .rb-right{ padding-left:0; }
+      .td-nowrap{ max-width: 320px; }
     }
   </style>
 </head>
@@ -261,9 +273,6 @@
               <option value="Company Audit">Company Audit</option>
               <option value="Third Party Audit">Third Party Audit</option>
             </select>
-            <div class="muted" style="margin-top:6px;">
-              To add more titles later, we can implement a “Manage Titles” admin list.
-            </div>
           </div>
 
           <div class="pi-field pi-span3">
@@ -300,6 +309,7 @@
               <button class="btn btn-muted" id="addManualBtn" type="button">Add Manual Item</button>
 
               <button class="btn btn-muted" id="statsBtn" type="button">KPIs</button>
+              <button class="btn btn-muted" id="kpiDashBtn" type="button">KPI Dashboard</button>
               <button class="btn btn-muted" id="finalizeBtn" type="button">Finalize check</button>
             </div>
           </div>
@@ -355,7 +365,7 @@
                 <th style="width:320px;">Nature of concern</th>
                 <th style="width:360px;">Classification coding</th>
                 <th>Observation text</th>
-                <th style="width:180px;">PGNO</th>
+                <th style="width:260px;">PGNO (selected text)</th>
               </tr>
             </thead>
             <tbody id="obsTableBody">
