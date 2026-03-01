@@ -15,9 +15,17 @@
       --pi-text:#0c1b2a;
       --pi-muted:#55708f;
       --pi-bg:#08131f;
-      --pi-accent:#2e7dd7;
-      --pi-accent2:#1a5fb7;
+
+      --pi-btn:#1f6feb;
+      --pi-btn2:#0f5bd6;
+      --pi-btnText:#ffffff;
+      --pi-btnLight:#eef6ff;
+      --pi-btnLightText:#113a63;
+      --pi-warn:#c0392b;
+      --pi-warn2:#a93226;
     }
+
+    *{ box-sizing:border-box; }
     body{ background:var(--pi-bg); color:var(--pi-text); }
     .pi-wrap{ max-width:1600px; margin:20px auto 40px; padding:0 14px; }
 
@@ -42,6 +50,38 @@
     }
     .pi-pill.muted{ color:rgba(255,255,255,.9); opacity:.95; }
 
+    .btn{
+      border:1px solid rgba(255,255,255,.12);
+      border-radius:10px;
+      padding:8px 12px;
+      font-weight:900;
+      cursor:pointer;
+      transition: transform .03s ease, opacity .15s ease;
+      background:#fff;
+      color:#0c1b2a;
+    }
+    .btn:active{ transform:translateY(1px); }
+    .btn.primary{
+      background:linear-gradient(180deg,var(--pi-btn),var(--pi-btn2));
+      color:var(--pi-btnText);
+      border-color:rgba(0,0,0,.05);
+    }
+    .btn.light{
+      background:rgba(255,255,255,.92);
+      color:#0c1b2a;
+      border-color:rgba(0,0,0,.08);
+    }
+    .btn.muted{
+      background:var(--pi-btnLight);
+      color:var(--pi-btnLightText);
+      border-color:#cfe0f4;
+    }
+    .btn.warn{
+      background:linear-gradient(180deg,var(--pi-warn),var(--pi-warn2));
+      color:#fff;
+      border-color:rgba(0,0,0,.05);
+    }
+
     .pi-card{
       background:var(--pi-card);
       border:1px solid var(--pi-border);
@@ -51,7 +91,12 @@
     }
     .pi-card h2{ margin:0 0 12px; color:#113a63; }
 
-    .pi-grid{ display:grid; grid-template-columns: 1fr; gap:18px; margin-top:16px; }
+    .pi-grid{
+      display:grid;
+      grid-template-columns: 1fr;
+      gap:18px;
+      margin-top:16px;
+    }
 
     .pi-fields{
       display:grid;
@@ -59,7 +104,9 @@
       gap:10px 12px;
       align-items:end;
     }
-    .pi-field label{ display:block; font-weight:900; color:#143a63; margin:0 0 6px; }
+    .pi-field label{
+      display:block; font-weight:900; color:#143a63; margin:0 0 6px;
+    }
     .pi-field input, .pi-field select{
       width:100%;
       padding:10px 12px;
@@ -68,6 +115,7 @@
       font-weight:800;
       outline:none;
       background:#fff;
+      min-width:0;
     }
     .pi-field input:focus, .pi-field select:focus{
       border-color:#5aa2ff; box-shadow:0 0 0 3px rgba(90,162,255,.2);
@@ -76,158 +124,95 @@
     .pi-span3{ grid-column: span 3; }
     .pi-span6{ grid-column: 1 / -1; }
 
-    /* Buttons: make them look consistent + nicer */
-    .pi-actions{ display:flex; gap:10px; flex-wrap:wrap; margin-top:12px; padding-top:12px; border-top:1px solid #e5eefc; }
-    .pi-actions .btn{ border-radius:12px; padding:9px 12px; font-weight:900; }
-    .pi-actions .btn.primary{ background:var(--pi-accent); border-color:var(--pi-accent2); color:#fff; }
-    .pi-actions .btn.primary:hover{ background:var(--pi-accent2); }
-    .pi-actions .btn.light{ background:#eef6ff; border:1px solid #cfe0f4; color:#113a63; }
-    .pi-actions .btn.light:hover{ background:#e6f1ff; }
-    .pi-actions .btn.warn{ background:#ffecec; border:1px solid #ffc7c7; color:#7a1f1f; }
-    .pi-actions .btn.warn:hover{ background:#ffdede; }
-    .pi-actions .btn.muted{ background:#f5f7fb; border:1px solid #dfe7f5; color:#143a63; }
-    .pi-actions .btn.muted:hover{ background:#eef3ff; }
+    .pi-actions{
+      display:flex; gap:10px; flex-wrap:wrap;
+      margin-top:12px;
+      padding-top:12px;
+      border-top:1px solid #e5eefc;
+    }
 
-    /* Stored inspections advanced filters (multi tick) */
-    .si-filterbar{
-      border:1px solid #e5eefc;
-      border-radius:16px;
-      background:#f8fbff;
-      padding:12px;
-      margin-bottom:12px;
-    }
-    .si-filterbar h3{
-      margin:0 0 10px;
-      color:#143a63;
-      font-size:14px;
-      font-weight:950;
-    }
-    .si-filtergrid{
-      display:grid;
-      grid-template-columns: repeat(6, 1fr);
-      gap:10px;
-    }
-    .si-box{
-      background:#fff;
-      border:1px solid #e5eefc;
-      border-radius:14px;
-      padding:10px;
-      min-height:120px;
+    /* Stored inspections */
+    .si-wrap{
       display:flex;
       flex-direction:column;
-      gap:8px;
+      gap:10px;
     }
-    .si-box .si-box-title{
-      font-weight:950;
-      color:#143a63;
-      font-size:12px;
-    }
-    .si-box input[type="text"], .si-box select{
-      padding:8px 10px;
-      border:1px solid #cfe0f4;
-      border-radius:12px;
-      font-weight:800;
-      outline:none;
-      background:#fff;
-    }
-    .si-checklist{
-      overflow:auto;
-      max-height:120px;
-      border-top:1px dashed #e5eefc;
-      padding-top:8px;
-    }
-    .si-check{
+    .si-head{
       display:flex;
-      gap:8px;
-      align-items:flex-start;
-      font-weight:700;
-      color:#0c1b2a;
-      padding:4px 0;
+      justify-content:space-between;
+      align-items:center;
+      gap:10px;
+      flex-wrap:wrap;
+      color:#113a63;
+      font-weight:950;
     }
-    .si-check input{ margin-top:3px; }
+    .si-sub{
+      color:#55708f;
+      font-weight:850;
+      margin-top:-2px;
+    }
 
-    /* Stored inspections table: NO horizontal scroll */
-    .si-wrap{
-      border:1px solid #e5eefc;
-      border-radius:16px;
-      background:#f8fbff;
-      padding:12px;
-    }
-    .si-toolbar{
-      display:flex; gap:10px; flex-wrap:wrap; align-items:center; justify-content:space-between;
-      margin-bottom:10px;
-    }
-    .si-title{ font-weight:950; color:#143a63; }
-    .si-hint{ color:#55708f; font-weight:700; }
-
+    /* Table layout: no horizontal scroll */
     .si-table{
       width:100%;
-      table-layout:fixed;   /* key: no horizontal scroll */
       border-collapse:separate;
       border-spacing:0;
-      background:#fff;
+      table-layout:fixed; /* critical to avoid overflow */
       border:1px solid #e5eefc;
       border-radius:14px;
       overflow:hidden;
     }
     .si-table thead th{
-      position:sticky;
-      top:0;
-      z-index:2;
-      background:#f3f8ff;
-      border-bottom:1px solid #e5eefc;
-      padding:10px 10px;
+      background:#f8fbff;
       color:#143a63;
       font-weight:950;
+      padding:10px;
+      border-bottom:1px solid #e5eefc;
       text-align:left;
-      vertical-align:bottom;
       white-space:nowrap;
-      font-size:13px;
+      overflow:hidden;
+      text-overflow:ellipsis;
     }
-    .si-filter-row th{
-      background:#f8fbff;
+    .si-table thead .si-filterrow th{
       padding:8px 10px 10px;
       border-bottom:1px solid #e5eefc;
     }
-    .si-filter-row input{
+    .si-filter{
       width:100%;
       padding:8px 10px;
       border:1px solid #cfe0f4;
-      border-radius:12px;
-      font-weight:800;
+      border-radius:10px;
       background:#fff;
+      font-weight:800;
       outline:none;
-      font-size:12px;
+      min-width:0;
     }
+    .si-filter:focus{
+      border-color:#5aa2ff;
+      box-shadow:0 0 0 3px rgba(90,162,255,.2);
+    }
+    .si-table tbody td{
+      padding:10px;
+      border-bottom:1px solid #eef4ff;
+      vertical-align:top;
+      color:#0c1b2a;
+      font-weight:700; /* normal (not bold) */
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+    .si-row{ cursor:pointer; }
+    .si-row:hover td{ background:#f8fbff; }
+    .si-vessel{ font-weight:950; }
 
-    .si-body-wrap{
-      max-height: 230px;
+    /* 5 rows visible + scroll */
+    .si-scroll{
+      max-height: 240px;
       overflow:auto;
       border-radius:14px;
     }
-    .si-table tbody td{
-      padding:10px 10px;
-      border-bottom:1px solid #eef4ff;
-      font-weight:600;
-      color:#0c1b2a;
-      vertical-align:top;
-      font-size:13px;
-    }
-    .si-table tbody tr{ cursor:pointer; }
-    .si-table tbody tr:hover td{ background:#f8fbff; }
-    .si-vessel{ font-weight:950; }
-    .si-cell{
-      overflow:hidden;
-      text-overflow:ellipsis;
-      white-space:nowrap;
-    }
-    .si-cell-wrap{
-      overflow:hidden;
-      text-overflow:ellipsis;
-      white-space:nowrap;
-    }
 
-    /* Extracted items table: NO horizontal scroll, no bold in rows */
+    /* Extracted items */
     .obs-toolbar{
       display:flex; gap:10px; flex-wrap:wrap; align-items:center; justify-content:space-between;
       margin:8px 0 10px;
@@ -236,6 +221,7 @@
     .obs-filters input, .obs-filters select{
       padding:10px 12px; border:1px solid #cfe0f4; border-radius:12px; font-weight:800;
       background:#fff;
+      min-width:0;
     }
     .obs-summary{
       display:flex; gap:10px; flex-wrap:wrap; align-items:center;
@@ -254,9 +240,9 @@
 
     .obs-table{
       width:100%;
-      table-layout:fixed;     /* key: no horizontal scroll */
       border-collapse:separate;
       border-spacing:0;
+      table-layout:fixed;
     }
     .obs-table thead th{
       text-align:left;
@@ -269,25 +255,28 @@
       top:0;
       z-index:1;
       white-space:nowrap;
-      font-size:13px;
+      overflow:hidden;
+      text-overflow:ellipsis;
     }
     .obs-table tbody td{
       padding:10px 10px;
       border-bottom:1px solid #eef4ff;
       vertical-align:top;
-      font-weight:600; /* NOT bold */
+      font-weight:700; /* normal (not bold) */
       color:#0c1b2a;
-      font-size:13px;
-    }
-    .obs-row{ cursor:pointer; }
-    .obs-row:hover td{ background:#f8fbff; }
-    .muted{ color:#55708f; font-weight:600; }
-
-    .cell-clip{
       overflow:hidden;
       text-overflow:ellipsis;
-      white-space:nowrap;
     }
+
+    /* Keep texts readable without heavy wrapping */
+    .td-nowrap{ white-space:nowrap; }
+    .td-wrap{ white-space:normal; word-break:break-word; }
+    .td-clip{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+    .obs-row{ cursor:pointer; }
+    .obs-row:hover td{ background:#f8fbff; }
+
+    .muted{ color:#55708f; font-weight:800; }
 
     dialog{ border:none; border-radius:18px; padding:0; max-width:1200px; width: calc(100vw - 40px); }
     .dlg{ padding:16px; }
@@ -307,10 +296,7 @@
       font-weight:800;
       resize:vertical;
       background:#fff;
-      outline:none;
     }
-    textarea:focus{ border-color:#5aa2ff; box-shadow:0 0 0 3px rgba(90,162,255,.2); }
-
     .dlg-actions{
       display:flex; gap:10px; justify-content:flex-end;
       margin-top:12px; padding-top:12px; border-top:1px solid #e5eefc;
@@ -322,15 +308,13 @@
       margin-top:12px;
     }
 
-    /* Responsive */
-    @media (max-width: 1300px){
-      .si-filtergrid{ grid-template-columns: repeat(3, 1fr); }
-    }
     @media (max-width: 1100px){
       .pi-fields{ grid-template-columns: 1fr 1fr; }
       .pi-span2, .pi-span3, .pi-span6{ grid-column:auto; }
       .dlg-grid{ grid-template-columns: 1fr; }
-      .si-filtergrid{ grid-template-columns: repeat(2, 1fr); }
+
+      .si-table thead th,
+      .si-table tbody td{ font-size:13px; }
     }
   </style>
 </head>
@@ -355,95 +339,57 @@
 
     <div class="pi-grid">
 
+      <!-- Stored Inspections (filters ONLY in table headers) -->
       <div class="pi-card" id="storedCard">
         <h2>Stored Inspections</h2>
 
-        <!-- Advanced multi-select tick filters -->
-        <div class="si-filterbar">
-          <h3>Multi-select filters (tick-boxes). Leave empty = no filtering.</h3>
-          <div class="si-filtergrid">
-            <div class="si-box">
-              <div class="si-box-title">Vessels</div>
-              <input id="fltVesselSearch" type="text" placeholder="Search vessel..." />
-              <div class="si-checklist" id="fltVesselList"></div>
-            </div>
-
-            <div class="si-box">
-              <div class="si-box-title">Years</div>
-              <div class="si-checklist" id="fltYearList"></div>
-            </div>
-
-            <div class="si-box">
-              <div class="si-box-title">Months</div>
-              <div class="si-checklist" id="fltMonthList"></div>
-            </div>
-
-            <div class="si-box">
-              <div class="si-box-title">OCIMF Inspecting Company</div>
-              <input id="fltOcimfSearch" type="text" placeholder="Search OCIMF..." />
-              <div class="si-checklist" id="fltOcimfList"></div>
-            </div>
-
-            <div class="si-box">
-              <div class="si-box-title">Inspector Name</div>
-              <input id="fltInspectorSearch" type="text" placeholder="Search inspector..." />
-              <div class="si-checklist" id="fltInspectorList"></div>
-            </div>
-
-            <div class="si-box">
-              <div class="si-box-title">Inspector’s Company</div>
-              <input id="fltInspectorCompanySearch" type="text" placeholder="Search company..." />
-              <div class="si-checklist" id="fltInspectorCompanyList"></div>
-            </div>
-          </div>
-
-          <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:10px;">
-            <button class="btn muted" id="fltClearBtn" type="button">Clear all ticks</button>
-            <span class="muted" style="align-self:center;">Tip: you can combine tick filters + header text filters below.</span>
-          </div>
-        </div>
-
-        <!-- Stored inspections table (columns + header filters) -->
         <div class="si-wrap">
-          <div class="si-toolbar">
-            <div class="si-title">Most recent on top • click a row to load</div>
-            <div class="si-hint" id="siCount">0 inspections</div>
+          <div class="si-head">
+            <div>Most recent on top • click a row to load</div>
+            <div class="muted" id="storedCount">0 inspections</div>
           </div>
+          <div class="si-sub">Filters are in the header row below. Leave empty = no filtering.</div>
 
-          <div class="si-body-wrap">
+          <div class="si-scroll">
             <table class="si-table">
               <thead>
                 <tr>
-                  <th style="width:16%;">Vessel</th>
+                  <th style="width:18%;">Vessel</th>
                   <th style="width:10%;">Date</th>
-                  <th style="width:12%;">Report Ref</th>
-                  <th style="width:12%;">Title</th>
-                  <th style="width:18%;">OCIMF</th>
-                  <th style="width:16%;">Inspector</th>
-                  <th style="width:16%;">Inspector’s Company</th>
+                  <th style="width:14%;">Report Ref</th>
+                  <th style="width:14%;">Title</th>
+                  <th style="width:20%;">OCIMF</th>
+                  <th style="width:12%;">Inspector</th>
+                  <th style="width:12%;">Inspector’s Company</th>
                 </tr>
-                <tr class="si-filter-row">
-                  <th><input id="siFilterVessel" type="text" placeholder="Filter..." /></th>
-                  <th><input id="siFilterDate" type="text" placeholder="dd/mm/yyyy or yyyy-mm" /></th>
-                  <th><input id="siFilterRef" type="text" placeholder="Filter..." /></th>
-                  <th><input id="siFilterTitle" type="text" placeholder="Filter..." /></th>
-                  <th><input id="siFilterOcimf" type="text" placeholder="Filter..." /></th>
-                  <th><input id="siFilterInspector" type="text" placeholder="Filter..." /></th>
-                  <th><input id="siFilterInspectorCompany" type="text" placeholder="Filter..." /></th>
+                <tr class="si-filterrow">
+                  <th><input class="si-filter" id="fVessel" placeholder="Filter…" /></th>
+                  <th><input class="si-filter" id="fDate" placeholder="dd/mm/yyyy or yyyy-mm or yyyy" /></th>
+                  <th><input class="si-filter" id="fRef" placeholder="Filter…" /></th>
+                  <th><input class="si-filter" id="fTitle" placeholder="Filter…" /></th>
+                  <th><input class="si-filter" id="fOcimf" placeholder="Filter…" /></th>
+                  <th><input class="si-filter" id="fInspector" placeholder="Filter…" /></th>
+                  <th><input class="si-filter" id="fInspectorCompany" placeholder="Filter…" /></th>
                 </tr>
               </thead>
-              <tbody id="storedTbody">
-                <tr><td colspan="7" class="muted" style="padding:12px 10px;">No inspections loaded.</td></tr>
+              <tbody id="storedTableBody">
+                <tr><td colspan="7" class="muted">No inspections loaded.</td></tr>
               </tbody>
             </table>
           </div>
         </div>
       </div>
 
+      <!-- Inspection Header -->
       <div class="pi-card" id="headerCard">
         <h2>Inspection Header</h2>
 
         <div class="pi-fields">
+          <div class="pi-field">
+            <label>Existing Reports</label>
+            <select id="reportSelect"></select>
+          </div>
+
           <div class="pi-field">
             <label>Vessel</label>
             <select id="vesselSelect"></select>
@@ -456,7 +402,7 @@
 
           <div class="pi-field">
             <label>Port (official name)</label>
-            <input id="portName" type="text" placeholder="e.g. Greece - Agio Theodoroi [GRAGT]" />
+            <input id="portName" type="text" placeholder="e.g. Greece - Agio Theodoroi" />
           </div>
 
           <div class="pi-field">
@@ -476,10 +422,12 @@
 
           <div class="pi-field pi-span3">
             <label>Title</label>
-            <div style="display:flex; gap:10px; align-items:center;">
-              <select id="reportTitle" style="flex:1;"></select>
-              <button class="btn muted" id="manageTitlesBtn" type="button" title="Add / deactivate titles">Manage Titles</button>
-            </div>
+            <select id="reportTitle">
+              <option value="">— Select —</option>
+              <option value="SIRE 2.0 Inspection">SIRE 2.0 Inspection</option>
+              <option value="Company Audit">Company Audit</option>
+              <option value="Third Party Audit">Third Party Audit</option>
+            </select>
           </div>
 
           <div class="pi-field pi-span3">
@@ -488,8 +436,8 @@
           </div>
 
           <div class="pi-field pi-span3">
-            <label>Inspector's Company (manual)</label>
-            <input id="inspectorCompany" type="text" placeholder="Enter inspector's contracting company" />
+            <label>Inspector’s Company (manual)</label>
+            <input id="inspectorCompany" type="text" placeholder="Contractor carrying out inspection" />
           </div>
 
           <div class="pi-field pi-span3">
@@ -524,19 +472,20 @@
 
         <div style="margin-top:10px; color:#0f3a63; font-weight:850;">
           <ul style="margin:0; padding-left:18px;">
-            <li><b>Negative</b>: category + Nature of Concern (Not as expected … / Observable or detectable deficiency). Requires PGNO.</li>
+            <li><b>Negative</b>: designation + Nature of Concern (Not as expected … / Observable or detectable deficiency). Requires PGNO.</li>
             <li><b>Positive</b>: Human + Nature of Concern (Exceeded normal expectation). No PGNO.</li>
-            <li><b>Largely as expected</b>: category + Nature of Concern (Largely as expected). KPI item.</li>
+            <li><b>Largely as expected</b>: designation + Nature of Concern (Largely as expected). KPI item.</li>
           </ul>
         </div>
       </div>
 
+      <!-- Extracted Items -->
       <div class="pi-card" id="obsCard">
         <h2>Extracted Items</h2>
 
         <div class="obs-toolbar">
           <div class="obs-filters">
-            <input id="obsSearch" type="text" placeholder="Search (qno / category / nature / coding / text)" />
+            <input id="obsSearch" type="text" placeholder="Search (qno / designation / nature / coding / text)" />
 
             <select id="obsTypeFilter">
               <option value="">All types</option>
@@ -545,7 +494,7 @@
               <option value="largely">Largely as expected</option>
             </select>
 
-            <select id="obsCategoryFilter">
+            <select id="obsDesignationFilter">
               <option value="">All categories</option>
               <option value="Human">Human</option>
               <option value="Process">Process</option>
@@ -566,13 +515,13 @@
           <table class="obs-table">
             <thead>
               <tr>
-                <th style="width:9%;">Question</th>
-                <th style="width:10%;">Type</th>
-                <th style="width:14%;">Category</th>
-                <th style="width:16%;">Nature of concern</th>
-                <th style="width:16%;">Classification coding</th>
-                <th style="width:20%;">Observation text</th>
-                <th style="width:15%;">PGNO (selected text)</th>
+                <th style="width:90px;">Question</th>
+                <th style="width:120px;">Type</th>
+                <th style="width:180px;">Category</th>
+                <th style="width:280px;">Nature of concern</th>
+                <th style="width:320px;">Classification coding</th>
+                <th>Observation text</th>
+                <th style="width:240px;">PGNO (selected text)</th>
               </tr>
             </thead>
             <tbody id="obsTableBody">
@@ -581,8 +530,10 @@
           </table>
         </div>
       </div>
+
     </div>
 
+    <!-- KPI quick dialog -->
     <dialog id="statsDialog">
       <div class="dlg">
         <h3>KPIs</h3>
@@ -600,6 +551,7 @@
       </div>
     </dialog>
 
+    <!-- Observation editor -->
     <dialog id="obsDialog">
       <div class="dlg">
         <h3 id="dlgTitle">Item</h3>
@@ -608,31 +560,6 @@
         <div class="dlg-actions">
           <button class="btn muted" id="dlgCancelBtn" type="button">Cancel</button>
           <button class="btn primary" id="dlgSaveBtn" type="button">Save</button>
-        </div>
-      </div>
-    </dialog>
-
-    <!-- Manage Titles Modal -->
-    <dialog id="titlesDialog">
-      <div class="dlg">
-        <h3>Manage Titles</h3>
-        <div class="dlg-sub">Add new titles and deactivate old ones. (Active titles appear in the dropdown.)</div>
-
-        <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;">
-          <div class="pi-field" style="flex:1;">
-            <label>New title</label>
-            <input id="newTitleInput" type="text" placeholder="e.g. Terminal Audit" />
-          </div>
-          <button class="btn primary" id="addTitleBtn" type="button">Add</button>
-        </div>
-
-        <div style="margin-top:12px; border-top:1px solid #e5eefc; padding-top:12px;">
-          <div style="font-weight:950; color:#143a63; margin-bottom:8px;">Existing titles</div>
-          <div id="titlesList" style="max-height:260px; overflow:auto; border:1px solid #e5eefc; border-radius:12px; padding:10px;"></div>
-        </div>
-
-        <div class="dlg-actions">
-          <button class="btn muted" id="closeTitlesBtn" type="button">Close</button>
         </div>
       </div>
     </dialog>
