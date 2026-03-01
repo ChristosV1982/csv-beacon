@@ -1,17 +1,15 @@
 import { loadLockedLibraryJson } from "./question_library_loader.js";
 
+/**
+ * HARD BUILD STAMP (so you always know what is loaded)
+ * Change this string every time you replace this file.
+ */
+const POST_INSPECTION_BUILD = "post_inspection_ui_category_filter_build_2026-03-01_v2";
+
 const LOCKED_LIBRARY_JSON = "./sire_questions_all_columns_named.json";
 
 const PDF_BUCKET_DEFAULT = "inspection-reports";
 const PDF_FOLDER_PREFIX = "post_inspections";
-
-/**
- * Visible version stamp.
- * - Shown in build pill
- * - Logged to console
- * - Also used by post_inspection.html cache-buster query param
- */
-const BUILD_ID = "post_inspection_ui_category_filter_build_2026-03-01";
 
 function el(id) { return document.getElementById(id); }
 
@@ -35,8 +33,8 @@ function ddmmyyyyToIso(ddmmyyyy) {
 }
 
 function normalizeQnoParts(qno, pad2) {
-  const parts = String(qno || "").trim().replace(/\.$/, "").split(".").filter(Boolean);
-  if (parts.length < 2) return String(qno || "").trim().replace(/\.$/, "");
+  const parts = String(qno || "").trim().split(".").filter(Boolean);
+  if (parts.length < 2) return String(qno || "").trim();
   const norm = parts.map(p => {
     const n = p.replace(/^0+/, "") || "0";
     return pad2 ? n.padStart(2, "0") : String(Number(n));
@@ -44,32 +42,19 @@ function normalizeQnoParts(qno, pad2) {
   return norm.join(".");
 }
 
-function normalizeDesignation(d) {
-  const s = String(d || "").trim();
-  if (!s) return "";
-  const low = s.toLowerCase();
-  if (low === "human") return "Human";
-  if (low === "process") return "Process";
-  if (low === "hardware") return "Hardware";
-  if (low === "photo") return "Photo";
-  return s; // keep as-is if something unexpected appears
-}
-
 function findLibraryQno(qbase) {
-  const raw0 = String(qbase || "").trim().replace(/\.$/, "");
-  if (!raw0) return null;
+  const raw = String(qbase || "").trim();
+  if (!raw) return null;
 
-  // direct hit
-  if (state.libByNo.has(raw0)) return raw0;
+  if (state.libByNo.has(raw)) return raw;
 
-  const padded = normalizeQnoParts(raw0, true);
+  const padded = normalizeQnoParts(raw, true);
   if (state.libByNo.has(padded)) return padded;
 
-  const nonPadded = normalizeQnoParts(raw0, false);
+  const nonPadded = normalizeQnoParts(raw, false);
   if (state.libByNo.has(nonPadded)) return nonPadded;
 
-  // extra: attempt strip leading zeros per segment
-  for (const candidate of [raw0, padded, nonPadded]) {
+  for (const candidate of [raw, padded, nonPadded]) {
     const alt = candidate.split(".").map(p => p.replace(/^0+/, "") || "0").join(".");
     if (state.libByNo.has(alt)) return alt;
   }
@@ -85,9 +70,7 @@ function pick(obj, keys) {
 }
 
 function getQno(q) {
-  return String(pick(q, ["No.", "No", "question_no", "QuestionNo", "Question ID"]))
-    .trim()
-    .replace(/\.$/, "");
+  return String(pick(q, ["No.", "No", "question_no", "QuestionNo", "Question ID"])).trim();
 }
 function getChap(q) { return String(pick(q, ["Chap", "chapter", "Chapter"])).trim(); }
 function getSection(q) { return String(pick(q, ["Section Name", "Sect", "section", "Section"])).trim(); }
@@ -106,6 +89,17 @@ function getPgnoBullets(q) {
   const lines = pgTxt.split("\n").map((s) => s.trim()).filter(Boolean);
   const usable = lines.filter((s) => s.length > 6);
   return usable.slice(0, 120);
+}
+
+function normDesignation(d) {
+  const s = String(d || "").trim();
+  if (!s) return "";
+  const low = s.toLowerCase();
+  if (low === "human") return "Human";
+  if (low === "process") return "Process";
+  if (low === "hardware") return "Hardware";
+  if (low === "photo") return "Photo";
+  return s; // keep as-is if something new appears
 }
 
 const state = {
@@ -295,7 +289,7 @@ function applyObsFilters(items) {
     if (type && it.kind !== type) return false;
 
     if (designationFilter) {
-      const d = normalizeDesignation(it.designation || "");
+      const d = String(it.designation || "").trim();
       if (designationFilter !== d) return false;
     }
 
@@ -342,7 +336,7 @@ function renderObsTable() {
 
     const designationDisplay = it.kind === "positive"
       ? (it.positive_rank ? `Human (${it.positive_rank})` : "Human")
-      : (normalizeDesignation(it.designation) || "—");
+      : (it.designation || "—");
 
     return `
       <tr class="obs-row" data-qno="${esc(it.qno)}">
@@ -415,7 +409,7 @@ function openObsDialog(item) {
 
   const designationDisplay = item.kind === "positive"
     ? (item.positive_rank ? `Human (${item.positive_rank})` : "Human")
-    : (normalizeDesignation(item.designation) || "—");
+    : (item.designation || "—");
 
   el("dlgBody").innerHTML = `
     <div style="font-weight:900; color:#143a63; margin-bottom:10px;">Question</div>
@@ -480,6 +474,7 @@ async function saveObsDialog() {
 
   const qno = item.qno;
   const isNegative = item.kind === "negative";
+
   const remarks = String(el("dlgRemarks").value || "").trim();
 
   let pgno_selected = [];
@@ -520,14 +515,11 @@ async function saveObsDialog() {
 
     observation_text: String(item.text || "").trim() || null,
 
-    designation: normalizeDesignation(item.designation || "") || (item.kind === "positive" ? "Human" : null),
+    designation: normDesignation(item.designation) || (item.kind === "positive" ? "Human" : null),
     positive_rank: String(item.positive_rank || "").trim() || null,
     nature_of_concern: String(item.nature_of_concern || "").trim() || null,
     classification_coding: String(item.classification_coding || "").trim() || null,
 
-    // Force audit fields for safety (prevents NOT NULL failures when auth.uid() is null in any context)
-    created_by: state.me?.id || null,
-    updated_by: state.me?.id || null,
     updated_at: nowIso(),
   };
 
@@ -695,7 +687,7 @@ function buildExtractedItemsFromDb() {
       qno,
       kind,
 
-      designation: normalizeDesignation(row.designation || "") || (kind === "positive" ? "Human" : ""),
+      designation: normDesignation(row.designation) || (kind === "positive" ? "Human" : ""),
       positive_rank: String(row.positive_rank || "").trim() || null,
       nature_of_concern: String(row.nature_of_concern || "").trim() || null,
       classification_coding: String(row.classification_coding || "").trim() || null,
@@ -734,6 +726,7 @@ async function importReportPdfAiFromFile(file) {
 
   const extracted = data.extracted;
   const h = extracted?.header || {};
+  const functionVersion = String(data?.function_version || "").trim();
 
   const extractedVesselName = String(h.vessel_name || "").trim();
   const vesselHit = extractedVesselName
@@ -788,18 +781,17 @@ async function importReportPdfAiFromFile(file) {
   el("pdfStatus").textContent = `Stored: ${tempPath.split("/").pop()}`;
 
   const obs = Array.isArray(extracted?.observations) ? extracted.observations : [];
-  setSaveStatus(`Saving ${obs.length} item(s)…`);
-
-  // Save all extracted items; do not silently drop negatives/largely due to library mismatch.
+  const skipped = [];
   let savedCount = 0;
-  let skippedCount = 0;
+
+  setSaveStatus(`Saving ${obs.length} item(s)…`);
 
   for (const item of obs) {
     try {
       const qbase = String(item?.question_base || "").trim();
       const qno = findLibraryQno(qbase);
       if (!qno) {
-        skippedCount++;
+        skipped.push({ qbase, reason: "Question not found in locked library JSON" });
         continue;
       }
 
@@ -828,22 +820,18 @@ async function importReportPdfAiFromFile(file) {
         pgno_selected: [],
         remarks: observation_text || null,
 
-        designation: normalizeDesignation(item?.designation || "") || (kind === "positive" ? "Human" : null),
+        designation: normDesignation(item?.designation) || (kind === "positive" ? "Human" : null),
         positive_rank: String(item?.positive_rank || "").trim() || null,
         nature_of_concern: String(item?.nature_of_concern || "").trim() || null,
         classification_coding: String(item?.classification_coding || "").trim() || null,
 
-        // Safety for audit NOT NULL constraints
-        created_by: state.me?.id || null,
-        updated_by: state.me?.id || null,
         updated_at: nowIso(),
       };
 
       await upsertObservationRow(row);
       savedCount++;
     } catch (e) {
-      console.error("Failed saving extracted item:", item, e);
-      // keep going so the UI never gets “stuck” mid-import
+      skipped.push({ qbase: String(item?.question_base || ""), reason: (e?.message || String(e)) });
     }
   }
 
@@ -851,7 +839,12 @@ async function importReportPdfAiFromFile(file) {
   buildExtractedItemsFromDb();
   renderObsTable();
 
-  setSaveStatus(`AI import done (saved ${savedCount}, skipped ${skippedCount})`);
+  const skipTxt = skipped.length ? `, skipped ${skipped.length}` : ", skipped 0";
+  setSaveStatus(`AI import done (saved ${savedCount}${skipTxt})`);
+
+  console.log("[Post-Inspection] BUILD:", POST_INSPECTION_BUILD);
+  console.log("[Post-Inspection] Edge function_version:", functionVersion);
+  if (skipped.length) console.warn("[Post-Inspection] Skipped items:", skipped);
 }
 
 // -------------------------
@@ -897,8 +890,8 @@ async function waitForAuth(timeoutMs = 4000) {
 }
 
 async function init() {
-  console.log(`[Post-Inspection] Loading build: ${BUILD_ID}`);
-  try { el("buildPill").textContent = `build: ${BUILD_ID}`; } catch {}
+  // expose build stamp (for debugging)
+  window.__POST_INSPECTION_BUILD = POST_INSPECTION_BUILD;
 
   const ok = await waitForAuth(4000);
   if (!ok) {
@@ -914,26 +907,21 @@ async function init() {
   window.AUTH.fillUserBadge(state.me, "userBadge");
   el("logoutBtn").addEventListener("click", window.AUTH.logoutAndGoLogin);
 
+  // FORCE visible build stamp in UI
+  el("buildPill").textContent = `build: ${POST_INSPECTION_BUILD}`;
+
+  console.log("[Post-Inspection] Loaded build:", POST_INSPECTION_BUILD);
+
   setSaveStatus("Loading…");
 
   state.vessels = await loadVessels();
   renderVesselsSelect();
 
-  // Load locked library and build map with normalized keys
   state.lib = await loadLockedLibraryJson(LOCKED_LIBRARY_JSON);
   state.libByNo = new Map();
   for (const q of state.lib) {
     const qno = getQno(q);
-    if (!qno) continue;
-
-    // store a few key variants to reduce “not found” cases
-    const k1 = qno;
-    const k2 = normalizeQnoParts(qno, false);
-    const k3 = normalizeQnoParts(qno, true);
-
-    state.libByNo.set(k1, q);
-    state.libByNo.set(k2, q);
-    state.libByNo.set(k3, q);
+    if (qno) state.libByNo.set(qno, q);
   }
 
   state.reports = await loadReportsFromDb();
@@ -954,30 +942,6 @@ async function init() {
   el("newReportBtn").addEventListener("click", handleNewReport);
   el("saveHeaderBtn").addEventListener("click", handleSaveHeader);
   el("deleteReportBtn").addEventListener("click", handleDeleteReport);
-
-  // Export/Import JSON (kept safe: no-op if you are not using it yet)
-  el("exportBtn")?.addEventListener("click", () => alert("Export JSON not implemented in this build yet."));
-  el("importBtn")?.addEventListener("click", () => el("importFile").click());
-  el("importFile")?.addEventListener("change", () => alert("Import JSON not implemented in this build yet."));
-
-  // PDF download
-  el("downloadPdfBtn")?.addEventListener("click", async () => {
-    if (!state.activeReport?.pdf_storage_path) {
-      alert("No PDF linked to this report.");
-      return;
-    }
-    try {
-      const { data, error } = await state.supabase
-        .storage
-        .from(PDF_BUCKET_DEFAULT)
-        .createSignedUrl(state.activeReport.pdf_storage_path, 60);
-      if (error) throw error;
-      window.open(data.signedUrl, "_blank");
-    } catch (e) {
-      console.error(e);
-      alert("Download failed: " + (e?.message || String(e)));
-    }
-  });
 
   el("importPdfBtn").addEventListener("click", () => el("importPdfFile").click());
   el("importPdfFile").addEventListener("change", async (e) => {
