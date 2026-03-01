@@ -85,7 +85,7 @@ function getPgnoBullets(q) {
   return usable.slice(0, 120);
 }
 
-/** NEW: normalize designation to allowed values only */
+/** normalize designation to allowed values only */
 function normalizeDesignation(val) {
   const s = String(val || "").trim();
   if (!s) return null;
@@ -164,7 +164,7 @@ async function loadReportsFromDb() {
 async function loadObservationsForReport(reportId) {
   const { data, error } = await state.supabase
     .from("post_inspection_observations")
-    .select("report_id, question_no, has_observation, observation_type, pgno_selected, remarks, updated_at, obs_type, observation_text, question_base, pgno_full, designation, nature_of_concern, classification_coding, positive_rank")
+    .select("report_id, question_no, has_observation, observation_type, pgno_selected, remarks, updated_at, obs_type, observation_text, question_base, pgno_full, designation, nature_of_concern, classification_coding, positive_rank, created_by, updated_by")
     .eq("report_id", reportId);
 
   if (error) throw error;
@@ -466,11 +466,16 @@ async function saveObsDialog() {
     alert("No active report.");
     return;
   }
+  if (!state.me?.id) {
+    alert("No user id (state.me.id). Please login again.");
+    return;
+  }
 
   const qno = item.qno;
   const isNegative = item.kind === "negative";
-
   const remarks = String(el("dlgRemarks").value || "").trim();
+
+  const existing = state.observationsByQno[qno] || null;
 
   let pgno_selected = [];
   if (isNegative) {
@@ -497,6 +502,9 @@ async function saveObsDialog() {
     item.kind === "positive" ? "positive" :
     "largely";
 
+  // IMPORTANT: created_by + updated_by are NOT NULL in your DB
+  const createdBy = String(existing?.created_by || state.me.id);
+
   const row = {
     report_id: state.activeReport.id,
     question_no: qno,
@@ -514,6 +522,9 @@ async function saveObsDialog() {
     positive_rank: String(item.positive_rank || "").trim() || null,
     nature_of_concern: String(item.nature_of_concern || "").trim() || null,
     classification_coding: String(item.classification_coding || "").trim() || null,
+
+    created_by: createdBy,
+    updated_by: String(state.me.id),
 
     updated_at: nowIso(),
   };
@@ -702,6 +713,10 @@ function buildExtractedItemsFromDb() {
 // -------------------------
 async function importReportPdfAiFromFile(file) {
   if (!file) return;
+  if (!state.me?.id) {
+    alert("No user id (state.me.id). Please login again.");
+    return;
+  }
 
   const bucket = PDF_BUCKET_DEFAULT;
   const safeName = String(file.name || "report.pdf").replace(/[^a-zA-Z0-9._-]+/g, "_");
@@ -797,6 +812,7 @@ async function importReportPdfAiFromFile(file) {
       kind === "positive" ? "positive" :
       "largely";
 
+    // IMPORTANT: created_by + updated_by are NOT NULL in your DB
     const row = {
       report_id: report.id,
       question_no: qno,
@@ -813,6 +829,9 @@ async function importReportPdfAiFromFile(file) {
       positive_rank: String(item?.positive_rank || "").trim() || null,
       nature_of_concern: String(item?.nature_of_concern || "").trim() || null,
       classification_coding: String(item?.classification_coding || "").trim() || null,
+
+      created_by: String(state.me.id),
+      updated_by: String(state.me.id),
 
       updated_at: nowIso(),
     };
@@ -884,7 +903,7 @@ async function init() {
   window.AUTH.fillUserBadge(state.me, "userBadge");
   el("logoutBtn").addEventListener("click", window.AUTH.logoutAndGoLogin);
 
-  try { el("buildPill").textContent = "build: post_inspection_category_fix_2026-02-27"; } catch {}
+  try { el("buildPill").textContent = "build: post_inspection_audit_fields_fix_2026-03-01"; } catch {}
 
   setSaveStatus("Loading…");
 
