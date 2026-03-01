@@ -2,9 +2,8 @@ import { loadLockedLibraryJson } from "./question_library_loader.js";
 
 /**
  * HARD BUILD STAMP (you can see it on the UI + console)
- * Change this string every time you replace this file.
  */
-const POST_INSPECTION_BUILD = "post_inspection_ui_category_filter_build_2026-03-01_v4_fix_largely_display";
+const POST_INSPECTION_BUILD = "post_inspection_ui_category_filter_build_2026-03-01_v5_fix_largely_save";
 
 /**
  * Locked library JSON
@@ -141,21 +140,17 @@ function findLibraryQno(qbase) {
   const raw = String(qbase || "").trim();
   if (!raw) return null;
 
-  // 1) direct hits
   if (state.libByNo.has(raw)) return raw;
 
-  // 2) padded/unpadded variants
   const padded = normalizeQnoParts(raw, true);
   if (state.libByNo.has(padded)) return padded;
 
   const nonPadded = normalizeQnoParts(raw, false);
   if (state.libByNo.has(nonPadded)) return nonPadded;
 
-  // 3) canonical map
   const canon = canonicalQno(raw);
   if (canon && state.libCanonToExact.has(canon)) return state.libCanonToExact.get(canon);
 
-  // 4) fallbacks
   const canonP = canonicalQno(padded);
   if (canonP && state.libCanonToExact.has(canonP)) return state.libCanonToExact.get(canonP);
 
@@ -533,10 +528,12 @@ async function saveObsDialog() {
     item.kind === "positive" ? "positive_observation" :
     "note_improvement";
 
+  // IMPORTANT FIX: obs_type should be ONLY "positive" or "negative" (or null).
+  // We store largely as expected as obs_type = null.
   const obs_type =
     item.kind === "negative" ? "negative" :
     item.kind === "positive" ? "positive" :
-    "largely";
+    null;
 
   const row = {
     report_id: state.activeReport.id,
@@ -832,7 +829,6 @@ async function importReportPdfAiFromFile(file) {
         continue;
       }
 
-      // MAIN FIX: do NOT skip if not in locked library
       const qnoExact = findLibraryQno(qbaseRaw);
       const qnoToUse = qnoExact || qcanon;
 
@@ -848,10 +844,11 @@ async function importReportPdfAiFromFile(file) {
         kind === "positive" ? "positive_observation" :
         "note_improvement";
 
+      // IMPORTANT FIX: do NOT store obs_type="largely"
       const obs_type =
         kind === "negative" ? "negative" :
         kind === "positive" ? "positive" :
-        "largely";
+        null;
 
       const row = {
         report_id: report.id,
@@ -891,7 +888,7 @@ async function importReportPdfAiFromFile(file) {
   console.log("[Post-Inspection] BUILD:", POST_INSPECTION_BUILD);
   console.log("[Post-Inspection] Edge function_version:", functionVersion);
   if (libraryMissing.length) console.warn("[Post-Inspection] Library-missing items (still saved):", libraryMissing);
-  if (errors.length) console.warn("[Post-Inspection] Save errors:", errors);
+  if (errors.length) console.error("[Post-Inspection] Save errors (FULL):", errors);
 }
 
 // -------------------------
@@ -961,9 +958,6 @@ async function init() {
   state.vessels = await loadVessels();
   renderVesselsSelect();
 
-  // Load locked library + build BOTH indexes:
-  //  - exact key map
-  //  - canonical -> exact key map
   state.lib = await loadLockedLibraryJson(LOCKED_LIBRARY_JSON);
   state.libByNo = new Map();
   state.libCanonToExact = new Map();
