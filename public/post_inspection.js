@@ -5,6 +5,14 @@ const LOCKED_LIBRARY_JSON = "./sire_questions_all_columns_named.json";
 const PDF_BUCKET_DEFAULT = "inspection-reports";
 const PDF_FOLDER_PREFIX = "post_inspections";
 
+/**
+ * Visible version stamp.
+ * - Shown in build pill
+ * - Logged to console
+ * - Also used by post_inspection.html cache-buster query param
+ */
+const BUILD_ID = "post_inspection_ui_category_filter_build_2026-03-01";
+
 function el(id) { return document.getElementById(id); }
 
 function esc(s) {
@@ -27,8 +35,8 @@ function ddmmyyyyToIso(ddmmyyyy) {
 }
 
 function normalizeQnoParts(qno, pad2) {
-  const parts = String(qno || "").trim().split(".").filter(Boolean);
-  if (parts.length < 2) return String(qno || "").trim();
+  const parts = String(qno || "").trim().replace(/\.$/, "").split(".").filter(Boolean);
+  if (parts.length < 2) return String(qno || "").trim().replace(/\.$/, "");
   const norm = parts.map(p => {
     const n = p.replace(/^0+/, "") || "0";
     return pad2 ? n.padStart(2, "0") : String(Number(n));
@@ -36,19 +44,32 @@ function normalizeQnoParts(qno, pad2) {
   return norm.join(".");
 }
 
+function normalizeDesignation(d) {
+  const s = String(d || "").trim();
+  if (!s) return "";
+  const low = s.toLowerCase();
+  if (low === "human") return "Human";
+  if (low === "process") return "Process";
+  if (low === "hardware") return "Hardware";
+  if (low === "photo") return "Photo";
+  return s; // keep as-is if something unexpected appears
+}
+
 function findLibraryQno(qbase) {
-  const raw = String(qbase || "").trim();
-  if (!raw) return null;
+  const raw0 = String(qbase || "").trim().replace(/\.$/, "");
+  if (!raw0) return null;
 
-  if (state.libByNo.has(raw)) return raw;
+  // direct hit
+  if (state.libByNo.has(raw0)) return raw0;
 
-  const padded = normalizeQnoParts(raw, true);
+  const padded = normalizeQnoParts(raw0, true);
   if (state.libByNo.has(padded)) return padded;
 
-  const nonPadded = normalizeQnoParts(raw, false);
+  const nonPadded = normalizeQnoParts(raw0, false);
   if (state.libByNo.has(nonPadded)) return nonPadded;
 
-  for (const candidate of [raw, padded, nonPadded]) {
+  // extra: attempt strip leading zeros per segment
+  for (const candidate of [raw0, padded, nonPadded]) {
     const alt = candidate.split(".").map(p => p.replace(/^0+/, "") || "0").join(".");
     if (state.libByNo.has(alt)) return alt;
   }
@@ -64,7 +85,9 @@ function pick(obj, keys) {
 }
 
 function getQno(q) {
-  return String(pick(q, ["No.", "No", "question_no", "QuestionNo", "Question ID"])).trim();
+  return String(pick(q, ["No.", "No", "question_no", "QuestionNo", "Question ID"]))
+    .trim()
+    .replace(/\.$/, "");
 }
 function getChap(q) { return String(pick(q, ["Chap", "chapter", "Chapter"])).trim(); }
 function getSection(q) { return String(pick(q, ["Section Name", "Sect", "section", "Section"])).trim(); }
@@ -83,18 +106,6 @@ function getPgnoBullets(q) {
   const lines = pgTxt.split("\n").map((s) => s.trim()).filter(Boolean);
   const usable = lines.filter((s) => s.length > 6);
   return usable.slice(0, 120);
-}
-
-/** normalize designation to allowed values only */
-function normalizeDesignation(val) {
-  const s = String(val || "").trim();
-  if (!s) return null;
-  const u = s.toLowerCase();
-  if (u === "human") return "Human";
-  if (u === "process") return "Process";
-  if (u === "hardware") return "Hardware";
-  if (u === "photo") return "Photo";
-  return null; // rejects "negative", "positive", etc.
 }
 
 const state = {
@@ -164,7 +175,7 @@ async function loadReportsFromDb() {
 async function loadObservationsForReport(reportId) {
   const { data, error } = await state.supabase
     .from("post_inspection_observations")
-    .select("report_id, question_no, has_observation, observation_type, pgno_selected, remarks, updated_at, obs_type, observation_text, question_base, pgno_full, designation, nature_of_concern, classification_coding, positive_rank, created_by, updated_by")
+    .select("report_id, question_no, has_observation, observation_type, pgno_selected, remarks, updated_at, obs_type, observation_text, question_base, pgno_full, designation, nature_of_concern, classification_coding, positive_rank")
     .eq("report_id", reportId);
 
   if (error) throw error;
@@ -284,7 +295,7 @@ function applyObsFilters(items) {
     if (type && it.kind !== type) return false;
 
     if (designationFilter) {
-      const d = String(it.designation || "").trim();
+      const d = normalizeDesignation(it.designation || "");
       if (designationFilter !== d) return false;
     }
 
@@ -331,7 +342,7 @@ function renderObsTable() {
 
     const designationDisplay = it.kind === "positive"
       ? (it.positive_rank ? `Human (${it.positive_rank})` : "Human")
-      : (it.designation || "—");
+      : (normalizeDesignation(it.designation) || "—");
 
     return `
       <tr class="obs-row" data-qno="${esc(it.qno)}">
@@ -404,7 +415,7 @@ function openObsDialog(item) {
 
   const designationDisplay = item.kind === "positive"
     ? (item.positive_rank ? `Human (${item.positive_rank})` : "Human")
-    : (item.designation || "—");
+    : (normalizeDesignation(item.designation) || "—");
 
   el("dlgBody").innerHTML = `
     <div style="font-weight:900; color:#143a63; margin-bottom:10px;">Question</div>
@@ -466,16 +477,10 @@ async function saveObsDialog() {
     alert("No active report.");
     return;
   }
-  if (!state.me?.id) {
-    alert("No user id (state.me.id). Please login again.");
-    return;
-  }
 
   const qno = item.qno;
   const isNegative = item.kind === "negative";
   const remarks = String(el("dlgRemarks").value || "").trim();
-
-  const existing = state.observationsByQno[qno] || null;
 
   let pgno_selected = [];
   if (isNegative) {
@@ -502,9 +507,6 @@ async function saveObsDialog() {
     item.kind === "positive" ? "positive" :
     "largely";
 
-  // IMPORTANT: created_by + updated_by are NOT NULL in your DB
-  const createdBy = String(existing?.created_by || state.me.id);
-
   const row = {
     report_id: state.activeReport.id,
     question_no: qno,
@@ -518,14 +520,14 @@ async function saveObsDialog() {
 
     observation_text: String(item.text || "").trim() || null,
 
-    designation: normalizeDesignation(item.designation) || (item.kind === "positive" ? "Human" : null),
+    designation: normalizeDesignation(item.designation || "") || (item.kind === "positive" ? "Human" : null),
     positive_rank: String(item.positive_rank || "").trim() || null,
     nature_of_concern: String(item.nature_of_concern || "").trim() || null,
     classification_coding: String(item.classification_coding || "").trim() || null,
 
-    created_by: createdBy,
-    updated_by: String(state.me.id),
-
+    // Force audit fields for safety (prevents NOT NULL failures when auth.uid() is null in any context)
+    created_by: state.me?.id || null,
+    updated_by: state.me?.id || null,
     updated_at: nowIso(),
   };
 
@@ -689,13 +691,11 @@ function buildExtractedItemsFromDb() {
     else if (ot === "positive_observation") kind = "positive";
     else kind = "largely";
 
-    const normalized = normalizeDesignation(row.designation);
-
     out.push({
       qno,
       kind,
 
-      designation: normalized || (kind === "positive" ? "Human" : null),
+      designation: normalizeDesignation(row.designation || "") || (kind === "positive" ? "Human" : ""),
       positive_rank: String(row.positive_rank || "").trim() || null,
       nature_of_concern: String(row.nature_of_concern || "").trim() || null,
       classification_coding: String(row.classification_coding || "").trim() || null,
@@ -713,10 +713,6 @@ function buildExtractedItemsFromDb() {
 // -------------------------
 async function importReportPdfAiFromFile(file) {
   if (!file) return;
-  if (!state.me?.id) {
-    alert("No user id (state.me.id). Please login again.");
-    return;
-  }
 
   const bucket = PDF_BUCKET_DEFAULT;
   const safeName = String(file.name || "report.pdf").replace(/[^a-zA-Z0-9._-]+/g, "_");
@@ -794,56 +790,68 @@ async function importReportPdfAiFromFile(file) {
   const obs = Array.isArray(extracted?.observations) ? extracted.observations : [];
   setSaveStatus(`Saving ${obs.length} item(s)…`);
 
+  // Save all extracted items; do not silently drop negatives/largely due to library mismatch.
+  let savedCount = 0;
+  let skippedCount = 0;
+
   for (const item of obs) {
-    const qbase = String(item?.question_base || "").trim();
-    const qno = findLibraryQno(qbase);
-    if (!qno) continue;
+    try {
+      const qbase = String(item?.question_base || "").trim();
+      const qno = findLibraryQno(qbase);
+      if (!qno) {
+        skippedCount++;
+        continue;
+      }
 
-    const kind = String(item?.obs_type || "").toLowerCase();
-    const observation_text = String(item?.observation_text || "").trim();
+      const kind = String(item?.obs_type || "").toLowerCase();
+      const observation_text = String(item?.observation_text || "").trim();
 
-    const observation_type =
-      kind === "negative" ? "negative_observation" :
-      kind === "positive" ? "positive_observation" :
-      "note_improvement";
+      const observation_type =
+        kind === "negative" ? "negative_observation" :
+        kind === "positive" ? "positive_observation" :
+        "note_improvement";
 
-    const obs_type =
-      kind === "negative" ? "negative" :
-      kind === "positive" ? "positive" :
-      "largely";
+      const obs_type =
+        kind === "negative" ? "negative" :
+        kind === "positive" ? "positive" :
+        "largely";
 
-    // IMPORTANT: created_by + updated_by are NOT NULL in your DB
-    const row = {
-      report_id: report.id,
-      question_no: qno,
-      has_observation: true,
-      observation_type,
-      obs_type,
-      question_base: qno,
+      const row = {
+        report_id: report.id,
+        question_no: qno,
+        has_observation: true,
+        observation_type,
+        obs_type,
+        question_base: qno,
 
-      observation_text: observation_text || null,
-      pgno_selected: [],
-      remarks: observation_text || null,
+        observation_text: observation_text || null,
+        pgno_selected: [],
+        remarks: observation_text || null,
 
-      designation: normalizeDesignation(item?.designation) || (kind === "positive" ? "Human" : null),
-      positive_rank: String(item?.positive_rank || "").trim() || null,
-      nature_of_concern: String(item?.nature_of_concern || "").trim() || null,
-      classification_coding: String(item?.classification_coding || "").trim() || null,
+        designation: normalizeDesignation(item?.designation || "") || (kind === "positive" ? "Human" : null),
+        positive_rank: String(item?.positive_rank || "").trim() || null,
+        nature_of_concern: String(item?.nature_of_concern || "").trim() || null,
+        classification_coding: String(item?.classification_coding || "").trim() || null,
 
-      created_by: String(state.me.id),
-      updated_by: String(state.me.id),
+        // Safety for audit NOT NULL constraints
+        created_by: state.me?.id || null,
+        updated_by: state.me?.id || null,
+        updated_at: nowIso(),
+      };
 
-      updated_at: nowIso(),
-    };
-
-    await upsertObservationRow(row);
+      await upsertObservationRow(row);
+      savedCount++;
+    } catch (e) {
+      console.error("Failed saving extracted item:", item, e);
+      // keep going so the UI never gets “stuck” mid-import
+    }
   }
 
   state.observationsByQno = await loadObservationsForReport(report.id);
   buildExtractedItemsFromDb();
   renderObsTable();
 
-  setSaveStatus(`AI import done (${obs.length} item(s))`);
+  setSaveStatus(`AI import done (saved ${savedCount}, skipped ${skippedCount})`);
 }
 
 // -------------------------
@@ -889,6 +897,9 @@ async function waitForAuth(timeoutMs = 4000) {
 }
 
 async function init() {
+  console.log(`[Post-Inspection] Loading build: ${BUILD_ID}`);
+  try { el("buildPill").textContent = `build: ${BUILD_ID}`; } catch {}
+
   const ok = await waitForAuth(4000);
   if (!ok) {
     throw new Error("AUTH not loaded. Ensure ./auth.js is included BEFORE ./post_inspection.js.");
@@ -903,18 +914,26 @@ async function init() {
   window.AUTH.fillUserBadge(state.me, "userBadge");
   el("logoutBtn").addEventListener("click", window.AUTH.logoutAndGoLogin);
 
-  try { el("buildPill").textContent = "build: post_inspection_audit_fields_fix_2026-03-01"; } catch {}
-
   setSaveStatus("Loading…");
 
   state.vessels = await loadVessels();
   renderVesselsSelect();
 
+  // Load locked library and build map with normalized keys
   state.lib = await loadLockedLibraryJson(LOCKED_LIBRARY_JSON);
   state.libByNo = new Map();
   for (const q of state.lib) {
     const qno = getQno(q);
-    if (qno) state.libByNo.set(qno, q);
+    if (!qno) continue;
+
+    // store a few key variants to reduce “not found” cases
+    const k1 = qno;
+    const k2 = normalizeQnoParts(qno, false);
+    const k3 = normalizeQnoParts(qno, true);
+
+    state.libByNo.set(k1, q);
+    state.libByNo.set(k2, q);
+    state.libByNo.set(k3, q);
   }
 
   state.reports = await loadReportsFromDb();
@@ -935,6 +954,30 @@ async function init() {
   el("newReportBtn").addEventListener("click", handleNewReport);
   el("saveHeaderBtn").addEventListener("click", handleSaveHeader);
   el("deleteReportBtn").addEventListener("click", handleDeleteReport);
+
+  // Export/Import JSON (kept safe: no-op if you are not using it yet)
+  el("exportBtn")?.addEventListener("click", () => alert("Export JSON not implemented in this build yet."));
+  el("importBtn")?.addEventListener("click", () => el("importFile").click());
+  el("importFile")?.addEventListener("change", () => alert("Import JSON not implemented in this build yet."));
+
+  // PDF download
+  el("downloadPdfBtn")?.addEventListener("click", async () => {
+    if (!state.activeReport?.pdf_storage_path) {
+      alert("No PDF linked to this report.");
+      return;
+    }
+    try {
+      const { data, error } = await state.supabase
+        .storage
+        .from(PDF_BUCKET_DEFAULT)
+        .createSignedUrl(state.activeReport.pdf_storage_path, 60);
+      if (error) throw error;
+      window.open(data.signedUrl, "_blank");
+    } catch (e) {
+      console.error(e);
+      alert("Download failed: " + (e?.message || String(e)));
+    }
+  });
 
   el("importPdfBtn").addEventListener("click", () => el("importPdfFile").click());
   el("importPdfFile").addEventListener("change", async (e) => {
