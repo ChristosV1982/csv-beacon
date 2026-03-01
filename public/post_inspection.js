@@ -1,10 +1,10 @@
 import { loadLockedLibraryJson } from "./question_library_loader.js";
 
 /**
- * HARD BUILD STAMP (so you always know what is loaded)
+ * HARD BUILD STAMP (you can see it on the UI + console)
  * Change this string every time you replace this file.
  */
-const POST_INSPECTION_BUILD = "post_inspection_ui_category_filter_build_2026-03-01_v3_fix_largely_skipped";
+const POST_INSPECTION_BUILD = "post_inspection_ui_category_filter_build_2026-03-01_v4_fix_largely_display";
 
 /**
  * Locked library JSON
@@ -151,11 +151,11 @@ function findLibraryQno(qbase) {
   const nonPadded = normalizeQnoParts(raw, false);
   if (state.libByNo.has(nonPadded)) return nonPadded;
 
-  // 3) canonical map (MAIN FIX)
+  // 3) canonical map
   const canon = canonicalQno(raw);
   if (canon && state.libCanonToExact.has(canon)) return state.libCanonToExact.get(canon);
 
-  // 4) as a final fallback, try canonical of padded/nonpadded
+  // 4) fallbacks
   const canonP = canonicalQno(padded);
   if (canonP && state.libCanonToExact.has(canonP)) return state.libCanonToExact.get(canonP);
 
@@ -325,7 +325,7 @@ function applyObsFilters(items) {
     if (type && it.kind !== type) return false;
 
     if (designationFilter) {
-      const d = String(it.designation || "").trim();
+      const d = normDesignation(it.designation);
       if (designationFilter !== d) return false;
     }
 
@@ -372,7 +372,7 @@ function renderObsTable() {
 
     const designationDisplay = it.kind === "positive"
       ? (it.positive_rank ? `Human (${it.positive_rank})` : "Human")
-      : (it.designation || "—");
+      : (normDesignation(it.designation) || "—");
 
     return `
       <tr class="obs-row" data-qno="${esc(it.qno)}">
@@ -406,7 +406,7 @@ function openObsDialog(item) {
 
   const q = state.libByNo.get(item.qno);
   const shortText = q ? getShort(q) : "";
-  const qText = q ? getQText(q) : "";
+  const qText = q ? getQText(q) : "(Question text not found in locked library JSON for this question.)";
   const chap = q ? getChap(q) : "";
   const sect = q ? getSection(q) : "";
 
@@ -445,7 +445,7 @@ function openObsDialog(item) {
 
   const designationDisplay = item.kind === "positive"
     ? (item.positive_rank ? `Human (${item.positive_rank})` : "Human")
-    : (item.designation || "—");
+    : (normDesignation(item.designation) || "—");
 
   el("dlgBody").innerHTML = `
     <div style="font-weight:900; color:#143a63; margin-bottom:10px;">Question</div>
@@ -817,18 +817,27 @@ async function importReportPdfAiFromFile(file) {
   el("pdfStatus").textContent = `Stored: ${tempPath.split("/").pop()}`;
 
   const obs = Array.isArray(extracted?.observations) ? extracted.observations : [];
-  const skipped = [];
+  const libraryMissing = [];
+  const errors = [];
   let savedCount = 0;
 
   setSaveStatus(`Saving ${obs.length} item(s)…`);
 
   for (const item of obs) {
     try {
-      const qbase = String(item?.question_base || "").trim();
-      const qno = findLibraryQno(qbase);
-      if (!qno) {
-        skipped.push({ qbase, reason: `Question not found in locked library JSON (canon=${canonicalQno(qbase)})` });
+      const qbaseRaw = String(item?.question_base || "").trim();
+      const qcanon = canonicalQno(qbaseRaw) || qbaseRaw || "";
+      if (!qcanon) {
+        errors.push({ qbase: qbaseRaw, reason: "Missing question_base from extractor" });
         continue;
+      }
+
+      // MAIN FIX: do NOT skip if not in locked library
+      const qnoExact = findLibraryQno(qbaseRaw);
+      const qnoToUse = qnoExact || qcanon;
+
+      if (!qnoExact) {
+        libraryMissing.push({ qbase: qbaseRaw, used: qnoToUse });
       }
 
       const kind = String(item?.obs_type || "").toLowerCase();
@@ -846,11 +855,11 @@ async function importReportPdfAiFromFile(file) {
 
       const row = {
         report_id: report.id,
-        question_no: qno,
+        question_no: qnoToUse,
         has_observation: true,
         observation_type,
         obs_type,
-        question_base: qno,
+        question_base: qcanon,
 
         observation_text: observation_text || null,
         pgno_selected: [],
@@ -867,7 +876,7 @@ async function importReportPdfAiFromFile(file) {
       await upsertObservationRow(row);
       savedCount++;
     } catch (e) {
-      skipped.push({ qbase: String(item?.question_base || ""), reason: (e?.message || String(e)) });
+      errors.push({ qbase: String(item?.question_base || ""), reason: (e?.message || String(e)) });
     }
   }
 
@@ -875,12 +884,14 @@ async function importReportPdfAiFromFile(file) {
   buildExtractedItemsFromDb();
   renderObsTable();
 
-  const skipTxt = skipped.length ? `, skipped ${skipped.length}` : ", skipped 0";
-  setSaveStatus(`AI import done (saved ${savedCount}${skipTxt})`);
+  const libTxt = libraryMissing.length ? `, library-missing ${libraryMissing.length}` : ", library-missing 0";
+  const errTxt = errors.length ? `, errors ${errors.length}` : ", errors 0";
+  setSaveStatus(`AI import done (saved ${savedCount}${libTxt}${errTxt})`);
 
   console.log("[Post-Inspection] BUILD:", POST_INSPECTION_BUILD);
   console.log("[Post-Inspection] Edge function_version:", functionVersion);
-  if (skipped.length) console.warn("[Post-Inspection] Skipped items:", skipped);
+  if (libraryMissing.length) console.warn("[Post-Inspection] Library-missing items (still saved):", libraryMissing);
+  if (errors.length) console.warn("[Post-Inspection] Save errors:", errors);
 }
 
 // -------------------------
@@ -952,7 +963,7 @@ async function init() {
 
   // Load locked library + build BOTH indexes:
   //  - exact key map
-  //  - canonical -> exact key map (MAIN FIX)
+  //  - canonical -> exact key map
   state.lib = await loadLockedLibraryJson(LOCKED_LIBRARY_JSON);
   state.libByNo = new Map();
   state.libCanonToExact = new Map();
