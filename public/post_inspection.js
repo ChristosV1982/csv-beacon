@@ -1,18 +1,8 @@
 import { loadLockedLibraryJson } from "./question_library_loader.js";
 
-/**
- * HARD BUILD STAMP (you can see it on the UI + console)
- */
-const POST_INSPECTION_BUILD = "post_inspection_ui_category_filter_build_2026-03-01_v5_fix_largely_save";
-
-/**
- * Locked library JSON
- */
+const POST_INSPECTION_BUILD = "post_inspection_ui_category_filter_build_2026-03-01_v6_view_pgno_text_manual_add";
 const LOCKED_LIBRARY_JSON = "./sire_questions_all_columns_named.json";
 
-/**
- * Storage
- */
 const PDF_BUCKET_DEFAULT = "inspection-reports";
 const PDF_FOLDER_PREFIX = "post_inspections";
 
@@ -47,13 +37,6 @@ function normalizeQnoParts(qno, pad2) {
   return norm.join(".");
 }
 
-/**
- * Canonicalize a qno by stripping leading zeros per segment and joining as numbers.
- * Examples:
- *  - "04.03.02" -> "4.3.2"
- *  - "4.03.02"  -> "4.3.2"
- *  - "4.3.2"    -> "4.3.2"
- */
 function canonicalQno(qno) {
   const parts = String(qno || "").trim().split(".").filter(Boolean);
   if (!parts.length) return "";
@@ -110,8 +93,8 @@ const state = {
 
   vessels: [],
   lib: [],
-  libByNo: new Map(),          // exact key -> question object
-  libCanonToExact: new Map(),  // canonical -> exact key (first match)
+  libByNo: new Map(),
+  libCanonToExact: new Map(),
 
   reports: [],
   activeReport: null,
@@ -122,6 +105,9 @@ const state = {
   dialogItem: null,
 };
 
+// -------------------------
+// UI helpers
+// -------------------------
 function setSaveStatus(text) { el("saveStatus").textContent = text || "Not saved"; }
 function setActivePill(text) { el("activeReportPill").textContent = text || "No active report"; }
 
@@ -132,10 +118,6 @@ function reportLabel(r) {
   return `${v} | ${d}${ref}`;
 }
 
-/**
- * Find qno in library, robust to leading zeros and variants.
- * Returns the *exact key* used in state.libByNo.
- */
 function findLibraryQno(qbase) {
   const raw = String(qbase || "").trim();
   if (!raw) return null;
@@ -282,7 +264,7 @@ function loadReportIntoHeader(r) {
 }
 
 // -------------------------
-// Rendering: extracted items table
+// Rendering
 // -------------------------
 function obsRowTypeLabel(item) {
   if (item.kind === "negative") return `<span class="obs-badge neg">Negative</span>`;
@@ -334,13 +316,22 @@ function applyObsFilters(items) {
         it.positive_rank || "",
         it.nature_of_concern || "",
         it.classification_coding || "",
-        it.text || ""
+        it.text || "",
+        it.pgno_texts || ""
       ].join(" ").toLowerCase();
       if (!hay.includes(term)) return false;
     }
 
     return true;
   });
+}
+
+function formatPgnoSelectedText(qno) {
+  const row = state.observationsByQno[qno];
+  const arr = Array.isArray(row?.pgno_selected) ? row.pgno_selected : [];
+  if (!arr.length) return "";
+  const texts = arr.map(x => String(x?.text || "").trim()).filter(Boolean);
+  return texts.join("; ");
 }
 
 function renderObsTable() {
@@ -361,9 +352,13 @@ function renderObsTable() {
 
   body.innerHTML = items.map(it => {
     const pg = state.observationsByQno[it.qno]?.pgno_selected || [];
-    const pgTxt = (Array.isArray(pg) && pg.length)
-      ? `PGNO ${pg.map(x => x.idx).join(", ")}`
-      : (it.kind === "negative" ? `<span class="muted">—</span>` : `<span class="muted">n/a</span>`);
+    let pgTxt = "";
+    if (it.kind === "negative") {
+      const txt = formatPgnoSelectedText(it.qno);
+      pgTxt = txt ? esc(txt) : `<span class="muted">—</span>`;
+    } else {
+      pgTxt = `<span class="muted">n/a</span>`;
+    }
 
     const designationDisplay = it.kind === "positive"
       ? (it.positive_rank ? `Human (${it.positive_rank})` : "Human")
@@ -371,13 +366,13 @@ function renderObsTable() {
 
     return `
       <tr class="obs-row" data-qno="${esc(it.qno)}">
-        <td><b>${esc(it.qno)}</b></td>
-        <td>${obsRowTypeLabel(it)}</td>
-        <td class="muted">${esc(designationDisplay)}</td>
-        <td>${esc(it.nature_of_concern || "")}</td>
-        <td class="muted">${esc(it.classification_coding || "")}</td>
-        <td>${esc(it.text || "")}</td>
-        <td>${pgTxt}</td>
+        <td class="td-nowrap">${esc(it.qno)}</td>
+        <td class="td-nowrap">${obsRowTypeLabel(it)}</td>
+        <td class="td-wrap muted">${esc(designationDisplay)}</td>
+        <td class="td-wrap">${esc(it.nature_of_concern || "")}</td>
+        <td class="td-wrap muted">${esc(it.classification_coding || "")}</td>
+        <td class="td-obs-text">${esc(it.text || "")}</td>
+        <td class="td-pgno">${pgTxt}</td>
       </tr>
     `;
   }).join("");
@@ -505,7 +500,6 @@ async function saveObsDialog() {
 
   const qno = item.qno;
   const isNegative = item.kind === "negative";
-
   const remarks = String(el("dlgRemarks").value || "").trim();
 
   let pgno_selected = [];
@@ -528,8 +522,6 @@ async function saveObsDialog() {
     item.kind === "positive" ? "positive_observation" :
     "note_improvement";
 
-  // IMPORTANT FIX: obs_type should be ONLY "positive" or "negative" (or null).
-  // We store largely as expected as obs_type = null.
   const obs_type =
     item.kind === "negative" ? "negative" :
     item.kind === "positive" ? "positive" :
@@ -567,6 +559,135 @@ async function saveObsDialog() {
   } catch (e) {
     console.error(e);
     alert("Save failed: " + (e?.message || String(e)));
+    setSaveStatus("Error");
+  }
+}
+
+// -------------------------
+// Manual add
+// -------------------------
+function showManualDialog() {
+  if (!state.activeReport) {
+    alert("No active report. Please select / create a report first.");
+    return;
+  }
+
+  el("manQno").value = "";
+  el("manType").value = "negative";
+  el("manDesignation").value = "Human";
+  el("manPositiveRank").value = "";
+  el("manNature").value = "Not as expected.";
+  el("manCoding").value = "";
+  el("manText").value = "";
+  el("manPgnoWrap").style.display = "block";
+  el("manPgnoList").innerHTML = `<div class="muted">Select a question number to load PGNO bullets.</div>`;
+
+  el("manualDialog").showModal();
+}
+
+function closeManualDialog() {
+  try { el("manualDialog").close(); } catch {}
+}
+
+function renderManualPgnoList(qnoExact) {
+  const q = state.libByNo.get(qnoExact);
+  const bullets = q ? getPgnoBullets(q) : [];
+  if (!bullets.length) {
+    el("manPgnoList").innerHTML = `<div class="muted">No PGNO bullets found in locked library JSON for this question.</div>`;
+    return;
+  }
+
+  el("manPgnoList").innerHTML = bullets.map((txt, i) => {
+    const idx = i + 1;
+    return `
+      <div class="pgnoRow">
+        <input type="checkbox" class="manPgChk" data-idx="${idx}" />
+        <div style="font-weight:950; color:#143a63;">PGNO ${idx}</div>
+        <div style="font-weight:850; color:#0c1b2a;">${esc(txt)}</div>
+      </div>
+    `;
+  }).join("");
+}
+
+async function createManualObservation() {
+  if (!state.activeReport) return;
+
+  const qRaw = String(el("manQno").value || "").trim();
+  if (!qRaw) { alert("Please enter a question number."); return; }
+
+  const qnoExact = findLibraryQno(qRaw);
+  const qnoToUse = qnoExact || canonicalQno(qRaw) || qRaw;
+
+  const kind = String(el("manType").value || "negative").trim();
+  const designation = normDesignation(String(el("manDesignation").value || "").trim());
+  const positive_rank = String(el("manPositiveRank").value || "").trim() || null;
+
+  let nature = String(el("manNature").value || "").trim();
+  if (!nature) {
+    nature = kind === "positive" ? "Exceeded normal expectation."
+      : kind === "largely" ? "Largely as expected."
+      : "Not as expected.";
+  }
+
+  const coding = String(el("manCoding").value || "").trim() || null;
+  const text = String(el("manText").value || "").trim() || null;
+
+  let pgno_selected = [];
+  if (kind === "negative") {
+    const list = el("manPgnoList").querySelectorAll(".manPgChk");
+    list.forEach(chk => {
+      if (chk.checked) {
+        const idx = Number(chk.getAttribute("data-idx"));
+        if (!Number.isFinite(idx)) return;
+        const q = qnoExact ? state.libByNo.get(qnoExact) : null;
+        const bullets = q ? getPgnoBullets(q) : [];
+        const txt = bullets[idx - 1] || "";
+        pgno_selected.push({ idx, text: String(txt || "").trim() });
+      }
+    });
+  }
+
+  const observation_type =
+    kind === "negative" ? "negative_observation" :
+    kind === "positive" ? "positive_observation" :
+    "note_improvement";
+
+  const obs_type =
+    kind === "negative" ? "negative" :
+    kind === "positive" ? "positive" :
+    null;
+
+  const row = {
+    report_id: state.activeReport.id,
+    question_no: qnoToUse,
+    has_observation: true,
+    observation_type,
+    obs_type,
+    question_base: canonicalQno(qnoToUse) || qnoToUse,
+
+    observation_text: text,
+    pgno_selected,
+    remarks: text,
+
+    designation: kind === "positive" ? "Human" : (designation || null),
+    positive_rank: kind === "positive" ? positive_rank : null,
+    nature_of_concern: nature,
+    classification_coding: coding,
+
+    updated_at: nowIso(),
+  };
+
+  setSaveStatus("Creating…");
+  try {
+    await upsertObservationRow(row);
+    state.observationsByQno = await loadObservationsForReport(state.activeReport.id);
+    buildExtractedItemsFromDb();
+    renderObsTable();
+    setSaveStatus("Created");
+    closeManualDialog();
+  } catch (e) {
+    console.error(e);
+    alert("Create failed: " + (e?.message || String(e)));
     setSaveStatus("Error");
   }
 }
@@ -719,13 +840,12 @@ function buildExtractedItemsFromDb() {
     out.push({
       qno,
       kind,
-
       designation: normDesignation(row.designation) || (kind === "positive" ? "Human" : ""),
       positive_rank: String(row.positive_rank || "").trim() || null,
       nature_of_concern: String(row.nature_of_concern || "").trim() || null,
       classification_coding: String(row.classification_coding || "").trim() || null,
-
       text: String(row.observation_text || "").trim(),
+      pgno_texts: formatPgnoSelectedText(qno)
     });
   }
 
@@ -759,7 +879,6 @@ async function importReportPdfAiFromFile(file) {
 
   const extracted = data.extracted;
   const h = extracted?.header || {};
-  const functionVersion = String(data?.function_version || "").trim();
 
   const extractedVesselName = String(h.vessel_name || "").trim();
   const vesselHit = extractedVesselName
@@ -814,9 +933,9 @@ async function importReportPdfAiFromFile(file) {
   el("pdfStatus").textContent = `Stored: ${tempPath.split("/").pop()}`;
 
   const obs = Array.isArray(extracted?.observations) ? extracted.observations : [];
-  const libraryMissing = [];
-  const errors = [];
   let savedCount = 0;
+  let libMissing = 0;
+  let errors = 0;
 
   setSaveStatus(`Saving ${obs.length} item(s)…`);
 
@@ -824,17 +943,12 @@ async function importReportPdfAiFromFile(file) {
     try {
       const qbaseRaw = String(item?.question_base || "").trim();
       const qcanon = canonicalQno(qbaseRaw) || qbaseRaw || "";
-      if (!qcanon) {
-        errors.push({ qbase: qbaseRaw, reason: "Missing question_base from extractor" });
-        continue;
-      }
+      if (!qcanon) { errors++; continue; }
 
       const qnoExact = findLibraryQno(qbaseRaw);
       const qnoToUse = qnoExact || qcanon;
 
-      if (!qnoExact) {
-        libraryMissing.push({ qbase: qbaseRaw, used: qnoToUse });
-      }
+      if (!qnoExact) libMissing++;
 
       const kind = String(item?.obs_type || "").toLowerCase();
       const observation_text = String(item?.observation_text || "").trim();
@@ -844,7 +958,6 @@ async function importReportPdfAiFromFile(file) {
         kind === "positive" ? "positive_observation" :
         "note_improvement";
 
-      // IMPORTANT FIX: do NOT store obs_type="largely"
       const obs_type =
         kind === "negative" ? "negative" :
         kind === "positive" ? "positive" :
@@ -873,7 +986,8 @@ async function importReportPdfAiFromFile(file) {
       await upsertObservationRow(row);
       savedCount++;
     } catch (e) {
-      errors.push({ qbase: String(item?.question_base || ""), reason: (e?.message || String(e)) });
+      console.error("AI import save error:", e);
+      errors++;
     }
   }
 
@@ -881,14 +995,7 @@ async function importReportPdfAiFromFile(file) {
   buildExtractedItemsFromDb();
   renderObsTable();
 
-  const libTxt = libraryMissing.length ? `, library-missing ${libraryMissing.length}` : ", library-missing 0";
-  const errTxt = errors.length ? `, errors ${errors.length}` : ", errors 0";
-  setSaveStatus(`AI import done (saved ${savedCount}${libTxt}${errTxt})`);
-
-  console.log("[Post-Inspection] BUILD:", POST_INSPECTION_BUILD);
-  console.log("[Post-Inspection] Edge function_version:", functionVersion);
-  if (libraryMissing.length) console.warn("[Post-Inspection] Library-missing items (still saved):", libraryMissing);
-  if (errors.length) console.error("[Post-Inspection] Save errors (FULL):", errors);
+  setSaveStatus(`AI import done (saved ${savedCount}, library-missing ${libMissing}, errors ${errors})`);
 }
 
 // -------------------------
@@ -961,13 +1068,10 @@ async function init() {
   state.lib = await loadLockedLibraryJson(LOCKED_LIBRARY_JSON);
   state.libByNo = new Map();
   state.libCanonToExact = new Map();
-
   for (const q of state.lib) {
     const qno = getQno(q);
     if (!qno) continue;
-
     state.libByNo.set(qno, q);
-
     const canon = canonicalQno(qno);
     if (canon && !state.libCanonToExact.has(canon)) {
       state.libCanonToExact.set(canon, qno);
@@ -1017,6 +1121,37 @@ async function init() {
 
   el("dashboardBtn")?.addEventListener("click", () => { window.location.href = "dashboard.html"; });
   el("modeSelectBtn")?.addEventListener("click", () => { window.location.href = "mode_selection.html"; });
+
+  // Manual add wiring
+  el("manualAddBtn")?.addEventListener("click", showManualDialog);
+  el("manCancelBtn")?.addEventListener("click", closeManualDialog);
+  el("manCreateBtn")?.addEventListener("click", createManualObservation);
+
+  // Manual dialog dynamic PGNO section
+  el("manType")?.addEventListener("change", () => {
+    const kind = String(el("manType").value || "negative").trim();
+    el("manPgnoWrap").style.display = (kind === "negative") ? "block" : "none";
+    if (kind === "positive") {
+      el("manDesignation").value = "Human";
+      if (!String(el("manNature").value || "").trim()) el("manNature").value = "Exceeded normal expectation.";
+    }
+    if (kind === "largely") {
+      if (!String(el("manNature").value || "").trim()) el("manNature").value = "Largely as expected.";
+    }
+    if (kind === "negative") {
+      if (!String(el("manNature").value || "").trim()) el("manNature").value = "Not as expected.";
+    }
+  });
+
+  el("manQno")?.addEventListener("input", () => {
+    const qRaw = String(el("manQno").value || "").trim();
+    const qnoExact = findLibraryQno(qRaw);
+    if (!qnoExact) {
+      el("manPgnoList").innerHTML = `<div class="muted">Question not found in library yet. PGNO bullets require a library match.</div>`;
+      return;
+    }
+    renderManualPgnoList(qnoExact);
+  });
 
   if (state.reports.length) {
     await setActiveReportById(state.reports[0].id);
