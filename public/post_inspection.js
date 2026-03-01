@@ -4,10 +4,16 @@ import { loadLockedLibraryJson } from "./question_library_loader.js";
  * HARD BUILD STAMP (so you always know what is loaded)
  * Change this string every time you replace this file.
  */
-const POST_INSPECTION_BUILD = "post_inspection_ui_category_filter_build_2026-03-01_v2";
+const POST_INSPECTION_BUILD = "post_inspection_ui_category_filter_build_2026-03-01_v3_fix_largely_skipped";
 
+/**
+ * Locked library JSON
+ */
 const LOCKED_LIBRARY_JSON = "./sire_questions_all_columns_named.json";
 
+/**
+ * Storage
+ */
 const PDF_BUCKET_DEFAULT = "inspection-reports";
 const PDF_FOLDER_PREFIX = "post_inspections";
 
@@ -42,24 +48,21 @@ function normalizeQnoParts(qno, pad2) {
   return norm.join(".");
 }
 
-function findLibraryQno(qbase) {
-  const raw = String(qbase || "").trim();
-  if (!raw) return null;
-
-  if (state.libByNo.has(raw)) return raw;
-
-  const padded = normalizeQnoParts(raw, true);
-  if (state.libByNo.has(padded)) return padded;
-
-  const nonPadded = normalizeQnoParts(raw, false);
-  if (state.libByNo.has(nonPadded)) return nonPadded;
-
-  for (const candidate of [raw, padded, nonPadded]) {
-    const alt = candidate.split(".").map(p => p.replace(/^0+/, "") || "0").join(".");
-    if (state.libByNo.has(alt)) return alt;
-  }
-
-  return null;
+/**
+ * Canonicalize a qno by stripping leading zeros per segment and joining as numbers.
+ * Examples:
+ *  - "04.03.02" -> "4.3.2"
+ *  - "4.03.02"  -> "4.3.2"
+ *  - "4.3.2"    -> "4.3.2"
+ */
+function canonicalQno(qno) {
+  const parts = String(qno || "").trim().split(".").filter(Boolean);
+  if (!parts.length) return "";
+  const canon = parts.map(p => {
+    const n = String(p).replace(/^0+/, "") || "0";
+    return String(Number(n));
+  });
+  return canon.join(".");
 }
 
 function pick(obj, keys) {
@@ -99,7 +102,7 @@ function normDesignation(d) {
   if (low === "process") return "Process";
   if (low === "hardware") return "Hardware";
   if (low === "photo") return "Photo";
-  return s; // keep as-is if something new appears
+  return s;
 }
 
 const state = {
@@ -108,7 +111,8 @@ const state = {
 
   vessels: [],
   lib: [],
-  libByNo: new Map(),
+  libByNo: new Map(),          // exact key -> question object
+  libCanonToExact: new Map(),  // canonical -> exact key (first match)
 
   reports: [],
   activeReport: null,
@@ -127,6 +131,38 @@ function reportLabel(r) {
   const d = r.inspection_date || "No date";
   const ref = r.report_ref ? ` | ${r.report_ref}` : "";
   return `${v} | ${d}${ref}`;
+}
+
+/**
+ * Find qno in library, robust to leading zeros and variants.
+ * Returns the *exact key* used in state.libByNo.
+ */
+function findLibraryQno(qbase) {
+  const raw = String(qbase || "").trim();
+  if (!raw) return null;
+
+  // 1) direct hits
+  if (state.libByNo.has(raw)) return raw;
+
+  // 2) padded/unpadded variants
+  const padded = normalizeQnoParts(raw, true);
+  if (state.libByNo.has(padded)) return padded;
+
+  const nonPadded = normalizeQnoParts(raw, false);
+  if (state.libByNo.has(nonPadded)) return nonPadded;
+
+  // 3) canonical map (MAIN FIX)
+  const canon = canonicalQno(raw);
+  if (canon && state.libCanonToExact.has(canon)) return state.libCanonToExact.get(canon);
+
+  // 4) as a final fallback, try canonical of padded/nonpadded
+  const canonP = canonicalQno(padded);
+  if (canonP && state.libCanonToExact.has(canonP)) return state.libCanonToExact.get(canonP);
+
+  const canonN = canonicalQno(nonPadded);
+  if (canonN && state.libCanonToExact.has(canonN)) return state.libCanonToExact.get(canonN);
+
+  return null;
 }
 
 // -------------------------
@@ -791,7 +827,7 @@ async function importReportPdfAiFromFile(file) {
       const qbase = String(item?.question_base || "").trim();
       const qno = findLibraryQno(qbase);
       if (!qno) {
-        skipped.push({ qbase, reason: "Question not found in locked library JSON" });
+        skipped.push({ qbase, reason: `Question not found in locked library JSON (canon=${canonicalQno(qbase)})` });
         continue;
       }
 
@@ -890,7 +926,6 @@ async function waitForAuth(timeoutMs = 4000) {
 }
 
 async function init() {
-  // expose build stamp (for debugging)
   window.__POST_INSPECTION_BUILD = POST_INSPECTION_BUILD;
 
   const ok = await waitForAuth(4000);
@@ -907,9 +942,7 @@ async function init() {
   window.AUTH.fillUserBadge(state.me, "userBadge");
   el("logoutBtn").addEventListener("click", window.AUTH.logoutAndGoLogin);
 
-  // FORCE visible build stamp in UI
   el("buildPill").textContent = `build: ${POST_INSPECTION_BUILD}`;
-
   console.log("[Post-Inspection] Loaded build:", POST_INSPECTION_BUILD);
 
   setSaveStatus("Loading…");
@@ -917,11 +950,23 @@ async function init() {
   state.vessels = await loadVessels();
   renderVesselsSelect();
 
+  // Load locked library + build BOTH indexes:
+  //  - exact key map
+  //  - canonical -> exact key map (MAIN FIX)
   state.lib = await loadLockedLibraryJson(LOCKED_LIBRARY_JSON);
   state.libByNo = new Map();
+  state.libCanonToExact = new Map();
+
   for (const q of state.lib) {
     const qno = getQno(q);
-    if (qno) state.libByNo.set(qno, q);
+    if (!qno) continue;
+
+    state.libByNo.set(qno, q);
+
+    const canon = canonicalQno(qno);
+    if (canon && !state.libCanonToExact.has(canon)) {
+      state.libCanonToExact.set(canon, qno);
+    }
   }
 
   state.reports = await loadReportsFromDb();
