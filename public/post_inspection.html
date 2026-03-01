@@ -49,12 +49,7 @@
     }
     .pi-card h2{ margin:0 0 12px; color:#113a63; }
 
-    .pi-grid{
-      display:grid;
-      grid-template-columns: 1fr;
-      gap:18px;
-      margin-top:16px;
-    }
+    .pi-grid{ display:grid; grid-template-columns: 1fr; gap:18px; margin-top:16px; }
 
     .pi-fields{
       display:grid;
@@ -62,9 +57,7 @@
       gap:10px 12px;
       align-items:end;
     }
-    .pi-field label{
-      display:block; font-weight:900; color:#143a63; margin:0 0 6px;
-    }
+    .pi-field label{ display:block; font-weight:900; color:#143a63; margin:0 0 6px; }
     .pi-field input, .pi-field select{
       width:100%;
       padding:10px 12px;
@@ -86,6 +79,23 @@
       margin-top:12px;
       padding-top:12px;
       border-top:1px solid #e5eefc;
+    }
+
+    .stored-grid{ display:grid; grid-template-columns: 360px 1fr; gap:14px; align-items:start; }
+    .stored-box{ border:1px solid #e5eefc; border-radius:14px; padding:12px; background:#f8fbff; }
+    .stored-title{ font-weight:950; color:#143a63; margin:0 0 10px; }
+    .stored-controls{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:10px; }
+    .stored-controls input{
+      padding:10px 12px; border:1px solid #cfe0f4; border-radius:12px; font-weight:800; background:#fff; width:100%;
+    }
+    #reportSelect{
+      width:100%;
+      border:1px solid #cfe0f4;
+      border-radius:12px;
+      padding:8px;
+      font-weight:800;
+      background:#fff;
+      height: 178px; /* ~5 rows */
     }
 
     .obs-toolbar{
@@ -113,6 +123,7 @@
     .obs-badge.lae{ background:#f3f0ff; border-color:#d9cffc; color:#3a2a7a; }
 
     table{ border-collapse:separate; border-spacing:0; width:100%; }
+    .obs-table{ min-width: 1400px; }
     .obs-table thead th{
       text-align:left;
       font-weight:950;
@@ -123,28 +134,31 @@
       position:sticky;
       top:0;
       z-index:1;
-      white-space:nowrap;
     }
-
-    /* IMPORTANT: body cells are NOT bold */
     .obs-table tbody td{
       padding:10px 10px;
       border-bottom:1px solid #eef4ff;
       vertical-align:top;
-      font-weight:500;
+      font-weight:600; /* NOT BOLD */
       color:#0c1b2a;
     }
-
     .obs-row{ cursor:pointer; }
     .obs-row:hover td{ background:#f8fbff; }
-    .muted{ color:#55708f; font-weight:500; }
+    .muted{ color:#55708f; font-weight:600; }
 
-    /* Reduce wrapping in Observation text: single-line, ellipsis */
-    .td-nowrap{
+    /* Reduce wrapping in long text columns: show single-line with ellipsis, full text on hover (title). */
+    .cell-ellipsis{
       white-space:nowrap;
       overflow:hidden;
       text-overflow:ellipsis;
-      max-width:560px;
+      max-width:520px;
+    }
+    .cell-ellipsis.wide{ max-width:720px; }
+    .cell-pgno{
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      max-width:360px;
     }
 
     dialog{ border:none; border-radius:18px; padding:0; max-width:1200px; width: calc(100vw - 40px); }
@@ -152,7 +166,6 @@
     .dlg h3{ margin:0 0 8px; color:#143a63; }
     .dlg-sub{ font-weight:900; color:#55708f; margin-bottom:12px; }
     .dlg-grid{ display:grid; grid-template-columns: 1fr 1fr; gap:12px; }
-
     .pgnoRow{
       display:grid; grid-template-columns: 22px 90px 1fr;
       gap:10px; align-items:start; padding:10px 0; border-bottom:1px dashed #d5deef;
@@ -166,7 +179,12 @@
       font-weight:800;
       resize:vertical;
       background:#fff;
+      outline:none;
     }
+    textarea:focus{
+      border-color:#5aa2ff; box-shadow:0 0 0 3px rgba(90,162,255,.2);
+    }
+
     .dlg-actions{
       display:flex; gap:10px; justify-content:flex-end;
       margin-top:12px; padding-top:12px; border-top:1px solid #e5eefc;
@@ -178,28 +196,11 @@
       margin-top:12px;
     }
 
-    /* Reports Browser dialog */
-    .rb-wrap{ display:grid; grid-template-columns: 360px 1fr; gap:12px; }
-    .rb-left{ border-right:1px solid #e5eefc; padding-right:12px; }
-    .rb-right{ padding-left:4px; }
-    .rb-group{ margin-bottom:12px; }
-    .rb-group h4{ margin:0 0 8px; color:#143a63; font-weight:950; }
-    .rb-box{
-      border:1px solid #e5eefc; border-radius:14px; padding:10px;
-      max-height: 180px; overflow:auto; background:#f8fbff;
-    }
-    .rb-opt{ display:flex; gap:8px; align-items:center; padding:6px 0; }
-    .rb-opt input{ transform: translateY(1px); }
-    .rb-actions{ display:flex; gap:10px; flex-wrap:wrap; margin-top:10px; }
-
     @media (max-width: 1100px){
       .pi-fields{ grid-template-columns: 1fr 1fr; }
       .pi-span2, .pi-span3, .pi-span6{ grid-column:auto; }
       .dlg-grid{ grid-template-columns: 1fr; }
-      .rb-wrap{ grid-template-columns: 1fr; }
-      .rb-left{ border-right:none; padding-right:0; border-bottom:1px solid #e5eefc; padding-bottom:12px; }
-      .rb-right{ padding-left:0; }
-      .td-nowrap{ max-width: 320px; }
+      .stored-grid{ grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -223,18 +224,37 @@
     </div>
 
     <div class="pi-grid">
+
+      <!-- Stored Inspections (scrollable list) -->
+      <div class="pi-card" id="storedCard">
+        <h2>Stored Inspections</h2>
+
+        <div class="stored-grid">
+          <div class="stored-box">
+            <div class="stored-title">List (most recent on top)</div>
+            <div class="stored-controls">
+              <input id="reportSearch" type="text" placeholder="Search (vessel / date / ref / company / inspector)" />
+            </div>
+            <select id="reportSelect" size="5" aria-label="Stored inspections list"></select>
+            <div class="muted" style="margin-top:10px;">
+              Tip: click an inspection to load it. The list is scrollable.
+            </div>
+          </div>
+
+          <div class="stored-box">
+            <div class="stored-title">Filters</div>
+            <div class="muted">
+              Advanced filters (multi-select by vessel / month / year / OCIMF / inspector / inspector company) will be added here.
+              For now, use the search box above.
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div class="pi-card" id="headerCard">
         <h2>Inspection Header</h2>
 
         <div class="pi-fields">
-          <div class="pi-field">
-            <label>Stored Inspections</label>
-            <div style="display:flex; gap:10px; align-items:center;">
-              <select id="reportSelect" style="flex:1;"></select>
-              <button class="btn btn-muted" id="browseReportsBtn" type="button">Browse</button>
-            </div>
-          </div>
-
           <div class="pi-field">
             <label>Vessel</label>
             <select id="vesselSelect"></select>
@@ -247,7 +267,7 @@
 
           <div class="pi-field">
             <label>Port (official name)</label>
-            <input id="portName" type="text" placeholder="e.g. Greece - Agio Theodoroi" />
+            <input id="portName" type="text" placeholder="e.g. Greece - Agio Theodoroi [GRAGT]" />
           </div>
 
           <div class="pi-field">
@@ -267,8 +287,8 @@
 
           <div class="pi-field pi-span3">
             <label>Title</label>
-            <select id="reportTitleSelect">
-              <option value="">— Select title —</option>
+            <select id="reportTitle">
+              <option value="">— Select —</option>
               <option value="SIRE 2.0 Inspection">SIRE 2.0 Inspection</option>
               <option value="Company Audit">Company Audit</option>
               <option value="Third Party Audit">Third Party Audit</option>
@@ -282,7 +302,7 @@
 
           <div class="pi-field pi-span3">
             <label>Inspector's Company (manual)</label>
-            <input id="inspectorCompany" type="text" placeholder="Contractor company (on behalf of OCIMF Inspecting Company)" />
+            <input id="inspectorCompany" type="text" placeholder="Enter inspector's contracting company" />
           </div>
 
           <div class="pi-field pi-span3">
@@ -317,9 +337,9 @@
 
         <div style="margin-top:10px; color:#0f3a63; font-weight:850;">
           <ul style="margin:0; padding-left:18px;">
-            <li><b>Negative</b>: designation + Nature of Concern (Not as expected … / Observable or detectable deficiency). Requires PGNO.</li>
+            <li><b>Negative</b>: category + Nature of Concern (Not as expected … / Observable or detectable deficiency). Requires PGNO.</li>
             <li><b>Positive</b>: Human + Nature of Concern (Exceeded normal expectation). No PGNO.</li>
-            <li><b>Largely as expected</b>: designation + Nature of Concern (Largely as expected). KPI item.</li>
+            <li><b>Largely as expected</b>: category + Nature of Concern (Largely as expected). KPI item.</li>
           </ul>
         </div>
       </div>
@@ -329,7 +349,7 @@
 
         <div class="obs-toolbar">
           <div class="obs-filters">
-            <input id="obsSearch" type="text" placeholder="Search (qno / designation / nature / coding / text)" />
+            <input id="obsSearch" type="text" placeholder="Search (qno / category / nature / coding / text)" />
 
             <select id="obsTypeFilter">
               <option value="">All types</option>
@@ -338,7 +358,7 @@
               <option value="largely">Largely as expected</option>
             </select>
 
-            <select id="obsDesignationFilter">
+            <select id="obsCategoryFilter">
               <option value="">All categories</option>
               <option value="Human">Human</option>
               <option value="Process">Process</option>
@@ -364,8 +384,8 @@
                 <th style="width:200px;">Category</th>
                 <th style="width:320px;">Nature of concern</th>
                 <th style="width:360px;">Classification coding</th>
-                <th>Observation text</th>
-                <th style="width:260px;">PGNO (selected text)</th>
+                <th style="width:520px;">Observation text</th>
+                <th style="width:360px;">PGNO (selected text)</th>
               </tr>
             </thead>
             <tbody id="obsTableBody">
@@ -402,75 +422,6 @@
           <button class="btn btn-muted" id="dlgCancelBtn" type="button">Cancel</button>
           <button class="btn primary" id="dlgSaveBtn" type="button">Save</button>
         </div>
-      </div>
-    </dialog>
-
-    <dialog id="reportsDialog">
-      <div class="dlg">
-        <h3>Stored Inspections</h3>
-        <div class="dlg-sub">Most recent on top. Use tick filters. Click a row to load.</div>
-
-        <div class="rb-wrap">
-          <div class="rb-left">
-            <div class="rb-group">
-              <h4>Vessel</h4>
-              <div class="rb-box" id="rbVessels"></div>
-            </div>
-
-            <div class="rb-group">
-              <h4>Inspection Year</h4>
-              <div class="rb-box" id="rbYears"></div>
-            </div>
-
-            <div class="rb-group">
-              <h4>Inspection Month</h4>
-              <div class="rb-box" id="rbMonths"></div>
-            </div>
-
-            <div class="rb-group">
-              <h4>OCIMF Inspecting Company</h4>
-              <div class="rb-box" id="rbOcimf"></div>
-            </div>
-
-            <div class="rb-group">
-              <h4>Inspector Name</h4>
-              <div class="rb-box" id="rbInspectorNames"></div>
-            </div>
-
-            <div class="rb-group">
-              <h4>Inspector’s Company</h4>
-              <div class="rb-box" id="rbInspectorCompanies"></div>
-            </div>
-
-            <div class="rb-actions">
-              <button class="btn btn-muted" id="rbClearBtn" type="button">Clear filters</button>
-              <button class="btn primary" id="rbApplyBtn" type="button">Apply filters</button>
-              <button class="btn btn-muted" id="rbCloseBtn" type="button">Close</button>
-            </div>
-          </div>
-
-          <div class="rb-right">
-            <div style="overflow:auto; max-height: 70vh;">
-              <table class="obs-table">
-                <thead>
-                  <tr>
-                    <th style="width:140px;">Date</th>
-                    <th style="width:220px;">Vessel</th>
-                    <th style="width:260px;">OCIMF Company</th>
-                    <th style="width:220px;">Inspector</th>
-                    <th style="width:260px;">Inspector’s Co.</th>
-                    <th style="width:220px;">Report Ref</th>
-                    <th style="width:200px;">Title</th>
-                  </tr>
-                </thead>
-                <tbody id="rbTableBody">
-                  <tr><td colspan="7" class="muted">Loading…</td></tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-
       </div>
     </dialog>
 
