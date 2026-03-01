@@ -104,7 +104,7 @@
 
     .obs-badge{
       display:inline-flex; align-items:center;
-      font-weight:900; font-size:12px; padding:6px 10px; border-radius:999px;
+      font-weight:950; font-size:12px; padding:6px 10px; border-radius:999px;
       border:1px solid #cfe0f4; background:#eef6ff; color:#143a63;
       white-space:nowrap;
     }
@@ -113,8 +113,6 @@
     .obs-badge.lae{ background:#f3f0ff; border-color:#d9cffc; color:#3a2a7a; }
 
     table{ border-collapse:separate; border-spacing:0; width:100%; }
-
-    /* --- TABLE: headers can be bold, BODY should NOT be bold --- */
     .obs-table thead th{
       text-align:left;
       font-weight:950;
@@ -131,38 +129,19 @@
       padding:10px 10px;
       border-bottom:1px solid #eef4ff;
       vertical-align:top;
-      font-weight:400;         /* <<< NOT bold */
+      font-weight:800;
       color:#0c1b2a;
     }
     .obs-row{ cursor:pointer; }
     .obs-row:hover td{ background:#f8fbff; }
-    .muted{ color:#55708f; font-weight:400; } /* <<< NOT bold */
-
-    /* --- Reduce wrapping of observation text: give table a min width + widen the column --- */
-    .obs-table{ min-width: 1700px; } /* forces horizontal scroll instead of narrow wrapping */
-    .td-nowrap{ white-space:nowrap; }
-    .td-wrap{ white-space:normal; }
-
-    /* Observation text: prefer less wrapping */
-    .td-obs-text{
-      min-width: 520px;
-      white-space: normal;
-      line-height: 1.35;
-      word-break: normal;
-    }
-
-    /* PGNO text display */
-    .td-pgno{
-      min-width: 260px;
-      white-space: normal;
-      line-height: 1.35;
-    }
+    .muted{ color:#55708f; font-weight:800; }
 
     dialog{ border:none; border-radius:18px; padding:0; max-width:1200px; width: calc(100vw - 40px); }
     .dlg{ padding:16px; }
     .dlg h3{ margin:0 0 8px; color:#143a63; }
     .dlg-sub{ font-weight:900; color:#55708f; margin-bottom:12px; }
     .dlg-grid{ display:grid; grid-template-columns: 1fr 1fr; gap:12px; }
+
     .pgnoRow{
       display:grid; grid-template-columns: 22px 90px 1fr;
       gap:10px; align-items:start; padding:10px 0; border-bottom:1px dashed #d5deef;
@@ -188,11 +167,27 @@
       margin-top:12px;
     }
 
+    /* Reports Browser dialog */
+    .rb-wrap{ display:grid; grid-template-columns: 360px 1fr; gap:12px; }
+    .rb-left{ border-right:1px solid #e5eefc; padding-right:12px; }
+    .rb-right{ padding-left:4px; }
+    .rb-group{ margin-bottom:12px; }
+    .rb-group h4{ margin:0 0 8px; color:#143a63; font-weight:950; }
+    .rb-box{
+      border:1px solid #e5eefc; border-radius:14px; padding:10px;
+      max-height: 180px; overflow:auto; background:#f8fbff;
+    }
+    .rb-opt{ display:flex; gap:8px; align-items:center; padding:6px 0; }
+    .rb-opt input{ transform: translateY(1px); }
+    .rb-actions{ display:flex; gap:10px; flex-wrap:wrap; margin-top:10px; }
+
     @media (max-width: 1100px){
       .pi-fields{ grid-template-columns: 1fr 1fr; }
       .pi-span2, .pi-span3, .pi-span6{ grid-column:auto; }
       .dlg-grid{ grid-template-columns: 1fr; }
-      .obs-table{ min-width: 1300px; }
+      .rb-wrap{ grid-template-columns: 1fr; }
+      .rb-left{ border-right:none; padding-right:0; border-bottom:1px solid #e5eefc; padding-bottom:12px; }
+      .rb-right{ padding-left:0; }
     }
   </style>
 </head>
@@ -221,8 +216,11 @@
 
         <div class="pi-fields">
           <div class="pi-field">
-            <label>Existing Reports</label>
-            <select id="reportSelect"></select>
+            <label>Stored Inspections</label>
+            <div style="display:flex; gap:10px; align-items:center;">
+              <select id="reportSelect" style="flex:1;"></select>
+              <button class="btn btn-muted" id="browseReportsBtn" type="button">Browse</button>
+            </div>
           </div>
 
           <div class="pi-field">
@@ -256,13 +254,26 @@
           </div>
 
           <div class="pi-field pi-span3">
-            <label>Title (optional)</label>
-            <input id="reportTitle" type="text" placeholder="OCIMF SIRE 2.0 – Discharge Call – Terminal XYZ" />
+            <label>Title</label>
+            <select id="reportTitleSelect">
+              <option value="">— Select title —</option>
+              <option value="SIRE 2.0 Inspection">SIRE 2.0 Inspection</option>
+              <option value="Company Audit">Company Audit</option>
+              <option value="Third Party Audit">Third Party Audit</option>
+            </select>
+            <div class="muted" style="margin-top:6px;">
+              To add more titles later, we can implement a “Manage Titles” admin list.
+            </div>
           </div>
 
           <div class="pi-field pi-span3">
             <label>Inspector Name (manual)</label>
             <input id="inspectorName" type="text" placeholder="Enter inspector name (not in PDF)" />
+          </div>
+
+          <div class="pi-field pi-span3">
+            <label>Inspector's Company (manual)</label>
+            <input id="inspectorCompany" type="text" placeholder="Contractor company (on behalf of OCIMF Inspecting Company)" />
           </div>
 
           <div class="pi-field pi-span3">
@@ -285,6 +296,8 @@
 
               <button class="btn btn-muted" id="importPdfBtn" type="button">Import PDF (AI)</button>
               <input id="importPdfFile" type="file" accept="application/pdf" style="display:none" />
+
+              <button class="btn btn-muted" id="addManualBtn" type="button">Add Manual Item</button>
 
               <button class="btn btn-muted" id="statsBtn" type="button">KPIs</button>
               <button class="btn btn-muted" id="finalizeBtn" type="button">Finalize check</button>
@@ -327,8 +340,6 @@
               <input id="onlyMissingPgno" type="checkbox" />
               Missing PGNO (negatives)
             </label>
-
-            <button class="btn btn-muted" id="manualAddBtn" type="button">Add manual observation</button>
           </div>
 
           <div class="obs-summary" id="obsSummary">No report loaded.</div>
@@ -340,11 +351,11 @@
               <tr>
                 <th style="width:110px;">Question</th>
                 <th style="width:140px;">Type</th>
-                <th style="width:220px;">Category</th>
+                <th style="width:200px;">Category</th>
                 <th style="width:320px;">Nature of concern</th>
                 <th style="width:360px;">Classification coding</th>
-                <th style="width:520px;">Observation text</th>
-                <th style="width:260px;">PGNO (selected text)</th>
+                <th>Observation text</th>
+                <th style="width:180px;">PGNO</th>
               </tr>
             </thead>
             <tbody id="obsTableBody">
@@ -384,67 +395,72 @@
       </div>
     </dialog>
 
-    <!-- Manual Add Dialog -->
-    <dialog id="manualDialog">
+    <dialog id="reportsDialog">
       <div class="dlg">
-        <h3>Add manual observation</h3>
-        <div class="dlg-sub">Use this if an item was not extracted by the PDF AI import.</div>
+        <h3>Stored Inspections</h3>
+        <div class="dlg-sub">Most recent on top. Use tick filters. Click a row to load.</div>
 
-        <div class="dlg-grid">
-          <div class="pi-field">
-            <label>Question number (e.g. 4.2.7)</label>
-            <input id="manQno" type="text" placeholder="e.g. 4.2.7" />
+        <div class="rb-wrap">
+          <div class="rb-left">
+            <div class="rb-group">
+              <h4>Vessel</h4>
+              <div class="rb-box" id="rbVessels"></div>
+            </div>
+
+            <div class="rb-group">
+              <h4>Inspection Year</h4>
+              <div class="rb-box" id="rbYears"></div>
+            </div>
+
+            <div class="rb-group">
+              <h4>Inspection Month</h4>
+              <div class="rb-box" id="rbMonths"></div>
+            </div>
+
+            <div class="rb-group">
+              <h4>OCIMF Inspecting Company</h4>
+              <div class="rb-box" id="rbOcimf"></div>
+            </div>
+
+            <div class="rb-group">
+              <h4>Inspector Name</h4>
+              <div class="rb-box" id="rbInspectorNames"></div>
+            </div>
+
+            <div class="rb-group">
+              <h4>Inspector’s Company</h4>
+              <div class="rb-box" id="rbInspectorCompanies"></div>
+            </div>
+
+            <div class="rb-actions">
+              <button class="btn btn-muted" id="rbClearBtn" type="button">Clear filters</button>
+              <button class="btn primary" id="rbApplyBtn" type="button">Apply filters</button>
+              <button class="btn btn-muted" id="rbCloseBtn" type="button">Close</button>
+            </div>
           </div>
 
-          <div class="pi-field">
-            <label>Type</label>
-            <select id="manType">
-              <option value="negative">Negative</option>
-              <option value="positive">Positive</option>
-              <option value="largely">Largely as expected</option>
-            </select>
-          </div>
-
-          <div class="pi-field">
-            <label>Category</label>
-            <select id="manDesignation">
-              <option value="Human">Human</option>
-              <option value="Process">Process</option>
-              <option value="Hardware">Hardware</option>
-              <option value="Photo">Photo</option>
-            </select>
-          </div>
-
-          <div class="pi-field">
-            <label>Positive rank (optional)</label>
-            <input id="manPositiveRank" type="text" placeholder="e.g. Senior Deck Officer" />
-          </div>
-
-          <div class="pi-field pi-span2">
-            <label>Nature of concern</label>
-            <input id="manNature" type="text" placeholder="e.g. Not as expected – procedure and/or document deficient." />
-          </div>
-
-          <div class="pi-field pi-span2">
-            <label>Classification coding (optional)</label>
-            <input id="manCoding" type="text" placeholder="e.g. 5.1.2.1.1 - Procedures may include..." />
-          </div>
-
-          <div class="pi-field pi-span6">
-            <label>Observation text</label>
-            <textarea id="manText" placeholder="Paste the observation text here..."></textarea>
-          </div>
-
-          <div class="pi-field pi-span6" id="manPgnoWrap" style="display:none;">
-            <div style="font-weight:950; color:#143a63; margin-top:8px;">PGNO tick selection (Negative only)</div>
-            <div id="manPgnoList" class="muted">Select a question number to load PGNO bullets.</div>
+          <div class="rb-right">
+            <div style="overflow:auto; max-height: 70vh;">
+              <table class="obs-table">
+                <thead>
+                  <tr>
+                    <th style="width:140px;">Date</th>
+                    <th style="width:220px;">Vessel</th>
+                    <th style="width:260px;">OCIMF Company</th>
+                    <th style="width:220px;">Inspector</th>
+                    <th style="width:260px;">Inspector’s Co.</th>
+                    <th style="width:220px;">Report Ref</th>
+                    <th style="width:200px;">Title</th>
+                  </tr>
+                </thead>
+                <tbody id="rbTableBody">
+                  <tr><td colspan="7" class="muted">Loading…</td></tr>
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
 
-        <div class="dlg-actions">
-          <button class="btn btn-muted" id="manCancelBtn" type="button">Cancel</button>
-          <button class="btn primary" id="manCreateBtn" type="button">Create</button>
-        </div>
       </div>
     </dialog>
 

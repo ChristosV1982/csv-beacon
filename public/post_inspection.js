@@ -1,6 +1,5 @@
 import { loadLockedLibraryJson } from "./question_library_loader.js";
 
-const POST_INSPECTION_BUILD = "post_inspection_ui_category_filter_build_2026-03-01_v6_view_pgno_text_manual_add";
 const LOCKED_LIBRARY_JSON = "./sire_questions_all_columns_named.json";
 
 const PDF_BUCKET_DEFAULT = "inspection-reports";
@@ -27,6 +26,19 @@ function ddmmyyyyToIso(ddmmyyyy) {
   return `${yyyy}-${mm}-${dd}`;
 }
 
+function isoToYyyyMm(isoDate) {
+  const s = String(isoDate || "").trim();
+  const m = s.match(/^(\d{4})-(\d{2})-\d{2}$/);
+  if (!m) return "";
+  return `${m[1]}-${m[2]}`;
+}
+
+function isoToYear(isoDate) {
+  const s = String(isoDate || "").trim();
+  const m = s.match(/^(\d{4})-/);
+  return m ? m[1] : "";
+}
+
 function normalizeQnoParts(qno, pad2) {
   const parts = String(qno || "").trim().split(".").filter(Boolean);
   if (parts.length < 2) return String(qno || "").trim();
@@ -37,14 +49,24 @@ function normalizeQnoParts(qno, pad2) {
   return norm.join(".");
 }
 
-function canonicalQno(qno) {
-  const parts = String(qno || "").trim().split(".").filter(Boolean);
-  if (!parts.length) return "";
-  const canon = parts.map(p => {
-    const n = String(p).replace(/^0+/, "") || "0";
-    return String(Number(n));
-  });
-  return canon.join(".");
+function findLibraryQno(qbase) {
+  const raw = String(qbase || "").trim();
+  if (!raw) return null;
+
+  if (state.libByNo.has(raw)) return raw;
+
+  const padded = normalizeQnoParts(raw, true);
+  if (state.libByNo.has(padded)) return padded;
+
+  const nonPadded = normalizeQnoParts(raw, false);
+  if (state.libByNo.has(nonPadded)) return nonPadded;
+
+  for (const candidate of [raw, padded, nonPadded]) {
+    const alt = candidate.split(".").map(p => p.replace(/^0+/, "") || "0").join(".");
+    if (state.libByNo.has(alt)) return alt;
+  }
+
+  return null;
 }
 
 function pick(obj, keys) {
@@ -76,17 +98,6 @@ function getPgnoBullets(q) {
   return usable.slice(0, 120);
 }
 
-function normDesignation(d) {
-  const s = String(d || "").trim();
-  if (!s) return "";
-  const low = s.toLowerCase();
-  if (low === "human") return "Human";
-  if (low === "process") return "Process";
-  if (low === "hardware") return "Hardware";
-  if (low === "photo") return "Photo";
-  return s;
-}
-
 const state = {
   me: null,
   supabase: null,
@@ -94,20 +105,26 @@ const state = {
   vessels: [],
   lib: [],
   libByNo: new Map(),
-  libCanonToExact: new Map(),
 
-  reports: [],
+  reports: [],            // full list from DB
+  reportsFiltered: [],    // filtered list (browser)
   activeReport: null,
 
   observationsByQno: {},
   extractedItems: [],
 
   dialogItem: null,
+
+  reportFilters: {
+    vessel_ids: new Set(),
+    years: new Set(),
+    months: new Set(),
+    ocimf: new Set(),
+    inspector_names: new Set(),
+    inspector_companies: new Set(),
+  }
 };
 
-// -------------------------
-// UI helpers
-// -------------------------
 function setSaveStatus(text) { el("saveStatus").textContent = text || "Not saved"; }
 function setActivePill(text) { el("activeReportPill").textContent = text || "No active report"; }
 
@@ -116,30 +133,6 @@ function reportLabel(r) {
   const d = r.inspection_date || "No date";
   const ref = r.report_ref ? ` | ${r.report_ref}` : "";
   return `${v} | ${d}${ref}`;
-}
-
-function findLibraryQno(qbase) {
-  const raw = String(qbase || "").trim();
-  if (!raw) return null;
-
-  if (state.libByNo.has(raw)) return raw;
-
-  const padded = normalizeQnoParts(raw, true);
-  if (state.libByNo.has(padded)) return padded;
-
-  const nonPadded = normalizeQnoParts(raw, false);
-  if (state.libByNo.has(nonPadded)) return nonPadded;
-
-  const canon = canonicalQno(raw);
-  if (canon && state.libCanonToExact.has(canon)) return state.libCanonToExact.get(canon);
-
-  const canonP = canonicalQno(padded);
-  if (canonP && state.libCanonToExact.has(canonP)) return state.libCanonToExact.get(canonP);
-
-  const canonN = canonicalQno(nonPadded);
-  if (canonN && state.libCanonToExact.has(canonN)) return state.libCanonToExact.get(canonN);
-
-  return null;
 }
 
 // -------------------------
@@ -158,7 +151,7 @@ async function loadVessels() {
 async function loadReportsFromDb() {
   const { data, error } = await state.supabase
     .from("post_inspection_reports")
-    .select("id, vessel_id, inspection_date, port_name, port_code, ocimf_inspecting_company, report_ref, title, pdf_storage_path, created_at, updated_at")
+    .select("id, vessel_id, inspection_date, port_name, port_code, ocimf_inspecting_company, report_ref, title, pdf_storage_path, inspector_name, inspector_company, created_at, updated_at")
     .order("updated_at", { ascending: false });
 
   if (error) throw error;
@@ -195,23 +188,31 @@ async function loadObservationsForReport(reportId) {
   return map;
 }
 
-async function createReportHeader({ vessel_id, inspection_date, port_name, port_code, ocimf_inspecting_company, report_ref, title, pdf_storage_path }) {
+async function createReportHeader({ vessel_id, inspection_date, port_name, port_code, ocimf_inspecting_company, report_ref, title, pdf_storage_path, inspector_name, inspector_company }) {
   const { data, error } = await state.supabase
     .from("post_inspection_reports")
-    .insert([{ vessel_id, inspection_date, port_name, port_code, ocimf_inspecting_company, report_ref, title, pdf_storage_path }])
-    .select("id, vessel_id, inspection_date, port_name, port_code, ocimf_inspecting_company, report_ref, title, pdf_storage_path, created_at, updated_at")
+    .insert([{
+      vessel_id, inspection_date, port_name, port_code, ocimf_inspecting_company,
+      report_ref, title, pdf_storage_path,
+      inspector_name, inspector_company
+    }])
+    .select("id, vessel_id, inspection_date, port_name, port_code, ocimf_inspecting_company, report_ref, title, pdf_storage_path, inspector_name, inspector_company, created_at, updated_at")
     .single();
 
   if (error) throw error;
   return data;
 }
 
-async function updateReportHeader(reportId, { vessel_id, inspection_date, port_name, port_code, ocimf_inspecting_company, report_ref, title, pdf_storage_path }) {
+async function updateReportHeader(reportId, { vessel_id, inspection_date, port_name, port_code, ocimf_inspecting_company, report_ref, title, pdf_storage_path, inspector_name, inspector_company }) {
   const { data, error } = await state.supabase
     .from("post_inspection_reports")
-    .update({ vessel_id, inspection_date, port_name, port_code, ocimf_inspecting_company, report_ref, title, pdf_storage_path })
+    .update({
+      vessel_id, inspection_date, port_name, port_code, ocimf_inspecting_company,
+      report_ref, title, pdf_storage_path,
+      inspector_name, inspector_company
+    })
     .eq("id", reportId)
-    .select("id, vessel_id, inspection_date, port_name, port_code, ocimf_inspecting_company, report_ref, title, pdf_storage_path, created_at, updated_at")
+    .select("id, vessel_id, inspection_date, port_name, port_code, ocimf_inspecting_company, report_ref, title, pdf_storage_path, inspector_name, inspector_company, created_at, updated_at")
     .single();
 
   if (error) throw error;
@@ -233,6 +234,9 @@ async function upsertObservationRow(row) {
   if (error) throw error;
 }
 
+// -------------------------
+// Header inputs & loading
+// -------------------------
 function headerInputs() {
   return {
     vessel_id: String(el("vesselSelect").value || "").trim(),
@@ -241,7 +245,9 @@ function headerInputs() {
     port_code: String(el("portCode").value || "").trim(),
     ocimf_inspecting_company: String(el("ocimfCompany").value || "").trim(),
     report_ref: String(el("reportRef").value || "").trim(),
-    title: String(el("reportTitle").value || "").trim(),
+    title: String(el("reportTitleSelect").value || "").trim(),
+    inspector_name: String(el("inspectorName").value || "").trim(),
+    inspector_company: String(el("inspectorCompany").value || "").trim(),
     pdf_storage_path: state.activeReport?.pdf_storage_path || null,
   };
 }
@@ -253,7 +259,10 @@ function loadReportIntoHeader(r) {
   el("portCode").value = r.port_code || "";
   el("ocimfCompany").value = r.ocimf_inspecting_company || "";
   el("reportRef").value = r.report_ref || "";
-  el("reportTitle").value = r.title || "";
+  el("reportTitleSelect").value = r.title || "";
+  el("inspectorName").value = r.inspector_name || "";
+  el("inspectorCompany").value = r.inspector_company || "";
+
   setActivePill("Active: " + reportLabel(r));
 
   if (r.pdf_storage_path) {
@@ -264,7 +273,7 @@ function loadReportIntoHeader(r) {
 }
 
 // -------------------------
-// Rendering
+// Rendering: extracted items table
 // -------------------------
 function obsRowTypeLabel(item) {
   if (item.kind === "negative") return `<span class="obs-badge neg">Negative</span>`;
@@ -302,7 +311,7 @@ function applyObsFilters(items) {
     if (type && it.kind !== type) return false;
 
     if (designationFilter) {
-      const d = normDesignation(it.designation);
+      const d = String(it.designation || "").trim();
       if (designationFilter !== d) return false;
     }
 
@@ -316,22 +325,13 @@ function applyObsFilters(items) {
         it.positive_rank || "",
         it.nature_of_concern || "",
         it.classification_coding || "",
-        it.text || "",
-        it.pgno_texts || ""
+        it.text || ""
       ].join(" ").toLowerCase();
       if (!hay.includes(term)) return false;
     }
 
     return true;
   });
-}
-
-function formatPgnoSelectedText(qno) {
-  const row = state.observationsByQno[qno];
-  const arr = Array.isArray(row?.pgno_selected) ? row.pgno_selected : [];
-  if (!arr.length) return "";
-  const texts = arr.map(x => String(x?.text || "").trim()).filter(Boolean);
-  return texts.join("; ");
 }
 
 function renderObsTable() {
@@ -352,27 +352,23 @@ function renderObsTable() {
 
   body.innerHTML = items.map(it => {
     const pg = state.observationsByQno[it.qno]?.pgno_selected || [];
-    let pgTxt = "";
-    if (it.kind === "negative") {
-      const txt = formatPgnoSelectedText(it.qno);
-      pgTxt = txt ? esc(txt) : `<span class="muted">—</span>`;
-    } else {
-      pgTxt = `<span class="muted">n/a</span>`;
-    }
+    const pgTxt = (Array.isArray(pg) && pg.length)
+      ? `PGNO ${pg.map(x => x.idx).join(", ")}`
+      : (it.kind === "negative" ? `<span class="muted">—</span>` : `<span class="muted">n/a</span>`);
 
     const designationDisplay = it.kind === "positive"
       ? (it.positive_rank ? `Human (${it.positive_rank})` : "Human")
-      : (normDesignation(it.designation) || "—");
+      : (it.designation || "—");
 
     return `
       <tr class="obs-row" data-qno="${esc(it.qno)}">
-        <td class="td-nowrap">${esc(it.qno)}</td>
-        <td class="td-nowrap">${obsRowTypeLabel(it)}</td>
-        <td class="td-wrap muted">${esc(designationDisplay)}</td>
-        <td class="td-wrap">${esc(it.nature_of_concern || "")}</td>
-        <td class="td-wrap muted">${esc(it.classification_coding || "")}</td>
-        <td class="td-obs-text">${esc(it.text || "")}</td>
-        <td class="td-pgno">${pgTxt}</td>
+        <td>${esc(it.qno)}</td>
+        <td>${obsRowTypeLabel(it)}</td>
+        <td class="muted">${esc(designationDisplay)}</td>
+        <td>${esc(it.nature_of_concern || "")}</td>
+        <td class="muted">${esc(it.classification_coding || "")}</td>
+        <td>${esc(it.text || "")}</td>
+        <td>${pgTxt}</td>
       </tr>
     `;
   }).join("");
@@ -396,7 +392,7 @@ function openObsDialog(item) {
 
   const q = state.libByNo.get(item.qno);
   const shortText = q ? getShort(q) : "";
-  const qText = q ? getQText(q) : "(Question text not found in locked library JSON for this question.)";
+  const qText = q ? getQText(q) : "";
   const chap = q ? getChap(q) : "";
   const sect = q ? getSection(q) : "";
 
@@ -435,7 +431,7 @@ function openObsDialog(item) {
 
   const designationDisplay = item.kind === "positive"
     ? (item.positive_rank ? `Human (${item.positive_rank})` : "Human")
-    : (normDesignation(item.designation) || "—");
+    : (item.designation || "—");
 
   el("dlgBody").innerHTML = `
     <div style="font-weight:900; color:#143a63; margin-bottom:10px;">Question</div>
@@ -525,7 +521,7 @@ async function saveObsDialog() {
   const obs_type =
     item.kind === "negative" ? "negative" :
     item.kind === "positive" ? "positive" :
-    null;
+    "largely";
 
   const row = {
     report_id: state.activeReport.id,
@@ -540,7 +536,7 @@ async function saveObsDialog() {
 
     observation_text: String(item.text || "").trim() || null,
 
-    designation: normDesignation(item.designation) || (item.kind === "positive" ? "Human" : null),
+    designation: String(item.designation || "").trim() || (item.kind === "positive" ? "Human" : null),
     positive_rank: String(item.positive_rank || "").trim() || null,
     nature_of_concern: String(item.nature_of_concern || "").trim() || null,
     classification_coding: String(item.classification_coding || "").trim() || null,
@@ -564,135 +560,6 @@ async function saveObsDialog() {
 }
 
 // -------------------------
-// Manual add
-// -------------------------
-function showManualDialog() {
-  if (!state.activeReport) {
-    alert("No active report. Please select / create a report first.");
-    return;
-  }
-
-  el("manQno").value = "";
-  el("manType").value = "negative";
-  el("manDesignation").value = "Human";
-  el("manPositiveRank").value = "";
-  el("manNature").value = "Not as expected.";
-  el("manCoding").value = "";
-  el("manText").value = "";
-  el("manPgnoWrap").style.display = "block";
-  el("manPgnoList").innerHTML = `<div class="muted">Select a question number to load PGNO bullets.</div>`;
-
-  el("manualDialog").showModal();
-}
-
-function closeManualDialog() {
-  try { el("manualDialog").close(); } catch {}
-}
-
-function renderManualPgnoList(qnoExact) {
-  const q = state.libByNo.get(qnoExact);
-  const bullets = q ? getPgnoBullets(q) : [];
-  if (!bullets.length) {
-    el("manPgnoList").innerHTML = `<div class="muted">No PGNO bullets found in locked library JSON for this question.</div>`;
-    return;
-  }
-
-  el("manPgnoList").innerHTML = bullets.map((txt, i) => {
-    const idx = i + 1;
-    return `
-      <div class="pgnoRow">
-        <input type="checkbox" class="manPgChk" data-idx="${idx}" />
-        <div style="font-weight:950; color:#143a63;">PGNO ${idx}</div>
-        <div style="font-weight:850; color:#0c1b2a;">${esc(txt)}</div>
-      </div>
-    `;
-  }).join("");
-}
-
-async function createManualObservation() {
-  if (!state.activeReport) return;
-
-  const qRaw = String(el("manQno").value || "").trim();
-  if (!qRaw) { alert("Please enter a question number."); return; }
-
-  const qnoExact = findLibraryQno(qRaw);
-  const qnoToUse = qnoExact || canonicalQno(qRaw) || qRaw;
-
-  const kind = String(el("manType").value || "negative").trim();
-  const designation = normDesignation(String(el("manDesignation").value || "").trim());
-  const positive_rank = String(el("manPositiveRank").value || "").trim() || null;
-
-  let nature = String(el("manNature").value || "").trim();
-  if (!nature) {
-    nature = kind === "positive" ? "Exceeded normal expectation."
-      : kind === "largely" ? "Largely as expected."
-      : "Not as expected.";
-  }
-
-  const coding = String(el("manCoding").value || "").trim() || null;
-  const text = String(el("manText").value || "").trim() || null;
-
-  let pgno_selected = [];
-  if (kind === "negative") {
-    const list = el("manPgnoList").querySelectorAll(".manPgChk");
-    list.forEach(chk => {
-      if (chk.checked) {
-        const idx = Number(chk.getAttribute("data-idx"));
-        if (!Number.isFinite(idx)) return;
-        const q = qnoExact ? state.libByNo.get(qnoExact) : null;
-        const bullets = q ? getPgnoBullets(q) : [];
-        const txt = bullets[idx - 1] || "";
-        pgno_selected.push({ idx, text: String(txt || "").trim() });
-      }
-    });
-  }
-
-  const observation_type =
-    kind === "negative" ? "negative_observation" :
-    kind === "positive" ? "positive_observation" :
-    "note_improvement";
-
-  const obs_type =
-    kind === "negative" ? "negative" :
-    kind === "positive" ? "positive" :
-    null;
-
-  const row = {
-    report_id: state.activeReport.id,
-    question_no: qnoToUse,
-    has_observation: true,
-    observation_type,
-    obs_type,
-    question_base: canonicalQno(qnoToUse) || qnoToUse,
-
-    observation_text: text,
-    pgno_selected,
-    remarks: text,
-
-    designation: kind === "positive" ? "Human" : (designation || null),
-    positive_rank: kind === "positive" ? positive_rank : null,
-    nature_of_concern: nature,
-    classification_coding: coding,
-
-    updated_at: nowIso(),
-  };
-
-  setSaveStatus("Creating…");
-  try {
-    await upsertObservationRow(row);
-    state.observationsByQno = await loadObservationsForReport(state.activeReport.id);
-    buildExtractedItemsFromDb();
-    renderObsTable();
-    setSaveStatus("Created");
-    closeManualDialog();
-  } catch (e) {
-    console.error(e);
-    alert("Create failed: " + (e?.message || String(e)));
-    setSaveStatus("Error");
-  }
-}
-
-// -------------------------
 // Report selection + header actions
 // -------------------------
 function renderVesselsSelect() {
@@ -708,8 +575,10 @@ function renderVesselsSelect() {
 
 function renderReportSelect() {
   const sel = el("reportSelect");
+  const list = state.reportsFiltered?.length ? state.reportsFiltered : state.reports;
+
   sel.innerHTML = `<option value="">— Select report —</option>`;
-  for (const r of state.reports) {
+  for (const r of list) {
     const o = document.createElement("option");
     o.value = r.id;
     o.textContent = reportLabel(r);
@@ -730,7 +599,7 @@ async function setActiveReportById(id) {
     return;
   }
 
-  const r = state.reports.find(x => x.id === id) || null;
+  const r = (state.reports || []).find(x => x.id === id) || null;
   if (!r) return;
 
   state.activeReport = r;
@@ -770,7 +639,9 @@ function handleNewReport() {
   el("portCode").value = "";
   el("ocimfCompany").value = "";
   el("reportRef").value = "";
-  el("reportTitle").value = "";
+  el("reportTitleSelect").value = "";
+  el("inspectorName").value = "";
+  el("inspectorCompany").value = "";
   el("pdfStatus").textContent = "No PDF linked";
 
   renderObsTable();
@@ -782,6 +653,7 @@ async function handleSaveHeader() {
   if (!payload.vessel_id) { alert("Please select a vessel first."); return; }
   if (!payload.inspection_date) { alert("Please set an inspection date."); return; }
   if (!payload.report_ref) { alert("Please enter report reference (unique)."); return; }
+  if (!payload.title) { alert("Please select Title (mandatory)."); return; }
 
   setSaveStatus("Saving…");
   try {
@@ -793,6 +665,7 @@ async function handleSaveHeader() {
     }
 
     state.reports = await loadReportsFromDb();
+    state.reportsFiltered = [];
     await setActiveReportById(saved.id);
     setSaveStatus("Saved");
   } catch (e) {
@@ -840,17 +713,241 @@ function buildExtractedItemsFromDb() {
     out.push({
       qno,
       kind,
-      designation: normDesignation(row.designation) || (kind === "positive" ? "Human" : ""),
+
+      designation: String(row.designation || "").trim() || (kind === "positive" ? "Human" : null),
       positive_rank: String(row.positive_rank || "").trim() || null,
       nature_of_concern: String(row.nature_of_concern || "").trim() || null,
       classification_coding: String(row.classification_coding || "").trim() || null,
+
       text: String(row.observation_text || "").trim(),
-      pgno_texts: formatPgnoSelectedText(qno)
     });
   }
 
   out.sort((a, b) => String(a.qno).localeCompare(String(b.qno)));
   state.extractedItems = out;
+}
+
+// -------------------------
+// PDF download helper
+// -------------------------
+async function downloadActivePdf() {
+  if (!state.activeReport?.pdf_storage_path) {
+    alert("No PDF linked.");
+    return;
+  }
+  const path = state.activeReport.pdf_storage_path;
+  const { data, error } = await state.supabase.storage.from(PDF_BUCKET_DEFAULT).download(path);
+  if (error || !data) throw error || new Error("Download failed.");
+  const blob = data;
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = path.split("/").pop() || "inspection.pdf";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
+
+// -------------------------
+// Manual add
+// -------------------------
+async function addManualItem() {
+  if (!state.activeReport) {
+    alert("Save Header first (create an inspection), then add manual items.");
+    return;
+  }
+
+  const qnoRaw = prompt("Enter question number (e.g. 4.2.7):");
+  if (!qnoRaw) return;
+  const qno = findLibraryQno(qnoRaw.trim()) || qnoRaw.trim();
+
+  const kind = prompt('Type: enter "negative" or "positive" or "largely":', "negative");
+  if (!kind) return;
+  const kindLc = kind.trim().toLowerCase();
+  const allowed = new Set(["negative","positive","largely"]);
+  if (!allowed.has(kindLc)) {
+    alert("Invalid type. Use negative / positive / largely.");
+    return;
+  }
+
+  const designation = kindLc === "positive" ? "Human" : (prompt('Category: Human / Process / Hardware / Photo:', "Human") || "Human").trim();
+  const nature = prompt('Nature of concern (e.g. "Not as expected." / "Largely as expected." / "Exceeded normal expectation."):', "") || "";
+  const coding = prompt("Classification coding (optional):", "") || "";
+  const text = prompt("Observation text:", "") || "";
+
+  const observation_type =
+    kindLc === "negative" ? "negative_observation" :
+    kindLc === "positive" ? "positive_observation" :
+    "note_improvement";
+
+  const row = {
+    report_id: state.activeReport.id,
+    question_no: qno,
+    has_observation: true,
+    observation_type,
+    obs_type: kindLc,
+    question_base: qno,
+    observation_text: text.trim() || null,
+    remarks: text.trim() || null,
+    pgno_selected: [],
+    designation: designation || null,
+    nature_of_concern: nature || null,
+    classification_coding: coding || null,
+    positive_rank: null,
+    updated_at: nowIso(),
+  };
+
+  setSaveStatus("Saving…");
+  try {
+    await upsertObservationRow(row);
+    state.observationsByQno = await loadObservationsForReport(state.activeReport.id);
+    buildExtractedItemsFromDb();
+    renderObsTable();
+    setSaveStatus("Saved");
+  } catch (e) {
+    console.error(e);
+    alert("Manual add failed: " + (e?.message || String(e)));
+    setSaveStatus("Error");
+  }
+}
+
+// -------------------------
+// Reports Browser (filters + list)
+// -------------------------
+function uniqSorted(arr) {
+  return Array.from(new Set(arr.filter(Boolean))).sort((a,b) => String(a).localeCompare(String(b)));
+}
+
+function renderRbBox(containerId, options, selectedSet, labelFn = (x)=>x) {
+  const box = el(containerId);
+  box.innerHTML = "";
+  for (const opt of options) {
+    const id = `${containerId}_${String(opt).replace(/[^a-zA-Z0-9]+/g,"_")}`;
+    const checked = selectedSet.has(opt) ? "checked" : "";
+    const div = document.createElement("div");
+    div.className = "rb-opt";
+    div.innerHTML = `<input type="checkbox" id="${esc(id)}" data-val="${esc(opt)}" ${checked}/>
+                     <label for="${esc(id)}" style="cursor:pointer; font-weight:850; color:#0c1b2a;">${esc(labelFn(opt))}</label>`;
+    box.appendChild(div);
+  }
+}
+
+function readRbSelections(containerId) {
+  const box = el(containerId);
+  const set = new Set();
+  box.querySelectorAll('input[type="checkbox"]').forEach(chk => {
+    if (chk.checked) set.add(chk.getAttribute("data-val") || "");
+  });
+  return set;
+}
+
+function applyReportFilters() {
+  const f = state.reportFilters;
+  const out = (state.reports || []).filter(r => {
+    // Vessel
+    if (f.vessel_ids.size) {
+      if (!f.vessel_ids.has(String(r.vessel_id || ""))) return false;
+    }
+    // Year
+    if (f.years.size) {
+      const y = isoToYear(r.inspection_date);
+      if (!f.years.has(y)) return false;
+    }
+    // Month
+    if (f.months.size) {
+      const m = isoToYyyyMm(r.inspection_date);
+      if (!f.months.has(m)) return false;
+    }
+    // OCIMF company
+    if (f.ocimf.size) {
+      const v = String(r.ocimf_inspecting_company || "");
+      if (!f.ocimf.has(v)) return false;
+    }
+    // Inspector name
+    if (f.inspector_names.size) {
+      const v = String(r.inspector_name || "");
+      if (!f.inspector_names.has(v)) return false;
+    }
+    // Inspector company
+    if (f.inspector_companies.size) {
+      const v = String(r.inspector_company || "");
+      if (!f.inspector_companies.has(v)) return false;
+    }
+    return true;
+  });
+
+  state.reportsFiltered = out;
+}
+
+function renderReportsBrowserList() {
+  const tbody = el("rbTableBody");
+  const list = state.reportsFiltered?.length ? state.reportsFiltered : state.reports;
+
+  if (!list?.length) {
+    tbody.innerHTML = `<tr><td colspan="7" class="muted">No reports match current filters.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = list.map(r => `
+    <tr class="obs-row" data-report-id="${esc(r.id)}">
+      <td>${esc(r.inspection_date || "")}</td>
+      <td>${esc(r.vessel_name || "")}</td>
+      <td>${esc(r.ocimf_inspecting_company || "")}</td>
+      <td>${esc(r.inspector_name || "")}</td>
+      <td>${esc(r.inspector_company || "")}</td>
+      <td>${esc(r.report_ref || "")}</td>
+      <td>${esc(r.title || "")}</td>
+    </tr>
+  `).join("");
+
+  tbody.querySelectorAll("tr.obs-row").forEach(tr => {
+    tr.addEventListener("click", async () => {
+      const id = tr.getAttribute("data-report-id");
+      if (!id) return;
+      el("reportsDialog").close();
+      el("reportSelect").value = id;
+      await setActiveReportById(id);
+    });
+  });
+}
+
+function openReportsDialog() {
+  // Build options from reports
+  const vessels = uniqSorted((state.reports||[]).map(r => String(r.vessel_id||"")));
+  const vesselLabel = (vid) => {
+    const hit = state.vessels.find(v => v.id === vid);
+    return hit ? hit.name : vid;
+  };
+
+  const years = uniqSorted((state.reports||[]).map(r => isoToYear(r.inspection_date)));
+  const months = uniqSorted((state.reports||[]).map(r => isoToYyyyMm(r.inspection_date)));
+
+  const ocimf = uniqSorted((state.reports||[]).map(r => String(r.ocimf_inspecting_company||"")));
+  const inspNames = uniqSorted((state.reports||[]).map(r => String(r.inspector_name||"")));
+  const inspCos = uniqSorted((state.reports||[]).map(r => String(r.inspector_company||"")));
+
+  renderRbBox("rbVessels", vessels, state.reportFilters.vessel_ids, vesselLabel);
+  renderRbBox("rbYears", years, state.reportFilters.years);
+  renderRbBox("rbMonths", months, state.reportFilters.months);
+  renderRbBox("rbOcimf", ocimf, state.reportFilters.ocimf);
+  renderRbBox("rbInspectorNames", inspNames, state.reportFilters.inspector_names);
+  renderRbBox("rbInspectorCompanies", inspCos, state.reportFilters.inspector_companies);
+
+  applyReportFilters();
+  renderReportsBrowserList();
+
+  el("reportsDialog").showModal();
+}
+
+function clearReportsFilters() {
+  state.reportFilters.vessel_ids = new Set();
+  state.reportFilters.years = new Set();
+  state.reportFilters.months = new Set();
+  state.reportFilters.ocimf = new Set();
+  state.reportFilters.inspector_names = new Set();
+  state.reportFilters.inspector_companies = new Set();
+  state.reportsFiltered = [];
 }
 
 // -------------------------
@@ -901,6 +998,11 @@ async function importReportPdfAiFromFile(file) {
     .maybeSingle();
   if (findErr) throw findErr;
 
+  const title = String(el("reportTitleSelect").value || "").trim();
+  if (!title) {
+    throw new Error("Title is mandatory. Select Title first, then import PDF.");
+  }
+
   const headerPayload = {
     vessel_id: vesselHit.id,
     inspection_date: isoDate,
@@ -908,8 +1010,10 @@ async function importReportPdfAiFromFile(file) {
     port_code: String(h.port_code || "").trim() || null,
     ocimf_inspecting_company: String(h.ocimf_inspecting_company || "").trim() || null,
     report_ref,
-    title: String(el("reportTitle").value || "").trim() || null,
+    title,
     pdf_storage_path: tempPath,
+    inspector_name: String(el("inspectorName").value || "").trim() || null,
+    inspector_company: String(el("inspectorCompany").value || "").trim() || null,
   };
 
   let report;
@@ -922,33 +1026,23 @@ async function importReportPdfAiFromFile(file) {
   }
 
   state.reports = await loadReportsFromDb();
+  state.reportsFiltered = [];
   await setActiveReportById(report.id);
 
-  el("vesselSelect").value = headerPayload.vessel_id;
-  el("inspectionDate").value = headerPayload.inspection_date;
-  el("portName").value = headerPayload.port_name || "";
-  el("portCode").value = headerPayload.port_code || "";
-  el("ocimfCompany").value = headerPayload.ocimf_inspecting_company || "";
-  el("reportRef").value = headerPayload.report_ref || "";
   el("pdfStatus").textContent = `Stored: ${tempPath.split("/").pop()}`;
 
   const obs = Array.isArray(extracted?.observations) ? extracted.observations : [];
-  let savedCount = 0;
-  let libMissing = 0;
-  let errors = 0;
-
   setSaveStatus(`Saving ${obs.length} item(s)…`);
+
+  let saved = 0;
+  let libraryMissing = 0;
+  let errors = 0;
 
   for (const item of obs) {
     try {
-      const qbaseRaw = String(item?.question_base || "").trim();
-      const qcanon = canonicalQno(qbaseRaw) || qbaseRaw || "";
-      if (!qcanon) { errors++; continue; }
-
-      const qnoExact = findLibraryQno(qbaseRaw);
-      const qnoToUse = qnoExact || qcanon;
-
-      if (!qnoExact) libMissing++;
+      const qbase = String(item?.question_base || "").trim();
+      const qno = findLibraryQno(qbase);
+      if (!qno) { libraryMissing++; continue; }
 
       const kind = String(item?.obs_type || "").toLowerCase();
       const observation_text = String(item?.observation_text || "").trim();
@@ -961,21 +1055,21 @@ async function importReportPdfAiFromFile(file) {
       const obs_type =
         kind === "negative" ? "negative" :
         kind === "positive" ? "positive" :
-        null;
+        "largely";
 
       const row = {
         report_id: report.id,
-        question_no: qnoToUse,
+        question_no: qno,
         has_observation: true,
         observation_type,
         obs_type,
-        question_base: qcanon,
+        question_base: qno,
 
         observation_text: observation_text || null,
         pgno_selected: [],
         remarks: observation_text || null,
 
-        designation: normDesignation(item?.designation) || (kind === "positive" ? "Human" : null),
+        designation: String(item?.designation || "").trim() || (kind === "positive" ? "Human" : null),
         positive_rank: String(item?.positive_rank || "").trim() || null,
         nature_of_concern: String(item?.nature_of_concern || "").trim() || null,
         classification_coding: String(item?.classification_coding || "").trim() || null,
@@ -984,9 +1078,9 @@ async function importReportPdfAiFromFile(file) {
       };
 
       await upsertObservationRow(row);
-      savedCount++;
+      saved++;
     } catch (e) {
-      console.error("AI import save error:", e);
+      console.error(e);
       errors++;
     }
   }
@@ -995,7 +1089,78 @@ async function importReportPdfAiFromFile(file) {
   buildExtractedItemsFromDb();
   renderObsTable();
 
-  setSaveStatus(`AI import done (saved ${savedCount}, library-missing ${libMissing}, errors ${errors})`);
+  setSaveStatus(`AI import done (saved ${saved}, library-missing ${libraryMissing}, errors ${errors})`);
+}
+
+// -------------------------
+// Export / Import JSON (basic)
+// -------------------------
+async function exportJson() {
+  if (!state.activeReport) { alert("No active report."); return; }
+  const report = state.activeReport;
+  const observations = Object.values(state.observationsByQno || {});
+  const payload = { report, observations };
+
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type:"application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `post_inspection_${report.report_ref || report.id}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+
+async function importJsonFile(file) {
+  if (!file) return;
+  const text = await file.text();
+  const obj = JSON.parse(text);
+
+  const report = obj?.report;
+  const observations = Array.isArray(obj?.observations) ? obj.observations : [];
+  if (!report?.report_ref) throw new Error("Invalid JSON: missing report.report_ref");
+
+  // Require Title because you want mandatory
+  if (!report?.title) throw new Error("Invalid JSON: missing report.title (Title is mandatory).");
+
+  // create or update report by report_ref
+  const { data: existingRep, error: findErr } = await state.supabase
+    .from("post_inspection_reports")
+    .select("id")
+    .eq("report_ref", report.report_ref)
+    .maybeSingle();
+  if (findErr) throw findErr;
+
+  const headerPayload = {
+    vessel_id: report.vessel_id,
+    inspection_date: report.inspection_date,
+    port_name: report.port_name,
+    port_code: report.port_code,
+    ocimf_inspecting_company: report.ocimf_inspecting_company,
+    report_ref: report.report_ref,
+    title: report.title,
+    pdf_storage_path: report.pdf_storage_path,
+    inspector_name: report.inspector_name || null,
+    inspector_company: report.inspector_company || null,
+  };
+
+  let savedReport;
+  if (existingRep?.id) savedReport = await updateReportHeader(existingRep.id, headerPayload);
+  else savedReport = await createReportHeader(headerPayload);
+
+  // upsert observations
+  for (const row of observations) {
+    if (!row?.question_no) continue;
+    await upsertObservationRow({
+      ...row,
+      report_id: savedReport.id,
+      updated_at: nowIso(),
+    });
+  }
+
+  state.reports = await loadReportsFromDb();
+  await setActiveReportById(savedReport.id);
 }
 
 // -------------------------
@@ -1041,8 +1206,6 @@ async function waitForAuth(timeoutMs = 4000) {
 }
 
 async function init() {
-  window.__POST_INSPECTION_BUILD = POST_INSPECTION_BUILD;
-
   const ok = await waitForAuth(4000);
   if (!ok) {
     throw new Error("AUTH not loaded. Ensure ./auth.js is included BEFORE ./post_inspection.js.");
@@ -1057,8 +1220,7 @@ async function init() {
   window.AUTH.fillUserBadge(state.me, "userBadge");
   el("logoutBtn").addEventListener("click", window.AUTH.logoutAndGoLogin);
 
-  el("buildPill").textContent = `build: ${POST_INSPECTION_BUILD}`;
-  console.log("[Post-Inspection] Loaded build:", POST_INSPECTION_BUILD);
+  try { el("buildPill").textContent = "build: post_inspection_reports_browser_titles_inspector_company_2026-03-01"; } catch {}
 
   setSaveStatus("Loading…");
 
@@ -1067,18 +1229,13 @@ async function init() {
 
   state.lib = await loadLockedLibraryJson(LOCKED_LIBRARY_JSON);
   state.libByNo = new Map();
-  state.libCanonToExact = new Map();
   for (const q of state.lib) {
     const qno = getQno(q);
-    if (!qno) continue;
-    state.libByNo.set(qno, q);
-    const canon = canonicalQno(qno);
-    if (canon && !state.libCanonToExact.has(canon)) {
-      state.libCanonToExact.set(canon, qno);
-    }
+    if (qno) state.libByNo.set(qno, q);
   }
 
   state.reports = await loadReportsFromDb();
+  state.reportsFiltered = [];
   renderReportSelect();
 
   if (!el("inspectionDate").value) {
@@ -1093,9 +1250,42 @@ async function init() {
     await setActiveReportById(el("reportSelect").value || null);
   });
 
+  el("browseReportsBtn").addEventListener("click", openReportsDialog);
+  el("rbCloseBtn").addEventListener("click", () => el("reportsDialog").close());
+  el("rbClearBtn").addEventListener("click", () => {
+    clearReportsFilters();
+    openReportsDialog();
+  });
+  el("rbApplyBtn").addEventListener("click", () => {
+    // read selections
+    state.reportFilters.vessel_ids = readRbSelections("rbVessels");
+    state.reportFilters.years = readRbSelections("rbYears");
+    state.reportFilters.months = readRbSelections("rbMonths");
+    state.reportFilters.ocimf = readRbSelections("rbOcimf");
+    state.reportFilters.inspector_names = readRbSelections("rbInspectorNames");
+    state.reportFilters.inspector_companies = readRbSelections("rbInspectorCompanies");
+
+    applyReportFilters();
+    renderReportsBrowserList();
+    renderReportSelect();
+  });
+
   el("newReportBtn").addEventListener("click", handleNewReport);
   el("saveHeaderBtn").addEventListener("click", handleSaveHeader);
   el("deleteReportBtn").addEventListener("click", handleDeleteReport);
+
+  el("downloadPdfBtn").addEventListener("click", async () => {
+    try { await downloadActivePdf(); } catch (e) { alert("PDF download failed: " + (e?.message || String(e))); }
+  });
+
+  el("exportBtn").addEventListener("click", exportJson);
+  el("importBtn").addEventListener("click", () => el("importFile").click());
+  el("importFile").addEventListener("change", async (e) => {
+    const f = e.target.files && e.target.files[0];
+    try { if (f) await importJsonFile(f); }
+    catch (err) { alert("Import failed: " + (err?.message || String(err))); }
+    finally { e.target.value = ""; }
+  });
 
   el("importPdfBtn").addEventListener("click", () => el("importPdfFile").click());
   el("importPdfFile").addEventListener("change", async (e) => {
@@ -1106,6 +1296,8 @@ async function init() {
       e.target.value = "";
     }
   });
+
+  el("addManualBtn").addEventListener("click", addManualItem);
 
   el("statsBtn").addEventListener("click", renderKpis);
   el("finalizeBtn").addEventListener("click", finalizeCheck);
@@ -1121,37 +1313,6 @@ async function init() {
 
   el("dashboardBtn")?.addEventListener("click", () => { window.location.href = "dashboard.html"; });
   el("modeSelectBtn")?.addEventListener("click", () => { window.location.href = "mode_selection.html"; });
-
-  // Manual add wiring
-  el("manualAddBtn")?.addEventListener("click", showManualDialog);
-  el("manCancelBtn")?.addEventListener("click", closeManualDialog);
-  el("manCreateBtn")?.addEventListener("click", createManualObservation);
-
-  // Manual dialog dynamic PGNO section
-  el("manType")?.addEventListener("change", () => {
-    const kind = String(el("manType").value || "negative").trim();
-    el("manPgnoWrap").style.display = (kind === "negative") ? "block" : "none";
-    if (kind === "positive") {
-      el("manDesignation").value = "Human";
-      if (!String(el("manNature").value || "").trim()) el("manNature").value = "Exceeded normal expectation.";
-    }
-    if (kind === "largely") {
-      if (!String(el("manNature").value || "").trim()) el("manNature").value = "Largely as expected.";
-    }
-    if (kind === "negative") {
-      if (!String(el("manNature").value || "").trim()) el("manNature").value = "Not as expected.";
-    }
-  });
-
-  el("manQno")?.addEventListener("input", () => {
-    const qRaw = String(el("manQno").value || "").trim();
-    const qnoExact = findLibraryQno(qRaw);
-    if (!qnoExact) {
-      el("manPgnoList").innerHTML = `<div class="muted">Question not found in library yet. PGNO bullets require a library match.</div>`;
-      return;
-    }
-    renderManualPgnoList(qnoExact);
-  });
 
   if (state.reports.length) {
     await setActiveReportById(state.reports[0].id);
