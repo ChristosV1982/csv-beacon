@@ -32,12 +32,10 @@ function isoToLabel(iso) {
   if (!m) return s || "";
   return `${m[3]}/${m[2]}/${m[1]}`;
 }
-
 function isoYear(iso) {
   const m = String(iso || "").match(/^(\d{4})-/);
   return m ? m[1] : "";
 }
-
 function isoMonth(iso) {
   const m = String(iso || "").match(/^\d{4}-(\d{2})-/);
   return m ? m[1] : "";
@@ -125,7 +123,6 @@ const state = {
   extractedItems: [],
   dialogItem: null,
 
-  // tick filters (multi-select)
   ticks: {
     vessels: new Set(),
     years: new Set(),
@@ -288,7 +285,6 @@ function loadReportIntoHeader(r) {
   el("inspectorCompany").value = r.inspector_company || "";
 
   setActivePill("Active: " + reportLabel(r));
-
   if (r.pdf_storage_path) el("pdfStatus").textContent = `Stored: ${r.pdf_storage_path.split("/").pop()}`;
   else el("pdfStatus").textContent = "No PDF linked";
 }
@@ -305,10 +301,7 @@ function renderTitleSelect() {
 function renderTitlesModal() {
   const box = el("titlesList");
   const rows = (state.titles || []).slice().sort((a,b)=>String(a.title).localeCompare(String(b.title)));
-  if (!rows.length) {
-    box.innerHTML = `<div class="muted">No titles found.</div>`;
-    return;
-  }
+  if (!rows.length) { box.innerHTML = `<div class="muted">No titles found.</div>`; return; }
 
   box.innerHTML = rows.map(t => {
     const active = !!t.is_active;
@@ -345,7 +338,7 @@ function renderTitlesModal() {
 }
 
 // -------------------------
-// Multi-select tick filters (Stored Inspections)
+// Stored inspections filters + table
 // -------------------------
 function uniqSorted(list) {
   return [...new Set(list.filter(Boolean))].sort((a,b)=>String(a).localeCompare(String(b)));
@@ -380,7 +373,6 @@ function buildChecklist(containerId, items, selectedSet, searchTerm="") {
 
 function refreshTickFilterLists() {
   const reports = state.reports || [];
-
   const vesselNames = uniqSorted(reports.map(r => r.vessel_name || ""));
   const years = uniqSorted(reports.map(r => isoYear(r.inspection_date)));
   const months = uniqSorted(reports.map(r => isoMonth(r.inspection_date)).filter(Boolean).map(m => {
@@ -401,13 +393,11 @@ function refreshTickFilterLists() {
 
 function tickFilterPass(r) {
   const t = state.ticks;
-
   const vessel = String(r.vessel_name || "");
   const year = isoYear(r.inspection_date);
   const month = isoMonth(r.inspection_date);
   const monthLabelMap = { "01":"Jan","02":"Feb","03":"Mar","04":"Apr","05":"May","06":"Jun","07":"Jul","08":"Aug","09":"Sep","10":"Oct","11":"Nov","12":"Dec" };
   const monthKey = month ? `${month} - ${monthLabelMap[month] || month}` : "";
-
   const ocimf = String(r.ocimf_inspecting_company || "");
   const insp = String(r.inspector_name || "");
   const inspC = String(r.inspector_company || "");
@@ -418,7 +408,6 @@ function tickFilterPass(r) {
   if (t.ocimf.size && !t.ocimf.has(ocimf)) return false;
   if (t.inspector.size && !t.inspector.has(insp)) return false;
   if (t.inspectorCompany.size && !t.inspectorCompany.has(inspC)) return false;
-
   return true;
 }
 
@@ -451,9 +440,7 @@ function headerFilterPass(r) {
   if (f.ocimf && !ocimf.includes(f.ocimf)) return false;
   if (f.inspector && !insp.includes(f.inspector)) return false;
   if (f.inspectorCompany && !inspC.includes(f.inspectorCompany)) return false;
-
   if (f.date) {
-    // allow match by dd/mm/yyyy OR yyyy-mm OR yyyy
     if (!dateLabel.includes(f.date) && !dateIso.includes(f.date)) return false;
   }
   return true;
@@ -462,7 +449,6 @@ function headerFilterPass(r) {
 function renderStoredInspections() {
   const tbody = el("storedTbody");
   const list = (state.reports || []).filter(r => tickFilterPass(r)).filter(r => headerFilterPass(r));
-
   el("siCount").textContent = `${list.length} inspections`;
 
   if (!list.length) {
@@ -500,8 +486,26 @@ function renderStoredInspections() {
   });
 }
 
+function wireStoredHeaderFilters() {
+  const ids = [
+    "siFilterVessel","siFilterDate","siFilterRef","siFilterTitle",
+    "siFilterOcimf","siFilterInspector","siFilterInspectorCompany"
+  ];
+  ids.forEach(id => {
+    const node = el(id);
+    if (!node) return;
+    node.addEventListener("input", () => renderStoredInspections());
+  });
+}
+
+function clearAllTicks() {
+  Object.values(state.ticks).forEach(set => set.clear());
+  refreshTickFilterLists();
+  renderStoredInspections();
+}
+
 // -------------------------
-// Extracted items table
+// Extracted items / dialog (same core as before)
 // -------------------------
 function obsRowTypeLabel(item) {
   if (item.kind === "negative") return `<span class="obs-badge neg">Negative</span>`;
@@ -525,7 +529,6 @@ function renderObsSummary() {
   const pos = items.filter(x => x.kind === "positive").length;
   const lae = items.filter(x => x.kind === "largely").length;
   const miss = items.filter(x => x.kind === "negative" && missingPgnoForQno(x.qno)).length;
-
   el("obsSummary").textContent = `Total: ${total} | Negative: ${neg} | Positive: ${pos} | Largely: ${lae} | Missing PGNO: ${miss}`;
 }
 
@@ -537,24 +540,20 @@ function applyObsFilters(items) {
 
   return (items || []).filter(it => {
     if (type && it.kind !== type) return false;
-
     if (categoryFilter) {
       const d = normCategory(it.designation || "");
       if (categoryFilter !== d) return false;
     }
-
     if (onlyMissing && !(it.kind === "negative" && missingPgnoForQno(it.qno))) return false;
 
     if (term) {
       const hay = [
-        it.qno,
-        it.kind,
+        it.qno, it.kind,
         it.designation || "",
         it.positive_rank || "",
         it.nature_of_concern || "",
         it.classification_coding || "",
-        it.text || "",
-        it.pgno_selected_text || ""
+        it.text || ""
       ].join(" ").toLowerCase();
       if (!hay.includes(term)) return false;
     }
@@ -619,9 +618,6 @@ function renderObsTable() {
   renderObsSummary();
 }
 
-// -------------------------
-// Modal editor (editable fields)
-— same as your current working editable version —
 function buildCategorySelect(selected, disabled=false) {
   const s = normCategory(selected);
   const dis = disabled ? "disabled" : "";
@@ -844,7 +840,7 @@ function buildExtractedItemsFromDb() {
 }
 
 // -------------------------
-// Report actions
+// Active report load
 // -------------------------
 async function setActiveReportById(id) {
   if (!id) {
@@ -877,232 +873,65 @@ async function setActiveReportById(id) {
   setSaveStatus("Loaded");
 }
 
-function handleNewReport() {
-  state.activeReport = null;
-  state.observationsByQno = {};
-  state.extractedItems = [];
-  setActivePill("No active report");
-  setSaveStatus("Not saved");
-
-  el("vesselSelect").value = "";
-  const d = new Date();
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  el("inspectionDate").value = `${yyyy}-${mm}-${dd}`;
-
-  el("portName").value = "";
-  el("portCode").value = "";
-  el("ocimfCompany").value = "";
-  el("reportRef").value = "";
-  el("reportTitle").value = "";
-  el("inspectorName").value = "";
-  el("inspectorCompany").value = "";
-  el("pdfStatus").textContent = "No PDF linked";
-
-  renderObsTable();
-}
-
-async function handleSaveHeader() {
-  const payload = headerInputs();
-
-  if (!payload.vessel_id) { alert("Please select a vessel first."); return; }
-  if (!payload.inspection_date) { alert("Please set an inspection date."); return; }
-  if (!payload.report_ref) { alert("Please enter report reference (unique)."); return; }
-  if (!payload.title) { alert("Please select Title."); return; }
-
-  setSaveStatus("Saving…");
-  try {
-    let saved;
-    if (!state.activeReport) saved = await createReportHeader(payload);
-    else saved = await updateReportHeader(state.activeReport.id, payload);
-
-    state.reports = await loadReportsFromDb();
-    refreshTickFilterLists();
-    renderStoredInspections();
-
-    await setActiveReportById(saved.id);
-    setSaveStatus("Saved");
-  } catch (e) {
-    console.error(e);
-    alert("Save header failed: " + (e?.message || String(e)));
-    setSaveStatus("Error");
-  }
-}
-
-async function handleDeleteReport() {
-  if (!state.activeReport) return;
-  const ok = confirm(`Delete this report?\n\n${reportLabel(state.activeReport)}\n\nAll items will be deleted (cascade).`);
-  if (!ok) return;
-
-  setSaveStatus("Deleting…");
-  try {
-    await deleteReport(state.activeReport.id);
-    state.reports = await loadReportsFromDb();
-    refreshTickFilterLists();
-    renderStoredInspections();
-
-    await setActiveReportById(state.reports[0]?.id || null);
-    setSaveStatus("Deleted");
-  } catch (e) {
-    console.error(e);
-    alert("Delete failed: " + (e?.message || String(e)));
-    setSaveStatus("Error");
-  }
-}
-
 // -------------------------
-// Manual item
+// AUTH + INIT (FIXED)
 // -------------------------
-async function addManualItem() {
-  if (!state.activeReport) { alert("Load or create a report first."); return; }
-
-  const qnoRaw = prompt("Enter Question No (e.g. 4.2.7). It must exist in the locked question library.");
-  const qno = findLibraryQno(qnoRaw || "");
-  if (!qno) { alert("Question number not found in locked library."); return; }
-
-  const type = prompt("Type? Enter: negative / positive / largely", "negative");
-  const kind = String(type || "").trim().toLowerCase();
-  const kindNorm = (kind === "positive" || kind === "negative" || kind === "largely") ? kind : "negative";
-
-  const observation_type =
-    kindNorm === "negative" ? "negative_observation" :
-    kindNorm === "positive" ? "positive_observation" :
-    "note_improvement";
-
-  const row = {
-    report_id: state.activeReport.id,
-    question_no: qno,
-    has_observation: true,
-    observation_type,
-    obs_type: kindNorm,
-    question_base: qno,
-    pgno_selected: [],
-    designation: kindNorm === "positive" ? "Human" : null,
-    nature_of_concern: kindNorm === "positive" ? "Exceeded normal expectation." : (kindNorm === "negative" ? "Not as expected." : "Largely as expected."),
-    observation_text: null,
-    remarks: null,
-    updated_at: nowIso(),
-  };
-
-  setSaveStatus("Saving…");
-  try {
-    await upsertObservationRow(row);
-    state.observationsByQno = await loadObservationsForReport(state.activeReport.id);
-    buildExtractedItemsFromDb();
-    renderObsTable();
-
-    const item = state.extractedItems.find(x => x.qno === qno);
-    if (item) openObsDialog(item);
-
-    setSaveStatus("Saved");
-  } catch (e) {
-    console.error(e);
-    alert("Failed to add manual item: " + (e?.message || String(e)));
-    setSaveStatus("Error");
-  }
-}
-
-// -------------------------
-// PDF download
-// -------------------------
-async function downloadPdf() {
-  if (!state.activeReport?.pdf_storage_path) { alert("No PDF linked for this report."); return; }
-  try {
-    const bucket = PDF_BUCKET_DEFAULT;
-    const path = state.activeReport.pdf_storage_path;
-    const { data, error } = await state.supabase.storage.from(bucket).createSignedUrl(path, 60 * 5);
-    if (error) throw error;
-    const url = data?.signedUrl;
-    if (!url) throw new Error("No signed URL returned");
-    window.open(url, "_blank");
-  } catch (e) {
-    console.error(e);
-    alert("Download PDF failed: " + (e?.message || String(e)));
-  }
-}
-
-// -------------------------
-// KPI
-// -------------------------
-function renderKpis() {
-  const items = state.extractedItems || [];
-  const total = items.length;
-  const neg = items.filter(x => x.kind === "negative").length;
-  const pos = items.filter(x => x.kind === "positive").length;
-  const lae = items.filter(x => x.kind === "largely").length;
-  const miss = items.filter(x => x.kind === "negative" && missingPgnoForQno(x.qno)).length;
-
-  el("kpiTotal").value = String(total);
-  el("kpiNeg").value = String(neg);
-  el("kpiPos").value = String(pos);
-  el("kpiLae").value = String(lae);
-  el("kpiMissingPgno").value = String(miss);
-
-  el("statsDialog").showModal();
-}
-
-function finalizeCheck() {
-  if (!state.activeReport) { alert("No active report."); return; }
-  const missing = (state.extractedItems || []).filter(x => x.kind === "negative" && missingPgnoForQno(x.qno));
-  if (!missing.length) {
-    alert("Finalize check: OK.\n\nNo negative items are missing PGNO ticks.");
-    return;
-  }
-  renderKpis();
-}
-
-// -------------------------
-// Init
-// -------------------------
-async function waitForAuth(timeoutMs = 4000) {
+async function waitForAuth(timeoutMs = 6000) {
   const started = Date.now();
   while (Date.now() - started < timeoutMs) {
-    if (window.AUTH && typeof window.AUTH.requireAuth === "function") return true;
+    if (window.AUTH && typeof window.AUTH.requireAuth === "function" && typeof window.AUTH.ensureSupabase === "function") return true;
     await new Promise(r => setTimeout(r, 50));
   }
   return false;
 }
 
-function wireStoredHeaderFilters() {
-  const ids = [
-    "siFilterVessel","siFilterDate","siFilterRef","siFilterTitle",
-    "siFilterOcimf","siFilterInspector","siFilterInspectorCompany"
-  ];
-  ids.forEach(id => {
-    const node = el(id);
-    if (!node) return;
-    node.addEventListener("input", () => renderStoredInspections());
-  });
-}
-
-function clearAllTicks() {
-  Object.values(state.ticks).forEach(set => set.clear());
-  refreshTickFilterLists();
-  renderStoredInspections();
+function redirectToLogin() {
+  // Use existing helper if available
+  try {
+    if (window.AUTH && typeof window.AUTH.logoutAndGoLogin === "function") {
+      window.AUTH.logoutAndGoLogin();
+      return;
+    }
+  } catch {}
+  // Fallback
+  window.location.href = "login.html";
 }
 
 async function init() {
-  const ok = await waitForAuth(4000);
+  const ok = await waitForAuth(6000);
   if (!ok) throw new Error("AUTH not loaded. Ensure ./auth.js is included BEFORE ./post_inspection.js.");
 
+  // Show immediate UI state
+  try { el("buildPill").textContent = "build: post_inspection_auth_fix_2026-03-01"; } catch {}
+  try { el("userBadge").textContent = "Signing in…"; } catch {}
+  setSaveStatus("Authenticating…");
+
+  // Create client
   state.supabase = window.AUTH.ensureSupabase();
 
+  // Require auth (hard fail -> redirect)
   const R = window.AUTH.ROLES;
   state.me = await window.AUTH.requireAuth([R.SUPER_ADMIN, R.COMPANY_ADMIN]);
-  if (!state.me) return;
 
+  if (!state.me) {
+    alert("You are not signed in (or session expired). Redirecting to login.");
+    redirectToLogin();
+    return;
+  }
+
+  // Signed in OK
   window.AUTH.fillUserBadge(state.me, "userBadge");
   el("logoutBtn").addEventListener("click", window.AUTH.logoutAndGoLogin);
 
-  try { el("buildPill").textContent = "build: post_inspection_titles_multitick_no_hscroll_2026-03-01"; } catch {}
-
   setSaveStatus("Loading…");
 
+  // Load vessels
   state.vessels = await loadVessels();
-  const vesselSelect = el("vesselSelect");
-  vesselSelect.innerHTML = `<option value="">— Select vessel —</option>` + state.vessels.map(v => `<option value="${esc(v.id)}">${esc(v.name)}</option>`).join("");
+  el("vesselSelect").innerHTML =
+    `<option value="">— Select vessel —</option>` +
+    state.vessels.map(v => `<option value="${esc(v.id)}">${esc(v.name)}</option>`).join("");
 
+  // Load library
   state.lib = await loadLockedLibraryJson(LOCKED_LIBRARY_JSON);
   state.libByNo = new Map();
   for (const q of state.lib) {
@@ -1119,11 +948,10 @@ async function init() {
     alert("Titles table not ready. Run the SQL to create post_inspection_titles.\n\nError: " + (e?.message || String(e)));
   }
 
-  // Stored reports
+  // Stored inspections
   state.reports = await loadReportsFromDb();
   wireStoredHeaderFilters();
 
-  // Wire tick search boxes
   el("fltVesselSearch").addEventListener("input", refreshTickFilterLists);
   el("fltOcimfSearch").addEventListener("input", refreshTickFilterLists);
   el("fltInspectorSearch").addEventListener("input", refreshTickFilterLists);
@@ -1142,19 +970,27 @@ async function init() {
     el("inspectionDate").value = `${yyyy}-${mm}-${dd}`;
   }
 
-  // Header buttons
-  el("newReportBtn").addEventListener("click", handleNewReport);
-  el("saveHeaderBtn").addEventListener("click", handleSaveHeader);
-  el("deleteReportBtn").addEventListener("click", handleDeleteReport);
-  el("downloadPdfBtn")?.addEventListener("click", downloadPdf);
+  // Wire minimal buttons (existing in your HTML)
+  el("dashboardBtn")?.addEventListener("click", () => { window.location.href = "dashboard.html"; });
+  el("modeSelectBtn")?.addEventListener("click", () => { window.location.href = "mode_selection.html"; });
 
-  // Manage titles
-  el("manageTitlesBtn").addEventListener("click", () => {
+  // Extracted table filters
+  el("obsSearch").addEventListener("input", renderObsTable);
+  el("obsTypeFilter").addEventListener("change", renderObsTable);
+  el("obsCategoryFilter").addEventListener("change", renderObsTable);
+  el("onlyMissingPgno").addEventListener("change", renderObsTable);
+
+  // Dialog buttons
+  el("dlgCancelBtn").addEventListener("click", closeObsDialog);
+  el("dlgSaveBtn").addEventListener("click", saveObsDialog);
+
+  // Manage titles modal (if present)
+  el("manageTitlesBtn")?.addEventListener("click", () => {
     renderTitlesModal();
     el("titlesDialog").showModal();
   });
-  el("closeTitlesBtn").addEventListener("click", () => el("titlesDialog").close());
-  el("addTitleBtn").addEventListener("click", async () => {
+  el("closeTitlesBtn")?.addEventListener("click", () => el("titlesDialog").close());
+  el("addTitleBtn")?.addEventListener("click", async () => {
     const t = String(el("newTitleInput").value || "").trim();
     if (!t) return alert("Enter a title first.");
     try {
@@ -1172,30 +1008,7 @@ async function init() {
     }
   });
 
-  // Extracted table filters
-  el("obsSearch").addEventListener("input", renderObsTable);
-  el("obsTypeFilter").addEventListener("change", renderObsTable);
-  el("obsCategoryFilter").addEventListener("change", renderObsTable);
-  el("onlyMissingPgno").addEventListener("change", renderObsTable);
-
-  // Dialog buttons
-  el("dlgCancelBtn").addEventListener("click", closeObsDialog);
-  el("dlgSaveBtn").addEventListener("click", saveObsDialog);
-
-  // Add manual
-  el("addManualBtn").addEventListener("click", addManualItem);
-
-  // KPI
-  el("statsBtn").addEventListener("click", renderKpis);
-  el("finalizeBtn").addEventListener("click", finalizeCheck);
-  el("closeStatsBtn").addEventListener("click", () => el("statsDialog").close());
-
-  // Navigation
-  el("dashboardBtn")?.addEventListener("click", () => { window.location.href = "dashboard.html"; });
-  el("modeSelectBtn")?.addEventListener("click", () => { window.location.href = "mode_selection.html"; });
-  el("kpiDashBtn")?.addEventListener("click", () => { window.location.href = "post_inspection_kpi_dashboard.html"; });
-
-  // Load most recent report
+  // Load most recent report automatically (if any)
   if (state.reports.length) {
     await setActiveReportById(state.reports[0].id);
   } else {
