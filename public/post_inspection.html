@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>SIRE 2.0 – Post-Inspection Observations</title>
   <link rel="stylesheet" href="style.css" />
-
   <style>
     :root{
       --pi-navy:#0b2a4a;
@@ -15,19 +14,15 @@
       --pi-text:#0c1b2a;
       --pi-muted:#55708f;
       --pi-bg:#08131f;
-
       --pi-chip:#eef6ff;
       --pi-chip-border:#cfe0f4;
-
       --pi-warn-bg:#fff2e0;
       --pi-warn-b:#ffd7a3;
       --pi-warn-t:#7a4a00;
     }
-
     *{ box-sizing:border-box; }
     body{ background:var(--pi-bg); color:var(--pi-text); }
     .pi-wrap{ max-width:1600px; margin:20px auto 40px; padding:0 14px; }
-
     .pi-hero{
       background:linear-gradient(180deg,var(--pi-navy2),var(--pi-navy));
       border:1px solid rgba(255,255,255,.10);
@@ -38,7 +33,6 @@
     }
     .pi-hero h1{ margin:0 0 6px; font-size:24px; letter-spacing:.2px; }
     .pi-hero p{ margin:0; color:rgba(255,255,255,.85); font-weight:800; }
-
     .pi-toprow{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:12px; }
     .pi-pill{
       display:inline-flex; align-items:center; gap:8px;
@@ -48,7 +42,6 @@
       font-weight:800; color:#fff;
     }
     .pi-pill.muted{ color:rgba(255,255,255,.9); opacity:.95; }
-
     .pi-card{
       background:var(--pi-card);
       border:1px solid var(--pi-border);
@@ -58,37 +51,24 @@
       overflow:hidden;
     }
     .pi-card h2{ margin:0 0 12px; color:#113a63; font-weight:900; }
-
-    .pi-grid{
-      display:grid;
-      grid-template-columns: 1fr;
-      gap:18px;
-      margin-top:16px;
-    }
-
-    /* ========= Inspection Header fields: SAFE responsive grid (prevents overlap) ========= */
+    .pi-grid{ display:grid; grid-template-columns: 1fr; gap:18px; margin-top:16px; }
     .pi-fields{
       display:grid;
       grid-template-columns: repeat(12, minmax(0, 1fr));
       gap:10px 12px;
       align-items:end;
     }
-
-    /* default col spans */
     .col-3{ grid-column: span 3; }
     .col-4{ grid-column: span 4; }
     .col-6{ grid-column: span 6; }
     .col-12{ grid-column: 1 / -1; }
-
-    .pi-field label{
-      display:block; font-weight:900; color:#143a63; margin:0 0 6px;
-    }
+    .pi-field label{ display:block; font-weight:900; color:#143a63; margin:0 0 6px; }
     .pi-field input, .pi-field select{
       width:100%;
       padding:10px 12px;
       border:1px solid #cfe0f4;
       border-radius:12px;
-      font-weight:600; /* NORMAL */
+      font-weight:600;
       outline:none;
       background:#fff;
       min-width:0;
@@ -96,90 +76,46 @@
     .pi-field input:focus, .pi-field select:focus{
       border-color:#5aa2ff; box-shadow:0 0 0 3px rgba(90,162,255,.2);
     }
-
-    /* Actions row */
     .pi-actions{
       display:flex; gap:10px; flex-wrap:wrap;
       margin-top:12px;
       padding-top:12px;
       border-top:1px solid #e5eefc;
     }
-
-    /* Buttons - consistent */
-    .btn{
-      border-radius:12px !important;
-      padding:9px 12px !important;
-      font-weight:800 !important;
-    }
-    .btn.primary{
-      background:#1f6feb !important;
-      border-color:#1f6feb !important;
-      color:#fff !important;
-    }
-    .btn.light{
-      background:#ffffff !important;
-      color:#0c1b2a !important;
-      border:1px solid rgba(255,255,255,.35) !important;
-    }
-    .btn.warn{
-      background:#ffe8d0 !important;
-      border:1px solid #ffcf9a !important;
-      color:#7a4a00 !important;
-    }
-    .btn.btn-muted{
-      background:#eef6ff !important;
-      border:1px solid #cfe0f4 !important;
-      color:#143a63 !important;
-    }
-
-    /* Stored inspections */
-    .stored-note{
-      margin:-2px 0 10px;
-      color:#143a63;
-      font-weight:800;
-    }
-
+    .btn{ border-radius:12px !important; padding:9px 12px !important; font-weight:800 !important; }
+    .btn.primary{ background:#1f6feb !important; border-color:#1f6feb !important; color:#fff !important; }
+    .btn.light{ background:#ffffff !important; color:#0c1b2a !important; border:1px solid rgba(255,255,255,.35) !important; }
+    .btn.warn{ background:#ffe8d0 !important; border:1px solid #ffcf9a !important; color:#7a4a00 !important; }
+    .btn.btn-muted{ background:#eef6ff !important; border:1px solid #cfe0f4 !important; color:#143a63 !important; }
+    .stored-note{ margin:-2px 0 10px; color:#143a63; font-weight:800; }
     table{ border-collapse:separate; border-spacing:0; width:100%; table-layout:fixed; }
     .tbl-wrap{ overflow:hidden; border:1px solid #e5eefc; border-radius:16px; }
-
     .pi-table thead th{
-      text-align:left;
-      font-weight:900;
-      color:#143a63;
+      text-align:left; font-weight:900; color:#143a63;
       padding:10px 10px;
       border-bottom:1px solid #e5eefc;
       background:#f8fbff;
-      position:sticky;
-      top:0;
-      z-index:1;
+      position:sticky; top:0; z-index:1;
       vertical-align:bottom;
     }
     .pi-table tbody td{
       padding:10px 10px;
       border-bottom:1px solid #eef4ff;
       vertical-align:top;
-      font-weight:500; /* NORMAL (not bold) */
+      font-weight:500;
       color:#0c1b2a;
       overflow:hidden;
       text-overflow:ellipsis;
-      white-space:nowrap;  /* Stored Inspections: keep compact */
+      white-space:nowrap;
     }
     .pi-table tbody tr{ cursor:pointer; }
     .pi-table tbody tr:hover td{ background:#f8fbff; }
-
     .muted{ color:#55708f; font-weight:700; }
-    .vessel-bold{ font-weight:900; } /* ONLY vessel bold */
-
-    .hdr-flex{
-      display:flex; align-items:center; justify-content:space-between; gap:8px;
-    }
+    .vessel-bold{ font-weight:900; }
+    .hdr-flex{ display:flex; align-items:center; justify-content:space-between; gap:8px; }
     .filter-btn{
-      display:inline-flex;
-      align-items:center;
-      justify-content:center;
-      gap:6px;
-      padding:6px 10px;
-      border-radius:999px;
+      display:inline-flex; align-items:center; justify-content:center; gap:6px;
+      padding:6px 10px; border-radius:999px;
       border:1px solid var(--pi-chip-border);
       background:var(--pi-chip);
       color:#143a63;
@@ -189,17 +125,11 @@
       white-space:nowrap;
     }
     .filter-btn:hover{ filter:brightness(0.98); }
-
-    /* Filter modal popover (no close button; outside click closes; header click toggles) */
     dialog{ border:none; border-radius:18px; padding:0; max-width:640px; width: calc(100vw - 40px); }
     .dlg{ padding:16px; }
     .dlg h3{ margin:0 0 8px; color:#143a63; font-weight:900; }
     .dlg-sub{ font-weight:800; color:#55708f; margin-bottom:12px; }
-    .dlg-actions{
-      display:flex; gap:10px; justify-content:flex-end;
-      margin-top:12px; padding-top:12px; border-top:1px solid #e5eefc;
-    }
-
+    .dlg-actions{ display:flex; gap:10px; justify-content:flex-end; margin-top:12px; padding-top:12px; border-top:1px solid #e5eefc; }
     .chk-list{
       border:1px solid #e5eefc;
       border-radius:14px;
@@ -218,7 +148,6 @@
       color:#0c1b2a;
     }
     .chk-row:last-child{ border-bottom:none; }
-
     .dlg-search{
       width:100%;
       padding:10px 12px;
@@ -228,8 +157,6 @@
       outline:none;
       margin-bottom:10px;
     }
-
-    /* Observation badges */
     .obs-badge{
       display:inline-flex; align-items:center;
       font-weight:800; font-size:12px; padding:6px 10px; border-radius:999px;
@@ -239,14 +166,12 @@
     .obs-badge.neg{ background:#fff2e0; border-color:#ffd7a3; color:#7a4a00; }
     .obs-badge.pos{ background:#e9fff0; border-color:#bfeccc; color:#145c2a; }
     .obs-badge.lae{ background:#f3f0ff; border-color:#d9cffc; color:#3a2a7a; }
-
     .hint{
       font-weight:800; color:var(--pi-warn-t);
       background:var(--pi-warn-bg); border:1px solid var(--pi-warn-b);
       padding:10px 12px; border-radius:14px;
       margin-top:12px;
     }
-
     textarea{
       width:100%;
       min-height:110px;
@@ -258,15 +183,11 @@
       background:#fff;
       outline:none;
     }
-
-    /* ========= Extracted Items table: readable observation text ========= */
     .pi-table.pi-obs tbody td{
-      white-space:normal;   /* allow wrapping */
+      white-space:normal;
       overflow:visible;
       text-overflow:clip;
     }
-
-    /* clamp observation text to keep it readable (not one long wrap) */
     .clamp-3{
       display:-webkit-box;
       -webkit-line-clamp:3;
@@ -275,8 +196,6 @@
       white-space:normal;
       line-height:1.25;
     }
-
-    /* Responsive */
     @media (max-width: 1200px){
       .col-3,.col-4,.col-6{ grid-column: span 6; }
       .col-12{ grid-column: 1 / -1; }
@@ -307,8 +226,6 @@
     </div>
 
     <div class="pi-grid">
-
-      <!-- Stored Inspections -->
       <div class="pi-card" id="storedCard">
         <h2>Stored Inspections</h2>
         <div class="stored-note">Most recent on top • click a row to load • filters are tick-box modals in each header</div>
@@ -373,7 +290,6 @@
         </div>
       </div>
 
-      <!-- Inspection Header -->
       <div class="pi-card" id="headerCard">
         <h2>Inspection Header</h2>
 
@@ -458,7 +374,7 @@
           <ul style="margin:0; padding-left:18px;">
             <li><b>Negative</b>: designation + Nature of Concern (Not as expected … / Observable or detectable deficiency). Requires PGNO.</li>
             <li><b>Positive</b>: Human + Nature of Concern (Exceeded normal expectation). No PGNO.</li>
-            <li><b>Largely as expected</b>: designation + Nature of Concern (Largely as expected). KPI item.</li>
+            <li><b>Largely as expected</b>: designation + Nature of Concern (Largely as expected). KPI item. Requires PGNO.</li>
           </ul>
 
           <div style="margin-top:10px; display:flex; gap:14px; flex-wrap:wrap; align-items:center;">
@@ -475,7 +391,6 @@
         </div>
       </div>
 
-      <!-- Extracted Items -->
       <div class="pi-card" id="obsCard">
         <h2>Extracted Items</h2>
 
@@ -501,7 +416,7 @@
 
             <label style="display:flex; gap:8px; align-items:center; font-weight:700; color:#143a63;">
               <input id="onlyMissingPgno" type="checkbox" />
-              Missing PGNO (negatives)
+              Missing PGNO (negative & largely)
             </label>
           </div>
 
@@ -527,17 +442,14 @@
           </table>
         </div>
       </div>
-
     </div>
 
-    <!-- Stored filter modal -->
     <dialog id="storedFilterDialog">
       <div class="dlg">
         <h3 id="storedFilterTitle">Filters</h3>
         <div class="dlg-sub" id="storedFilterSub">Select values to include. Leave empty = no filtering.</div>
         <input id="storedFilterSearch" class="dlg-search" type="text" placeholder="Search values..." />
         <div class="chk-list" id="storedFilterList"></div>
-
         <div class="dlg-actions">
           <button class="btn btn-muted" id="storedFilterClearBtn" type="button">Clear</button>
           <button class="btn primary" id="storedFilterApplyBtn" type="button">Apply</button>
@@ -545,7 +457,6 @@
       </div>
     </dialog>
 
-    <!-- Titles modal -->
     <dialog id="titlesDialog">
       <div class="dlg">
         <h3>Manage Titles</h3>
@@ -565,7 +476,6 @@
       </div>
     </dialog>
 
-    <!-- KPIs dialog -->
     <dialog id="statsDialog">
       <div class="dlg">
         <h3>KPIs</h3>
@@ -575,7 +485,7 @@
           <div class="pi-field"><label>Negative</label><input id="kpiNeg" readonly /></div>
           <div class="pi-field"><label>Positive</label><input id="kpiPos" readonly /></div>
           <div class="pi-field"><label>Largely as expected</label><input id="kpiLae" readonly /></div>
-          <div class="pi-field"><label>Negatives missing PGNO</label><input id="kpiMissingPgno" readonly /></div>
+          <div class="pi-field"><label>Missing PGNO (neg & largely)</label><input id="kpiMissingPgno" readonly /></div>
         </div>
 
         <div class="dlg-actions">
@@ -584,7 +494,6 @@
       </div>
     </dialog>
 
-    <!-- Observation editor -->
     <dialog id="obsDialog">
       <div class="dlg">
         <h3 id="dlgTitle">Item</h3>

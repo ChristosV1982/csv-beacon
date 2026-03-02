@@ -1,10 +1,9 @@
 import { loadLockedLibraryJson } from "./question_library_loader.js";
 
 /**
- * HARD BUILD STAMP (visible in the blue pill)
- * Change this string every time you replace this file.
+ * HARD BUILD STAMP
  */
-const POST_INSPECTION_BUILD = "post_inspection_ui_counters_examined_store_v22_2026-03-02";
+const POST_INSPECTION_BUILD = "post_inspection_ui_v23_pgno_for_largely_examined_fix_2026-03-02";
 
 /**
  * Locked library JSON
@@ -121,27 +120,22 @@ const state = {
 
   vessels: [],
   lib: [],
-  libByNo: new Map(),          // exact key -> question object
-  libCanonToExact: new Map(),  // canonical -> exact key (first match)
+  libByNo: new Map(),
+  libCanonToExact: new Map(),
 
   reports: [],
   activeReport: null,
 
-  observationsByQno: {},   // question_no -> row
-  extractedItems: [],      // table model
+  observationsByQno: {},
+  extractedItems: [],
   dialogItem: null,
 
-  // Stored inspections filters: col -> Set(values)
   storedFilters: {},
-
-  // Current open filter column
   openFilterCol: null,
 
-  // Titles
   titles: [],
 
-  // Examined questions per active report
-  examinedQuestions: [], // canonical qnos
+  examinedQuestions: [],
   examinedCount: 0,
 };
 
@@ -237,8 +231,6 @@ async function loadVessels() {
 }
 
 async function loadReportsFromDb() {
-  // IMPORTANT: do NOT select columns that might not exist in your schema.
-  // We keep the original known columns only.
   const { data, error } = await state.supabase
     .from("post_inspection_reports")
     .select("id, vessel_id, inspection_date, port_name, port_code, ocimf_inspecting_company, report_ref, title, inspector_name, inspector_company, pdf_storage_path, created_at, updated_at")
@@ -316,35 +308,27 @@ async function upsertObservationRow(row) {
 
 /**
  * Examined questions persistence (best-effort):
- * 1) Try to update post_inspection_reports with examined_count + examined_questions (if columns exist).
- * 2) Else try to upsert into post_inspection_examined_questions table (if exists).
- * 3) Else store in localStorage (fallback; still shown in UI).
  */
 async function persistExaminedQuestions(reportId, examinedQuestions) {
   const canon = (examinedQuestions || []).map(canonicalQno).filter(Boolean);
   const uniq = [...new Set(canon)].sort((a,b)=>a.localeCompare(b));
 
-  // reset hint
   el("examinedStoreHint").style.display = "none";
 
-  // Try option 1: columns on reports table
   try {
     const { error } = await state.supabase
       .from("post_inspection_reports")
       .update({
         examined_count: uniq.length,
-        examined_questions: uniq, // jsonb array if column exists
+        examined_questions: uniq,
         updated_at: nowIso(),
       })
       .eq("id", reportId);
 
     if (!error) return { ok:true, method:"reports_columns" };
-    // if error exists, fall through
   } catch (_) {}
 
-  // Try option 2: dedicated table
   try {
-    // We do not assume this exists; attempt and catch.
     const rows = uniq.map(qno => ({
       report_id: reportId,
       question_no: qno,
@@ -358,7 +342,6 @@ async function persistExaminedQuestions(reportId, examinedQuestions) {
     if (!error) return { ok:true, method:"examined_table" };
   } catch (_) {}
 
-  // Fallback option 3: localStorage
   try {
     const raw = localStorage.getItem(EXAMINED_LOCAL_KEY);
     const obj = raw ? JSON.parse(raw) : {};
@@ -383,6 +366,18 @@ function loadExaminedQuestionsFallback(reportId) {
   } catch {
     return { examined_questions: [], examined_count: 0 };
   }
+}
+
+/* ---------- PGNO rules ---------- */
+/**
+ * PGNO is REQUIRED for:
+ * - negative
+ * - largely
+ * PGNO is NOT APPLICABLE for:
+ * - positive
+ */
+function pgnoRequiredForKind(kind) {
+  return kind === "negative" || kind === "largely";
 }
 
 /* ---------- Stored inspections table + tickbox filters ---------- */
@@ -450,7 +445,6 @@ function closeStoredFilterDialog() {
 }
 
 function openStoredFilterForCol(col) {
-  // toggle: if same open -> close
   if (state.openFilterCol === col && el("storedFilterDialog").open) {
     closeStoredFilterDialog();
     return;
@@ -478,7 +472,6 @@ function openStoredFilterForCol(col) {
 
   el("storedFilterDialog").showModal();
 
-  // outside click closes (no close button)
   el("storedFilterDialog").addEventListener("click", (e) => {
     const rect = el("storedFilterDialog").getBoundingClientRect();
     const inDialog =
@@ -610,7 +603,6 @@ async function setActiveReportById(id) {
     state.observationsByQno = {};
   }
 
-  // examined questions: load fallback (or 0 if none)
   const fb = loadExaminedQuestionsFallback(r.id);
   state.examinedQuestions = fb.examined_questions || [];
   state.examinedCount = Number(fb.examined_count || state.examinedQuestions.length) || state.examinedQuestions.length;
@@ -628,8 +620,12 @@ async function setActiveReportById(id) {
 function missingPgnoForQno(qno) {
   const row = state.observationsByQno[qno];
   if (!row) return false;
-  const isNeg = String(row.observation_type || "") === "negative_observation";
-  if (!isNeg) return false;
+
+  const ot = String(row.observation_type || "");
+  const isPgnoRequired = (ot === "negative_observation" || ot === "note_improvement"); // note_improvement == largely
+
+  if (!isPgnoRequired) return false;
+
   const arr = Array.isArray(row.pgno_selected) ? row.pgno_selected : [];
   return arr.length === 0;
 }
@@ -676,7 +672,11 @@ function applyObsFilters(items) {
   return (items || []).filter(it => {
     if (type && it.kind !== type) return false;
     if (designationFilter && normDesignation(it.designation) !== designationFilter) return false;
-    if (onlyMissing && !(it.kind === "negative" && missingPgnoForQno(it.qno))) return false;
+
+    if (onlyMissing) {
+      // Missing PGNO applies to negative AND largely
+      if (!(pgnoRequiredForKind(it.kind) && missingPgnoForQno(it.qno))) return false;
+    }
 
     if (term) {
       const hay = [
@@ -725,9 +725,13 @@ function renderObsTable() {
   }
 
   body.innerHTML = items.map(it => {
-    const pgTxt = it.kind === "negative"
-      ? (selectedPgnoText(it.pgno_selected) ? selectedPgnoText(it.pgno_selected) : `<span class="muted">—</span>`)
-      : `<span class="muted">n/a</span>`;
+    const needsPgno = pgnoRequiredForKind(it.kind);
+
+    const pgTxt = !needsPgno
+      ? `<span class="muted">n/a</span>`
+      : (selectedPgnoText(it.pgno_selected)
+          ? selectedPgnoText(it.pgno_selected)
+          : `<span class="muted">—</span>`);
 
     const catDisplay = it.kind === "positive"
       ? (it.positive_rank ? `Human (${it.positive_rank})` : "Human")
@@ -743,7 +747,7 @@ function renderObsTable() {
         <td title="${esc(it.nature_of_concern || "")}">${esc(it.nature_of_concern || "")}</td>
         <td title="${esc(it.classification_coding || "")}">${esc(it.classification_coding || "")}</td>
         <td title="${esc(obsText)}"><div class="clamp-3">${esc(obsText)}</div></td>
-        <td title="${esc(it.kind === "negative" ? selectedPgnoText(it.pgno_selected) : "")}">${pgTxt}</td>
+        <td title="${esc(needsPgno ? selectedPgnoText(it.pgno_selected) : "")}">${pgTxt}</td>
       </tr>
     `;
   }).join("");
@@ -766,7 +770,7 @@ function renderObsSummary() {
   const neg = items.filter(x => x.kind === "negative").length;
   const pos = items.filter(x => x.kind === "positive").length;
   const lae = items.filter(x => x.kind === "largely").length;
-  const miss = items.filter(x => x.kind === "negative" && missingPgnoForQno(x.qno)).length;
+  const miss = items.filter(x => pgnoRequiredForKind(x.kind) && missingPgnoForQno(x.qno)).length;
 
   el("obsSummary").textContent =
     `Total Items Extracted: ${total} | Negative: ${neg} | Positive: ${pos} | Largely: ${lae} | Missing PGNO: ${miss}`;
@@ -774,7 +778,7 @@ function renderObsSummary() {
   updateTopCounters();
 }
 
-/* ---------- Observation editor (editable fields) ---------- */
+/* ---------- Observation editor ---------- */
 
 function openObsDialog(item) {
   state.dialogItem = item;
@@ -790,16 +794,16 @@ function openObsDialog(item) {
   el("dlgTitle").textContent = `${item.qno} — ${shortText || "Question"}`;
   el("dlgSub").textContent = `Chapter ${chap || "—"} | ${sect || "—"} | ${item.kind.toUpperCase()}`;
 
-  const isNegative = item.kind === "negative";
+  const pgnoApplies = pgnoRequiredForKind(item.kind); // NEGATIVE + LARGELY
   const pgnoBullets = q ? getPgnoBullets(q) : [];
   const selected = new Set((item.pgno_selected || []).map(x => Number(x.idx)).filter(Number.isFinite));
 
-  const pgnoHtml = !isNegative
-    ? `<div class="hint">PGNOs are <b>not applicable</b> for Positive / Largely as expected items.</div>`
+  const pgnoHtml = !pgnoApplies
+    ? `<div class="hint">PGNOs are <b>not applicable</b> for Positive items.</div>`
     : (
       pgnoBullets.length
         ? `
-          <div style="font-weight:900; color:#143a63; margin-top:8px;">PGNO tick selection (Negative only)</div>
+          <div style="font-weight:900; color:#143a63; margin-top:8px;">PGNO tick selection (${item.kind === "largely" ? "Largely as expected" : "Negative"})</div>
           <div id="dlgPgnoList">
             ${pgnoBullets.map((txt, i) => {
               const idx = i + 1;
@@ -854,14 +858,13 @@ function openObsDialog(item) {
 
     ${pgnoHtml}
 
-    ${isNegative ? `<div id="dlgMissingHint" class="hint" style="display:none;">Missing PGNO tick (Finalize will flag this).</div>` : ``}
+    ${pgnoApplies ? `<div id="dlgMissingHint" class="hint" style="display:none;">Missing PGNO tick (Finalize will flag this).</div>` : ``}
   `;
 
-  // set category dropdown current
   const sel = el("dlgDesignation");
   sel.value = normDesignation(item.designation) || (item.kind === "positive" ? "Human" : "");
 
-  if (isNegative) {
+  if (pgnoApplies) {
     const hint = el("dlgMissingHint");
     const arr = Array.isArray(item.pgno_selected) ? item.pgno_selected : [];
     hint.style.display = arr.length ? "none" : "block";
@@ -884,7 +887,7 @@ async function saveObsDialog() {
   }
 
   const qno = item.qno;
-  const isNegative = item.kind === "negative";
+  const pgnoApplies = pgnoRequiredForKind(item.kind);
 
   const designation = normDesignation(String(el("dlgDesignation").value || "").trim());
   const nature_of_concern = String(el("dlgNature").value || "").trim();
@@ -892,7 +895,7 @@ async function saveObsDialog() {
   const observation_text = String(el("dlgObsText").value || "").trim();
 
   let pgno_selected = [];
-  if (isNegative) {
+  if (pgnoApplies) {
     const pgList = el("dlgBody").querySelectorAll(".dlgPgChk");
     const qExact = state.libCanonToExact.get(canonicalQno(qno)) || qno;
     const q = state.libByNo.get(qExact);
@@ -1062,7 +1065,6 @@ async function importReportPdfAiFromFile(file) {
   const h = extracted?.header || {};
   const obs = Array.isArray(extracted?.observations) ? extracted.observations : [];
 
-  // NEW: examined questions from function
   const examined_questions = Array.isArray(extracted?.examined_questions) ? extracted.examined_questions : [];
   const examined_count = Number(extracted?.examined_count || examined_questions.length) || examined_questions.length;
 
@@ -1109,17 +1111,13 @@ async function importReportPdfAiFromFile(file) {
     report = await createReportHeader(headerPayload);
   }
 
-  // reload reports list + stored inspections table
   state.reports = await loadReportsFromDb();
   renderStoredTable();
 
-  // activate report
   await setActiveReportById(report.id);
 
-  // store header UI
   loadReportIntoHeader({ ...report, vessel_name: extractedVesselName });
 
-  // Persist examined questions (best-effort)
   state.examinedQuestions = examined_questions.map(canonicalQno).filter(Boolean);
   state.examinedCount = examined_count;
 
@@ -1178,7 +1176,6 @@ async function importReportPdfAiFromFile(file) {
     }
   }
 
-  // refresh observations for report
   state.observationsByQno = await loadObservationsForReport(report.id);
   buildExtractedItemsFromDb();
   renderObsTable();
@@ -1266,30 +1263,25 @@ async function importJsonFile(file) {
     const examined = payload?.examined;
 
     if (obs && typeof obs === "object") {
-      // upsert each observation row
       const keys = Object.keys(obs);
       for (const qno of keys) {
         const row = obs[qno];
         if (!row) continue;
         if (String(row.report_id || "") !== String(state.activeReport.id)) {
-          // force into current report
           row.report_id = state.activeReport.id;
         }
-        // normalize minimal required fields
         row.question_no = canonicalQno(row.question_no || qno);
         row.updated_at = nowIso();
         await upsertObservationRow(row);
       }
     }
 
-    // examined
     if (examined && Array.isArray(examined.examined_questions)) {
       state.examinedQuestions = examined.examined_questions.map(canonicalQno).filter(Boolean);
       state.examinedCount = Number(examined.examined_count || state.examinedQuestions.length) || state.examinedQuestions.length;
       await persistExaminedQuestions(state.activeReport.id, state.examinedQuestions);
     }
 
-    // reload
     state.observationsByQno = await loadObservationsForReport(state.activeReport.id);
     buildExtractedItemsFromDb();
     renderObsTable();
@@ -1312,7 +1304,7 @@ function renderKpis() {
   const neg = items.filter(x => x.kind === "negative").length;
   const pos = items.filter(x => x.kind === "positive").length;
   const lae = items.filter(x => x.kind === "largely").length;
-  const miss = items.filter(x => x.kind === "negative" && missingPgnoForQno(x.qno)).length;
+  const miss = items.filter(x => pgnoRequiredForKind(x.kind) && missingPgnoForQno(x.qno)).length;
 
   el("kpiQuestionsExamined").value = String(state.examinedCount || 0);
   el("kpiTotal").value = String(total);
@@ -1326,9 +1318,9 @@ function renderKpis() {
 
 function finalizeCheck() {
   if (!state.activeReport) { alert("No active report."); return; }
-  const missing = (state.extractedItems || []).filter(x => x.kind === "negative" && missingPgnoForQno(x.qno));
+  const missing = (state.extractedItems || []).filter(x => pgnoRequiredForKind(x.kind) && missingPgnoForQno(x.qno));
   if (!missing.length) {
-    alert("Finalize check: OK.\n\nNo negative items are missing PGNO ticks.");
+    alert("Finalize check: OK.\n\nNo Negative/Largely items are missing PGNO ticks.");
     return;
   }
   renderKpis();
@@ -1440,13 +1432,10 @@ async function waitForAuth(timeoutMs = 5000) {
 }
 
 async function init() {
-  // show build stamp always
   try { el("buildPill").textContent = `build: ${POST_INSPECTION_BUILD}`; } catch {}
 
   const ok = await waitForAuth(5000);
-  if (!ok) {
-    throw new Error("AUTH not loaded. Ensure ./auth.js is included BEFORE ./post_inspection.js.");
-  }
+  if (!ok) throw new Error("AUTH not loaded. Ensure ./auth.js is included BEFORE ./post_inspection.js.");
 
   state.supabase = window.AUTH.ensureSupabase();
 
@@ -1460,7 +1449,6 @@ async function init() {
   el("dashboardBtn")?.addEventListener("click", () => { window.location.href = "dashboard.html"; });
   el("modeSelectBtn")?.addEventListener("click", () => { window.location.href = "mode_selection.html"; });
 
-  // titles
   state.titles = loadTitles();
   renderTitleSelect();
 
@@ -1479,11 +1467,9 @@ async function init() {
 
   setSaveStatus("Loading…");
 
-  // load vessels
   state.vessels = await loadVessels();
   renderVesselsSelect();
 
-  // load locked library
   state.lib = await loadLockedLibraryJson(LOCKED_LIBRARY_JSON);
   state.libByNo = new Map();
   state.libCanonToExact = new Map();
@@ -1495,11 +1481,9 @@ async function init() {
     if (canon && !state.libCanonToExact.has(canon)) state.libCanonToExact.set(canon, qno);
   }
 
-  // load reports
   state.reports = await loadReportsFromDb();
   renderStoredTable();
 
-  // Stored filters buttons
   document.querySelectorAll(".filter-btn[data-filter-col]").forEach(btn => {
     btn.addEventListener("click", (e) => {
       e.preventDefault();
@@ -1509,7 +1493,6 @@ async function init() {
     });
   });
 
-  // Stored filter dialog controls
   el("storedFilterSearch").addEventListener("input", () => {
     const col = state.openFilterCol;
     if (!col) return;
@@ -1537,56 +1520,41 @@ async function init() {
     renderStoredTable();
   });
 
-  // header buttons
   el("newReportBtn").addEventListener("click", handleNewReport);
   el("saveHeaderBtn").addEventListener("click", handleSaveHeader);
   el("deleteReportBtn").addEventListener("click", handleDeleteReport);
 
-  // PDF download
   el("downloadPdfBtn").addEventListener("click", downloadActivePdf);
 
-  // import PDF
   el("importPdfBtn").addEventListener("click", () => el("importPdfFile").click());
   el("importPdfFile").addEventListener("change", async (e) => {
     const f = e.target.files && e.target.files[0];
-    try {
-      if (f) await importReportPdfAiFromFile(f);
-    } finally {
-      e.target.value = "";
-    }
+    try { if (f) await importReportPdfAiFromFile(f); }
+    finally { e.target.value = ""; }
   });
 
-  // Export / Import JSON
   el("exportBtn").addEventListener("click", exportJson);
   el("importBtn").addEventListener("click", () => el("importFile").click());
   el("importFile").addEventListener("change", async (e) => {
     const f = e.target.files && e.target.files[0];
-    try {
-      if (f) await importJsonFile(f);
-    } finally {
-      e.target.value = "";
-    }
+    try { if (f) await importJsonFile(f); }
+    finally { e.target.value = ""; }
   });
 
-  // KPIs + finalize
   el("statsBtn").addEventListener("click", renderKpis);
   el("finalizeBtn").addEventListener("click", finalizeCheck);
   el("closeStatsBtn").addEventListener("click", () => el("statsDialog").close());
 
-  // Add manual
   el("addManualBtn").addEventListener("click", addManualItem);
 
-  // extracted filters
   el("obsSearch").addEventListener("input", renderObsTable);
   el("obsTypeFilter").addEventListener("change", renderObsTable);
   el("obsDesignationFilter").addEventListener("change", renderObsTable);
   el("onlyMissingPgno").addEventListener("change", renderObsTable);
 
-  // obs modal buttons
   el("dlgCancelBtn").addEventListener("click", closeObsDialog);
   el("dlgSaveBtn").addEventListener("click", saveObsDialog);
 
-  // default date for new report form
   if (!el("inspectionDate").value) {
     const d = new Date();
     const yyyy = d.getFullYear();
@@ -1595,7 +1563,6 @@ async function init() {
     el("inspectionDate").value = `${yyyy}-${mm}-${dd}`;
   }
 
-  // no active report until user clicks stored inspection
   renderObsTable();
   renderObsSummary();
   updateTopCounters();
