@@ -15,9 +15,16 @@
       --pi-text:#0c1b2a;
       --pi-muted:#55708f;
       --pi-bg:#08131f;
-      --pi-soft:#f8fbff;
+
       --pi-chip:#eef6ff;
+      --pi-chip-border:#cfe0f4;
+
+      --pi-warn-bg:#fff2e0;
+      --pi-warn-b:#ffd7a3;
+      --pi-warn-t:#7a4a00;
     }
+
+    *{ box-sizing:border-box; }
     body{ background:var(--pi-bg); color:var(--pi-text); }
     .pi-wrap{ max-width:1600px; margin:20px auto 40px; padding:0 14px; }
 
@@ -38,7 +45,7 @@
       padding:8px 12px; border-radius:999px;
       background:rgba(255,255,255,.08);
       border:1px solid rgba(255,255,255,.15);
-      font-weight:900; color:#fff;
+      font-weight:800; color:#fff;
     }
     .pi-pill.muted{ color:rgba(255,255,255,.9); opacity:.95; }
 
@@ -48,15 +55,21 @@
       border-radius:18px;
       padding:16px;
       box-shadow:0 10px 24px rgba(0,0,0,.20);
+      overflow:hidden;
     }
-    .pi-card h2{ margin:0 0 12px; color:#113a63; }
+    .pi-card h2{ margin:0 0 12px; color:#113a63; font-weight:900; }
 
-    .pi-grid{ display:grid; grid-template-columns: 1fr; gap:18px; margin-top:16px; }
+    .pi-grid{
+      display:grid;
+      grid-template-columns: 1fr;
+      gap:18px;
+      margin-top:16px;
+    }
 
-    /* Header fields */
+    /* Header fields grid */
     .pi-fields{
       display:grid;
-      grid-template-columns: 260px 1fr 200px 1fr 180px 1fr;
+      grid-template-columns: 260px 1fr 220px 1fr 220px 1fr;
       gap:10px 12px;
       align-items:end;
     }
@@ -68,9 +81,10 @@
       padding:10px 12px;
       border:1px solid #cfe0f4;
       border-radius:12px;
-      font-weight:800;
+      font-weight:700;
       outline:none;
       background:#fff;
+      min-width:0;
     }
     .pi-field input:focus, .pi-field select:focus{
       border-color:#5aa2ff; box-shadow:0 0 0 3px rgba(90,162,255,.2);
@@ -79,84 +93,54 @@
     .pi-span3{ grid-column: span 3; }
     .pi-span6{ grid-column: 1 / -1; }
 
-    /* Buttons: nicer */
+    /* Actions row */
     .pi-actions{
       display:flex; gap:10px; flex-wrap:wrap;
       margin-top:12px;
       padding-top:12px;
       border-top:1px solid #e5eefc;
     }
-    .btn{ border-radius:12px; padding:10px 12px; font-weight:900; border:1px solid #cfe0f4; background:#fff; cursor:pointer; }
-    .btn:hover{ box-shadow:0 6px 16px rgba(0,0,0,.10); }
-    .btn.primary{ background:#1b64c7; border-color:#1b64c7; color:#fff; }
-    .btn.primary:hover{ filter:brightness(1.05); }
-    .btn.light{ background:rgba(255,255,255,.12); border-color:rgba(255,255,255,.22); color:#fff; }
-    .btn.warn{ background:#ffefe9; border-color:#ffc7b5; color:#8a2a06; }
-    .btn.muted{ background:#f2f7ff; border-color:#d7e8ff; color:#143a63; }
 
-    /* Stored inspections table */
-    .si-sub{ color:#143a63; font-weight:900; margin-top:-4px; margin-bottom:8px; }
-    .si-wrap{ overflow:auto; max-height: 280px; border:1px solid #e5eefc; border-radius:14px; }
-    table{ border-collapse:separate; border-spacing:0; width:100%; }
-    .si-table thead th{
-      text-align:left;
-      font-weight:950;
+    /* Buttons - nicer */
+    .btn{
+      border-radius:12px !important;
+      padding:9px 12px !important;
+      font-weight:800 !important;
+    }
+    .btn.primary{
+      background:#1f6feb !important;
+      border-color:#1f6feb !important;
+      color:#fff !important;
+    }
+    .btn.light{
+      background:#ffffff !important;
+      color:#0c1b2a !important;
+      border:1px solid rgba(255,255,255,.35) !important;
+    }
+    .btn.warn{
+      background:#ffe8d0 !important;
+      border:1px solid #ffcf9a !important;
+      color:#7a4a00 !important;
+    }
+    .btn.btn-muted{
+      background:#eef6ff !important;
+      border:1px solid #cfe0f4 !important;
+      color:#143a63 !important;
+    }
+
+    /* Stored inspections */
+    .stored-note{
+      margin:-2px 0 10px;
       color:#143a63;
-      padding:10px 10px;
-      border-bottom:1px solid #e5eefc;
-      background:var(--pi-soft);
-      position:sticky;
-      top:0;
-      z-index:2;
-      vertical-align:bottom;
-      white-space:nowrap;
-    }
-    .th-tools{ display:flex; gap:8px; align-items:center; justify-content:space-between; }
-    .th-tools button{
-      padding:6px 10px; border-radius:999px; border:1px solid #cfe0f4;
-      background:var(--pi-chip); color:#143a63; font-weight:900; cursor:pointer;
-    }
-    .th-tools button:hover{ filter:brightness(0.98); }
-
-    .si-table tbody td{
-      padding:10px 10px;
-      border-bottom:1px solid #eef4ff;
-      vertical-align:top;
       font-weight:800;
-      color:#0c1b2a;
-      white-space:nowrap;
-      overflow:hidden;
-      text-overflow:ellipsis;
-      max-width: 1px;
     }
-    .si-row{ cursor:pointer; }
-    .si-row:hover td{ background:var(--pi-soft); }
 
-    /* Observations */
-    .obs-toolbar{
-      display:flex; gap:10px; flex-wrap:wrap; align-items:center; justify-content:space-between;
-      margin:8px 0 10px;
-    }
-    .obs-filters{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
-    .obs-filters input, .obs-filters select{
-      padding:10px 12px; border:1px solid #cfe0f4; border-radius:12px; font-weight:800;
-      background:#fff;
-    }
-    .obs-summary{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; color:#143a63; font-weight:950; }
+    table{ border-collapse:separate; border-spacing:0; width:100%; table-layout:fixed; }
+    .tbl-wrap{ overflow:hidden; border:1px solid #e5eefc; border-radius:16px; }
 
-    .obs-badge{
-      display:inline-flex; align-items:center;
-      font-weight:950; font-size:12px; padding:6px 10px; border-radius:999px;
-      border:1px solid #cfe0f4; background:#eef6ff; color:#143a63;
-      white-space:nowrap;
-    }
-    .obs-badge.neg{ background:#fff2e0; border-color:#ffd7a3; color:#7a4a00; }
-    .obs-badge.pos{ background:#e9fff0; border-color:#bfeccc; color:#145c2a; }
-    .obs-badge.lae{ background:#f3f0ff; border-color:#d9cffc; color:#3a2a7a; }
-
-    .obs-table thead th{
+    .pi-table thead th{
       text-align:left;
-      font-weight:950;
+      font-weight:900;
       color:#143a63;
       padding:10px 10px;
       border-bottom:1px solid #e5eefc;
@@ -164,57 +148,119 @@
       position:sticky;
       top:0;
       z-index:1;
-      white-space:nowrap;
+      vertical-align:bottom;
     }
-    .obs-table tbody td{
+    .pi-table tbody td{
       padding:10px 10px;
       border-bottom:1px solid #eef4ff;
       vertical-align:top;
-      font-weight:800;
+      font-weight:600; /* NORMAL (not bold) */
       color:#0c1b2a;
-      white-space:nowrap;
       overflow:hidden;
       text-overflow:ellipsis;
-      max-width: 1px;
+      white-space:nowrap;  /* minimal wrap */
     }
-    .obs-row{ cursor:pointer; }
-    .obs-row:hover td{ background:#f8fbff; }
-    .muted{ color:#55708f; font-weight:800; }
+    .pi-table tbody tr{ cursor:pointer; }
+    .pi-table tbody tr:hover td{ background:#f8fbff; }
 
-    dialog{ border:none; border-radius:18px; padding:0; max-width:1200px; width: calc(100vw - 40px); }
-    .dlg{ padding:16px; }
-    .dlg h3{ margin:0 0 8px; color:#143a63; }
-    .dlg-sub{ font-weight:900; color:#55708f; margin-bottom:12px; }
-    .dlg-grid{ display:grid; grid-template-columns: 1fr 1fr; gap:12px; }
-    .pgnoRow{
-      display:grid; grid-template-columns: 22px 90px 1fr;
-      gap:10px; align-items:start; padding:10px 0; border-bottom:1px dashed #d5deef;
+    .muted{ color:#55708f; font-weight:700; }
+    .vessel-bold{ font-weight:900; } /* ONLY vessel bold */
+
+    .hdr-flex{
+      display:flex; align-items:center; justify-content:space-between; gap:8px;
     }
-    textarea{
-      width:100%;
-      min-height:120px;
-      padding:10px 12px;
-      border:1px solid #cfe0f4;
-      border-radius:12px;
+    .filter-btn{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      gap:6px;
+      padding:6px 10px;
+      border-radius:999px;
+      border:1px solid var(--pi-chip-border);
+      background:var(--pi-chip);
+      color:#143a63;
       font-weight:800;
-      resize:vertical;
-      background:#fff;
+      cursor:pointer;
+      user-select:none;
+      white-space:nowrap;
     }
+    .filter-btn:hover{ filter:brightness(0.98); }
+
+    /* Filter modal popover */
+    dialog{ border:none; border-radius:18px; padding:0; max-width:640px; width: calc(100vw - 40px); }
+    .dlg{ padding:16px; }
+    .dlg h3{ margin:0 0 8px; color:#143a63; font-weight:900; }
+    .dlg-sub{ font-weight:800; color:#55708f; margin-bottom:12px; }
     .dlg-actions{
       display:flex; gap:10px; justify-content:flex-end;
       margin-top:12px; padding-top:12px; border-top:1px solid #e5eefc;
     }
+
+    .chk-list{
+      border:1px solid #e5eefc;
+      border-radius:14px;
+      padding:10px;
+      max-height:42vh;
+      overflow:auto;
+      background:#fff;
+    }
+    .chk-row{
+      display:flex;
+      gap:10px;
+      align-items:center;
+      padding:8px 6px;
+      border-bottom:1px dashed #e6eefc;
+      font-weight:700;
+      color:#0c1b2a;
+    }
+    .chk-row:last-child{ border-bottom:none; }
+
+    .dlg-search{
+      width:100%;
+      padding:10px 12px;
+      border:1px solid #cfe0f4;
+      border-radius:12px;
+      font-weight:700;
+      outline:none;
+      margin-bottom:10px;
+    }
+
+    /* Observation badges */
+    .obs-badge{
+      display:inline-flex; align-items:center;
+      font-weight:800; font-size:12px; padding:6px 10px; border-radius:999px;
+      border:1px solid #cfe0f4; background:#eef6ff; color:#143a63;
+      white-space:nowrap;
+    }
+    .obs-badge.neg{ background:#fff2e0; border-color:#ffd7a3; color:#7a4a00; }
+    .obs-badge.pos{ background:#e9fff0; border-color:#bfeccc; color:#145c2a; }
+    .obs-badge.lae{ background:#f3f0ff; border-color:#d9cffc; color:#3a2a7a; }
+
     .hint{
-      font-weight:900; color:#7a4a00;
-      background:#fff2e0; border:1px solid #ffd7a3;
+      font-weight:800; color:var(--pi-warn-t);
+      background:var(--pi-warn-bg); border:1px solid var(--pi-warn-b);
       padding:10px 12px; border-radius:14px;
       margin-top:12px;
     }
 
+    textarea{
+      width:100%;
+      min-height:110px;
+      padding:10px 12px;
+      border:1px solid #cfe0f4;
+      border-radius:12px;
+      font-weight:700;
+      resize:vertical;
+      background:#fff;
+      outline:none;
+    }
+
+    /* Responsive */
     @media (max-width: 1100px){
       .pi-fields{ grid-template-columns: 1fr 1fr; }
       .pi-span2, .pi-span3, .pi-span6{ grid-column:auto; }
-      .dlg-grid{ grid-template-columns: 1fr; }
+      table{ table-layout:auto; }
+      .pi-table tbody td{ white-space:normal; }
     }
   </style>
 </head>
@@ -229,7 +275,7 @@
         <span class="pi-pill" id="userBadge">Not signed in</span>
         <button class="btn light" id="dashboardBtn" type="button">Dashboard</button>
         <button class="btn light" id="modeSelectBtn" type="button">Mode Selection</button>
-        <button class="btn light" id="logoutBtn" type="button">Logout</button>
+        <button class="btn primary" id="logoutBtn" type="button">Logout</button>
 
         <span class="pi-pill muted" id="activeReportPill">No active report</span>
         <span class="pi-pill muted" id="saveStatus">Not saved</span>
@@ -242,74 +288,73 @@
       <!-- Stored Inspections -->
       <div class="pi-card" id="storedCard">
         <h2>Stored Inspections</h2>
-        <div class="si-sub">Most recent on top • click a row to load • filters are tick-box modals in each header</div>
+        <div class="stored-note">Most recent on top • click a row to load • filters are tick-box modals in each header</div>
 
-        <div class="si-wrap">
-          <table class="si-table">
+        <div class="tbl-wrap" style="max-height:260px; overflow:auto;">
+          <table class="pi-table" id="storedTable">
             <thead>
               <tr>
-                <th style="width:240px;">
-                  <div class="th-tools">
+                <th style="width:18%;">
+                  <div class="hdr-flex">
                     <span>Vessel</span>
-                    <button type="button" data-filter="vessel">Filters</button>
+                    <span class="filter-btn" data-filter-col="vessel_name">Filters</span>
                   </div>
                 </th>
-                <th style="width:140px;">
-                  <div class="th-tools">
+                <th style="width:11%;">
+                  <div class="hdr-flex">
                     <span>Date</span>
-                    <button type="button" data-filter="date">Filters</button>
+                    <span class="filter-btn" data-filter-col="inspection_date">Filters</span>
                   </div>
                 </th>
-                <th style="width:200px;">
-                  <div class="th-tools">
+                <th style="width:13%;">
+                  <div class="hdr-flex">
                     <span>Report Ref</span>
-                    <button type="button" data-filter="report_ref">Filters</button>
+                    <span class="filter-btn" data-filter-col="report_ref">Filters</span>
                   </div>
                 </th>
-                <th style="width:190px;">
-                  <div class="th-tools">
+                <th style="width:13%;">
+                  <div class="hdr-flex">
                     <span>Title</span>
-                    <button type="button" data-filter="title">Filters</button>
+                    <span class="filter-btn" data-filter-col="title">Filters</span>
                   </div>
                 </th>
-                <th style="width:240px;">
-                  <div class="th-tools">
+                <th style="width:18%;">
+                  <div class="hdr-flex">
                     <span>OCIMF</span>
-                    <button type="button" data-filter="ocimf">Filters</button>
+                    <span class="filter-btn" data-filter-col="ocimf_inspecting_company">Filters</span>
                   </div>
                 </th>
-                <th style="width:190px;">
-                  <div class="th-tools">
+                <th style="width:14%;">
+                  <div class="hdr-flex">
                     <span>Inspector</span>
-                    <button type="button" data-filter="inspector">Filters</button>
+                    <span class="filter-btn" data-filter-col="inspector_name">Filters</span>
                   </div>
                 </th>
-                <th style="width:210px;">
-                  <div class="th-tools">
+                <th style="width:13%;">
+                  <div class="hdr-flex">
                     <span>Inspector’s Company</span>
-                    <button type="button" data-filter="inspector_company">Filters</button>
+                    <span class="filter-btn" data-filter-col="inspector_company">Filters</span>
                   </div>
                 </th>
               </tr>
             </thead>
             <tbody id="storedTableBody">
-              <tr><td colspan="7" class="muted">Loading inspections…</td></tr>
+              <tr><td colspan="7" class="muted">Loading…</td></tr>
             </tbody>
           </table>
         </div>
 
-        <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:10px;">
-          <span class="muted" id="storedCount">0 inspections</span>
-          <button class="btn muted" id="clearStoredFiltersBtn" type="button">Clear all stored filters</button>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:10px; gap:12px; flex-wrap:wrap;">
+          <div class="muted" id="storedCount">0 inspection(s)</div>
+          <button class="btn btn-muted" id="clearStoredFiltersBtn" type="button">Clear all stored filters</button>
         </div>
       </div>
 
-      <!-- Header -->
+      <!-- Inspection Header -->
       <div class="pi-card" id="headerCard">
         <h2>Inspection Header</h2>
 
         <div class="pi-fields">
-
           <div class="pi-field">
             <label>Vessel</label>
             <select id="vesselSelect"></select>
@@ -322,7 +367,7 @@
 
           <div class="pi-field">
             <label>Port (official name)</label>
-            <input id="portName" type="text" placeholder="e.g. Greece - Agio Theodoroi [GRAGT]" />
+            <input id="portName" type="text" placeholder="e.g. Greece - Agio Theodoroi" />
           </div>
 
           <div class="pi-field">
@@ -343,8 +388,8 @@
           <div class="pi-field pi-span2">
             <label>Title</label>
             <div style="display:flex; gap:10px; align-items:center;">
-              <select id="reportTitleSelect"></select>
-              <button class="btn muted" id="manageTitlesBtn" type="button">Manage Titles</button>
+              <select id="reportTitle"></select>
+              <button class="btn btn-muted" id="manageTitlesBtn" type="button">Manage Titles</button>
             </div>
           </div>
 
@@ -355,67 +400,70 @@
 
           <div class="pi-field pi-span3">
             <label>Inspector’s Company (manual)</label>
-            <input id="inspectorCompany" type="text" placeholder="Contractor company (on behalf of OCIMF)" />
+            <input id="inspectorCompany" type="text" placeholder="Enter inspector company (not in PDF)" />
           </div>
 
           <div class="pi-field pi-span3">
             <label>PDF Report (stored)</label>
             <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-              <button class="btn muted" id="downloadPdfBtn" type="button">Download PDF</button>
-              <span id="pdfStatus" style="font-weight:900; color:#143a63;">No PDF linked</span>
+              <button class="btn btn-muted" id="downloadPdfBtn" type="button">Download PDF</button>
+              <span id="pdfStatus" style="font-weight:800; color:#143a63;">No PDF linked</span>
             </div>
           </div>
 
           <div class="pi-field pi-span6">
             <div class="pi-actions">
-              <button class="btn muted" id="newReportBtn" type="button">New Report</button>
+              <button class="btn btn-muted" id="newReportBtn" type="button">New Report</button>
               <button class="btn primary" id="saveHeaderBtn" type="button">Save Header</button>
               <button class="btn warn" id="deleteReportBtn" type="button">Delete Report</button>
 
-              <button class="btn muted" id="exportBtn" type="button">Export JSON</button>
-              <button class="btn muted" id="importBtn" type="button">Import JSON</button>
+              <button class="btn btn-muted" id="exportBtn" type="button">Export JSON</button>
+              <button class="btn btn-muted" id="importBtn" type="button">Import JSON</button>
               <input id="importFile" type="file" accept="application/json" style="display:none" />
 
-              <button class="btn muted" id="importPdfBtn" type="button">Import PDF (AI)</button>
+              <button class="btn btn-muted" id="importPdfBtn" type="button">Import PDF (AI)</button>
               <input id="importPdfFile" type="file" accept="application/pdf" style="display:none" />
 
-              <button class="btn muted" id="addManualBtn" type="button">Add Manual Item</button>
-
-              <button class="btn muted" id="statsBtn" type="button">KPIs</button>
-              <button class="btn muted" id="finalizeBtn" type="button">Finalize check</button>
+              <button class="btn btn-muted" id="addManualBtn" type="button">Add Manual Item</button>
+              <button class="btn btn-muted" id="statsBtn" type="button">KPIs</button>
+              <button class="btn btn-muted" id="finalizeBtn" type="button">Finalize check</button>
             </div>
           </div>
         </div>
 
-        <div style="margin-top:10px; color:#0f3a63; font-weight:850;">
+        <div style="margin-top:10px; color:#0f3a63; font-weight:800;">
           <ul style="margin:0; padding-left:18px;">
             <li><b>Negative</b>: designation + Nature of Concern (Not as expected … / Observable or detectable deficiency). Requires PGNO.</li>
             <li><b>Positive</b>: Human + Nature of Concern (Exceeded normal expectation). No PGNO.</li>
             <li><b>Largely as expected</b>: designation + Nature of Concern (Largely as expected). KPI item.</li>
           </ul>
-        </div>
-
-        <div style="margin-top:10px; color:#143a63; font-weight:900;">
-          Questions examined (from PDF): <span id="examinedCount">0</span>
+          <div style="margin-top:8px;">
+            <span style="font-weight:900;">Total Questions Examined (from PDF):</span>
+            <span id="questionsExaminedVal">0</span>
+            &nbsp;•&nbsp;
+            <span style="font-weight:900;">Total Items Extracted:</span>
+            <span id="itemsExtractedVal">0</span>
+          </div>
         </div>
       </div>
 
-      <!-- Observations -->
+      <!-- Extracted Items -->
       <div class="pi-card" id="obsCard">
         <h2>Extracted Items</h2>
 
-        <div class="obs-toolbar">
-          <div class="obs-filters">
-            <input id="obsSearch" type="text" placeholder="Search (qno / category / nature / coding / text)" />
+        <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; justify-content:space-between; margin:8px 0 10px;">
+          <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+            <input id="obsSearch" type="text" placeholder="Search (qno / category / nature / coding / text)"
+                   style="padding:10px 12px; border:1px solid #cfe0f4; border-radius:12px; font-weight:700; background:#fff; min-width:260px;" />
 
-            <select id="obsTypeFilter">
+            <select id="obsTypeFilter" style="padding:10px 12px; border:1px solid #cfe0f4; border-radius:12px; font-weight:700; background:#fff;">
               <option value="">All types</option>
               <option value="negative">Negative</option>
               <option value="positive">Positive</option>
               <option value="largely">Largely as expected</option>
             </select>
 
-            <select id="obsCategoryFilter">
+            <select id="obsDesignationFilter" style="padding:10px 12px; border:1px solid #cfe0f4; border-radius:12px; font-weight:700; background:#fff;">
               <option value="">All categories</option>
               <option value="Human">Human</option>
               <option value="Process">Process</option>
@@ -423,24 +471,24 @@
               <option value="Photo">Photo</option>
             </select>
 
-            <label style="display:flex; gap:8px; align-items:center; font-weight:900; color:#143a63;">
+            <label style="display:flex; gap:8px; align-items:center; font-weight:800; color:#143a63;">
               <input id="onlyMissingPgno" type="checkbox" />
               Missing PGNO (negatives)
             </label>
           </div>
 
-          <div class="obs-summary" id="obsSummary">No report loaded.</div>
+          <div style="color:#143a63; font-weight:900;" id="obsSummary">No report loaded.</div>
         </div>
 
-        <div style="overflow:auto; max-height: 60vh; border:1px solid #e5eefc; border-radius:14px;">
-          <table class="obs-table">
+        <div class="tbl-wrap" style="max-height: 60vh; overflow:auto;">
+          <table class="pi-table">
             <thead>
               <tr>
                 <th style="width:90px;">Question</th>
-                <th style="width:120px;">Type</th>
-                <th style="width:200px;">Category</th>
-                <th style="width:320px;">Nature of concern</th>
-                <th style="width:320px;">Classification coding</th>
+                <th style="width:110px;">Type</th>
+                <th style="width:160px;">Category</th>
+                <th style="width:260px;">Nature of concern</th>
+                <th style="width:260px;">Classification coding</th>
                 <th>Observation text</th>
                 <th style="width:260px;">PGNO (selected text)</th>
               </tr>
@@ -451,17 +499,20 @@
           </table>
         </div>
       </div>
+
     </div>
 
-    <!-- Stored filters modal -->
-    <dialog id="storedFiltersDialog">
+    <!-- Stored filter modal -->
+    <dialog id="storedFilterDialog">
       <div class="dlg">
-        <h3 id="sfTitle">Filters</h3>
-        <div class="dlg-sub" id="sfSub">Tick to include • leave empty = no filtering</div>
-        <div id="sfBody"></div>
+        <h3 id="storedFilterTitle">Filters</h3>
+        <div class="dlg-sub" id="storedFilterSub">Select values to include. Leave empty = no filtering.</div>
+        <input id="storedFilterSearch" class="dlg-search" type="text" placeholder="Search values..." />
+        <div class="chk-list" id="storedFilterList"></div>
+
         <div class="dlg-actions">
-          <button class="btn muted" id="sfClearBtn" type="button">Clear this filter</button>
-          <button class="btn primary" id="sfCloseBtn" type="button">Close</button>
+          <button class="btn btn-muted" id="storedFilterClearBtn" type="button">Clear</button>
+          <button class="btn primary" id="storedFilterApplyBtn" type="button">Apply</button>
         </div>
       </div>
     </dialog>
@@ -470,14 +521,15 @@
     <dialog id="titlesDialog">
       <div class="dlg">
         <h3>Manage Titles</h3>
-        <div class="dlg-sub">Add new titles for the Title dropdown. (You can extend later.)</div>
+        <div class="dlg-sub">Add/remove items for the Title dropdown.</div>
 
-        <div style="display:flex; gap:10px; align-items:center; margin-bottom:12px;">
-          <input id="newTitleInput" type="text" placeholder="New title..." style="flex:1; padding:10px 12px; border:1px solid #cfe0f4; border-radius:12px; font-weight:800;">
+        <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+          <input id="newTitleInput" type="text" placeholder="New title..."
+                 style="flex:1 1 260px; padding:10px 12px; border:1px solid #cfe0f4; border-radius:12px; font-weight:700;" />
           <button class="btn primary" id="addTitleBtn" type="button">Add</button>
         </div>
 
-        <div id="titlesList" style="border:1px solid #e5eefc; border-radius:14px; padding:10px; max-height:260px; overflow:auto;"></div>
+        <div style="margin-top:10px;" class="chk-list" id="titlesList"></div>
 
         <div class="dlg-actions">
           <button class="btn primary" id="closeTitlesBtn" type="button">Close</button>
@@ -485,17 +537,17 @@
       </div>
     </dialog>
 
-    <!-- KPI dialog (simple) -->
+    <!-- KPIs dialog -->
     <dialog id="statsDialog">
       <div class="dlg">
-        <h3>KPIs (Live)</h3>
-        <div class="dlg-grid">
+        <h3>KPIs</h3>
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
+          <div class="pi-field"><label>Total questions examined</label><input id="kpiQuestionsExamined" readonly /></div>
           <div class="pi-field"><label>Total extracted items</label><input id="kpiTotal" readonly /></div>
           <div class="pi-field"><label>Negative</label><input id="kpiNeg" readonly /></div>
           <div class="pi-field"><label>Positive</label><input id="kpiPos" readonly /></div>
           <div class="pi-field"><label>Largely as expected</label><input id="kpiLae" readonly /></div>
           <div class="pi-field"><label>Negatives missing PGNO</label><input id="kpiMissingPgno" readonly /></div>
-          <div class="pi-field"><label>Questions examined (from PDF)</label><input id="kpiExamined" readonly /></div>
         </div>
 
         <div class="dlg-actions">
@@ -511,21 +563,8 @@
         <div class="dlg-sub" id="dlgSub">—</div>
         <div id="dlgBody"></div>
         <div class="dlg-actions">
-          <button class="btn muted" id="dlgCancelBtn" type="button">Cancel</button>
+          <button class="btn btn-muted" id="dlgCancelBtn" type="button">Cancel</button>
           <button class="btn primary" id="dlgSaveBtn" type="button">Save</button>
-        </div>
-      </div>
-    </dialog>
-
-    <!-- Manual add -->
-    <dialog id="manualDialog">
-      <div class="dlg">
-        <h3>Add Manual Item</h3>
-        <div class="dlg-sub">Use when AI did not extract an item. This will create/update an observation row.</div>
-        <div id="manualBody"></div>
-        <div class="dlg-actions">
-          <button class="btn muted" id="manualCancelBtn" type="button">Cancel</button>
-          <button class="btn primary" id="manualSaveBtn" type="button">Save</button>
         </div>
       </div>
     </dialog>
