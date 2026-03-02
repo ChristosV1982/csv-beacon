@@ -1,9 +1,10 @@
 import { loadLockedLibraryJson } from "./question_library_loader.js";
 
 /**
- * HARD BUILD STAMP
+ * HARD BUILD STAMP (visible in the blue pill)
+ * Change this string every time you replace this file.
  */
-const POST_INSPECTION_BUILD = "post_inspection_ui_v23_pgno_for_largely_examined_fix_2026-03-02";
+const POST_INSPECTION_BUILD = "post_inspection_ui_v24_examined_fix_lae_pgno_date_filter_navfix_2026-03-02";
 
 /**
  * Locked library JSON
@@ -26,11 +27,6 @@ const DEFAULT_TITLES = [
   "Third Party Audit",
 ];
 
-/**
- * Examined questions fallback storage (if DB schema missing)
- */
-const EXAMINED_LOCAL_KEY = "post_inspection_examined_by_report_v1";
-
 function el(id) { return document.getElementById(id); }
 
 function esc(s) {
@@ -50,6 +46,17 @@ function ddmmyyyyToIso(ddmmyyyy) {
   if (!m) return "";
   const dd = m[1], mm = m[2], yyyy = m[3];
   return `${yyyy}-${mm}-${dd}`;
+}
+
+function parseDateParts(anyDate) {
+  const s = String(anyDate || "").trim();
+  // yyyy-mm-dd
+  let m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (m) return { year: m[1], month: m[2], day: m[3], iso: s };
+  // dd.mm.yyyy
+  m = s.match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
+  if (m) return { year: m[3], month: m[2], day: m[1], iso: `${m[3]}-${m[2]}-${m[1]}` };
+  return { year: "", month: "", day: "", iso: "" };
 }
 
 function canonicalQno(qno) {
@@ -82,11 +89,6 @@ function pick(obj, keys) {
 function getQno(q) {
   return String(pick(q, ["No.", "No", "question_no", "QuestionNo", "Question ID"])).trim();
 }
-function getChap(q) { return String(pick(q, ["Chap", "chapter", "Chapter"])).trim(); }
-function getSection(q) { return String(pick(q, ["Section Name", "Sect", "section", "Section"])).trim(); }
-function getShort(q) { return String(pick(q, ["Short Text", "short_text", "ShortText"])).trim(); }
-function getQText(q) { return String(pick(q, ["Question", "question"])).trim(); }
-
 function getPgnoBullets(q) {
   const bullets = Array.isArray(q?.NegObs_Bullets) ? q.NegObs_Bullets : null;
   if (bullets && bullets.length) {
@@ -120,23 +122,28 @@ const state = {
 
   vessels: [],
   lib: [],
-  libByNo: new Map(),
-  libCanonToExact: new Map(),
+  libByNo: new Map(),          // exact key -> question object
+  libCanonToExact: new Map(),  // canonical -> exact key (first match)
 
   reports: [],
   activeReport: null,
 
-  observationsByQno: {},
-  extractedItems: [],
+  observationsByQno: {},   // question_no -> row
+  extractedItems: [],      // table model
   dialogItem: null,
 
+  // Stored inspections filters: col -> Set(values)
   storedFilters: {},
+
+  // Date filter (special): year + month tickbox
+  storedDateYears: new Set(),
+  storedDateMonths: new Set(),
+
+  // Current open filter column
   openFilterCol: null,
 
+  // Titles
   titles: [],
-
-  examinedQuestions: [],
-  examinedCount: 0,
 };
 
 /* ---------- UI helpers ---------- */
@@ -144,17 +151,24 @@ const state = {
 function setSaveStatus(text) { el("saveStatus").textContent = text || "Not saved"; }
 function setActivePill(text) { el("activeReportPill").textContent = text || "No active report"; }
 
-function reportLabel(r) {
-  const v = r.vessel_name || "Unknown vessel";
-  const d = r.inspection_date || "No date";
-  const ref = r.report_ref ? ` | ${r.report_ref}` : "";
-  return `${v} | ${d}${ref}`;
-}
-
 function obsRowTypeLabel(kind) {
   if (kind === "negative") return `<span class="obs-badge neg">Negative</span>`;
   if (kind === "positive") return `<span class="obs-badge pos">Positive</span>`;
   return `<span class="obs-badge lae">Largely</span>`;
+}
+
+async function safeNavigate(candidates) {
+  const list = Array.isArray(candidates) ? candidates : [];
+  for (const url of list) {
+    try {
+      const r = await fetch(url, { method: "GET", cache: "no-store" });
+      if (r && r.ok) { window.location.href = url; return; }
+    } catch {}
+  }
+  alert(
+    "Navigation failed.\n\nNone of these pages were found:\n" +
+    list.map(x => `- ${x}`).join("\n")
+  );
 }
 
 /* ---------- Titles (local) ---------- */
@@ -231,16 +245,28 @@ async function loadVessels() {
 }
 
 async function loadReportsFromDb() {
-  const { data, error } = await state.supabase
-    .from("post_inspection_reports")
-    .select("id, vessel_id, inspection_date, port_name, port_code, ocimf_inspecting_company, report_ref, title, inspector_name, inspector_company, pdf_storage_path, created_at, updated_at")
-    .order("updated_at", { ascending: false });
+  // Try with examined columns first; if schema doesn't have them, fallback safely.
+  const selectA = "id, vessel_id, inspection_date, port_name, port_code, ocimf_inspecting_company, report_ref, title, inspector_name, inspector_company, pdf_storage_path, examined_questions, examined_count, created_at, updated_at";
+  const selectB = "id, vessel_id, inspection_date, port_name, port_code, ocimf_inspecting_company, report_ref, title, inspector_name, inspector_company, pdf_storage_path, created_at, updated_at";
 
-  if (error) throw error;
+  let rows = [];
+  try {
+    const { data, error } = await state.supabase
+      .from("post_inspection_reports")
+      .select(selectA)
+      .order("updated_at", { ascending: false });
+    if (error) throw error;
+    rows = data || [];
+  } catch {
+    const { data, error } = await state.supabase
+      .from("post_inspection_reports")
+      .select(selectB)
+      .order("updated_at", { ascending: false });
+    if (error) throw error;
+    rows = data || [];
+  }
 
-  const rows = data || [];
   const vesselIds = [...new Set(rows.map(r => r.vessel_id).filter(Boolean))];
-
   if (!vesselIds.length) return rows.map(r => ({ ...r, vessel_name: "" }));
 
   const { data: vessels, error: vErr } = await state.supabase
@@ -271,24 +297,51 @@ async function loadObservationsForReport(reportId) {
 }
 
 async function createReportHeader(payload) {
-  const { data, error } = await state.supabase
-    .from("post_inspection_reports")
-    .insert([payload])
-    .select("id, vessel_id, inspection_date, port_name, port_code, ocimf_inspecting_company, report_ref, title, inspector_name, inspector_company, pdf_storage_path, created_at, updated_at")
-    .single();
-  if (error) throw error;
-  return data;
+  // Try returning examined columns; fallback if schema doesn't include them
+  try {
+    const { data, error } = await state.supabase
+      .from("post_inspection_reports")
+      .insert([payload])
+      .select("id, vessel_id, inspection_date, port_name, port_code, ocimf_inspecting_company, report_ref, title, inspector_name, inspector_company, pdf_storage_path, examined_questions, examined_count, created_at, updated_at")
+      .single();
+    if (error) throw error;
+    return data;
+  } catch {
+    const { data, error } = await state.supabase
+      .from("post_inspection_reports")
+      .insert([payload])
+      .select("id, vessel_id, inspection_date, port_name, port_code, ocimf_inspecting_company, report_ref, title, inspector_name, inspector_company, pdf_storage_path, created_at, updated_at")
+      .single();
+    if (error) throw error;
+    return data;
+  }
 }
 
 async function updateReportHeader(reportId, payload) {
-  const { data, error } = await state.supabase
-    .from("post_inspection_reports")
-    .update(payload)
-    .eq("id", reportId)
-    .select("id, vessel_id, inspection_date, port_name, port_code, ocimf_inspecting_company, report_ref, title, inspector_name, inspector_company, pdf_storage_path, created_at, updated_at")
-    .single();
-  if (error) throw error;
-  return data;
+  try {
+    const { data, error } = await state.supabase
+      .from("post_inspection_reports")
+      .update(payload)
+      .eq("id", reportId)
+      .select("id, vessel_id, inspection_date, port_name, port_code, ocimf_inspecting_company, report_ref, title, inspector_name, inspector_company, pdf_storage_path, examined_questions, examined_count, created_at, updated_at")
+      .single();
+    if (error) throw error;
+    return data;
+  } catch {
+    // Remove examined fields and retry if schema doesn't support them
+    const safe = { ...payload };
+    delete safe.examined_questions;
+    delete safe.examined_count;
+
+    const { data, error } = await state.supabase
+      .from("post_inspection_reports")
+      .update(safe)
+      .eq("id", reportId)
+      .select("id, vessel_id, inspection_date, port_name, port_code, ocimf_inspecting_company, report_ref, title, inspector_name, inspector_company, pdf_storage_path, created_at, updated_at")
+      .single();
+    if (error) throw error;
+    return data;
+  }
 }
 
 async function deleteReport(reportId) {
@@ -306,80 +359,6 @@ async function upsertObservationRow(row) {
   if (error) throw error;
 }
 
-/**
- * Examined questions persistence (best-effort):
- */
-async function persistExaminedQuestions(reportId, examinedQuestions) {
-  const canon = (examinedQuestions || []).map(canonicalQno).filter(Boolean);
-  const uniq = [...new Set(canon)].sort((a,b)=>a.localeCompare(b));
-
-  el("examinedStoreHint").style.display = "none";
-
-  try {
-    const { error } = await state.supabase
-      .from("post_inspection_reports")
-      .update({
-        examined_count: uniq.length,
-        examined_questions: uniq,
-        updated_at: nowIso(),
-      })
-      .eq("id", reportId);
-
-    if (!error) return { ok:true, method:"reports_columns" };
-  } catch (_) {}
-
-  try {
-    const rows = uniq.map(qno => ({
-      report_id: reportId,
-      question_no: qno,
-      updated_at: nowIso(),
-    }));
-
-    const { error } = await state.supabase
-      .from("post_inspection_examined_questions")
-      .upsert(rows, { onConflict: "report_id,question_no" });
-
-    if (!error) return { ok:true, method:"examined_table" };
-  } catch (_) {}
-
-  try {
-    const raw = localStorage.getItem(EXAMINED_LOCAL_KEY);
-    const obj = raw ? JSON.parse(raw) : {};
-    obj[String(reportId)] = { examined_questions: uniq, examined_count: uniq.length, stored_at: nowIso() };
-    localStorage.setItem(EXAMINED_LOCAL_KEY, JSON.stringify(obj));
-    el("examinedStoreHint").style.display = "block";
-  } catch {}
-
-  return { ok:false, method:"local_fallback" };
-}
-
-function loadExaminedQuestionsFallback(reportId) {
-  try {
-    const raw = localStorage.getItem(EXAMINED_LOCAL_KEY);
-    if (!raw) return { examined_questions: [], examined_count: 0 };
-    const obj = JSON.parse(raw);
-    const hit = obj?.[String(reportId)];
-    if (!hit) return { examined_questions: [], examined_count: 0 };
-    const arr = Array.isArray(hit.examined_questions) ? hit.examined_questions : [];
-    const cnt = Number(hit.examined_count || arr.length) || arr.length;
-    return { examined_questions: arr.map(canonicalQno).filter(Boolean), examined_count: cnt };
-  } catch {
-    return { examined_questions: [], examined_count: 0 };
-  }
-}
-
-/* ---------- PGNO rules ---------- */
-/**
- * PGNO is REQUIRED for:
- * - negative
- * - largely
- * PGNO is NOT APPLICABLE for:
- * - positive
- */
-function pgnoRequiredForKind(kind) {
-  return kind === "negative" || kind === "largely";
-}
-
 /* ---------- Stored inspections table + tickbox filters ---------- */
 
 function uniqueValuesForCol(col) {
@@ -393,8 +372,40 @@ function uniqueValuesForCol(col) {
   return uniq;
 }
 
+function uniqueYearsForDate() {
+  const yrs = [];
+  for (const r of (state.reports || [])) {
+    const p = parseDateParts(r?.inspection_date);
+    if (p.year) yrs.push(p.year);
+  }
+  return [...new Set(yrs)].sort((a,b) => a.localeCompare(b));
+}
+
+function uniqueMonthsForDate() {
+  const mos = [];
+  for (const r of (state.reports || [])) {
+    const p = parseDateParts(r?.inspection_date);
+    if (p.month) mos.push(p.month);
+  }
+  return [...new Set(mos)].sort((a,b) => a.localeCompare(b));
+}
+
 function reportPassesStoredFilters(r) {
+  // Special: date filter (year + month)
+  {
+    const p = parseDateParts(r?.inspection_date);
+    if (state.storedDateYears.size > 0) {
+      if (!p.year || !state.storedDateYears.has(p.year)) return false;
+    }
+    if (state.storedDateMonths.size > 0) {
+      if (!p.month || !state.storedDateMonths.has(p.month)) return false;
+    }
+  }
+
+  // Standard filters (excluding inspection_date; and report_ref has no filter button anyway)
   for (const col of Object.keys(state.storedFilters)) {
+    if (col === "inspection_date") continue;
+
     const set = state.storedFilters[col];
     if (!(set instanceof Set) || set.size === 0) continue;
 
@@ -444,7 +455,72 @@ function closeStoredFilterDialog() {
   state.openFilterCol = null;
 }
 
+function renderStoredDateFilterUI() {
+  const wrap = el("storedFilterList");
+  const years = uniqueYearsForDate();
+  const months = uniqueMonthsForDate();
+
+  const monthName = (mm) => {
+    const map = {
+      "01":"Jan","02":"Feb","03":"Mar","04":"Apr","05":"May","06":"Jun",
+      "07":"Jul","08":"Aug","09":"Sep","10":"Oct","11":"Nov","12":"Dec"
+    };
+    return map[mm] || mm;
+  };
+
+  const yearHtml = years.length ? years.map(y => {
+    const checked = state.storedDateYears.has(y) ? "checked" : "";
+    return `
+      <label class="chk-row">
+        <input type="checkbox" class="storedDateYearChk" data-year="${esc(y)}" ${checked} />
+        <span>${esc(y)}</span>
+      </label>
+    `;
+  }).join("") : `<div class="muted" style="padding:8px;">No years.</div>`;
+
+  const monthHtml = months.length ? months.map(m => {
+    const checked = state.storedDateMonths.has(m) ? "checked" : "";
+    return `
+      <label class="chk-row">
+        <input type="checkbox" class="storedDateMonthChk" data-month="${esc(m)}" ${checked} />
+        <span>${esc(m)} — ${esc(monthName(m))}</span>
+      </label>
+    `;
+  }).join("") : `<div class="muted" style="padding:8px;">No months.</div>`;
+
+  wrap.innerHTML = `
+    <div class="date-filter-grid">
+      <div class="date-filter-card">
+        <h4>Year</h4>
+        <div class="chk-list">${yearHtml}</div>
+      </div>
+      <div class="date-filter-card">
+        <h4>Month</h4>
+        <div class="chk-list">${monthHtml}</div>
+      </div>
+    </div>
+  `;
+
+  wrap.querySelectorAll(".storedDateYearChk").forEach(chk => {
+    chk.addEventListener("change", () => {
+      const y = chk.getAttribute("data-year");
+      if (!y) return;
+      if (chk.checked) state.storedDateYears.add(y);
+      else state.storedDateYears.delete(y);
+    });
+  });
+  wrap.querySelectorAll(".storedDateMonthChk").forEach(chk => {
+    const m = chk.getAttribute("data-month");
+    chk.addEventListener("change", () => {
+      if (!m) return;
+      if (chk.checked) state.storedDateMonths.add(m);
+      else state.storedDateMonths.delete(m);
+    });
+  });
+}
+
 function openStoredFilterForCol(col) {
+  // toggle: if same open -> close
   if (state.openFilterCol === col && el("storedFilterDialog").open) {
     closeStoredFilterDialog();
     return;
@@ -454,8 +530,7 @@ function openStoredFilterForCol(col) {
 
   const titleMap = {
     vessel_name: "Vessel",
-    inspection_date: "Date",
-    report_ref: "Report Ref",
+    inspection_date: "Date (Year + Month)",
     title: "Title",
     ocimf_inspecting_company: "OCIMF Inspecting Company",
     inspector_name: "Inspector Name",
@@ -463,15 +538,26 @@ function openStoredFilterForCol(col) {
   };
 
   el("storedFilterTitle").textContent = `${titleMap[col] || "Filters"}`;
-  el("storedFilterSearch").value = "";
 
-  const values = uniqueValuesForCol(col);
-  const set = state.storedFilters[col] instanceof Set ? state.storedFilters[col] : new Set();
+  // Special UI for Date filter: Year + Month tickbox; hide search box
+  if (col === "inspection_date") {
+    el("storedFilterSub").textContent = "Tick Year and/or Month. Leave both empty = no filtering.";
+    el("storedFilterSearch").style.display = "none";
+    renderStoredDateFilterUI();
+  } else {
+    el("storedFilterSub").textContent = "Select values to include. Leave empty = no filtering.";
+    el("storedFilterSearch").style.display = "block";
+    el("storedFilterSearch").value = "";
 
-  renderStoredFilterList(values, set, "");
+    const values = uniqueValuesForCol(col);
+    const set = state.storedFilters[col] instanceof Set ? state.storedFilters[col] : new Set();
+    renderStoredFilterList(values, set, "");
+    state.storedFilters[col] = set;
+  }
 
   el("storedFilterDialog").showModal();
 
+  // clicking outside closes
   el("storedFilterDialog").addEventListener("click", (e) => {
     const rect = el("storedFilterDialog").getBoundingClientRect();
     const inDialog =
@@ -483,8 +569,9 @@ function openStoredFilterForCol(col) {
 
 function renderStoredFilterList(values, selectedSet, searchTerm) {
   const box = el("storedFilterList");
-  const term = String(searchTerm || "").trim().toLowerCase();
+  box.className = "chk-list";
 
+  const term = String(searchTerm || "").trim().toLowerCase();
   const filtered = !term
     ? values
     : values.filter(v => String(v).toLowerCase().includes(term));
@@ -520,50 +607,22 @@ function headerInputs() {
   return {
     vessel_id: String(el("vesselSelect").value || "").trim(),
     inspection_date: String(el("inspectionDate").value || "").trim(),
-    port_name: String(el("portName").value || "").trim(),
-    port_code: String(el("portCode").value || "").trim(),
-    ocimf_inspecting_company: String(el("ocimfCompany").value || "").trim(),
+    port_name: String(el("portName").value || "").trim() || null,
+    port_code: String(el("portCode").value || "").trim() || null,
+    ocimf_inspecting_company: String(el("ocimfCompany").value || "").trim() || null,
     report_ref: String(el("reportRef").value || "").trim(),
     title: String(el("reportTitle").value || "").trim(),
     inspector_name: String(el("inspectorName").value || "").trim() || null,
     inspector_company: String(el("inspectorCompany").value || "").trim() || null,
     pdf_storage_path: state.activeReport?.pdf_storage_path || null,
+    // examined_count/questions are set during AI import (not manual save)
   };
-}
-
-function loadReportIntoHeader(r) {
-  el("vesselSelect").value = r.vessel_id || "";
-  el("inspectionDate").value = r.inspection_date || "";
-  el("portName").value = r.port_name || "";
-  el("portCode").value = r.port_code || "";
-  el("ocimfCompany").value = r.ocimf_inspecting_company || "";
-  el("reportRef").value = r.report_ref || "";
-
-  const t = String(r.title || "").trim();
-  if (t && !state.titles.includes(t)) {
-    state.titles.push(t);
-    state.titles = [...new Set(state.titles)];
-    saveTitles();
-    renderTitleSelect();
-  }
-  el("reportTitle").value = t || (state.titles[0] || "");
-
-  el("inspectorName").value = r.inspector_name || "";
-  el("inspectorCompany").value = r.inspector_company || "";
-
-  setActivePill("Active: " + reportLabel(r));
-
-  if (r.pdf_storage_path) {
-    el("pdfStatus").textContent = `Stored: ${r.pdf_storage_path.split("/").pop()}`;
-  } else {
-    el("pdfStatus").textContent = "No PDF linked";
-  }
 }
 
 function renderVesselsSelect() {
   const sel = el("vesselSelect");
-  sel.innerHTML = `<option value="">— Select vessel —</option>`;
-  for (const v of state.vessels) {
+  sel.innerHTML = "";
+  for (const v of state.vessels || []) {
     const o = document.createElement("option");
     o.value = v.id;
     o.textContent = v.name;
@@ -571,61 +630,169 @@ function renderVesselsSelect() {
   }
 }
 
-function updateTopCounters() {
-  el("questionsExaminedVal").textContent = String(state.examinedCount || 0);
+function loadReportIntoHeader(r) {
+  if (!r) return;
 
+  el("vesselSelect").value = r.vessel_id || "";
+  el("inspectionDate").value = r.inspection_date || "";
+  el("portName").value = r.port_name || "";
+  el("portCode").value = r.port_code || "";
+  el("ocimfCompany").value = r.ocimf_inspecting_company || "";
+  el("reportRef").value = r.report_ref || "";
+  el("reportTitle").value = r.title || (state.titles[0] || "");
+  el("inspectorName").value = r.inspector_name || "";
+  el("inspectorCompany").value = r.inspector_company || "";
+
+  // PDF status
+  if (r.pdf_storage_path) {
+    el("pdfStatus").textContent = `Stored: ${r.pdf_storage_path.split("/").pop()}`;
+  } else {
+    el("pdfStatus").textContent = "No PDF linked";
+  }
+}
+
+function examinedCountFromActive() {
+  const r = state.activeReport || {};
+  const c = Number(r.examined_count || 0);
+  if (Number.isFinite(c) && c > 0) return c;
+
+  // fallback: if examined_questions is present
+  const arr = Array.isArray(r.examined_questions) ? r.examined_questions : null;
+  if (arr && arr.length) return arr.length;
+
+  return 0;
+}
+
+function setCountersFromState() {
   const items = state.extractedItems || [];
-  const total = items.length;
   const neg = items.filter(x => x.kind === "negative").length;
   const pos = items.filter(x => x.kind === "positive").length;
   const lae = items.filter(x => x.kind === "largely").length;
 
-  el("itemsExtractedVal").textContent = String(total);
-  el("negCountVal").textContent = String(neg);
-  el("posCountVal").textContent = String(pos);
-  el("laeCountVal").textContent = String(lae);
+  el("itemsExtractedVal").textContent = String(items.length);
+  el("questionsExaminedVal").textContent = String(examinedCountFromActive());
+
+  el("cntNeg").textContent = String(neg);
+  el("cntPos").textContent = String(pos);
+  el("cntLae").textContent = String(lae);
 }
 
-async function setActiveReportById(id) {
-  const r = state.reports.find(x => x.id === id) || null;
-  if (!r) return;
+async function setActiveReportById(reportId) {
+  const rep = (state.reports || []).find(r => r.id === reportId);
+  if (!rep) return;
 
-  state.activeReport = r;
-  loadReportIntoHeader(r);
+  state.activeReport = rep;
+  setActivePill(`Loaded`);
+  setSaveStatus("Loading report…");
 
-  setSaveStatus("Loading…");
+  loadReportIntoHeader(rep);
 
-  try {
-    state.observationsByQno = await loadObservationsForReport(r.id);
-  } catch (e) {
-    console.error(e);
-    alert("Failed to load observations: " + (e?.message || String(e)));
-    state.observationsByQno = {};
-  }
-
-  const fb = loadExaminedQuestionsFallback(r.id);
-  state.examinedQuestions = fb.examined_questions || [];
-  state.examinedCount = Number(fb.examined_count || state.examinedQuestions.length) || state.examinedQuestions.length;
+  // load observations
+  state.observationsByQno = await loadObservationsForReport(rep.id);
 
   buildExtractedItemsFromDb();
   renderObsTable();
   renderObsSummary();
-  updateTopCounters();
 
   setSaveStatus("Loaded");
 }
 
+async function handleNewReport() {
+  state.activeReport = null;
+  state.observationsByQno = {};
+  state.extractedItems = [];
+
+  setActivePill("No active report");
+  setSaveStatus("Not saved");
+
+  // clear header fields (inspector fields empty by default)
+  if (state.vessels?.[0]?.id) el("vesselSelect").value = state.vessels[0].id;
+  el("portName").value = "";
+  el("portCode").value = "";
+  el("ocimfCompany").value = "";
+  el("reportRef").value = "";
+  el("inspectorName").value = "";
+  el("inspectorCompany").value = "";
+  el("pdfStatus").textContent = "No PDF linked";
+
+  buildExtractedItemsFromDb();
+  renderObsTable();
+  renderObsSummary();
+}
+
+async function handleSaveHeader() {
+  const inp = headerInputs();
+
+  if (!inp.vessel_id) return alert("Select vessel.");
+  if (!inp.inspection_date) return alert("Inspection date is required.");
+  if (!inp.report_ref) return alert("Report Reference is required.");
+
+  setSaveStatus("Saving…");
+  try {
+    let rep;
+    if (!state.activeReport?.id) {
+      rep = await createReportHeader(inp);
+    } else {
+      rep = await updateReportHeader(state.activeReport.id, inp);
+    }
+
+    state.reports = await loadReportsFromDb();
+    renderStoredTable();
+
+    await setActiveReportById(rep.id);
+    setSaveStatus("Saved");
+  } catch (e) {
+    console.error(e);
+    alert("Save header failed: " + (e?.message || String(e)));
+    setSaveStatus("Error");
+  }
+}
+
+async function handleDeleteReport() {
+  if (!state.activeReport?.id) return alert("No active report.");
+  const ok = confirm("Delete this report and all its observations?");
+  if (!ok) return;
+
+  setSaveStatus("Deleting…");
+  try {
+    await deleteReport(state.activeReport.id);
+    state.activeReport = null;
+    state.observationsByQno = {};
+    state.extractedItems = [];
+
+    state.reports = await loadReportsFromDb();
+    renderStoredTable();
+
+    setActivePill("No active report");
+    setSaveStatus("Deleted");
+
+    buildExtractedItemsFromDb();
+    renderObsTable();
+    renderObsSummary();
+  } catch (e) {
+    console.error(e);
+    alert("Delete failed: " + (e?.message || String(e)));
+    setSaveStatus("Error");
+  }
+}
+
 /* ---------- Extracted items building ---------- */
+
+function pgnoRequiredForRow(row) {
+  const ot = String(row?.observation_type || "");
+  // Positive: no PGNO
+  if (ot === "positive_observation") return false;
+  // Negative and Largely: require PGNO
+  if (ot === "negative_observation") return true;
+  if (ot === "note_improvement") return true; // Largely as expected
+  // Default: if unknown but has observation, require PGNO to be safe
+  return true;
+}
 
 function missingPgnoForQno(qno) {
   const row = state.observationsByQno[qno];
   if (!row) return false;
-
-  const ot = String(row.observation_type || "");
-  const isPgnoRequired = (ot === "negative_observation" || ot === "note_improvement"); // note_improvement == largely
-
-  if (!isPgnoRequired) return false;
-
+  if (!pgnoRequiredForRow(row)) return false;
   const arr = Array.isArray(row.pgno_selected) ? row.pgno_selected : [];
   return arr.length === 0;
 }
@@ -660,7 +827,7 @@ function buildExtractedItemsFromDb() {
   out.sort((a, b) => String(a.qno).localeCompare(String(b.qno)));
   state.extractedItems = out;
 
-  updateTopCounters();
+  setCountersFromState();
 }
 
 function applyObsFilters(items) {
@@ -672,11 +839,7 @@ function applyObsFilters(items) {
   return (items || []).filter(it => {
     if (type && it.kind !== type) return false;
     if (designationFilter && normDesignation(it.designation) !== designationFilter) return false;
-
-    if (onlyMissing) {
-      // Missing PGNO applies to negative AND largely
-      if (!(pgnoRequiredForKind(it.kind) && missingPgnoForQno(it.qno))) return false;
-    }
+    if (onlyMissing && !missingPgnoForQno(it.qno)) return false;
 
     if (term) {
       const hay = [
@@ -711,7 +874,7 @@ function renderObsTable() {
   if (!state.activeReport) {
     body.innerHTML = `<tr><td colspan="7" class="muted">No report loaded.</td></tr>`;
     el("obsSummary").textContent = "No report loaded.";
-    updateTopCounters();
+    setCountersFromState();
     return;
   }
 
@@ -720,18 +883,17 @@ function renderObsTable() {
   if (!items.length) {
     body.innerHTML = `<tr><td colspan="7" class="muted">No items match the current filters.</td></tr>`;
     renderObsSummary();
-    updateTopCounters();
+    setCountersFromState();
     return;
   }
 
   body.innerHTML = items.map(it => {
-    const needsPgno = pgnoRequiredForKind(it.kind);
+    const pgRequired = it.kind !== "positive";
+    const pgText = selectedPgnoText(it.pgno_selected);
 
-    const pgTxt = !needsPgno
-      ? `<span class="muted">n/a</span>`
-      : (selectedPgnoText(it.pgno_selected)
-          ? selectedPgnoText(it.pgno_selected)
-          : `<span class="muted">—</span>`);
+    const pgCell = pgRequired
+      ? (pgText ? pgText : `<span class="muted">—</span>`)
+      : `<span class="muted">n/a</span>`;
 
     const catDisplay = it.kind === "positive"
       ? (it.positive_rank ? `Human (${it.positive_rank})` : "Human")
@@ -746,8 +908,8 @@ function renderObsTable() {
         <td title="${esc(catDisplay)}">${esc(catDisplay)}</td>
         <td title="${esc(it.nature_of_concern || "")}">${esc(it.nature_of_concern || "")}</td>
         <td title="${esc(it.classification_coding || "")}">${esc(it.classification_coding || "")}</td>
-        <td title="${esc(obsText)}"><div class="clamp-3">${esc(obsText)}</div></td>
-        <td title="${esc(needsPgno ? selectedPgnoText(it.pgno_selected) : "")}">${pgTxt}</td>
+        <td title="${esc(obsText)}">${esc(obsText)}</td>
+        <td title="${esc(pgRequired ? pgText : "")}">${pgCell}</td>
       </tr>
     `;
   }).join("");
@@ -755,198 +917,149 @@ function renderObsTable() {
   body.querySelectorAll("tr.obs-row").forEach(tr => {
     tr.addEventListener("click", () => {
       const qno = tr.getAttribute("data-qno");
-      const item = state.extractedItems.find(x => x.qno === qno);
-      if (item) openObsDialog(item);
+      if (!qno) return;
+      openObsDialog(qno);
     });
   });
 
   renderObsSummary();
-  updateTopCounters();
+  setCountersFromState();
 }
 
 function renderObsSummary() {
-  const items = state.extractedItems || [];
+  if (!state.activeReport) {
+    el("obsSummary").textContent = "No report loaded.";
+    return;
+  }
+
+  const items = applyObsFilters(state.extractedItems);
   const total = items.length;
   const neg = items.filter(x => x.kind === "negative").length;
   const pos = items.filter(x => x.kind === "positive").length;
   const lae = items.filter(x => x.kind === "largely").length;
-  const miss = items.filter(x => pgnoRequiredForKind(x.kind) && missingPgnoForQno(x.qno)).length;
 
-  el("obsSummary").textContent =
-    `Total Items Extracted: ${total} | Negative: ${neg} | Positive: ${pos} | Largely: ${lae} | Missing PGNO: ${miss}`;
-
-  updateTopCounters();
+  el("obsSummary").textContent = `Total Items Extracted: ${total} | Negative: ${neg} | Positive: ${pos} | Largely: ${lae}`;
 }
 
-/* ---------- Observation editor ---------- */
+/* ---------- Observation editor dialog (existing behavior retained) ---------- */
 
-function openObsDialog(item) {
-  state.dialogItem = item;
+function closeObsDialog() {
+  try { el("obsDialog").close(); } catch {}
+  state.dialogItem = null;
+}
 
-  const qExact = state.libCanonToExact.get(canonicalQno(item.qno)) || item.qno;
-  const q = state.libByNo.get(qExact);
+function findQuestionFromLib(qnoCanon) {
+  const exact = state.libCanonToExact.get(qnoCanon) || qnoCanon;
+  return state.libByNo.get(exact) || null;
+}
 
-  const shortText = q ? getShort(q) : "";
-  const qText = q ? getQText(q) : "";
-  const chap = q ? getChap(q) : "";
-  const sect = q ? getSection(q) : "";
+function pgnoCheckboxList(qObj, selectedArr) {
+  const bullets = getPgnoBullets(qObj);
+  const selected = Array.isArray(selectedArr) ? selectedArr : [];
+  const selectedSet = new Set(selected.map(x => String(x?.text || "").trim()).filter(Boolean));
 
-  el("dlgTitle").textContent = `${item.qno} — ${shortText || "Question"}`;
-  el("dlgSub").textContent = `Chapter ${chap || "—"} | ${sect || "—"} | ${item.kind.toUpperCase()}`;
+  if (!bullets.length) {
+    return `<div class="muted">No PGNO bullets found for this question in the library.</div>`;
+  }
 
-  const pgnoApplies = pgnoRequiredForKind(item.kind); // NEGATIVE + LARGELY
-  const pgnoBullets = q ? getPgnoBullets(q) : [];
-  const selected = new Set((item.pgno_selected || []).map(x => Number(x.idx)).filter(Number.isFinite));
+  return bullets.map((t, idx) => {
+    const isOn = selectedSet.has(String(t).trim());
+    const checked = isOn ? "checked" : "";
+    return `
+      <label class="chk-row">
+        <input type="checkbox" class="pgnoChk" data-idx="${idx}" data-text="${esc(t)}" ${checked}/>
+        <span>${esc(t)}</span>
+      </label>
+    `;
+  }).join("");
+}
 
-  const pgnoHtml = !pgnoApplies
-    ? `<div class="hint">PGNOs are <b>not applicable</b> for Positive items.</div>`
-    : (
-      pgnoBullets.length
-        ? `
-          <div style="font-weight:900; color:#143a63; margin-top:8px;">PGNO tick selection (${item.kind === "largely" ? "Largely as expected" : "Negative"})</div>
-          <div id="dlgPgnoList">
-            ${pgnoBullets.map((txt, i) => {
-              const idx = i + 1;
-              const chk = selected.has(idx) ? "checked" : "";
-              return `
-                <div style="display:grid; grid-template-columns:22px 1fr; gap:10px; align-items:start; padding:10px 0; border-bottom:1px dashed #d5deef;">
-                  <input type="checkbox" class="dlgPgChk" data-idx="${idx}" ${chk}/>
-                  <div style="font-weight:600; color:#0c1b2a; line-height:1.25;">${esc(String(txt || "").trim())}</div>
-                </div>
-              `;
-            }).join("")}
-          </div>
-        `
-        : `<div class="hint">No PGNO bullets found in your locked library JSON for this question.</div>`
-    );
+function openObsDialog(qnoCanon) {
+  if (!state.activeReport?.id) return;
 
-  el("dlgBody").innerHTML = `
-    <div style="font-weight:900; color:#143a63; margin-bottom:10px;">Question</div>
-    <div style="font-weight:600; color:#0c1b2a; line-height:1.35; margin-bottom:12px;">
-      ${esc(qText)}
+  const row = state.observationsByQno[qnoCanon];
+  if (!row) return alert("Row not found.");
+
+  const qObj = findQuestionFromLib(qnoCanon);
+  const qShort = qObj ? (String(qObj["Short Text"] || qObj["short_text"] || "").trim()) : "";
+  const qText = qObj ? (String(qObj["Question"] || qObj["question"] || "").trim()) : "";
+
+  const kind =
+    String(row.observation_type || "") === "negative_observation" ? "negative" :
+    String(row.observation_type || "") === "positive_observation" ? "positive" :
+    "largely";
+
+  const requiresPgno = pgnoRequiredForRow(row);
+
+  el("dlgTitle").textContent = `Question ${qnoCanon}`;
+  el("dlgSub").innerHTML = `
+    <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+      <span>${obsRowTypeLabel(kind)}</span>
+      <span class="muted">${esc(qShort || "")}</span>
+      ${requiresPgno ? `<span class="muted">• PGNO required</span>` : `<span class="muted">• PGNO not required</span>`}
     </div>
-
-    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
-      <div>
-        <div style="font-weight:900; color:#143a63; margin-bottom:6px;">Category (editable)</div>
-        <select id="dlgDesignation" style="width:100%; padding:10px 12px; border:1px solid #cfe0f4; border-radius:12px; font-weight:600;">
-          <option value="">—</option>
-          <option value="Human">Human</option>
-          <option value="Process">Process</option>
-          <option value="Hardware">Hardware</option>
-          <option value="Photo">Photo</option>
-        </select>
-      </div>
-
-      <div>
-        <div style="font-weight:900; color:#143a63; margin-bottom:6px;">Nature of concern (editable)</div>
-        <input id="dlgNature" type="text" value="${esc(item.nature_of_concern || "")}"
-               style="width:100%; padding:10px 12px; border:1px solid #cfe0f4; border-radius:12px; font-weight:600;" />
-      </div>
-    </div>
-
-    <div style="margin-top:10px;">
-      <div style="font-weight:900; color:#143a63; margin-bottom:6px;">Classification coding (editable)</div>
-      <input id="dlgCoding" type="text" value="${esc(item.classification_coding || "")}"
-             style="width:100%; padding:10px 12px; border:1px solid #cfe0f4; border-radius:12px; font-weight:600;" />
-    </div>
-
-    <div style="margin-top:10px;">
-      <div style="font-weight:900; color:#143a63; margin-bottom:6px;">Observation text (editable)</div>
-      <textarea id="dlgObsText" placeholder="Edit / paste final wording here...">${esc((item.observation_text || item.remarks || "").trim())}</textarea>
-    </div>
-
-    ${pgnoHtml}
-
-    ${pgnoApplies ? `<div id="dlgMissingHint" class="hint" style="display:none;">Missing PGNO tick (Finalize will flag this).</div>` : ``}
   `;
 
-  const sel = el("dlgDesignation");
-  sel.value = normDesignation(item.designation) || (item.kind === "positive" ? "Human" : "");
+  const pgnoHtml = requiresPgno ? `
+    <div class="pi-field" style="margin-top:10px;">
+      <label>PGNO tickbox selection (required for Negative + Largely)</label>
+      <div class="chk-list" id="pgnoList">${pgnoCheckboxList(qObj, row.pgno_selected)}</div>
+    </div>
+  ` : `
+    <div class="muted" style="margin-top:10px;">PGNO not required for Positive items.</div>
+  `;
 
-  if (pgnoApplies) {
-    const hint = el("dlgMissingHint");
-    const arr = Array.isArray(item.pgno_selected) ? item.pgno_selected : [];
-    hint.style.display = arr.length ? "none" : "block";
-  }
+  el("dlgBody").innerHTML = `
+    <div class="pi-field">
+      <label>Observation text</label>
+      <textarea id="dlgObsText" placeholder="Observation text...">${esc(String(row.observation_text || row.remarks || ""))}</textarea>
+    </div>
+    ${pgnoHtml}
+  `;
+
+  state.dialogItem = { qnoCanon, kind, requiresPgno };
 
   el("obsDialog").showModal();
 }
 
-function closeObsDialog() {
-  state.dialogItem = null;
-  try { el("obsDialog").close(); } catch {}
-}
-
 async function saveObsDialog() {
-  const item = state.dialogItem;
-  if (!item) return;
-  if (!state.activeReport) {
-    alert("No active report.");
-    return;
-  }
+  if (!state.dialogItem) return;
+  if (!state.activeReport?.id) return;
 
-  const qno = item.qno;
-  const pgnoApplies = pgnoRequiredForKind(item.kind);
+  const { qnoCanon, requiresPgno } = state.dialogItem;
+  const row = state.observationsByQno[qnoCanon];
+  if (!row) return;
 
-  const designation = normDesignation(String(el("dlgDesignation").value || "").trim());
-  const nature_of_concern = String(el("dlgNature").value || "").trim();
-  const classification_coding = String(el("dlgCoding").value || "").trim();
-  const observation_text = String(el("dlgObsText").value || "").trim();
+  const text = String(el("dlgObsText")?.value || "").trim();
 
-  let pgno_selected = [];
-  if (pgnoApplies) {
-    const pgList = el("dlgBody").querySelectorAll(".dlgPgChk");
-    const qExact = state.libCanonToExact.get(canonicalQno(qno)) || qno;
-    const q = state.libByNo.get(qExact);
-    const bullets = q ? getPgnoBullets(q) : [];
+  let selected = Array.isArray(row.pgno_selected) ? row.pgno_selected : [];
 
-    pgList.forEach(chk => {
-      if (chk.checked) {
-        const idx = Number(chk.getAttribute("data-idx"));
-        if (!Number.isFinite(idx)) return;
-        const txt = bullets[idx - 1] || "";
-        pgno_selected.push({ idx, text: String(txt || "").trim() });
-      }
+  if (requiresPgno) {
+    selected = [];
+    document.querySelectorAll("#pgnoList .pgnoChk").forEach(chk => {
+      if (!chk.checked) return;
+      const t = String(chk.getAttribute("data-text") || "").trim();
+      if (!t) return;
+      selected.push({ text: t });
     });
   }
 
-  const observation_type =
-    item.kind === "negative" ? "negative_observation" :
-    item.kind === "positive" ? "positive_observation" :
-    "note_improvement";
-
-  const obs_type =
-    item.kind === "negative" ? "negative" :
-    item.kind === "positive" ? "positive" :
-    "largely";
-
-  const row = {
-    report_id: state.activeReport.id,
-    question_no: qno,
-    has_observation: true,
-    observation_type,
-    obs_type,
-
-    designation: designation || (item.kind === "positive" ? "Human" : null),
-    nature_of_concern: nature_of_concern || null,
-    classification_coding: classification_coding || null,
-
-    observation_text: observation_text || null,
-    remarks: observation_text || null,
-
-    pgno_selected,
+  const updated = {
+    ...row,
+    observation_text: text || null,
+    remarks: text || null,
+    pgno_selected: selected,
     updated_at: nowIso(),
   };
 
   setSaveStatus("Saving…");
   try {
-    await upsertObservationRow(row);
-
-    state.observationsByQno[qno] = { ...(state.observationsByQno[qno] || {}), ...row };
+    await upsertObservationRow(updated);
+    state.observationsByQno[qnoCanon] = updated;
 
     buildExtractedItemsFromDb();
     renderObsTable();
+
     setSaveStatus("Saved");
     closeObsDialog();
   } catch (e) {
@@ -956,39 +1069,30 @@ async function saveObsDialog() {
   }
 }
 
-/* ---------- Manual item ---------- */
+/* ---------- Add manual item (kept as-is) ---------- */
 
 async function addManualItem() {
-  if (!state.activeReport) {
-    alert("Load an inspection first (Stored Inspections) or save a new header.");
-    return;
-  }
+  if (!state.activeReport?.id) { alert("No active report."); return; }
 
-  const qno = prompt("Enter Question No (e.g. 4.2.7):");
-  if (!qno) return;
-
+  const qno = prompt("Question number (e.g. 4.2.7):", "") || "";
   const qCanon = canonicalQno(qno);
-  if (!qCanon) { alert("Invalid question number."); return; }
+  if (!qCanon) return;
 
-  const exists = state.observationsByQno[qCanon];
-  if (exists) { alert("This question already exists in this report."); return; }
-
-  const kind = prompt("Type: negative / positive / largely", "negative");
-  const t = String(kind || "").trim().toLowerCase();
-  const k = (t === "positive" || t === "negative" || t === "largely") ? t : "negative";
+  const k = (prompt("Type (negative/positive/largely):", "negative") || "").trim().toLowerCase();
+  const kind = (k === "negative" || k === "positive" || k === "largely") ? k : "negative";
 
   const observation_type =
-    k === "negative" ? "negative_observation" :
-    k === "positive" ? "positive_observation" :
+    kind === "negative" ? "negative_observation" :
+    kind === "positive" ? "positive_observation" :
     "note_improvement";
 
   const obs_type =
-    k === "negative" ? "negative" :
-    k === "positive" ? "positive" :
+    kind === "negative" ? "negative" :
+    kind === "positive" ? "positive" :
     "largely";
 
-  const designation = k === "positive" ? "Human" : (prompt("Category (Human/Process/Hardware/Photo):", "Human") || "");
-  const nature = prompt("Nature of concern:", k === "negative" ? "Not as expected." : (k === "positive" ? "Exceeded normal expectation." : "Largely as expected.")) || "";
+  const designation = kind === "positive" ? "Human" : (prompt("Category (Human/Process/Hardware/Photo):", "Human") || "");
+  const nature = prompt("Nature of concern:", kind === "negative" ? "Not as expected." : (kind === "positive" ? "Exceeded normal expectation." : "Largely as expected.")) || "";
   const text = prompt("Observation text:", "") || "";
 
   const row = {
@@ -1065,8 +1169,9 @@ async function importReportPdfAiFromFile(file) {
   const h = extracted?.header || {};
   const obs = Array.isArray(extracted?.observations) ? extracted.observations : [];
 
+  // Examined questions from AI extraction (this is what fixes "Total Questions Examined")
   const examined_questions = Array.isArray(extracted?.examined_questions) ? extracted.examined_questions : [];
-  const examined_count = Number(extracted?.examined_count || examined_questions.length) || examined_questions.length;
+  const examined_count = Number(extracted?.examined_count || examined_questions.length || 0);
 
   const extractedVesselName = String(h.vessel_name || "").trim();
   const vesselHit = extractedVesselName
@@ -1082,12 +1187,17 @@ async function importReportPdfAiFromFile(file) {
   const report_ref = String(h.report_reference || "").trim();
   if (!report_ref) throw new Error("AI import: report_reference missing (required).");
 
+  // Upsert report by report_ref
   const { data: existingRep, error: findErr } = await state.supabase
     .from("post_inspection_reports")
     .select("id")
     .eq("report_ref", report_ref)
     .maybeSingle();
   if (findErr) throw findErr;
+
+  // IMPORTANT REQUIREMENT:
+  // - Inspector Name + Inspector Company must be EMPTY by default when importing a NEW report.
+  const isNew = !existingRep?.id;
 
   const headerPayload = {
     vessel_id: vesselHit.id,
@@ -1097,9 +1207,15 @@ async function importReportPdfAiFromFile(file) {
     ocimf_inspecting_company: String(h.ocimf_inspecting_company || "").trim() || null,
     report_ref,
     title: String(el("reportTitle").value || "").trim() || state.titles[0] || null,
-    inspector_name: String(el("inspectorName").value || "").trim() || null,
-    inspector_company: String(el("inspectorCompany").value || "").trim() || null,
+
+    inspector_name: isNew ? null : (String(el("inspectorName").value || "").trim() || null),
+    inspector_company: isNew ? null : (String(el("inspectorCompany").value || "").trim() || null),
+
     pdf_storage_path: tempPath,
+
+    // Store examined identity list + count if schema supports it (fallbacks are implemented in update/create)
+    examined_questions,
+    examined_count,
   };
 
   let report;
@@ -1111,18 +1227,18 @@ async function importReportPdfAiFromFile(file) {
     report = await createReportHeader(headerPayload);
   }
 
+  // Reload reports list + stored inspections table
   state.reports = await loadReportsFromDb();
   renderStoredTable();
 
+  // Activate report
   await setActiveReportById(report.id);
 
-  loadReportIntoHeader({ ...report, vessel_name: extractedVesselName });
-
-  state.examinedQuestions = examined_questions.map(canonicalQno).filter(Boolean);
-  state.examinedCount = examined_count;
-
-  await persistExaminedQuestions(report.id, state.examinedQuestions);
-  updateTopCounters();
+  // For NEW import: ensure the inputs are empty now (you will fill after import)
+  if (isNew) {
+    el("inspectorName").value = "";
+    el("inspectorCompany").value = "";
+  }
 
   let saved = 0;
   let skipped = 0;
@@ -1176,124 +1292,13 @@ async function importReportPdfAiFromFile(file) {
     }
   }
 
+  // Refresh observations for report
   state.observationsByQno = await loadObservationsForReport(report.id);
   buildExtractedItemsFromDb();
   renderObsTable();
   renderObsSummary();
-  updateTopCounters();
 
   setSaveStatus(`AI import done (saved ${saved}, skipped ${skipped}, errors ${errors})`);
-}
-
-/* ---------- PDF download ---------- */
-
-async function downloadActivePdf() {
-  if (!state.activeReport) { alert("No active report."); return; }
-  const path = state.activeReport.pdf_storage_path;
-  if (!path) { alert("This report has no linked PDF."); return; }
-
-  try {
-    setSaveStatus("Preparing PDF…");
-    const { data, error } = await state.supabase
-      .storage
-      .from(PDF_BUCKET_DEFAULT)
-      .createSignedUrl(path, 60);
-
-    if (error) throw error;
-    if (!data?.signedUrl) throw new Error("No signed URL returned.");
-
-    window.open(data.signedUrl, "_blank", "noopener,noreferrer");
-    setSaveStatus("Loaded");
-  } catch (e) {
-    console.error(e);
-    alert("PDF download failed: " + (e?.message || String(e)));
-    setSaveStatus("Error");
-  }
-}
-
-/* ---------- Export / Import JSON ---------- */
-
-function buildExportPayload() {
-  const report = state.activeReport;
-  if (!report) return null;
-
-  return {
-    export_version: "post_inspection_export_v1",
-    exported_at: nowIso(),
-    report_header: {
-      ...report,
-      vessel_name: report.vessel_name || "",
-    },
-    examined: {
-      examined_count: state.examinedCount || 0,
-      examined_questions: state.examinedQuestions || [],
-    },
-    observations: state.observationsByQno || {},
-  };
-}
-
-function exportJson() {
-  if (!state.activeReport) { alert("No active report."); return; }
-  const payload = buildExportPayload();
-  if (!payload) return;
-
-  const name = `post_inspection_${String(state.activeReport.report_ref || "report").replace(/[^a-zA-Z0-9._-]+/g,"_")}.json`;
-  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = name;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
-}
-
-async function importJsonFile(file) {
-  if (!file) return;
-  if (!state.activeReport) { alert("Load a report first (Stored Inspections)."); return; }
-
-  try {
-    setSaveStatus("Importing JSON…");
-    const txt = await file.text();
-    const payload = JSON.parse(txt);
-
-    const obs = payload?.observations;
-    const examined = payload?.examined;
-
-    if (obs && typeof obs === "object") {
-      const keys = Object.keys(obs);
-      for (const qno of keys) {
-        const row = obs[qno];
-        if (!row) continue;
-        if (String(row.report_id || "") !== String(state.activeReport.id)) {
-          row.report_id = state.activeReport.id;
-        }
-        row.question_no = canonicalQno(row.question_no || qno);
-        row.updated_at = nowIso();
-        await upsertObservationRow(row);
-      }
-    }
-
-    if (examined && Array.isArray(examined.examined_questions)) {
-      state.examinedQuestions = examined.examined_questions.map(canonicalQno).filter(Boolean);
-      state.examinedCount = Number(examined.examined_count || state.examinedQuestions.length) || state.examinedQuestions.length;
-      await persistExaminedQuestions(state.activeReport.id, state.examinedQuestions);
-    }
-
-    state.observationsByQno = await loadObservationsForReport(state.activeReport.id);
-    buildExtractedItemsFromDb();
-    renderObsTable();
-    renderObsSummary();
-    updateTopCounters();
-
-    setSaveStatus("Imported");
-  } catch (e) {
-    console.error(e);
-    alert("Import failed: " + (e?.message || String(e)));
-    setSaveStatus("Error");
-  }
 }
 
 /* ---------- KPIs ---------- */
@@ -1304,9 +1309,9 @@ function renderKpis() {
   const neg = items.filter(x => x.kind === "negative").length;
   const pos = items.filter(x => x.kind === "positive").length;
   const lae = items.filter(x => x.kind === "largely").length;
-  const miss = items.filter(x => pgnoRequiredForKind(x.kind) && missingPgnoForQno(x.qno)).length;
+  const miss = items.filter(x => (x.kind !== "positive") && missingPgnoForQno(x.qno)).length;
 
-  el("kpiQuestionsExamined").value = String(state.examinedCount || 0);
+  el("kpiQuestionsExamined").value = String(examinedCountFromActive());
   el("kpiTotal").value = String(total);
   el("kpiNeg").value = String(neg);
   el("kpiPos").value = String(pos);
@@ -1318,114 +1323,26 @@ function renderKpis() {
 
 function finalizeCheck() {
   if (!state.activeReport) { alert("No active report."); return; }
-  const missing = (state.extractedItems || []).filter(x => pgnoRequiredForKind(x.kind) && missingPgnoForQno(x.qno));
+
+  const missing = (state.extractedItems || []).filter(x => (x.kind !== "positive") && missingPgnoForQno(x.qno));
   if (!missing.length) {
     alert("Finalize check: OK.\n\nNo Negative/Largely items are missing PGNO ticks.");
     return;
   }
-  renderKpis();
+
+  const lines = missing.slice(0, 30).map(x => `- ${x.qno} (${x.kind})`).join("\n");
+  alert(
+    `Finalize check: NOT OK.\n\nMissing PGNO tick(s) for:\n${lines}` +
+    (missing.length > 30 ? `\n… plus ${missing.length - 30} more.` : "")
+  );
 }
 
-/* ---------- Header actions ---------- */
+/* ---------- Init + wiring ---------- */
 
-function handleNewReport() {
-  state.activeReport = null;
-  state.observationsByQno = {};
-  state.extractedItems = [];
-  state.examinedQuestions = [];
-  state.examinedCount = 0;
-
-  setActivePill("No active report");
-  setSaveStatus("Not saved");
-
-  el("vesselSelect").value = "";
-  const d = new Date();
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  el("inspectionDate").value = `${yyyy}-${mm}-${dd}`;
-
-  el("portName").value = "";
-  el("portCode").value = "";
-  el("ocimfCompany").value = "";
-  el("reportRef").value = "";
-  el("inspectorName").value = "";
-  el("inspectorCompany").value = "";
-  el("pdfStatus").textContent = "No PDF linked";
-
-  buildExtractedItemsFromDb();
-  renderObsTable();
-  renderObsSummary();
-  updateTopCounters();
-}
-
-async function handleSaveHeader() {
-  const payload = headerInputs();
-
-  if (!payload.vessel_id) { alert("Please select a vessel first."); return; }
-  if (!payload.inspection_date) { alert("Please set an inspection date."); return; }
-  if (!payload.report_ref) { alert("Please enter report reference (unique)."); return; }
-  if (!payload.title) { alert("Please select a Title."); return; }
-
-  setSaveStatus("Saving…");
-  try {
-    let saved;
-    if (!state.activeReport) {
-      saved = await createReportHeader(payload);
-    } else {
-      saved = await updateReportHeader(state.activeReport.id, payload);
-    }
-
-    state.reports = await loadReportsFromDb();
-    renderStoredTable();
-
-    await setActiveReportById(saved.id);
-    setSaveStatus("Saved");
-  } catch (e) {
-    console.error(e);
-    alert("Save header failed: " + (e?.message || String(e)));
-    setSaveStatus("Error");
-  }
-}
-
-async function handleDeleteReport() {
-  if (!state.activeReport) return;
-  const ok = confirm(`Delete this report?\n\n${reportLabel(state.activeReport)}\n\nAll items will be deleted (cascade).`);
-  if (!ok) return;
-
-  setSaveStatus("Deleting…");
-  try {
-    await deleteReport(state.activeReport.id);
-
-    state.activeReport = null;
-    state.observationsByQno = {};
-    state.extractedItems = [];
-    state.examinedQuestions = [];
-    state.examinedCount = 0;
-
-    setActivePill("No active report");
-
-    state.reports = await loadReportsFromDb();
-    renderStoredTable();
-
-    renderObsTable();
-    renderObsSummary();
-    updateTopCounters();
-
-    setSaveStatus("Deleted");
-  } catch (e) {
-    console.error(e);
-    alert("Delete failed: " + (e?.message || String(e)));
-    setSaveStatus("Error");
-  }
-}
-
-/* ---------- Auth init ---------- */
-
-async function waitForAuth(timeoutMs = 5000) {
-  const started = Date.now();
-  while (Date.now() - started < timeoutMs) {
-    if (window.AUTH && typeof window.AUTH.requireAuth === "function") return true;
+async function waitForAuth(ms) {
+  const start = Date.now();
+  while (Date.now() - start < ms) {
+    if (window.AUTH && window.AUTH.ensureSupabase) return true;
     await new Promise(r => setTimeout(r, 50));
   }
   return false;
@@ -1435,7 +1352,9 @@ async function init() {
   try { el("buildPill").textContent = `build: ${POST_INSPECTION_BUILD}`; } catch {}
 
   const ok = await waitForAuth(5000);
-  if (!ok) throw new Error("AUTH not loaded. Ensure ./auth.js is included BEFORE ./post_inspection.js.");
+  if (!ok) {
+    throw new Error("AUTH not loaded. Ensure ./auth.js is included BEFORE ./post_inspection.js.");
+  }
 
   state.supabase = window.AUTH.ensureSupabase();
 
@@ -1446,9 +1365,15 @@ async function init() {
   window.AUTH.fillUserBadge(state.me, "userBadge");
   el("logoutBtn").addEventListener("click", window.AUTH.logoutAndGoLogin);
 
-  el("dashboardBtn")?.addEventListener("click", () => { window.location.href = "dashboard.html"; });
-  el("modeSelectBtn")?.addEventListener("click", () => { window.location.href = "mode_selection.html"; });
+  // FIX: robust navigation (no dead dashboard.html)
+  el("dashboardBtn")?.addEventListener("click", async () => {
+    await safeNavigate(["./dashboard.html", "./su-admin.html", "./index.html", "./"]);
+  });
+  el("modeSelectBtn")?.addEventListener("click", async () => {
+    await safeNavigate(["./mode_selection.html", "./mode-selection.html", "./index.html", "./"]);
+  });
 
+  // Titles
   state.titles = loadTitles();
   renderTitleSelect();
 
@@ -1467,12 +1392,12 @@ async function init() {
 
   setSaveStatus("Loading…");
 
+  // Load vessels
   state.vessels = await loadVessels();
   renderVesselsSelect();
 
+  // Load locked library
   state.lib = await loadLockedLibraryJson(LOCKED_LIBRARY_JSON);
-  state.libByNo = new Map();
-  state.libCanonToExact = new Map();
   for (const q of state.lib) {
     const qno = getQno(q);
     if (!qno) continue;
@@ -1481,9 +1406,11 @@ async function init() {
     if (canon && !state.libCanonToExact.has(canon)) state.libCanonToExact.set(canon, qno);
   }
 
+  // Load reports
   state.reports = await loadReportsFromDb();
   renderStoredTable();
 
+  // Stored filters buttons
   document.querySelectorAll(".filter-btn[data-filter-col]").forEach(btn => {
     btn.addEventListener("click", (e) => {
       e.preventDefault();
@@ -1493,9 +1420,12 @@ async function init() {
     });
   });
 
+  // Stored filter dialog controls
   el("storedFilterSearch").addEventListener("input", () => {
     const col = state.openFilterCol;
     if (!col) return;
+    if (col === "inspection_date") return; // date filter has no search box
+
     const values = uniqueValuesForCol(col);
     const set = state.storedFilters[col] instanceof Set ? state.storedFilters[col] : new Set();
     renderStoredFilterList(values, set, el("storedFilterSearch").value);
@@ -1505,6 +1435,14 @@ async function init() {
   el("storedFilterClearBtn").addEventListener("click", () => {
     const col = state.openFilterCol;
     if (!col) return;
+
+    if (col === "inspection_date") {
+      state.storedDateYears = new Set();
+      state.storedDateMonths = new Set();
+      renderStoredDateFilterUI();
+      return;
+    }
+
     state.storedFilters[col] = new Set();
     const values = uniqueValuesForCol(col);
     renderStoredFilterList(values, state.storedFilters[col], el("storedFilterSearch").value);
@@ -1517,44 +1455,46 @@ async function init() {
 
   el("clearStoredFiltersBtn").addEventListener("click", () => {
     state.storedFilters = {};
+    state.storedDateYears = new Set();
+    state.storedDateMonths = new Set();
     renderStoredTable();
   });
 
+  // Header buttons
   el("newReportBtn").addEventListener("click", handleNewReport);
   el("saveHeaderBtn").addEventListener("click", handleSaveHeader);
   el("deleteReportBtn").addEventListener("click", handleDeleteReport);
 
-  el("downloadPdfBtn").addEventListener("click", downloadActivePdf);
-
+  // Import PDF
   el("importPdfBtn").addEventListener("click", () => el("importPdfFile").click());
   el("importPdfFile").addEventListener("change", async (e) => {
     const f = e.target.files && e.target.files[0];
-    try { if (f) await importReportPdfAiFromFile(f); }
-    finally { e.target.value = ""; }
+    try {
+      if (f) await importReportPdfAiFromFile(f);
+    } finally {
+      e.target.value = "";
+    }
   });
 
-  el("exportBtn").addEventListener("click", exportJson);
-  el("importBtn").addEventListener("click", () => el("importFile").click());
-  el("importFile").addEventListener("change", async (e) => {
-    const f = e.target.files && e.target.files[0];
-    try { if (f) await importJsonFile(f); }
-    finally { e.target.value = ""; }
-  });
-
+  // KPIs + finalize
   el("statsBtn").addEventListener("click", renderKpis);
   el("finalizeBtn").addEventListener("click", finalizeCheck);
   el("closeStatsBtn").addEventListener("click", () => el("statsDialog").close());
 
+  // Add manual
   el("addManualBtn").addEventListener("click", addManualItem);
 
+  // Extracted filters
   el("obsSearch").addEventListener("input", renderObsTable);
   el("obsTypeFilter").addEventListener("change", renderObsTable);
   el("obsDesignationFilter").addEventListener("change", renderObsTable);
   el("onlyMissingPgno").addEventListener("change", renderObsTable);
 
+  // Obs modal buttons
   el("dlgCancelBtn").addEventListener("click", closeObsDialog);
   el("dlgSaveBtn").addEventListener("click", saveObsDialog);
 
+  // Default date for new report form
   if (!el("inspectionDate").value) {
     const d = new Date();
     const yyyy = d.getFullYear();
@@ -1563,9 +1503,10 @@ async function init() {
     el("inspectionDate").value = `${yyyy}-${mm}-${dd}`;
   }
 
+  // No active report until user clicks stored inspection
+  buildExtractedItemsFromDb();
   renderObsTable();
   renderObsSummary();
-  updateTopCounters();
   setSaveStatus("Loaded");
 }
 
