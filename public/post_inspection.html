@@ -66,13 +66,20 @@
       margin-top:16px;
     }
 
-    /* Header fields grid */
+    /* ========= Inspection Header fields: SAFE responsive grid (prevents overlap) ========= */
     .pi-fields{
       display:grid;
-      grid-template-columns: 260px 1fr 220px 1fr 220px 1fr;
+      grid-template-columns: repeat(12, minmax(0, 1fr));
       gap:10px 12px;
       align-items:end;
     }
+
+    /* default col spans */
+    .col-3{ grid-column: span 3; }
+    .col-4{ grid-column: span 4; }
+    .col-6{ grid-column: span 6; }
+    .col-12{ grid-column: 1 / -1; }
+
     .pi-field label{
       display:block; font-weight:900; color:#143a63; margin:0 0 6px;
     }
@@ -81,7 +88,7 @@
       padding:10px 12px;
       border:1px solid #cfe0f4;
       border-radius:12px;
-      font-weight:700;
+      font-weight:600; /* NORMAL */
       outline:none;
       background:#fff;
       min-width:0;
@@ -89,9 +96,6 @@
     .pi-field input:focus, .pi-field select:focus{
       border-color:#5aa2ff; box-shadow:0 0 0 3px rgba(90,162,255,.2);
     }
-    .pi-span2{ grid-column: span 2; }
-    .pi-span3{ grid-column: span 3; }
-    .pi-span6{ grid-column: 1 / -1; }
 
     /* Actions row */
     .pi-actions{
@@ -101,7 +105,7 @@
       border-top:1px solid #e5eefc;
     }
 
-    /* Buttons - nicer */
+    /* Buttons - consistent */
     .btn{
       border-radius:12px !important;
       padding:9px 12px !important;
@@ -154,11 +158,11 @@
       padding:10px 10px;
       border-bottom:1px solid #eef4ff;
       vertical-align:top;
-      font-weight:600; /* NORMAL (not bold) */
+      font-weight:500; /* NORMAL (not bold) */
       color:#0c1b2a;
       overflow:hidden;
       text-overflow:ellipsis;
-      white-space:nowrap;  /* minimal wrap */
+      white-space:nowrap;  /* Stored Inspections: keep compact */
     }
     .pi-table tbody tr{ cursor:pointer; }
     .pi-table tbody tr:hover td{ background:#f8fbff; }
@@ -186,7 +190,7 @@
     }
     .filter-btn:hover{ filter:brightness(0.98); }
 
-    /* Filter modal popover */
+    /* Filter modal popover (no close button; outside click closes; header click toggles) */
     dialog{ border:none; border-radius:18px; padding:0; max-width:640px; width: calc(100vw - 40px); }
     .dlg{ padding:16px; }
     .dlg h3{ margin:0 0 8px; color:#143a63; font-weight:900; }
@@ -210,7 +214,7 @@
       align-items:center;
       padding:8px 6px;
       border-bottom:1px dashed #e6eefc;
-      font-weight:700;
+      font-weight:600;
       color:#0c1b2a;
     }
     .chk-row:last-child{ border-bottom:none; }
@@ -220,7 +224,7 @@
       padding:10px 12px;
       border:1px solid #cfe0f4;
       border-radius:12px;
-      font-weight:700;
+      font-weight:600;
       outline:none;
       margin-bottom:10px;
     }
@@ -249,18 +253,37 @@
       padding:10px 12px;
       border:1px solid #cfe0f4;
       border-radius:12px;
-      font-weight:700;
+      font-weight:600;
       resize:vertical;
       background:#fff;
       outline:none;
     }
 
+    /* ========= Extracted Items table: readable observation text ========= */
+    .pi-table.pi-obs tbody td{
+      white-space:normal;   /* allow wrapping */
+      overflow:visible;
+      text-overflow:clip;
+    }
+
+    /* clamp observation text to keep it readable (not one long wrap) */
+    .clamp-3{
+      display:-webkit-box;
+      -webkit-line-clamp:3;
+      -webkit-box-orient:vertical;
+      overflow:hidden;
+      white-space:normal;
+      line-height:1.25;
+    }
+
     /* Responsive */
-    @media (max-width: 1100px){
-      .pi-fields{ grid-template-columns: 1fr 1fr; }
-      .pi-span2, .pi-span3, .pi-span6{ grid-column:auto; }
+    @media (max-width: 1200px){
+      .col-3,.col-4,.col-6{ grid-column: span 6; }
+      .col-12{ grid-column: 1 / -1; }
       table{ table-layout:auto; }
-      .pi-table tbody td{ white-space:normal; }
+    }
+    @media (max-width: 820px){
+      .col-3,.col-4,.col-6{ grid-column: 1 / -1; }
     }
   </style>
 </head>
@@ -355,55 +378,55 @@
         <h2>Inspection Header</h2>
 
         <div class="pi-fields">
-          <div class="pi-field">
+          <div class="pi-field col-3">
             <label>Vessel</label>
             <select id="vesselSelect"></select>
           </div>
 
-          <div class="pi-field">
+          <div class="pi-field col-3">
             <label>Inspection Date</label>
             <input id="inspectionDate" type="date" />
           </div>
 
-          <div class="pi-field">
+          <div class="pi-field col-3">
             <label>Port (official name)</label>
             <input id="portName" type="text" placeholder="e.g. Greece - Agio Theodoroi" />
           </div>
 
-          <div class="pi-field">
+          <div class="pi-field col-3">
             <label>Port Code</label>
             <input id="portCode" type="text" placeholder="e.g. GRAGT" />
           </div>
 
-          <div class="pi-field">
+          <div class="pi-field col-6">
             <label>OCIMF Inspecting Company</label>
             <input id="ocimfCompany" type="text" placeholder="MOTOR OIL HELLAS S.A." />
           </div>
 
-          <div class="pi-field pi-span2">
+          <div class="pi-field col-6">
             <label>Report Reference</label>
             <input id="reportRef" type="text" placeholder="LDSS-2560-2968-7649" />
           </div>
 
-          <div class="pi-field pi-span2">
+          <div class="pi-field col-6">
             <label>Title</label>
-            <div style="display:flex; gap:10px; align-items:center;">
-              <select id="reportTitle"></select>
+            <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+              <select id="reportTitle" style="flex:1 1 260px;"></select>
               <button class="btn btn-muted" id="manageTitlesBtn" type="button">Manage Titles</button>
             </div>
           </div>
 
-          <div class="pi-field pi-span3">
+          <div class="pi-field col-3">
             <label>Inspector Name (manual)</label>
             <input id="inspectorName" type="text" placeholder="Enter inspector name (not in PDF)" />
           </div>
 
-          <div class="pi-field pi-span3">
+          <div class="pi-field col-3">
             <label>Inspector’s Company (manual)</label>
             <input id="inspectorCompany" type="text" placeholder="Enter inspector company (not in PDF)" />
           </div>
 
-          <div class="pi-field pi-span3">
+          <div class="pi-field col-12">
             <label>PDF Report (stored)</label>
             <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
               <button class="btn btn-muted" id="downloadPdfBtn" type="button">Download PDF</button>
@@ -411,7 +434,7 @@
             </div>
           </div>
 
-          <div class="pi-field pi-span6">
+          <div class="pi-field col-12">
             <div class="pi-actions">
               <button class="btn btn-muted" id="newReportBtn" type="button">New Report</button>
               <button class="btn primary" id="saveHeaderBtn" type="button">Save Header</button>
@@ -431,18 +454,23 @@
           </div>
         </div>
 
-        <div style="margin-top:10px; color:#0f3a63; font-weight:800;">
+        <div style="margin-top:10px; color:#0f3a63; font-weight:700;">
           <ul style="margin:0; padding-left:18px;">
             <li><b>Negative</b>: designation + Nature of Concern (Not as expected … / Observable or detectable deficiency). Requires PGNO.</li>
             <li><b>Positive</b>: Human + Nature of Concern (Exceeded normal expectation). No PGNO.</li>
             <li><b>Largely as expected</b>: designation + Nature of Concern (Largely as expected). KPI item.</li>
           </ul>
-          <div style="margin-top:8px;">
-            <span style="font-weight:900;">Total Questions Examined (from PDF):</span>
-            <span id="questionsExaminedVal">0</span>
-            &nbsp;•&nbsp;
-            <span style="font-weight:900;">Total Items Extracted:</span>
-            <span id="itemsExtractedVal">0</span>
+
+          <div style="margin-top:10px; display:flex; gap:14px; flex-wrap:wrap; align-items:center;">
+            <span><b>Total Questions Examined (from PDF):</b> <span id="questionsExaminedVal">0</span></span>
+            <span><b>Total Items Extracted:</b> <span id="itemsExtractedVal">0</span></span>
+            <span><b>Negative:</b> <span id="negCountVal">0</span></span>
+            <span><b>Positive:</b> <span id="posCountVal">0</span></span>
+            <span><b>Largely:</b> <span id="laeCountVal">0</span></span>
+          </div>
+
+          <div id="examinedStoreHint" class="muted" style="margin-top:8px; display:none;">
+            Examined questions were captured, but could not be persisted to DB (schema missing). Stored locally for this browser session.
           </div>
         </div>
       </div>
@@ -454,16 +482,16 @@
         <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; justify-content:space-between; margin:8px 0 10px;">
           <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
             <input id="obsSearch" type="text" placeholder="Search (qno / category / nature / coding / text)"
-                   style="padding:10px 12px; border:1px solid #cfe0f4; border-radius:12px; font-weight:700; background:#fff; min-width:260px;" />
+                   style="padding:10px 12px; border:1px solid #cfe0f4; border-radius:12px; font-weight:600; background:#fff; min-width:260px;" />
 
-            <select id="obsTypeFilter" style="padding:10px 12px; border:1px solid #cfe0f4; border-radius:12px; font-weight:700; background:#fff;">
+            <select id="obsTypeFilter" style="padding:10px 12px; border:1px solid #cfe0f4; border-radius:12px; font-weight:600; background:#fff;">
               <option value="">All types</option>
               <option value="negative">Negative</option>
               <option value="positive">Positive</option>
               <option value="largely">Largely as expected</option>
             </select>
 
-            <select id="obsDesignationFilter" style="padding:10px 12px; border:1px solid #cfe0f4; border-radius:12px; font-weight:700; background:#fff;">
+            <select id="obsDesignationFilter" style="padding:10px 12px; border:1px solid #cfe0f4; border-radius:12px; font-weight:600; background:#fff;">
               <option value="">All categories</option>
               <option value="Human">Human</option>
               <option value="Process">Process</option>
@@ -471,7 +499,7 @@
               <option value="Photo">Photo</option>
             </select>
 
-            <label style="display:flex; gap:8px; align-items:center; font-weight:800; color:#143a63;">
+            <label style="display:flex; gap:8px; align-items:center; font-weight:700; color:#143a63;">
               <input id="onlyMissingPgno" type="checkbox" />
               Missing PGNO (negatives)
             </label>
@@ -481,7 +509,7 @@
         </div>
 
         <div class="tbl-wrap" style="max-height: 60vh; overflow:auto;">
-          <table class="pi-table">
+          <table class="pi-table pi-obs">
             <thead>
               <tr>
                 <th style="width:90px;">Question</th>
@@ -525,7 +553,7 @@
 
         <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
           <input id="newTitleInput" type="text" placeholder="New title..."
-                 style="flex:1 1 260px; padding:10px 12px; border:1px solid #cfe0f4; border-radius:12px; font-weight:700;" />
+                 style="flex:1 1 260px; padding:10px 12px; border:1px solid #cfe0f4; border-radius:12px; font-weight:600;" />
           <button class="btn primary" id="addTitleBtn" type="button">Add</button>
         </div>
 

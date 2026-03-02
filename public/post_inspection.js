@@ -4,7 +4,7 @@ import { loadLockedLibraryJson } from "./question_library_loader.js";
  * HARD BUILD STAMP (visible in the blue pill)
  * Change this string every time you replace this file.
  */
-const POST_INSPECTION_BUILD = "post_inspection_stored_tick_filters_no_close_normal_fonts_2026-03-02";
+const POST_INSPECTION_BUILD = "post_inspection_ui_counters_examined_store_v22_2026-03-02";
 
 /**
  * Locked library JSON
@@ -26,6 +26,11 @@ const DEFAULT_TITLES = [
   "Company Audit",
   "Third Party Audit",
 ];
+
+/**
+ * Examined questions fallback storage (if DB schema missing)
+ */
+const EXAMINED_LOCAL_KEY = "post_inspection_examined_by_report_v1";
 
 function el(id) { return document.getElementById(id); }
 
@@ -134,6 +139,10 @@ const state = {
 
   // Titles
   titles: [],
+
+  // Examined questions per active report
+  examinedQuestions: [], // canonical qnos
+  examinedCount: 0,
 };
 
 /* ---------- UI helpers ---------- */
@@ -181,7 +190,6 @@ function renderTitleSelect() {
     o.textContent = t;
     sel.appendChild(o);
   }
-  // keep selection if possible
   if (current && state.titles.includes(current)) sel.value = current;
   else sel.value = state.titles[0] || "";
 }
@@ -230,6 +238,7 @@ async function loadVessels() {
 
 async function loadReportsFromDb() {
   // IMPORTANT: do NOT select columns that might not exist in your schema.
+  // We keep the original known columns only.
   const { data, error } = await state.supabase
     .from("post_inspection_reports")
     .select("id, vessel_id, inspection_date, port_name, port_code, ocimf_inspecting_company, report_ref, title, inspector_name, inspector_company, pdf_storage_path, created_at, updated_at")
@@ -305,6 +314,77 @@ async function upsertObservationRow(row) {
   if (error) throw error;
 }
 
+/**
+ * Examined questions persistence (best-effort):
+ * 1) Try to update post_inspection_reports with examined_count + examined_questions (if columns exist).
+ * 2) Else try to upsert into post_inspection_examined_questions table (if exists).
+ * 3) Else store in localStorage (fallback; still shown in UI).
+ */
+async function persistExaminedQuestions(reportId, examinedQuestions) {
+  const canon = (examinedQuestions || []).map(canonicalQno).filter(Boolean);
+  const uniq = [...new Set(canon)].sort((a,b)=>a.localeCompare(b));
+
+  // reset hint
+  el("examinedStoreHint").style.display = "none";
+
+  // Try option 1: columns on reports table
+  try {
+    const { error } = await state.supabase
+      .from("post_inspection_reports")
+      .update({
+        examined_count: uniq.length,
+        examined_questions: uniq, // jsonb array if column exists
+        updated_at: nowIso(),
+      })
+      .eq("id", reportId);
+
+    if (!error) return { ok:true, method:"reports_columns" };
+    // if error exists, fall through
+  } catch (_) {}
+
+  // Try option 2: dedicated table
+  try {
+    // We do not assume this exists; attempt and catch.
+    const rows = uniq.map(qno => ({
+      report_id: reportId,
+      question_no: qno,
+      updated_at: nowIso(),
+    }));
+
+    const { error } = await state.supabase
+      .from("post_inspection_examined_questions")
+      .upsert(rows, { onConflict: "report_id,question_no" });
+
+    if (!error) return { ok:true, method:"examined_table" };
+  } catch (_) {}
+
+  // Fallback option 3: localStorage
+  try {
+    const raw = localStorage.getItem(EXAMINED_LOCAL_KEY);
+    const obj = raw ? JSON.parse(raw) : {};
+    obj[String(reportId)] = { examined_questions: uniq, examined_count: uniq.length, stored_at: nowIso() };
+    localStorage.setItem(EXAMINED_LOCAL_KEY, JSON.stringify(obj));
+    el("examinedStoreHint").style.display = "block";
+  } catch {}
+
+  return { ok:false, method:"local_fallback" };
+}
+
+function loadExaminedQuestionsFallback(reportId) {
+  try {
+    const raw = localStorage.getItem(EXAMINED_LOCAL_KEY);
+    if (!raw) return { examined_questions: [], examined_count: 0 };
+    const obj = JSON.parse(raw);
+    const hit = obj?.[String(reportId)];
+    if (!hit) return { examined_questions: [], examined_count: 0 };
+    const arr = Array.isArray(hit.examined_questions) ? hit.examined_questions : [];
+    const cnt = Number(hit.examined_count || arr.length) || arr.length;
+    return { examined_questions: arr.map(canonicalQno).filter(Boolean), examined_count: cnt };
+  } catch {
+    return { examined_questions: [], examined_count: 0 };
+  }
+}
+
 /* ---------- Stored inspections table + tickbox filters ---------- */
 
 function uniqueValuesForCol(col) {
@@ -313,7 +393,6 @@ function uniqueValuesForCol(col) {
     .map(v => String(v || "").trim())
     .filter(Boolean);
 
-  // For date, allow exact dates; you can later evolve to month/year.
   const uniq = [...new Set(vals)];
   uniq.sort((a,b) => a.localeCompare(b));
   return uniq;
@@ -325,7 +404,6 @@ function reportPassesStoredFilters(r) {
     if (!(set instanceof Set) || set.size === 0) continue;
 
     const v = String(r?.[col] ?? "").trim();
-    // if empty value, treat as not matching when filter active
     if (!v) return false;
     if (!set.has(v)) return false;
   }
@@ -400,7 +478,7 @@ function openStoredFilterForCol(col) {
 
   el("storedFilterDialog").showModal();
 
-  // clicking outside closes
+  // outside click closes (no close button)
   el("storedFilterDialog").addEventListener("click", (e) => {
     const rect = el("storedFilterDialog").getBoundingClientRect();
     const inDialog =
@@ -433,7 +511,6 @@ function renderStoredFilterList(values, selectedSet, searchTerm) {
     `;
   }).join("");
 
-  // handlers
   box.querySelectorAll(".storedFilterChk").forEach(chk => {
     chk.addEventListener("change", () => {
       const v = chk.getAttribute("data-val");
@@ -469,7 +546,6 @@ function loadReportIntoHeader(r) {
   el("ocimfCompany").value = r.ocimf_inspecting_company || "";
   el("reportRef").value = r.report_ref || "";
 
-  // title: if unknown, add it
   const t = String(r.title || "").trim();
   if (t && !state.titles.includes(t)) {
     state.titles.push(t);
@@ -502,6 +578,21 @@ function renderVesselsSelect() {
   }
 }
 
+function updateTopCounters() {
+  el("questionsExaminedVal").textContent = String(state.examinedCount || 0);
+
+  const items = state.extractedItems || [];
+  const total = items.length;
+  const neg = items.filter(x => x.kind === "negative").length;
+  const pos = items.filter(x => x.kind === "positive").length;
+  const lae = items.filter(x => x.kind === "largely").length;
+
+  el("itemsExtractedVal").textContent = String(total);
+  el("negCountVal").textContent = String(neg);
+  el("posCountVal").textContent = String(pos);
+  el("laeCountVal").textContent = String(lae);
+}
+
 async function setActiveReportById(id) {
   const r = state.reports.find(x => x.id === id) || null;
   if (!r) return;
@@ -519,9 +610,16 @@ async function setActiveReportById(id) {
     state.observationsByQno = {};
   }
 
+  // examined questions: load fallback (or 0 if none)
+  const fb = loadExaminedQuestionsFallback(r.id);
+  state.examinedQuestions = fb.examined_questions || [];
+  state.examinedCount = Number(fb.examined_count || state.examinedQuestions.length) || state.examinedQuestions.length;
+
   buildExtractedItemsFromDb();
   renderObsTable();
   renderObsSummary();
+  updateTopCounters();
+
   setSaveStatus("Loaded");
 }
 
@@ -566,11 +664,7 @@ function buildExtractedItemsFromDb() {
   out.sort((a, b) => String(a.qno).localeCompare(String(b.qno)));
   state.extractedItems = out;
 
-  // Totals in header
-  el("itemsExtractedVal").textContent = String(out.length);
-
-  // Questions examined (not yet captured by backend) - keep 0 unless you later add it
-  el("questionsExaminedVal").textContent = String(0);
+  updateTopCounters();
 }
 
 function applyObsFilters(items) {
@@ -604,7 +698,6 @@ function applyObsFilters(items) {
 function selectedPgnoText(pgno_selected) {
   const arr = Array.isArray(pgno_selected) ? pgno_selected : [];
   if (!arr.length) return "";
-  // join selected bullet texts
   return arr
     .map(x => String(x?.text || "").trim())
     .filter(Boolean)
@@ -618,7 +711,7 @@ function renderObsTable() {
   if (!state.activeReport) {
     body.innerHTML = `<tr><td colspan="7" class="muted">No report loaded.</td></tr>`;
     el("obsSummary").textContent = "No report loaded.";
-    el("itemsExtractedVal").textContent = "0";
+    updateTopCounters();
     return;
   }
 
@@ -627,6 +720,7 @@ function renderObsTable() {
   if (!items.length) {
     body.innerHTML = `<tr><td colspan="7" class="muted">No items match the current filters.</td></tr>`;
     renderObsSummary();
+    updateTopCounters();
     return;
   }
 
@@ -635,7 +729,6 @@ function renderObsTable() {
       ? (selectedPgnoText(it.pgno_selected) ? selectedPgnoText(it.pgno_selected) : `<span class="muted">—</span>`)
       : `<span class="muted">n/a</span>`;
 
-    // Category display: for positives show rank in parentheses if present (still normal weight)
     const catDisplay = it.kind === "positive"
       ? (it.positive_rank ? `Human (${it.positive_rank})` : "Human")
       : (it.designation || "—");
@@ -649,7 +742,7 @@ function renderObsTable() {
         <td title="${esc(catDisplay)}">${esc(catDisplay)}</td>
         <td title="${esc(it.nature_of_concern || "")}">${esc(it.nature_of_concern || "")}</td>
         <td title="${esc(it.classification_coding || "")}">${esc(it.classification_coding || "")}</td>
-        <td title="${esc(obsText)}">${esc(obsText)}</td>
+        <td title="${esc(obsText)}"><div class="clamp-3">${esc(obsText)}</div></td>
         <td title="${esc(it.kind === "negative" ? selectedPgnoText(it.pgno_selected) : "")}">${pgTxt}</td>
       </tr>
     `;
@@ -664,6 +757,7 @@ function renderObsTable() {
   });
 
   renderObsSummary();
+  updateTopCounters();
 }
 
 function renderObsSummary() {
@@ -677,7 +771,7 @@ function renderObsSummary() {
   el("obsSummary").textContent =
     `Total Items Extracted: ${total} | Negative: ${neg} | Positive: ${pos} | Largely: ${lae} | Missing PGNO: ${miss}`;
 
-  el("itemsExtractedVal").textContent = String(total);
+  updateTopCounters();
 }
 
 /* ---------- Observation editor (editable fields) ---------- */
@@ -713,7 +807,7 @@ function openObsDialog(item) {
               return `
                 <div style="display:grid; grid-template-columns:22px 1fr; gap:10px; align-items:start; padding:10px 0; border-bottom:1px dashed #d5deef;">
                   <input type="checkbox" class="dlgPgChk" data-idx="${idx}" ${chk}/>
-                  <div style="font-weight:700; color:#0c1b2a;">${esc(String(txt || "").trim())}</div>
+                  <div style="font-weight:600; color:#0c1b2a; line-height:1.25;">${esc(String(txt || "").trim())}</div>
                 </div>
               `;
             }).join("")}
@@ -722,20 +816,16 @@ function openObsDialog(item) {
         : `<div class="hint">No PGNO bullets found in your locked library JSON for this question.</div>`
     );
 
-  const catDisplay = item.kind === "positive"
-    ? (item.positive_rank ? `Human (${item.positive_rank})` : "Human")
-    : (item.designation || "");
-
   el("dlgBody").innerHTML = `
     <div style="font-weight:900; color:#143a63; margin-bottom:10px;">Question</div>
-    <div style="font-weight:700; color:#0c1b2a; line-height:1.35; margin-bottom:12px;">
+    <div style="font-weight:600; color:#0c1b2a; line-height:1.35; margin-bottom:12px;">
       ${esc(qText)}
     </div>
 
     <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
       <div>
         <div style="font-weight:900; color:#143a63; margin-bottom:6px;">Category (editable)</div>
-        <select id="dlgDesignation" style="width:100%; padding:10px 12px; border:1px solid #cfe0f4; border-radius:12px; font-weight:700;">
+        <select id="dlgDesignation" style="width:100%; padding:10px 12px; border:1px solid #cfe0f4; border-radius:12px; font-weight:600;">
           <option value="">—</option>
           <option value="Human">Human</option>
           <option value="Process">Process</option>
@@ -747,14 +837,14 @@ function openObsDialog(item) {
       <div>
         <div style="font-weight:900; color:#143a63; margin-bottom:6px;">Nature of concern (editable)</div>
         <input id="dlgNature" type="text" value="${esc(item.nature_of_concern || "")}"
-               style="width:100%; padding:10px 12px; border:1px solid #cfe0f4; border-radius:12px; font-weight:700;" />
+               style="width:100%; padding:10px 12px; border:1px solid #cfe0f4; border-radius:12px; font-weight:600;" />
       </div>
     </div>
 
     <div style="margin-top:10px;">
       <div style="font-weight:900; color:#143a63; margin-bottom:6px;">Classification coding (editable)</div>
       <input id="dlgCoding" type="text" value="${esc(item.classification_coding || "")}"
-             style="width:100%; padding:10px 12px; border:1px solid #cfe0f4; border-radius:12px; font-weight:700;" />
+             style="width:100%; padding:10px 12px; border:1px solid #cfe0f4; border-radius:12px; font-weight:600;" />
     </div>
 
     <div style="margin-top:10px;">
@@ -835,13 +925,11 @@ async function saveObsDialog() {
     observation_type,
     obs_type,
 
-    // store user-edited
     designation: designation || (item.kind === "positive" ? "Human" : null),
     nature_of_concern: nature_of_concern || null,
     classification_coding: classification_coding || null,
 
     observation_text: observation_text || null,
-    // keep remarks in sync so older UI logic still sees it
     remarks: observation_text || null,
 
     pgno_selected,
@@ -852,10 +940,8 @@ async function saveObsDialog() {
   try {
     await upsertObservationRow(row);
 
-    // update state
     state.observationsByQno[qno] = { ...(state.observationsByQno[qno] || {}), ...row };
 
-    // rebuild items and re-render
     buildExtractedItemsFromDb();
     renderObsTable();
     setSaveStatus("Saved");
@@ -940,7 +1026,6 @@ function findLibraryQno(qbase) {
   const canon = canonicalQno(raw);
   if (state.libCanonToExact.has(canon)) return state.libCanonToExact.get(canon);
 
-  // fallback: direct
   if (state.libByNo.has(raw)) return raw;
 
   const padded = normalizeQnoParts(raw, true);
@@ -977,6 +1062,10 @@ async function importReportPdfAiFromFile(file) {
   const h = extracted?.header || {};
   const obs = Array.isArray(extracted?.observations) ? extracted.observations : [];
 
+  // NEW: examined questions from function
+  const examined_questions = Array.isArray(extracted?.examined_questions) ? extracted.examined_questions : [];
+  const examined_count = Number(extracted?.examined_count || examined_questions.length) || examined_questions.length;
+
   const extractedVesselName = String(h.vessel_name || "").trim();
   const vesselHit = extractedVesselName
     ? (state.vessels || []).find(v => String(v.name || "").trim().toLowerCase() === extractedVesselName.toLowerCase())
@@ -991,7 +1080,6 @@ async function importReportPdfAiFromFile(file) {
   const report_ref = String(h.report_reference || "").trim();
   if (!report_ref) throw new Error("AI import: report_reference missing (required).");
 
-  // upsert report by report_ref
   const { data: existingRep, error: findErr } = await state.supabase
     .from("post_inspection_reports")
     .select("id")
@@ -1030,6 +1118,13 @@ async function importReportPdfAiFromFile(file) {
 
   // store header UI
   loadReportIntoHeader({ ...report, vessel_name: extractedVesselName });
+
+  // Persist examined questions (best-effort)
+  state.examinedQuestions = examined_questions.map(canonicalQno).filter(Boolean);
+  state.examinedCount = examined_count;
+
+  await persistExaminedQuestions(report.id, state.examinedQuestions);
+  updateTopCounters();
 
   let saved = 0;
   let skipped = 0;
@@ -1088,8 +1183,125 @@ async function importReportPdfAiFromFile(file) {
   buildExtractedItemsFromDb();
   renderObsTable();
   renderObsSummary();
+  updateTopCounters();
 
   setSaveStatus(`AI import done (saved ${saved}, skipped ${skipped}, errors ${errors})`);
+}
+
+/* ---------- PDF download ---------- */
+
+async function downloadActivePdf() {
+  if (!state.activeReport) { alert("No active report."); return; }
+  const path = state.activeReport.pdf_storage_path;
+  if (!path) { alert("This report has no linked PDF."); return; }
+
+  try {
+    setSaveStatus("Preparing PDF…");
+    const { data, error } = await state.supabase
+      .storage
+      .from(PDF_BUCKET_DEFAULT)
+      .createSignedUrl(path, 60);
+
+    if (error) throw error;
+    if (!data?.signedUrl) throw new Error("No signed URL returned.");
+
+    window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+    setSaveStatus("Loaded");
+  } catch (e) {
+    console.error(e);
+    alert("PDF download failed: " + (e?.message || String(e)));
+    setSaveStatus("Error");
+  }
+}
+
+/* ---------- Export / Import JSON ---------- */
+
+function buildExportPayload() {
+  const report = state.activeReport;
+  if (!report) return null;
+
+  return {
+    export_version: "post_inspection_export_v1",
+    exported_at: nowIso(),
+    report_header: {
+      ...report,
+      vessel_name: report.vessel_name || "",
+    },
+    examined: {
+      examined_count: state.examinedCount || 0,
+      examined_questions: state.examinedQuestions || [],
+    },
+    observations: state.observationsByQno || {},
+  };
+}
+
+function exportJson() {
+  if (!state.activeReport) { alert("No active report."); return; }
+  const payload = buildExportPayload();
+  if (!payload) return;
+
+  const name = `post_inspection_${String(state.activeReport.report_ref || "report").replace(/[^a-zA-Z0-9._-]+/g,"_")}.json`;
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+async function importJsonFile(file) {
+  if (!file) return;
+  if (!state.activeReport) { alert("Load a report first (Stored Inspections)."); return; }
+
+  try {
+    setSaveStatus("Importing JSON…");
+    const txt = await file.text();
+    const payload = JSON.parse(txt);
+
+    const obs = payload?.observations;
+    const examined = payload?.examined;
+
+    if (obs && typeof obs === "object") {
+      // upsert each observation row
+      const keys = Object.keys(obs);
+      for (const qno of keys) {
+        const row = obs[qno];
+        if (!row) continue;
+        if (String(row.report_id || "") !== String(state.activeReport.id)) {
+          // force into current report
+          row.report_id = state.activeReport.id;
+        }
+        // normalize minimal required fields
+        row.question_no = canonicalQno(row.question_no || qno);
+        row.updated_at = nowIso();
+        await upsertObservationRow(row);
+      }
+    }
+
+    // examined
+    if (examined && Array.isArray(examined.examined_questions)) {
+      state.examinedQuestions = examined.examined_questions.map(canonicalQno).filter(Boolean);
+      state.examinedCount = Number(examined.examined_count || state.examinedQuestions.length) || state.examinedQuestions.length;
+      await persistExaminedQuestions(state.activeReport.id, state.examinedQuestions);
+    }
+
+    // reload
+    state.observationsByQno = await loadObservationsForReport(state.activeReport.id);
+    buildExtractedItemsFromDb();
+    renderObsTable();
+    renderObsSummary();
+    updateTopCounters();
+
+    setSaveStatus("Imported");
+  } catch (e) {
+    console.error(e);
+    alert("Import failed: " + (e?.message || String(e)));
+    setSaveStatus("Error");
+  }
 }
 
 /* ---------- KPIs ---------- */
@@ -1102,8 +1314,7 @@ function renderKpis() {
   const lae = items.filter(x => x.kind === "largely").length;
   const miss = items.filter(x => x.kind === "negative" && missingPgnoForQno(x.qno)).length;
 
-  // questions examined placeholder (backend to fill later)
-  el("kpiQuestionsExamined").value = String(0);
+  el("kpiQuestionsExamined").value = String(state.examinedCount || 0);
   el("kpiTotal").value = String(total);
   el("kpiNeg").value = String(neg);
   el("kpiPos").value = String(pos);
@@ -1129,6 +1340,9 @@ function handleNewReport() {
   state.activeReport = null;
   state.observationsByQno = {};
   state.extractedItems = [];
+  state.examinedQuestions = [];
+  state.examinedCount = 0;
+
   setActivePill("No active report");
   setSaveStatus("Not saved");
 
@@ -1150,6 +1364,7 @@ function handleNewReport() {
   buildExtractedItemsFromDb();
   renderObsTable();
   renderObsSummary();
+  updateTopCounters();
 }
 
 async function handleSaveHeader() {
@@ -1193,6 +1408,9 @@ async function handleDeleteReport() {
     state.activeReport = null;
     state.observationsByQno = {};
     state.extractedItems = [];
+    state.examinedQuestions = [];
+    state.examinedCount = 0;
+
     setActivePill("No active report");
 
     state.reports = await loadReportsFromDb();
@@ -1200,6 +1418,8 @@ async function handleDeleteReport() {
 
     renderObsTable();
     renderObsSummary();
+    updateTopCounters();
+
     setSaveStatus("Deleted");
   } catch (e) {
     console.error(e);
@@ -1322,12 +1542,27 @@ async function init() {
   el("saveHeaderBtn").addEventListener("click", handleSaveHeader);
   el("deleteReportBtn").addEventListener("click", handleDeleteReport);
 
+  // PDF download
+  el("downloadPdfBtn").addEventListener("click", downloadActivePdf);
+
   // import PDF
   el("importPdfBtn").addEventListener("click", () => el("importPdfFile").click());
   el("importPdfFile").addEventListener("change", async (e) => {
     const f = e.target.files && e.target.files[0];
     try {
       if (f) await importReportPdfAiFromFile(f);
+    } finally {
+      e.target.value = "";
+    }
+  });
+
+  // Export / Import JSON
+  el("exportBtn").addEventListener("click", exportJson);
+  el("importBtn").addEventListener("click", () => el("importFile").click());
+  el("importFile").addEventListener("change", async (e) => {
+    const f = e.target.files && e.target.files[0];
+    try {
+      if (f) await importJsonFile(f);
     } finally {
       e.target.value = "";
     }
@@ -1363,6 +1598,7 @@ async function init() {
   // no active report until user clicks stored inspection
   renderObsTable();
   renderObsSummary();
+  updateTopCounters();
   setSaveStatus("Loaded");
 }
 
