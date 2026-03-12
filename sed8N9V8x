@@ -1,9 +1,9 @@
 entrypoint = "public/index.html"
-modules = ["nodejs-20"]
+modules = ["nodejs-20", "web", "python-3.11"]
 
 [nix]
 channel = "stable-25_05"
-packages = ["static-web-server"]
+packages = ["static-web-server", "supabase-cli", "curl"]
 
 [workflows]
 runButton = "Project"
@@ -26,14 +26,6 @@ outputType = "webview"
 [[ports]]
 localPort = 3000
 externalPort = 80
-
-[[ports]]
-localPort = 5000
-externalPort = 5000
-
-[[ports]]
-localPort = 24783
-externalPort = 3000
 
 [deployment]
 publicDir = "public"

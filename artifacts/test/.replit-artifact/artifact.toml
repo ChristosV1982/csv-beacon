@@ -1,0 +1,22 @@
+kind = "design"
+previewPath = "/"
+title = "Test"
+version = "1.0.0"
+id = "artifacts/test"
+router = "path"
+
+[[integratedSkills]]
+name = "mockup-sandbox"
+version = "1.0.0"
+
+[[services]]
+localPort = 24783
+name = "Component Preview Server"
+paths = ["/"]
+
+[services.development]
+run = "npm run dev"
+
+[services.env]
+PORT = "24783"
+BASE_PATH = "/"
