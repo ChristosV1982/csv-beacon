@@ -4,7 +4,7 @@ import { loadLockedLibraryJson } from "./question_library_loader.js";
  * HARD BUILD STAMP
  */
 const POST_INSPECTION_BUILD =
-  "post_inspection_ui_v25_fix_ai_freeze_add_trycatch_header_retry_2026-03-02";
+  "post_inspection_ui_v32_multi_observation_items_2026-03-03";
 
 /**
  * Locked library JSON
@@ -21,7 +21,11 @@ const PDF_FOLDER_PREFIX = "post_inspections";
  * Titles storage (local, user-editable via modal)
  */
 const TITLES_STORAGE_KEY = "post_inspection_titles_v1";
-const DEFAULT_TITLES = ["SIRE 2.0 Inspection", "Company Audit", "Third Party Audit"];
+const DEFAULT_TITLES = [
+  "SIRE 2.0 Inspection",
+  "Company Audit",
+  "Third Party Audit",
+];
 
 function el(id) {
   return document.getElementById(id);
@@ -45,7 +49,6 @@ function sleep(ms) {
 }
 
 async function yieldUI() {
-  // give the browser a chance to paint UI updates (status pill, etc.)
   await sleep(0);
 }
 
@@ -53,20 +56,18 @@ function ddmmyyyyToIso(ddmmyyyy) {
   const s = String(ddmmyyyy || "").trim();
   const m = s.match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
   if (!m) return "";
-  const dd = m[1],
-    mm = m[2],
-    yyyy = m[3];
+  const dd = m[1], mm = m[2], yyyy = m[3];
   return `${yyyy}-${mm}-${dd}`;
 }
 
 function parseDateParts(anyDate) {
   const s = String(anyDate || "").trim();
-  // yyyy-mm-dd
   let m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (m) return { year: m[1], month: m[2], day: m[3], iso: s };
-  // dd.mm.yyyy
+
   m = s.match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
   if (m) return { year: m[3], month: m[2], day: m[1], iso: `${m[3]}-${m[2]}-${m[1]}` };
+
   return { year: "", month: "", day: "", iso: "" };
 }
 
@@ -126,43 +127,6 @@ function normDesignation(d) {
   return s;
 }
 
-/* ---------- State ---------- */
-
-const state = {
-  me: null,
-  supabase: null,
-
-  vessels: [],
-  lib: [],
-  libByNo: new Map(),
-  libCanonToExact: new Map(),
-
-  reports: [],
-  activeReport: null,
-
-  observationsByQno: {},
-  extractedItems: [],
-  dialogItem: null,
-
-  storedFilters: {},
-
-  storedDateYears: new Set(),
-  storedDateMonths: new Set(),
-
-  openFilterCol: null,
-
-  titles: [],
-};
-
-/* ---------- UI helpers ---------- */
-
-function setSaveStatus(text) {
-  el("saveStatus").textContent = text || "Not saved";
-}
-function setActivePill(text) {
-  el("activeReportPill").textContent = text || "No active report";
-}
-
 function obsRowTypeLabel(kind) {
   if (kind === "negative") return `<span class="obs-badge neg">Negative</span>`;
   if (kind === "positive") return `<span class="obs-badge pos">Positive</span>`;
@@ -184,6 +148,43 @@ async function safeNavigate(candidates) {
     "Navigation failed.\n\nNone of these pages were found:\n" +
       list.map((x) => `- ${x}`).join("\n"),
   );
+}
+
+/* ---------- State ---------- */
+
+const state = {
+  me: null,
+  supabase: null,
+
+  vessels: [],
+  lib: [],
+  libByNo: new Map(),
+  libCanonToExact: new Map(),
+
+  reports: [],
+  activeReport: null,
+
+  // NEW canonical in-app model
+  observationItems: [],
+  extractedItems: [],
+  dialogItemId: null,
+
+  storedFilters: {},
+  storedDateYears: new Set(),
+  storedDateMonths: new Set(),
+  openFilterCol: null,
+
+  titles: [],
+};
+
+/* ---------- UI helpers ---------- */
+
+function setSaveStatus(text) {
+  el("saveStatus").textContent = text || "Not saved";
+}
+
+function setActivePill(text) {
+  el("activeReportPill").textContent = text || "No active report";
 }
 
 /* ---------- Titles ---------- */
@@ -249,7 +250,7 @@ function renderTitlesList() {
   });
 }
 
-/* ---------- Supabase DB helpers ---------- */
+/* ---------- DB helpers ---------- */
 
 async function loadVessels() {
   const { data, error } = await state.supabase
@@ -291,24 +292,6 @@ async function loadReportsFromDb() {
 
   const map = new Map((vessels || []).map((v) => [v.id, v.name]));
   return rows.map((r) => ({ ...r, vessel_name: map.get(r.vessel_id) || "" }));
-}
-
-async function loadObservationsForReport(reportId) {
-  const { data, error } = await state.supabase
-    .from("post_inspection_observations")
-    .select(
-      "report_id, question_no, has_observation, observation_type, pgno_selected, remarks, updated_at, obs_type, observation_text, question_base, designation, nature_of_concern, classification_coding, positive_rank",
-    )
-    .eq("report_id", reportId);
-
-  if (error) throw error;
-
-  const map = {};
-  for (const row of data || []) {
-    const pg = Array.isArray(row.pgno_selected) ? row.pgno_selected : [];
-    map[row.question_no] = { ...row, pgno_selected: pg };
-  }
-  return map;
 }
 
 async function createReportHeader(payload) {
@@ -374,14 +357,168 @@ async function deleteReport(reportId) {
   if (error) throw error;
 }
 
-async function upsertObservationRow(row) {
-  const { error } = await state.supabase
+/* ---------- NEW multi-item table helpers ---------- */
+
+async function loadObservationItemsForReport(reportId) {
+  const { data, error } = await state.supabase
+    .from("post_inspection_observation_items")
+    .select("*")
+    .eq("report_id", reportId)
+    .order("question_no", { ascending: true })
+    .order("sort_index", { ascending: true })
+    .order("created_at", { ascending: true });
+
+  if (error) throw error;
+  return (data || []).map(normalizeObservationItemFromDb);
+}
+
+async function loadLegacyObservationsForReport(reportId) {
+  const { data, error } = await state.supabase
     .from("post_inspection_observations")
-    .upsert([row], { onConflict: "report_id,question_no" });
+    .select(
+      "report_id, question_no, has_observation, observation_type, pgno_selected, remarks, updated_at, obs_type, observation_text, question_base, designation, nature_of_concern, classification_coding, positive_rank",
+    )
+    .eq("report_id", reportId);
+
+  if (error) throw error;
+
+  return (data || []).map((row, idx) =>
+    normalizeObservationItemFromDb({
+      id: `legacy-${reportId}-${row.question_no}-${idx}`,
+      report_id: row.report_id,
+      question_no: row.question_no,
+      question_base: row.question_base || row.question_no,
+      question_full: null,
+      has_observation: !!row.has_observation,
+      observation_type: row.observation_type,
+      obs_type: row.obs_type ||
+        (row.observation_type === "negative_observation"
+          ? "negative"
+          : row.observation_type === "positive_observation"
+            ? "positive"
+            : "largely"),
+      designation: row.designation,
+      positive_rank: row.positive_rank,
+      nature_of_concern: row.nature_of_concern,
+      classification_coding: row.classification_coding,
+      observation_text: row.observation_text,
+      remarks: row.remarks,
+      pgno_selected: Array.isArray(row.pgno_selected) ? row.pgno_selected : [],
+      page_hint: null,
+      source_excerpt: null,
+      confidence: null,
+      sort_index: idx,
+      created_at: row.updated_at || nowIso(),
+      updated_at: row.updated_at || nowIso(),
+      __legacy: true,
+    }),
+  );
+}
+
+function normalizeObservationItemFromDb(row) {
+  return {
+    id: row.id,
+    report_id: row.report_id,
+    question_no: canonicalQno(row.question_no || row.question_base || ""),
+    question_base: canonicalQno(row.question_base || row.question_no || ""),
+    question_full: String(row.question_full || "").trim() || null,
+    has_observation: row.has_observation !== false,
+    observation_type: String(row.observation_type || "").trim(),
+    obs_type: String(row.obs_type || "").trim(),
+    designation: normDesignation(row.designation),
+    positive_rank: String(row.positive_rank || "").trim() || null,
+    nature_of_concern: String(row.nature_of_concern || "").trim() || null,
+    classification_coding: String(row.classification_coding || "").trim() || null,
+    observation_text: String(row.observation_text || "").trim() || null,
+    remarks: String(row.remarks || "").trim() || null,
+    pgno_selected: Array.isArray(row.pgno_selected) ? row.pgno_selected : [],
+    page_hint: Number.isFinite(Number(row.page_hint)) ? Number(row.page_hint) : null,
+    source_excerpt: String(row.source_excerpt || "").trim() || null,
+    confidence: row.confidence == null ? null : Number(row.confidence),
+    sort_index: Number.isFinite(Number(row.sort_index)) ? Number(row.sort_index) : 0,
+    created_at: row.created_at || null,
+    updated_at: row.updated_at || null,
+    __legacy: !!row.__legacy,
+  };
+}
+
+async function deleteObservationItemsForReport(reportId) {
+  const { error } = await state.supabase
+    .from("post_inspection_observation_items")
+    .delete()
+    .eq("report_id", reportId);
   if (error) throw error;
 }
 
-/* ---------- Stored inspections + filters ---------- */
+async function insertObservationItem(row) {
+  const payload = {
+    report_id: row.report_id,
+    question_no: row.question_no,
+    question_base: row.question_base || row.question_no,
+    question_full: row.question_full || null,
+    has_observation: row.has_observation !== false,
+    observation_type: row.observation_type,
+    obs_type: row.obs_type,
+    designation: row.designation || null,
+    positive_rank: row.positive_rank || null,
+    nature_of_concern: row.nature_of_concern || null,
+    classification_coding: row.classification_coding || null,
+    observation_text: row.observation_text || null,
+    remarks: row.remarks || null,
+    pgno_selected: Array.isArray(row.pgno_selected) ? row.pgno_selected : [],
+    page_hint: row.page_hint ?? null,
+    source_excerpt: row.source_excerpt || null,
+    confidence: row.confidence ?? null,
+    sort_index: row.sort_index ?? 0,
+  };
+
+  const { data, error } = await state.supabase
+    .from("post_inspection_observation_items")
+    .insert([payload])
+    .select("*")
+    .single();
+
+  if (error) throw error;
+  return normalizeObservationItemFromDb(data);
+}
+
+async function updateObservationItem(row) {
+  if (!row.id || String(row.id).startsWith("legacy-")) {
+    return await insertObservationItem(row);
+  }
+
+  const payload = {
+    question_no: row.question_no,
+    question_base: row.question_base || row.question_no,
+    question_full: row.question_full || null,
+    has_observation: row.has_observation !== false,
+    observation_type: row.observation_type,
+    obs_type: row.obs_type,
+    designation: row.designation || null,
+    positive_rank: row.positive_rank || null,
+    nature_of_concern: row.nature_of_concern || null,
+    classification_coding: row.classification_coding || null,
+    observation_text: row.observation_text || null,
+    remarks: row.remarks || null,
+    pgno_selected: Array.isArray(row.pgno_selected) ? row.pgno_selected : [],
+    page_hint: row.page_hint ?? null,
+    source_excerpt: row.source_excerpt || null,
+    confidence: row.confidence ?? null,
+    sort_index: row.sort_index ?? 0,
+  };
+
+  const { data, error } = await state.supabase
+    .from("post_inspection_observation_items")
+    .update(payload)
+    .eq("id", row.id)
+    .select("*")
+    .single();
+
+  if (error) throw error;
+  return normalizeObservationItemFromDb(data);
+}
+
+/* ---------- Stored inspections filters ---------- */
 
 function uniqueValuesForCol(col) {
   const vals = (state.reports || [])
@@ -645,7 +782,7 @@ function openStoredFilterForCol(col) {
   );
 }
 
-/* ---------- Header + active report ---------- */
+/* ---------- Active report / header ---------- */
 
 function headerInputs() {
   return {
@@ -702,34 +839,36 @@ function examinedCountFromActive() {
   return 0;
 }
 
-function setCountersFromState() {
-  const items = state.extractedItems || [];
-  const neg = items.filter((x) => x.kind === "negative").length;
-  const pos = items.filter((x) => x.kind === "positive").length;
-  const lae = items.filter((x) => x.kind === "largely").length;
-
-  el("itemsExtractedVal").textContent = String(items.length);
-  el("questionsExaminedVal").textContent = String(examinedCountFromActive());
-
-  el("cntNeg").textContent = String(neg);
-  el("cntPos").textContent = String(pos);
-  el("cntLae").textContent = String(lae);
-}
-
 async function setActiveReportById(reportId) {
   const rep = (state.reports || []).find((r) => r.id === reportId);
   if (!rep) return;
 
   state.activeReport = rep;
-  setActivePill(`Loaded`);
+  setActivePill("Loaded");
   setSaveStatus("Loading report…");
   await yieldUI();
 
   loadReportIntoHeader(rep);
 
-  state.observationsByQno = await loadObservationsForReport(rep.id);
+  // NEW table first
+  let items = [];
+  try {
+    items = await loadObservationItemsForReport(rep.id);
+  } catch (e) {
+    console.error("loadObservationItemsForReport failed", e);
+  }
 
-  buildExtractedItemsFromDb();
+  // fallback to legacy only if new table empty
+  if (!items.length) {
+    try {
+      items = await loadLegacyObservationsForReport(rep.id);
+    } catch (e) {
+      console.error("loadLegacyObservationsForReport failed", e);
+    }
+  }
+
+  state.observationItems = items;
+  rebuildExtractedItems();
   renderObsTable();
   renderObsSummary();
 
@@ -738,8 +877,9 @@ async function setActiveReportById(reportId) {
 
 async function handleNewReport() {
   state.activeReport = null;
-  state.observationsByQno = {};
+  state.observationItems = [];
   state.extractedItems = [];
+  state.dialogItemId = null;
 
   setActivePill("No active report");
   setSaveStatus("Not saved");
@@ -753,7 +893,7 @@ async function handleNewReport() {
   el("inspectorCompany").value = "";
   el("pdfStatus").textContent = "No PDF linked";
 
-  buildExtractedItemsFromDb();
+  rebuildExtractedItems();
   renderObsTable();
   renderObsSummary();
 }
@@ -795,9 +935,11 @@ async function handleDeleteReport() {
 
   try {
     await deleteReport(state.activeReport.id);
+
     state.activeReport = null;
-    state.observationsByQno = {};
+    state.observationItems = [];
     state.extractedItems = [];
+    state.dialogItemId = null;
 
     state.reports = await loadReportsFromDb();
     renderStoredTable();
@@ -805,7 +947,7 @@ async function handleDeleteReport() {
     setActivePill("No active report");
     setSaveStatus("Deleted");
 
-    buildExtractedItemsFromDb();
+    rebuildExtractedItems();
     renderObsTable();
     renderObsSummary();
   } catch (e) {
@@ -815,85 +957,16 @@ async function handleDeleteReport() {
   }
 }
 
-/* ---------- Extracted items ---------- */
+/* ---------- Observation item model ---------- */
 
-function pgnoRequiredForRow(row) {
-  const ot = String(row?.observation_type || "");
-  if (ot === "positive_observation") return false;
-  if (ot === "negative_observation") return true;
-  if (ot === "note_improvement") return true; // Largely as expected REQUIRES PGNO
-  return true;
+function itemNeedsPgno(item) {
+  return item?.obs_type === "negative" || item?.obs_type === "largely";
 }
 
-function missingPgnoForQno(qno) {
-  const row = state.observationsByQno[qno];
-  if (!row) return false;
-  if (!pgnoRequiredForRow(row)) return false;
-  const arr = Array.isArray(row.pgno_selected) ? row.pgno_selected : [];
+function missingPgnoForItem(item) {
+  if (!itemNeedsPgno(item)) return false;
+  const arr = Array.isArray(item.pgno_selected) ? item.pgno_selected : [];
   return arr.length === 0;
-}
-
-function buildExtractedItemsFromDb() {
-  const out = [];
-  const map = state.observationsByQno || {};
-
-  for (const qno of Object.keys(map)) {
-    const row = map[qno];
-    if (!row?.has_observation) continue;
-
-    const ot = String(row.observation_type || "");
-    let kind = "largely";
-    if (ot === "negative_observation") kind = "negative";
-    else if (ot === "positive_observation") kind = "positive";
-    else kind = "largely";
-
-    out.push({
-      qno,
-      kind,
-      designation: normDesignation(row.designation) || (kind === "positive" ? "Human" : ""),
-      positive_rank: String(row.positive_rank || "").trim() || "",
-      nature_of_concern: String(row.nature_of_concern || "").trim() || "",
-      classification_coding: String(row.classification_coding || "").trim() || "",
-      observation_text: String(row.observation_text || "").trim() || "",
-      remarks: String(row.remarks || "").trim() || "",
-      pgno_selected: Array.isArray(row.pgno_selected) ? row.pgno_selected : [],
-    });
-  }
-
-  out.sort((a, b) => String(a.qno).localeCompare(String(b.qno)));
-  state.extractedItems = out;
-
-  setCountersFromState();
-}
-
-function applyObsFilters(items) {
-  const term = String(el("obsSearch").value || "").trim().toLowerCase();
-  const type = String(el("obsTypeFilter").value || "").trim();
-  const designationFilter = String(el("obsDesignationFilter").value || "").trim();
-  const onlyMissing = !!el("onlyMissingPgno").checked;
-
-  return (items || []).filter((it) => {
-    if (type && it.kind !== type) return false;
-    if (designationFilter && normDesignation(it.designation) !== designationFilter) return false;
-    if (onlyMissing && !missingPgnoForQno(it.qno)) return false;
-
-    if (term) {
-      const hay = [
-        it.qno,
-        it.kind,
-        it.designation || "",
-        it.positive_rank || "",
-        it.nature_of_concern || "",
-        it.classification_coding || "",
-        it.observation_text || "",
-        it.remarks || "",
-      ]
-        .join(" ")
-        .toLowerCase();
-      if (!hay.includes(term)) return false;
-    }
-    return true;
-  });
 }
 
 function selectedPgnoText(pgno_selected) {
@@ -906,39 +979,127 @@ function selectedPgnoText(pgno_selected) {
     .join(" • ");
 }
 
+function rebuildExtractedItems() {
+  const items = (state.observationItems || [])
+    .filter((x) => x.has_observation !== false)
+    .map((x) => ({
+      ...x,
+      qno: canonicalQno(x.question_no || x.question_base || ""),
+      kind: x.obs_type,
+    }));
+
+  items.sort((a, b) => {
+    const qCmp = String(a.qno).localeCompare(String(b.qno), undefined, { numeric: true });
+    if (qCmp !== 0) return qCmp;
+    const sCmp = Number(a.sort_index || 0) - Number(b.sort_index || 0);
+    if (sCmp !== 0) return sCmp;
+    return String(a.id || "").localeCompare(String(b.id || ""));
+  });
+
+  state.extractedItems = items;
+  updateCounters();
+}
+
+function updateCounters() {
+  const items = state.extractedItems || [];
+  const neg = items.filter((x) => x.kind === "negative").length;
+  const pos = items.filter((x) => x.kind === "positive").length;
+  const lae = items.filter((x) => x.kind === "largely").length;
+
+  el("itemsExtractedVal").textContent = String(items.length);
+  el("questionsExaminedVal").textContent = String(examinedCountFromActive());
+
+  el("cntNeg").textContent = String(neg);
+  el("cntPos").textContent = String(pos);
+  el("cntLae").textContent = String(lae);
+}
+
+function applyObsFilters(items) {
+  const term = String(el("obsSearch").value || "").trim().toLowerCase();
+  const type = String(el("obsTypeFilter").value || "").trim();
+  const designationFilter = String(el("obsDesignationFilter").value || "").trim();
+  const onlyMissing = !!el("onlyMissingPgno").checked;
+
+  return (items || []).filter((it) => {
+    if (type && it.kind !== type) return false;
+    if (designationFilter && normDesignation(it.designation) !== designationFilter) return false;
+    if (onlyMissing && !missingPgnoForItem(it)) return false;
+
+    if (term) {
+      const hay = [
+        it.qno,
+        it.kind,
+        it.designation || "",
+        it.positive_rank || "",
+        it.nature_of_concern || "",
+        it.classification_coding || "",
+        it.observation_text || "",
+        it.remarks || "",
+        it.question_full || "",
+      ]
+        .join(" ")
+        .toLowerCase();
+
+      if (!hay.includes(term)) return false;
+    }
+
+    return true;
+  });
+}
+
+function renderObsSummary() {
+  if (!state.activeReport) {
+    el("obsSummary").textContent = "No report loaded.";
+    return;
+  }
+
+  const items = applyObsFilters(state.extractedItems || []);
+  const total = items.length;
+  const neg = items.filter((x) => x.kind === "negative").length;
+  const pos = items.filter((x) => x.kind === "positive").length;
+  const lae = items.filter((x) => x.kind === "largely").length;
+
+  el("obsSummary").textContent =
+    `Total Items Extracted: ${total} | Negative: ${neg} | Positive: ${pos} | Largely: ${lae}`;
+}
+
 function renderObsTable() {
   const body = el("obsTableBody");
 
   if (!state.activeReport) {
     body.innerHTML = `<tr><td colspan="7" class="muted">No report loaded.</td></tr>`;
     el("obsSummary").textContent = "No report loaded.";
-    setCountersFromState();
+    updateCounters();
     return;
   }
 
-  const items = applyObsFilters(state.extractedItems);
+  const items = applyObsFilters(state.extractedItems || []);
 
   if (!items.length) {
     body.innerHTML = `<tr><td colspan="7" class="muted">No items match the current filters.</td></tr>`;
     renderObsSummary();
-    setCountersFromState();
+    updateCounters();
     return;
   }
 
   body.innerHTML = items
     .map((it) => {
-      const pgRequired = it.kind !== "positive";
+      const pgRequired = itemNeedsPgno(it);
       const pgText = selectedPgnoText(it.pgno_selected);
 
-      const pgCell = pgRequired ? (pgText ? pgText : `<span class="muted">—</span>`) : `<span class="muted">n/a</span>`;
+      const pgCell = pgRequired
+        ? (pgText ? pgText : `<span class="muted">—</span>`)
+        : `<span class="muted">n/a</span>`;
 
       const catDisplay =
-        it.kind === "positive" ? (it.positive_rank ? `Human (${it.positive_rank})` : "Human") : it.designation || "—";
+        it.kind === "positive"
+          ? (it.positive_rank ? `Human (${it.positive_rank})` : "Human")
+          : (it.designation || "—");
 
       const obsText = (it.observation_text || it.remarks || "").trim();
 
       return `
-      <tr class="obs-row" data-qno="${esc(it.qno)}">
+      <tr class="obs-row" data-id="${esc(it.id)}">
         <td title="${esc(it.qno)}">${esc(it.qno)}</td>
         <td>${obsRowTypeLabel(it.kind)}</td>
         <td title="${esc(catDisplay)}">${esc(catDisplay)}</td>
@@ -953,29 +1114,19 @@ function renderObsTable() {
 
   body.querySelectorAll("tr.obs-row").forEach((tr) => {
     tr.addEventListener("click", () => {
-      const qno = tr.getAttribute("data-qno");
-      if (!qno) return;
-      openObsDialog(qno);
+      const id = tr.getAttribute("data-id");
+      if (!id) return;
+      openObsDialog(id);
     });
   });
 
   renderObsSummary();
-  setCountersFromState();
+  updateCounters();
 }
 
-function renderObsSummary() {
-  if (!state.activeReport) {
-    el("obsSummary").textContent = "No report loaded.";
-    return;
-  }
-
-  const items = applyObsFilters(state.extractedItems);
-  const total = items.length;
-  const neg = items.filter((x) => x.kind === "negative").length;
-  const pos = items.filter((x) => x.kind === "positive").length;
-  const lae = items.filter((x) => x.kind === "largely").length;
-
-  el("obsSummary").textContent = `Total Items Extracted: ${total} | Negative: ${neg} | Positive: ${pos} | Largely: ${lae}`;
+function findQuestionFromLib(qnoCanon) {
+  const exact = state.libCanonToExact.get(qnoCanon) || qnoCanon;
+  return state.libByNo.get(exact) || null;
 }
 
 /* ---------- Observation editor ---------- */
@@ -984,12 +1135,7 @@ function closeObsDialog() {
   try {
     el("obsDialog").close();
   } catch {}
-  state.dialogItem = null;
-}
-
-function findQuestionFromLib(qnoCanon) {
-  const exact = state.libCanonToExact.get(qnoCanon) || qnoCanon;
-  return state.libByNo.get(exact) || null;
+  state.dialogItemId = null;
 }
 
 function pgnoCheckboxList(qObj, selectedArr) {
@@ -1015,29 +1161,23 @@ function pgnoCheckboxList(qObj, selectedArr) {
     .join("");
 }
 
-function openObsDialog(qnoCanon) {
+function openObsDialog(itemId) {
   if (!state.activeReport?.id) return;
 
-  const row = state.observationsByQno[qnoCanon];
-  if (!row) return alert("Row not found.");
+  const item = (state.extractedItems || []).find((x) => String(x.id) === String(itemId));
+  if (!item) return alert("Item not found.");
 
-  const qObj = findQuestionFromLib(qnoCanon);
+  const qObj = findQuestionFromLib(item.qno);
   const qShort = qObj ? String(qObj["Short Text"] || qObj["short_text"] || "").trim() : "";
 
-  const kind =
-    String(row.observation_type || "") === "negative_observation"
-      ? "negative"
-      : String(row.observation_type || "") === "positive_observation"
-        ? "positive"
-        : "largely";
+  const requiresPgno = itemNeedsPgno(item);
 
-  const requiresPgno = pgnoRequiredForRow(row);
-
-  el("dlgTitle").textContent = `Question ${qnoCanon}`;
+  el("dlgTitle").textContent = `Question ${item.qno}`;
   el("dlgSub").innerHTML = `
     <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
-      <span>${obsRowTypeLabel(kind)}</span>
+      <span>${obsRowTypeLabel(item.kind)}</span>
       <span class="muted">${esc(qShort || "")}</span>
+      <span class="muted">${esc(item.designation || "")}</span>
       ${requiresPgno ? `<span class="muted">• PGNO required</span>` : `<span class="muted">• PGNO not required</span>`}
     </div>
   `;
@@ -1046,38 +1186,41 @@ function openObsDialog(qnoCanon) {
     ? `
     <div class="pi-field" style="margin-top:10px;">
       <label>PGNO tickbox selection (required for Negative + Largely)</label>
-      <div class="chk-list" id="pgnoList">${pgnoCheckboxList(qObj, row.pgno_selected)}</div>
+      <div class="chk-list" id="pgnoList">${pgnoCheckboxList(qObj, item.pgno_selected)}</div>
     </div>
   `
-    : `
-    <div class="muted" style="margin-top:10px;">PGNO not required for Positive items.</div>
-  `;
+    : `<div class="muted" style="margin-top:10px;">PGNO not required for Positive items.</div>`;
 
   el("dlgBody").innerHTML = `
     <div class="pi-field">
-      <label>Observation text</label>
-      <textarea id="dlgObsText" placeholder="Observation text...">${esc(String(row.observation_text || row.remarks || ""))}</textarea>
+      <label>Question</label>
+      <textarea readonly style="min-height:90px; background:#f8fbff;">${esc(item.question_full || "")}</textarea>
     </div>
+
+    <div class="pi-field" style="margin-top:10px;">
+      <label>Observation text</label>
+      <textarea id="dlgObsText" placeholder="Observation text...">${esc(String(item.observation_text || item.remarks || ""))}</textarea>
+    </div>
+
     ${pgnoHtml}
   `;
 
-  state.dialogItem = { qnoCanon, kind, requiresPgno };
-
+  state.dialogItemId = item.id;
   el("obsDialog").showModal();
 }
 
 async function saveObsDialog() {
-  if (!state.dialogItem) return;
+  if (!state.dialogItemId) return;
   if (!state.activeReport?.id) return;
 
-  const { qnoCanon, requiresPgno } = state.dialogItem;
-  const row = state.observationsByQno[qnoCanon];
-  if (!row) return;
+  const item = (state.extractedItems || []).find((x) => String(x.id) === String(state.dialogItemId));
+  if (!item) return;
 
   const text = String(el("dlgObsText")?.value || "").trim();
-  let selected = Array.isArray(row.pgno_selected) ? row.pgno_selected : [];
 
-  if (requiresPgno) {
+  let selected = Array.isArray(item.pgno_selected) ? item.pgno_selected : [];
+
+  if (itemNeedsPgno(item)) {
     selected = [];
     document.querySelectorAll("#pgnoList .pgnoChk").forEach((chk) => {
       if (!chk.checked) return;
@@ -1088,7 +1231,7 @@ async function saveObsDialog() {
   }
 
   const updated = {
-    ...row,
+    ...item,
     observation_text: text || null,
     remarks: text || null,
     pgno_selected: selected,
@@ -1099,10 +1242,13 @@ async function saveObsDialog() {
   await yieldUI();
 
   try {
-    await upsertObservationRow(updated);
-    state.observationsByQno[qnoCanon] = updated;
+    const saved = await updateObservationItem(updated);
 
-    buildExtractedItemsFromDb();
+    const idx = state.observationItems.findIndex((x) => String(x.id) === String(item.id));
+    if (idx >= 0) state.observationItems[idx] = saved;
+    else state.observationItems.push(saved);
+
+    rebuildExtractedItems();
     renderObsTable();
 
     setSaveStatus("Saved");
@@ -1127,43 +1273,61 @@ async function addManualItem() {
   if (!qCanon) return;
 
   const k = (prompt("Type (negative/positive/largely):", "negative") || "").trim().toLowerCase();
-  const kind = k === "negative" || k === "positive" || k === "largely" ? k : "negative";
+  const kind = (k === "negative" || k === "positive" || k === "largely") ? k : "negative";
 
   const observation_type =
-    kind === "negative" ? "negative_observation" : kind === "positive" ? "positive_observation" : "note_improvement";
+    kind === "negative" ? "negative_observation" :
+    kind === "positive" ? "positive_observation" :
+    "note_improvement";
 
-  const obs_type = kind === "negative" ? "negative" : kind === "positive" ? "positive" : "largely";
+  const obs_type =
+    kind === "negative" ? "negative" :
+    kind === "positive" ? "positive" :
+    "largely";
 
-  const designation = kind === "positive" ? "Human" : prompt("Category (Human/Process/Hardware/Photo):", "Human") || "";
-  const nature =
-    prompt(
-      "Nature of concern:",
-      kind === "negative" ? "Not as expected." : kind === "positive" ? "Exceeded normal expectation." : "Largely as expected.",
-    ) || "";
+  const designation = kind === "positive"
+    ? "Human"
+    : (prompt("Category (Human/Process/Hardware/Photo):", "Human") || "");
+
+  const nature = prompt(
+    "Nature of concern:",
+    kind === "negative"
+      ? "Not as expected."
+      : kind === "positive"
+        ? "Exceeded normal expectation."
+        : "Largely as expected.",
+  ) || "";
+
   const text = prompt("Observation text:", "") || "";
 
   const row = {
     report_id: state.activeReport.id,
     question_no: qCanon,
+    question_base: qCanon,
+    question_full: null,
     has_observation: true,
     observation_type,
     obs_type,
     designation: normDesignation(designation) || null,
+    positive_rank: null,
     nature_of_concern: String(nature).trim() || null,
     classification_coding: null,
     observation_text: String(text).trim() || null,
     remarks: String(text).trim() || null,
     pgno_selected: [],
-    updated_at: nowIso(),
+    page_hint: null,
+    source_excerpt: null,
+    confidence: null,
+    sort_index: (state.observationItems || []).filter((x) => x.question_no === qCanon).length,
   };
 
   setSaveStatus("Saving…");
   await yieldUI();
 
   try {
-    await upsertObservationRow(row);
-    state.observationsByQno[qCanon] = row;
-    buildExtractedItemsFromDb();
+    const saved = await insertObservationItem(row);
+    state.observationItems.push(saved);
+    rebuildExtractedItems();
     renderObsTable();
     setSaveStatus("Saved");
   } catch (e) {
@@ -1173,7 +1337,7 @@ async function addManualItem() {
   }
 }
 
-/* ---------- Import PDF (AI) ---------- */
+/* ---------- AI Import ---------- */
 
 function findLibraryQno(qbase) {
   const raw = String(qbase || "").trim();
@@ -1202,7 +1366,6 @@ async function invokeWithTimeout(functionName, payload, timeoutMs) {
 }
 
 async function importReportPdfAiFromFile(file) {
-  // IMPORTANT: this whole function is now protected with try/catch so the UI can never get stuck.
   setSaveStatus("Uploading PDF…");
   await yieldUI();
 
@@ -1210,22 +1373,19 @@ async function importReportPdfAiFromFile(file) {
   const safeName = String(file.name || "report.pdf").replace(/[^a-zA-Z0-9._-]+/g, "_");
   const tempPath = `${PDF_FOLDER_PREFIX}/tmp/${Date.now()}_${safeName}`;
 
-  // Upload
   const { error: upErr } = await state.supabase
     .storage
     .from(bucket)
     .upload(tempPath, file, { upsert: true, contentType: "application/pdf" });
   if (upErr) throw upErr;
 
-  // Invoke Edge Function
   setSaveStatus("Extracting via AI…");
   await yieldUI();
 
-  // give it enough time for 50-100 page PDFs
   const { data, error } = await invokeWithTimeout(
     "import-post-inspection-pdf",
     { report_id: "temp", pdf_storage_path: tempPath },
-    180000, // 180s
+    180000,
   );
 
   if (error) throw error;
@@ -1238,7 +1398,6 @@ async function importReportPdfAiFromFile(file) {
   const examined_questions = Array.isArray(extracted?.examined_questions) ? extracted.examined_questions : [];
   const examined_count = Number(extracted?.examined_count || examined_questions.length || 0);
 
-  // Resolve vessel id
   const extractedVesselName = String(h.vessel_name || "").trim();
   const vesselHit = extractedVesselName
     ? (state.vessels || []).find((v) => String(v.name || "").trim().toLowerCase() === extractedVesselName.toLowerCase())
@@ -1254,7 +1413,6 @@ async function importReportPdfAiFromFile(file) {
   const report_ref = String(h.report_reference || "").trim();
   if (!report_ref) throw new Error("AI import: report_reference missing (required).");
 
-  // Report existence by report_ref
   const { data: existingRep, error: findErr } = await state.supabase
     .from("post_inspection_reports")
     .select("id")
@@ -1272,25 +1430,20 @@ async function importReportPdfAiFromFile(file) {
     ocimf_inspecting_company: String(h.ocimf_inspecting_company || "").trim() || null,
     report_ref,
     title: String(el("reportTitle").value || "").trim() || state.titles[0] || null,
-
-    // REQUIRED: new report -> inspector fields empty
-    inspector_name: isNew ? null : String(el("inspectorName").value || "").trim() || null,
-    inspector_company: isNew ? null : String(el("inspectorCompany").value || "").trim() || null,
-
+    inspector_name: isNew ? null : (String(el("inspectorName").value || "").trim() || null),
+    inspector_company: isNew ? null : (String(el("inspectorCompany").value || "").trim() || null),
     pdf_storage_path: tempPath,
-
     examined_questions,
     examined_count,
   };
 
-  // Save Header (with safety fallback inside create/update helpers)
   setSaveStatus("Saving header…");
   await yieldUI();
 
   let report;
   if (existingRep?.id) {
     const ok = confirm(
-      `Report ref already exists:\n\n${report_ref}\n\nImport into existing report and overwrite matching items?`,
+      `Report ref already exists:\n\n${report_ref}\n\nImport into existing report and replace existing extracted items?`,
     );
     if (!ok) {
       setSaveStatus("Cancelled");
@@ -1301,15 +1454,11 @@ async function importReportPdfAiFromFile(file) {
     report = await createReportHeader(headerPayload);
   }
 
-  // Reload stored list
   state.reports = await loadReportsFromDb();
   renderStoredTable();
 
-  // Activate report
   await setActiveReportById(report.id);
 
-  // If DB didn't store examined_* columns, still show correct counters in UI immediately:
-  // (attach to activeReport object)
   state.activeReport.examined_questions = examined_questions;
   state.activeReport.examined_count = examined_count;
   el("questionsExaminedVal").textContent = String(examined_count);
@@ -1319,13 +1468,19 @@ async function importReportPdfAiFromFile(file) {
     el("inspectorCompany").value = "";
   }
 
-  // Save extracted items
+  // clear current items for this report in NEW table only
+  setSaveStatus("Replacing extracted items…");
+  await yieldUI();
+  await deleteObservationItemsForReport(report.id);
+
+  // now insert all extracted items
   setSaveStatus(`Saving ${obs.length} item(s)…`);
   await yieldUI();
 
   let saved = 0;
   let skipped = 0;
   let errors = 0;
+  const inserted = [];
 
   for (let i = 0; i < obs.length; i++) {
     const item = obs[i];
@@ -1338,36 +1493,45 @@ async function importReportPdfAiFromFile(file) {
       }
 
       const kindRaw = String(item?.obs_type || "").toLowerCase();
-      const k = kindRaw === "negative" || kindRaw === "positive" || kindRaw === "largely" ? kindRaw : "largely";
+      const k = (kindRaw === "negative" || kindRaw === "positive" || kindRaw === "largely")
+        ? kindRaw
+        : "largely";
 
       const observation_type =
-        k === "negative" ? "negative_observation" : k === "positive" ? "positive_observation" : "note_improvement";
+        k === "negative" ? "negative_observation" :
+        k === "positive" ? "positive_observation" :
+        "note_improvement";
 
-      const obs_type = k === "negative" ? "negative" : k === "positive" ? "positive" : "largely";
+      const obs_type =
+        k === "negative" ? "negative" :
+        k === "positive" ? "positive" :
+        "largely";
 
       const row = {
         report_id: report.id,
         question_no: canonicalQno(qno),
+        question_base: canonicalQno(item?.question_base || qno),
+        question_full: String(item?.question_full || "").trim() || null,
         has_observation: true,
         observation_type,
         obs_type,
-
         designation: normDesignation(item?.designation) || (k === "positive" ? "Human" : null),
         positive_rank: String(item?.positive_rank || "").trim() || null,
         nature_of_concern: String(item?.nature_of_concern || "").trim() || null,
         classification_coding: String(item?.classification_coding || "").trim() || null,
-
         observation_text: String(item?.observation_text || "").trim() || null,
         remarks: String(item?.observation_text || "").trim() || null,
-
         pgno_selected: [],
-        updated_at: nowIso(),
+        page_hint: Number.isFinite(Number(item?.page_hint)) ? Number(item.page_hint) : null,
+        source_excerpt: String(item?.source_excerpt || "").trim() || null,
+        confidence: item?.confidence == null ? null : Number(item.confidence),
+        sort_index: i,
       };
 
-      await upsertObservationRow(row);
+      const savedRow = await insertObservationItem(row);
+      inserted.push(savedRow);
       saved++;
 
-      // keep UI responsive every ~10 rows
       if (i % 10 === 0) {
         setSaveStatus(`Saving items… (${saved}/${obs.length})`);
         await yieldUI();
@@ -1378,13 +1542,163 @@ async function importReportPdfAiFromFile(file) {
     }
   }
 
-  // Refresh rows for report
-  state.observationsByQno = await loadObservationsForReport(report.id);
-  buildExtractedItemsFromDb();
+  state.observationItems = inserted;
+  rebuildExtractedItems();
   renderObsTable();
   renderObsSummary();
 
   setSaveStatus(`AI import done (saved ${saved}, skipped ${skipped}, errors ${errors})`);
+}
+
+/* ---------- PDF download ---------- */
+
+async function downloadActivePdf() {
+  if (!state.activeReport) {
+    alert("No active report.");
+    return;
+  }
+  const path = state.activeReport.pdf_storage_path;
+  if (!path) {
+    alert("This report has no linked PDF.");
+    return;
+  }
+
+  try {
+    setSaveStatus("Preparing PDF…");
+    const { data, error } = await state.supabase
+      .storage
+      .from(PDF_BUCKET_DEFAULT)
+      .createSignedUrl(path, 60);
+
+    if (error) throw error;
+    if (!data?.signedUrl) throw new Error("No signed URL returned.");
+
+    window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+    setSaveStatus("Loaded");
+  } catch (e) {
+    console.error(e);
+    alert("PDF download failed: " + (e?.message || String(e)));
+    setSaveStatus("Error");
+  }
+}
+
+/* ---------- Export / Import JSON ---------- */
+
+function buildExportPayload() {
+  const report = state.activeReport;
+  if (!report) return null;
+
+  return {
+    export_version: "post_inspection_export_v2_multi_items",
+    exported_at: nowIso(),
+    report_header: {
+      ...report,
+      vessel_name: report.vessel_name || "",
+    },
+    examined: {
+      examined_count: examinedCountFromActive(),
+      examined_questions: Array.isArray(report.examined_questions) ? report.examined_questions : [],
+    },
+    observation_items: state.observationItems || [],
+  };
+}
+
+function exportJson() {
+  if (!state.activeReport) {
+    alert("No active report.");
+    return;
+  }
+  const payload = buildExportPayload();
+  if (!payload) return;
+
+  const name =
+    `post_inspection_${String(state.activeReport.report_ref || "report").replace(/[^a-zA-Z0-9._-]+/g, "_")}.json`;
+
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+async function importJsonFile(file) {
+  if (!file) return;
+  if (!state.activeReport) {
+    alert("Load a report first (Stored Inspections).");
+    return;
+  }
+
+  try {
+    setSaveStatus("Importing JSON…");
+    const txt = await file.text();
+    const payload = JSON.parse(txt);
+
+    const items = Array.isArray(payload?.observation_items) ? payload.observation_items : [];
+    const examined = payload?.examined;
+
+    // replace current new-table items for this report
+    await deleteObservationItemsForReport(state.activeReport.id);
+
+    const inserted = [];
+    for (let i = 0; i < items.length; i++) {
+      const x = items[i];
+      const row = {
+        report_id: state.activeReport.id,
+        question_no: canonicalQno(x.question_no || x.question_base || ""),
+        question_base: canonicalQno(x.question_base || x.question_no || ""),
+        question_full: String(x.question_full || "").trim() || null,
+        has_observation: x.has_observation !== false,
+        observation_type: String(x.observation_type || "").trim(),
+        obs_type: String(x.obs_type || "").trim(),
+        designation: normDesignation(x.designation),
+        positive_rank: String(x.positive_rank || "").trim() || null,
+        nature_of_concern: String(x.nature_of_concern || "").trim() || null,
+        classification_coding: String(x.classification_coding || "").trim() || null,
+        observation_text: String(x.observation_text || "").trim() || null,
+        remarks: String(x.remarks || "").trim() || null,
+        pgno_selected: Array.isArray(x.pgno_selected) ? x.pgno_selected : [],
+        page_hint: Number.isFinite(Number(x.page_hint)) ? Number(x.page_hint) : null,
+        source_excerpt: String(x.source_excerpt || "").trim() || null,
+        confidence: x.confidence == null ? null : Number(x.confidence),
+        sort_index: Number.isFinite(Number(x.sort_index)) ? Number(x.sort_index) : i,
+      };
+
+      const saved = await insertObservationItem(row);
+      inserted.push(saved);
+    }
+
+    if (examined && Array.isArray(examined.examined_questions)) {
+      state.activeReport.examined_questions = examined.examined_questions;
+      state.activeReport.examined_count =
+        Number(examined.examined_count || examined.examined_questions.length) || examined.examined_questions.length;
+
+      try {
+        await updateReportHeader(state.activeReport.id, {
+          ...headerInputs(),
+          examined_questions: state.activeReport.examined_questions,
+          examined_count: state.activeReport.examined_count,
+        });
+      } catch (e) {
+        console.warn("Could not persist examined fields on import JSON", e);
+      }
+    }
+
+    state.observationItems = inserted;
+    rebuildExtractedItems();
+    renderObsTable();
+    renderObsSummary();
+
+    setSaveStatus("Imported");
+  } catch (e) {
+    console.error(e);
+    alert("Import failed: " + (e?.message || String(e)));
+    setSaveStatus("Error");
+  }
 }
 
 /* ---------- KPIs ---------- */
@@ -1395,7 +1709,7 @@ function renderKpis() {
   const neg = items.filter((x) => x.kind === "negative").length;
   const pos = items.filter((x) => x.kind === "positive").length;
   const lae = items.filter((x) => x.kind === "largely").length;
-  const miss = items.filter((x) => x.kind !== "positive" && missingPgnoForQno(x.qno)).length;
+  const miss = items.filter((x) => itemNeedsPgno(x) && missingPgnoForItem(x)).length;
 
   el("kpiQuestionsExamined").value = String(examinedCountFromActive());
   el("kpiTotal").value = String(total);
@@ -1413,19 +1727,17 @@ function finalizeCheck() {
     return;
   }
 
-  const missing = (state.extractedItems || []).filter((x) => x.kind !== "positive" && missingPgnoForQno(x.qno));
+  const missing = (state.extractedItems || []).filter((x) => itemNeedsPgno(x) && missingPgnoForItem(x));
   if (!missing.length) {
     alert("Finalize check: OK.\n\nNo Negative/Largely items are missing PGNO ticks.");
     return;
   }
 
-  const lines = missing
-    .slice(0, 30)
-    .map((x) => `- ${x.qno} (${x.kind})`)
-    .join("\n");
+  const lines = missing.slice(0, 30).map((x) => `- ${x.qno} (${x.kind} / ${x.designation || "—"})`).join("\n");
 
   alert(
-    `Finalize check: NOT OK.\n\nMissing PGNO tick(s) for:\n${lines}` + (missing.length > 30 ? `\n… plus ${missing.length - 30} more.` : ""),
+    `Finalize check: NOT OK.\n\nMissing PGNO tick(s) for:\n${lines}` +
+      (missing.length > 30 ? `\n… plus ${missing.length - 30} more.` : ""),
   );
 }
 
@@ -1462,7 +1774,7 @@ async function init() {
     await safeNavigate(["./mode_selection.html", "./mode-selection.html", "./index.html", "./"]);
   });
 
-  // Titles
+  // titles
   state.titles = loadTitles();
   renderTitleSelect();
   el("manageTitlesBtn").addEventListener("click", openTitlesModal);
@@ -1481,11 +1793,9 @@ async function init() {
   setSaveStatus("Loading…");
   await yieldUI();
 
-  // Load vessels
   state.vessels = await loadVessels();
   renderVesselsSelect();
 
-  // Load locked library
   state.lib = await loadLockedLibraryJson(LOCKED_LIBRARY_JSON);
   for (const q of state.lib) {
     const qno = getQno(q);
@@ -1495,11 +1805,9 @@ async function init() {
     if (canon && !state.libCanonToExact.has(canon)) state.libCanonToExact.set(canon, qno);
   }
 
-  // Load reports
   state.reports = await loadReportsFromDb();
   renderStoredTable();
 
-  // Stored filters buttons
   document.querySelectorAll(".filter-btn[data-filter-col]").forEach((btn) => {
     btn.addEventListener("click", (e) => {
       e.preventDefault();
@@ -1509,7 +1817,6 @@ async function init() {
     });
   });
 
-  // Stored dialog controls
   el("storedFilterSearch").addEventListener("input", () => {
     const col = state.openFilterCol;
     if (!col) return;
@@ -1549,12 +1856,15 @@ async function init() {
     renderStoredTable();
   });
 
-  // Header buttons
+  // header buttons
   el("newReportBtn").addEventListener("click", handleNewReport);
   el("saveHeaderBtn").addEventListener("click", handleSaveHeader);
   el("deleteReportBtn").addEventListener("click", handleDeleteReport);
 
-  // Import PDF (AI) — NOW WITH CATCH so it never looks frozen
+  // download PDF
+  el("downloadPdfBtn").addEventListener("click", downloadActivePdf);
+
+  // import PDF
   el("importPdfBtn").addEventListener("click", () => el("importPdfFile").click());
   el("importPdfFile").addEventListener("change", async (e) => {
     const f = e.target.files && e.target.files[0];
@@ -1570,25 +1880,36 @@ async function init() {
     }
   });
 
+  // export / import JSON
+  el("exportBtn").addEventListener("click", exportJson);
+  el("importBtn").addEventListener("click", () => el("importFile").click());
+  el("importFile").addEventListener("change", async (e) => {
+    const f = e.target.files && e.target.files[0];
+    try {
+      if (f) await importJsonFile(f);
+    } finally {
+      e.target.value = "";
+    }
+  });
+
   // KPIs + finalize
   el("statsBtn").addEventListener("click", renderKpis);
   el("finalizeBtn").addEventListener("click", finalizeCheck);
   el("closeStatsBtn").addEventListener("click", () => el("statsDialog").close());
 
-  // Manual
+  // manual
   el("addManualBtn").addEventListener("click", addManualItem);
 
-  // Extracted filters
+  // extracted filters
   el("obsSearch").addEventListener("input", renderObsTable);
   el("obsTypeFilter").addEventListener("change", renderObsTable);
   el("obsDesignationFilter").addEventListener("change", renderObsTable);
   el("onlyMissingPgno").addEventListener("change", renderObsTable);
 
-  // Obs modal buttons
+  // dialog
   el("dlgCancelBtn").addEventListener("click", closeObsDialog);
   el("dlgSaveBtn").addEventListener("click", saveObsDialog);
 
-  // Default date for new report form
   if (!el("inspectionDate").value) {
     const d = new Date();
     const yyyy = d.getFullYear();
@@ -1597,8 +1918,8 @@ async function init() {
     el("inspectionDate").value = `${yyyy}-${mm}-${dd}`;
   }
 
-  // Start empty
-  buildExtractedItemsFromDb();
+  state.observationItems = [];
+  rebuildExtractedItems();
   renderObsTable();
   renderObsSummary();
   setSaveStatus("Loaded");
