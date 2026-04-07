@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>SIRE 2.0 – Observation Detail</title>
+  <link rel="stylesheet" href="style.css" />
+
+  <style>
+    :root{
+      --pi-navy:#0b2a4a;
+      --pi-navy2:#0f3a63;
+      --pi-card:#ffffff;
+      --pi-border:#cfe0f4;
+      --pi-text:#0c1b2a;
+      --pi-muted:#55708f;
+      --pi-bg:#08131f;
+    }
+
+    *{ box-sizing:border-box; }
+    body{ background:var(--pi-bg); color:var(--pi-text); margin:0; }
+    .pi-wrap{ max-width:1700px; margin:20px auto 40px; padding:0 14px; }
+
+    .pi-hero{
+      background:linear-gradient(180deg,var(--pi-navy2),var(--pi-navy));
+      border:1px solid rgba(255,255,255,.10);
+      border-radius:18px;
+      padding:18px 18px 14px;
+      color:#fff;
+      box-shadow:0 10px 30px rgba(0,0,0,.30);
+    }
+    .pi-hero h1{ margin:0 0 6px; font-size:24px; }
+    .pi-hero p{ margin:0; color:rgba(255,255,255,.85); font-weight:800; }
+
+    .pi-toprow{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:12px; }
+    .pi-pill{
+      display:inline-flex; align-items:center; gap:8px;
+      padding:8px 12px; border-radius:999px;
+      background:rgba(255,255,255,.08);
+      border:1px solid rgba(255,255,255,.15);
+      font-weight:800; color:#fff;
+    }
+
+    .pi-card{
+      background:#fff;
+      border:1px solid #cfe0f4;
+      border-radius:18px;
+      padding:16px;
+      box-shadow:0 10px 24px rgba(0,0,0,.20);
+      overflow:hidden;
+      margin-top:18px;
+    }
+    .pi-card h2{ margin:0 0 12px; color:#113a63; font-weight:900; }
+
+    .btn{
+      border-radius:12px !important;
+      padding:9px 12px !important;
+      font-weight:800 !important;
+      cursor:pointer;
+      border:none;
+    }
+    .btn.primary{ background:#1f6feb !important; color:#fff !important; }
+    .btn.light{
+      background:#ffffff !important;
+      color:#0c1b2a !important;
+      border:1px solid rgba(255,255,255,.35) !important;
+    }
+    .btn.btn-muted{
+      background:#eef6ff !important;
+      border:1px solid #cfe0f4 !important;
+      color:#143a63 !important;
+    }
+
+    .grid-2{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap:16px;
+    }
+
+    .pi-field label{
+      display:block; font-weight:900; color:#143a63; margin:0 0 6px;
+    }
+    .pi-field input, .pi-field textarea{
+      width:100%;
+      padding:10px 12px;
+      border:1px solid #cfe0f4;
+      border-radius:12px;
+      font-weight:700;
+      background:#fff;
+    }
+    textarea{
+      min-height:140px;
+      resize:vertical;
+    }
+
+    .obs-badge{
+      display:inline-flex; align-items:center;
+      font-weight:800; font-size:12px; padding:6px 10px; border-radius:999px;
+      border:1px solid #cfe0f4; background:#eef6ff; color:#143a63;
+      white-space:nowrap;
+    }
+    .obs-badge.neg{ background:#fff2e0; border-color:#ffd7a3; color:#7a4a00; }
+    .obs-badge.pos{ background:#e9fff0; border-color:#bfeccc; color:#145c2a; }
+    .obs-badge.lae{ background:#f3f0ff; border-color:#d9cffc; color:#3a2a7a; }
+
+    .muted{ color:#55708f; font-weight:700; }
+
+    @media (max-width: 1100px){
+      .grid-2{ grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="pi-wrap">
+    <div class="pi-hero">
+      <h1>Observation Detail</h1>
+      <p>Dedicated page for one extracted observation, with space for response drafting.</p>
+
+      <div class="pi-toprow">
+        <span class="pi-pill" id="userBadge">Not signed in</span>
+        <button class="btn light" id="backToInspectionBtn" type="button">Back to Inspection</button>
+        <button class="btn light" id="backToListBtn" type="button">Back to Stored Inspections</button>
+        <button class="btn primary" id="logoutBtn" type="button">Logout</button>
+        <span class="pi-pill" id="buildPill">build: —</span>
+      </div>
+    </div>
+
+    <div class="pi-card">
+      <h2>Observation Summary</h2>
+
+      <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:12px;">
+        <span id="obsTypeBadge"></span>
+        <span class="muted" id="obsQuestionLabel">—</span>
+        <span class="muted" id="obsCategoryLabel">—</span>
+      </div>
+
+      <div class="grid-2">
+        <div class="pi-field">
+          <label>Subject of Concern (SOC)</label>
+          <textarea id="socField" readonly></textarea>
+        </div>
+
+        <div class="pi-field">
+          <label>Nature of Concern (NOC)</label>
+          <textarea id="nocField" readonly></textarea>
+        </div>
+      </div>
+
+      <div class="pi-field" style="margin-top:16px;">
+        <label>Question Text</label>
+        <textarea id="questionFullField" readonly style="min-height:120px;"></textarea>
+      </div>
+
+      <div class="pi-field" style="margin-top:16px;">
+        <label>Supporting Comment</label>
+        <textarea id="supportingCommentField" readonly style="min-height:140px;"></textarea>
+      </div>
+
+      <div class="pi-field" style="margin-top:16px;">
+        <label>PGNO</label>
+        <textarea id="pgnoField" readonly style="min-height:100px;"></textarea>
+      </div>
+    </div>
+
+    <div class="pi-card">
+      <h2>Response Drafting</h2>
+      <div class="muted" style="margin-bottom:12px;">
+        This step stores drafts locally in the browser for now. SQL persistence can be added next.
+      </div>
+
+      <div class="pi-field">
+        <label>Immediate Cause</label>
+        <textarea id="immediateCause"></textarea>
+      </div>
+      <div class="pi-field" style="margin-top:12px;">
+        <label>Subsequent Comment(s) — Immediate Cause</label>
+        <textarea id="immediateCauseComments"></textarea>
+      </div>
+
+      <div class="pi-field" style="margin-top:20px;">
+        <label>Root Cause</label>
+        <textarea id="rootCause"></textarea>
+      </div>
+      <div class="pi-field" style="margin-top:12px;">
+        <label>Subsequent Comment(s) — Root Cause</label>
+        <textarea id="rootCauseComments"></textarea>
+      </div>
+
+      <div class="pi-field" style="margin-top:20px;">
+        <label>Corrective Action</label>
+        <textarea id="correctiveAction"></textarea>
+      </div>
+      <div class="pi-field" style="margin-top:12px;">
+        <label>Subsequent Comment(s) — Corrective Action</label>
+        <textarea id="correctiveActionComments"></textarea>
+      </div>
+
+      <div class="pi-field" style="margin-top:20px;">
+        <label>Preventative Action</label>
+        <textarea id="preventativeAction"></textarea>
+      </div>
+      <div class="pi-field" style="margin-top:12px;">
+        <label>Subsequent Comment(s) — Preventative Action</label>
+        <textarea id="preventativeActionComments"></textarea>
+      </div>
+
+      <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:16px;">
+        <button class="btn primary" id="saveDraftBtn" type="button">Save Draft</button>
+        <button class="btn btn-muted" id="reloadDraftBtn" type="button">Reload Draft</button>
+        <button class="btn btn-muted" id="clearDraftBtn" type="button">Clear Draft</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js" defer></script>
+  <script src="./app-config.js" defer></script>
+  <script src="./auth.js" defer></script>
+  <script type="module" src="./post_inspection_observation_detail.js"></script>
+</body>
+</html>
