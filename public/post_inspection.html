@@ -154,7 +154,7 @@
       padding:10px 10px;
       border-bottom:1px solid #eef4ff;
       vertical-align:top;
-      font-weight:600; /* NORMAL (not bold) */
+      font-weight:600;
       color:#0c1b2a;
       overflow:hidden;
       text-overflow:ellipsis;
@@ -164,7 +164,7 @@
     .pi-table tbody tr:hover td{ background:#f8fbff; }
 
     .muted{ color:#55708f; font-weight:700; }
-    .vessel-bold{ font-weight:900; } /* ONLY vessel bold */
+    .vessel-bold{ font-weight:900; }
 
     .hdr-flex{
       display:flex; align-items:center; justify-content:space-between; gap:8px;
@@ -186,7 +186,6 @@
     }
     .filter-btn:hover{ filter:brightness(0.98); }
 
-    /* Filter modal popover */
     dialog{ border:none; border-radius:18px; padding:0; max-width:760px; width: calc(100vw - 40px); }
     .dlg{ padding:16px; }
     .dlg h3{ margin:0 0 8px; color:#143a63; font-weight:900; }
@@ -250,7 +249,6 @@
       max-height:36vh;
     }
 
-    /* Observation badges */
     .obs-badge{
       display:inline-flex; align-items:center;
       font-weight:800; font-size:12px; padding:6px 10px; border-radius:999px;
@@ -273,7 +271,6 @@
       outline:none;
     }
 
-    /* Responsive */
     @media (max-width: 1100px){
       .pi-fields{ grid-template-columns: 1fr 1fr; }
       .pi-span2, .pi-span3, .pi-span6{ grid-column:auto; }
@@ -304,7 +301,6 @@
 
     <div class="pi-grid">
 
-      <!-- Stored Inspections -->
       <div class="pi-card" id="storedCard">
         <h2>Stored Inspections</h2>
         <div class="stored-note">Most recent on top • click a row to load • filters are tick-box modals in each header</div>
@@ -328,7 +324,6 @@
                 <th style="width:13%;">
                   <div class="hdr-flex">
                     <span>Report Ref</span>
-                    <!-- NO FILTERS for Report Ref -->
                   </div>
                 </th>
                 <th style="width:13%;">
@@ -369,7 +364,6 @@
         </div>
       </div>
 
-      <!-- Inspection Header -->
       <div class="pi-card" id="headerCard">
         <h2>Inspection Header</h2>
 
@@ -452,9 +446,9 @@
 
         <div style="margin-top:10px; color:#0f3a63; font-weight:800;">
           <ul style="margin:0; padding-left:18px;">
-            <li><b>Negative</b>: designation + Nature of Concern (Not as expected … / Observable or detectable deficiency). Requires PGNO.</li>
-            <li><b>Positive</b>: Human + Nature of Concern (Exceeded normal expectation). No PGNO.</li>
-            <li><b>Largely as expected</b>: designation + Nature of Concern (Largely as expected). KPI item. <b>Requires PGNO.</b></li>
+            <li><b>Negative</b>: Category + SOC + NOC + Supporting Comment. Requires PGNO.</li>
+            <li><b>Positive</b>: Keep Question No as KPI dimension and record Human/Process/Hardware category as extracted. No PGNO.</li>
+            <li><b>Largely as expected</b>: Category + SOC + NOC + Supporting Comment. KPI item. <b>Requires PGNO.</b></li>
           </ul>
           <div style="margin-top:8px;">
             <span style="font-weight:900;">Total Questions Examined (from PDF):</span>
@@ -472,13 +466,12 @@
         </div>
       </div>
 
-      <!-- Extracted Items -->
       <div class="pi-card" id="obsCard">
         <h2>Extracted Items</h2>
 
         <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; justify-content:space-between; margin:8px 0 10px;">
           <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
-            <input id="obsSearch" type="text" placeholder="Search (qno / category / nature / coding / text)"
+            <input id="obsSearch" type="text" placeholder="Search (qno / category / SOC / NOC / supporting comment)"
                    style="padding:10px 12px; border:1px solid #cfe0f4; border-radius:12px; font-weight:700; background:#fff; min-width:260px;" />
 
             <select id="obsTypeFilter" style="padding:10px 12px; border:1px solid #cfe0f4; border-radius:12px; font-weight:700; background:#fff;">
@@ -512,9 +505,9 @@
                 <th style="width:90px;">Question</th>
                 <th style="width:110px;">Type</th>
                 <th style="width:160px;">Category</th>
-                <th style="width:260px;">Nature of concern</th>
-                <th style="width:260px;">Classification coding</th>
-                <th>Observation text</th>
+                <th style="width:260px;">Subject of Concern (SOC)</th>
+                <th style="width:260px;">Nature of Concern (NOC)</th>
+                <th>Supporting Comment</th>
                 <th style="width:260px;">PGNO (selected text)</th>
               </tr>
             </thead>
@@ -527,7 +520,6 @@
 
     </div>
 
-    <!-- Stored filter modal -->
     <dialog id="storedFilterDialog">
       <div class="dlg">
         <h3 id="storedFilterTitle">Filters</h3>
@@ -544,7 +536,6 @@
       </div>
     </dialog>
 
-    <!-- Titles modal -->
     <dialog id="titlesDialog">
       <div class="dlg">
         <h3>Manage Titles</h3>
@@ -564,7 +555,6 @@
       </div>
     </dialog>
 
-    <!-- KPIs dialog -->
     <dialog id="statsDialog">
       <div class="dlg">
         <h3>KPIs</h3>
@@ -577,13 +567,21 @@
           <div class="pi-field"><label>Items missing PGNO (neg + largely)</label><input id="kpiMissingPgno" readonly /></div>
         </div>
 
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-top:12px;">
+          <div class="pi-field"><label>Top Questions</label><textarea id="kpiTopQuestions" readonly style="min-height:150px;"></textarea></div>
+          <div class="pi-field"><label>Top Categories</label><textarea id="kpiTopCategories" readonly style="min-height:150px;"></textarea></div>
+          <div class="pi-field"><label>Top SOC</label><textarea id="kpiTopSoc" readonly style="min-height:150px;"></textarea></div>
+          <div class="pi-field"><label>Top NOC</label><textarea id="kpiTopNoc" readonly style="min-height:150px;"></textarea></div>
+          <div class="pi-field"><label>Top Human SOC</label><textarea id="kpiTopHumanSoc" readonly style="min-height:150px;"></textarea></div>
+          <div class="pi-field"><label>Top Human PIF</label><textarea id="kpiTopHumanPif" readonly style="min-height:150px;"></textarea></div>
+        </div>
+
         <div class="dlg-actions">
           <button class="btn primary" id="closeStatsBtn" type="button">Close</button>
         </div>
       </div>
     </dialog>
 
-    <!-- Observation editor -->
     <dialog id="obsDialog">
       <div class="dlg">
         <h3 id="dlgTitle">Item</h3>

@@ -4,7 +4,7 @@ import { loadLockedLibraryJson } from "./question_library_loader.js";
  * HARD BUILD STAMP
  */
 const POST_INSPECTION_BUILD =
-  "post_inspection_ui_v32_multi_observation_items_2026-03-03";
+  "post_inspection_ui_v33_soc_noc_kpi_2026-04-07";
 
 /**
  * Locked library JSON
@@ -148,6 +148,129 @@ async function safeNavigate(candidates) {
     "Navigation failed.\n\nNone of these pages were found:\n" +
       list.map((x) => `- ${x}`).join("\n"),
   );
+}
+
+
+/* ---------- SIRE 2.0 official SOC / NOC helpers ---------- */
+
+const HARDWARE_NOC_OPTIONS = [
+  "Maintenance task available – not completed",
+  "Maintenance task available – records incompatible with condition seen",
+  "No maintenance task developed",
+  "Maintenance deferred – awaiting spares",
+  "Maintenance deferred – awaiting technician",
+  "Maintenance deferred – awaiting out of service / gas free",
+  "Sudden failure – maintenance tasks available and up to date",
+  "Other - text",
+];
+
+const PROCESS_NOC_OPTIONS = [
+  "No procedure",
+  "Procedure not present/available/accessible",
+  "Too many/conflicting procedures",
+  "Procedure clarity and understandability",
+  "Procedure accuracy/correctness",
+  "Procedure realism/feasibility/suitability",
+  "Procedure completeness/validity/version",
+  "Communication of procedure/practice updates",
+  "Other - text",
+];
+
+const HUMAN_PIF_OPTIONS = [
+  "1. Recognition of safety criticality of the task or associated steps",
+  "2. Custom and practice surrounding use of procedures",
+  "3. Procedures accessible, helpful, understood and accurate for task",
+  "4. Team dynamics, communications and coordination with others",
+  "5. Evidence of stress, workload, fatigue, time constraints",
+  "6. Factors such as morale, motivation, nervousness",
+  "7. Workplace ergonomics incl. signage, tools, layout, space, noise, light, heat, etc.",
+  "8. Human-Machine Interface (E.g.: Controls, Alarms, etc.)",
+  "9. Opportunity to learn or practice",
+  "10. Not Identified",
+];
+
+const HUMAN_SOC_OPTIONS = [
+  "Not Identified",
+  "Senior Deck Officer",
+  "Junior Deck Officer",
+  "Senior Engineer Officer",
+  "Junior Engineer Officer",
+  "Rating",
+  "Deck team task - historical",
+  "Engine room team task - historical",
+];
+
+function getNocOptionsByDesignation(designation) {
+  const d = normDesignation(designation);
+  if (d === "Hardware") return HARDWARE_NOC_OPTIONS;
+  if (d === "Process") return PROCESS_NOC_OPTIONS;
+  if (d === "Human") return HUMAN_PIF_OPTIONS;
+  return [];
+}
+
+function humanSocFromItem(item) {
+  const direct = String(item?.positive_rank || "").trim();
+  if (direct) return direct;
+
+  const sx = String(item?.source_excerpt || "").trim();
+  const m = sx.match(/^Human\s+(.+?):/i);
+  if (m) return String(m[1] || "").trim();
+
+  const soc = String(item?.classification_coding || "").trim();
+  if (HUMAN_SOC_OPTIONS.includes(soc)) return soc;
+
+  return "";
+}
+
+function humanPifsFromItem(item) {
+  const candidates = [];
+  const cc = String(item?.classification_coding || "").trim();
+  const noc = String(item?.nature_of_concern || "").trim();
+
+  if (cc) candidates.push(...cc.split("|").map((x) => String(x).trim()).filter(Boolean));
+  if (noc) candidates.push(...noc.split("|").map((x) => String(x).trim()).filter(Boolean));
+
+  const matched = HUMAN_PIF_OPTIONS.filter((opt) => candidates.some((x) => x === opt));
+  return [...new Set(matched)];
+}
+
+function socDisplay(item) {
+  if (!item) return "";
+  const d = normDesignation(item.designation);
+  if (d === "Human") {
+    return humanSocFromItem(item);
+  }
+  return String(item.classification_coding || "").trim();
+}
+
+function nocDisplay(item) {
+  if (!item) return "";
+  const d = normDesignation(item.designation);
+  if (d === "Human") {
+    const arr = humanPifsFromItem(item);
+    return arr.join(" | ");
+  }
+  return String(item.nature_of_concern || "").trim();
+}
+
+function supportingCommentDisplay(item) {
+  return String(item?.observation_text || item?.remarks || "").trim();
+}
+
+function uniqueCountMap(items, getter) {
+  const map = new Map();
+  for (const it of items || []) {
+    const val = String(getter(it) || "").trim();
+    if (!val) continue;
+    map.set(val, (map.get(val) || 0) + 1);
+  }
+  return [...map.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+}
+
+function topLines(items, getter, limit = 12) {
+  const pairs = uniqueCountMap(items, getter).slice(0, limit);
+  if (!pairs.length) return "—";
+  return pairs.map(([k, v]) => `${v} × ${k}`).join("\n");
 }
 
 /* ---------- State ---------- */
@@ -1030,12 +1153,11 @@ function applyObsFilters(items) {
         it.qno,
         it.kind,
         it.designation || "",
-        it.positive_rank || "",
-        it.nature_of_concern || "",
-        it.classification_coding || "",
-        it.observation_text || "",
-        it.remarks || "",
+        socDisplay(it),
+        nocDisplay(it),
+        supportingCommentDisplay(it),
         it.question_full || "",
+        it.source_excerpt || "",
       ]
         .join(" ")
         .toLowerCase();
@@ -1091,21 +1213,19 @@ function renderObsTable() {
         ? (pgText ? pgText : `<span class="muted">—</span>`)
         : `<span class="muted">n/a</span>`;
 
-      const catDisplay =
-        it.kind === "positive"
-          ? (it.positive_rank ? `Human (${it.positive_rank})` : "Human")
-          : (it.designation || "—");
-
-      const obsText = (it.observation_text || it.remarks || "").trim();
+      const catDisplay = normDesignation(it.designation) || "—";
+      const soc = socDisplay(it);
+      const noc = nocDisplay(it);
+      const supporting = supportingCommentDisplay(it);
 
       return `
       <tr class="obs-row" data-id="${esc(it.id)}">
         <td title="${esc(it.qno)}">${esc(it.qno)}</td>
         <td>${obsRowTypeLabel(it.kind)}</td>
         <td title="${esc(catDisplay)}">${esc(catDisplay)}</td>
-        <td title="${esc(it.nature_of_concern || "")}">${esc(it.nature_of_concern || "")}</td>
-        <td title="${esc(it.classification_coding || "")}">${esc(it.classification_coding || "")}</td>
-        <td title="${esc(obsText)}">${esc(obsText)}</td>
+        <td title="${esc(soc)}">${esc(soc || "—")}</td>
+        <td title="${esc(noc)}">${esc(noc || "—")}</td>
+        <td title="${esc(supporting)}">${esc(supporting)}</td>
         <td title="${esc(pgRequired ? pgText : "")}">${pgCell}</td>
       </tr>
     `;
@@ -1171,16 +1291,74 @@ function openObsDialog(itemId) {
   const qShort = qObj ? String(qObj["Short Text"] || qObj["short_text"] || "").trim() : "";
 
   const requiresPgno = itemNeedsPgno(item);
+  const designation = normDesignation(item.designation) || "";
 
   el("dlgTitle").textContent = `Question ${item.qno}`;
   el("dlgSub").innerHTML = `
     <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
       <span>${obsRowTypeLabel(item.kind)}</span>
       <span class="muted">${esc(qShort || "")}</span>
-      <span class="muted">${esc(item.designation || "")}</span>
+      <span class="muted">${esc(designation || "")}</span>
       ${requiresPgno ? `<span class="muted">• PGNO required</span>` : `<span class="muted">• PGNO not required</span>`}
     </div>
   `;
+
+  const socValue = socDisplay(item);
+  const nocValue = nocDisplay(item);
+  const supporting = supportingCommentDisplay(item);
+
+  let socHtml = "";
+  if (designation === "Human") {
+    socHtml = `
+      <div class="pi-field" style="margin-top:10px;">
+        <label>Subject of Concern (SOC) — Human Rank Group</label>
+        <select id="dlgHumanSoc">
+          <option value="">Select rank group</option>
+          ${HUMAN_SOC_OPTIONS.map((opt) => `<option value="${esc(opt)}" ${socValue === opt ? "selected" : ""}>${esc(opt)}</option>`).join("")}
+        </select>
+      </div>
+    `;
+  } else {
+    socHtml = `
+      <div class="pi-field" style="margin-top:10px;">
+        <label>Subject of Concern (SOC)</label>
+        <input id="dlgSocText" type="text" value="${esc(socValue)}" placeholder="Enter SOC exactly as shown in the PDF/report." />
+      </div>
+    `;
+  }
+
+  let nocHtml = "";
+  if (designation === "Human") {
+    const selectedPifs = new Set(humanPifsFromItem(item));
+    nocHtml = `
+      <div class="pi-field" style="margin-top:10px;">
+        <label>Nature of Concern (NOC) — Human PIF(s)</label>
+        <div class="chk-list" id="dlgHumanPifList">
+          ${HUMAN_PIF_OPTIONS.map((opt, idx) => `
+            <label class="chk-row">
+              <input type="checkbox" class="dlgHumanPifChk" data-pif="${esc(opt)}" ${selectedPifs.has(opt) ? "checked" : ""}/>
+              <span>${esc(opt)}</span>
+            </label>
+          `).join("")}
+        </div>
+      </div>
+    `;
+  } else {
+    const options = getNocOptionsByDesignation(designation);
+    nocHtml = `
+      <div class="pi-field" style="margin-top:10px;">
+        <label>Nature of Concern (NOC)</label>
+        <div class="chk-list" id="dlgNocRadioList">
+          ${options.map((opt) => `
+            <label class="chk-row">
+              <input type="radio" name="dlgNocRadio" value="${esc(opt)}" ${nocValue === opt ? "checked" : ""}/>
+              <span>${esc(opt)}</span>
+            </label>
+          `).join("")}
+        </div>
+      </div>
+    `;
+  }
 
   const pgnoHtml = requiresPgno
     ? `
@@ -1197,9 +1375,12 @@ function openObsDialog(itemId) {
       <textarea readonly style="min-height:90px; background:#f8fbff;">${esc(item.question_full || "")}</textarea>
     </div>
 
+    ${socHtml}
+    ${nocHtml}
+
     <div class="pi-field" style="margin-top:10px;">
-      <label>Observation text</label>
-      <textarea id="dlgObsText" placeholder="Observation text...">${esc(String(item.observation_text || item.remarks || ""))}</textarea>
+      <label>Supporting Comment</label>
+      <textarea id="dlgObsText" placeholder="Supporting comment...">${esc(supporting)}</textarea>
     </div>
 
     ${pgnoHtml}
@@ -1216,7 +1397,29 @@ async function saveObsDialog() {
   const item = (state.extractedItems || []).find((x) => String(x.id) === String(state.dialogItemId));
   if (!item) return;
 
+  const designation = normDesignation(item.designation);
   const text = String(el("dlgObsText")?.value || "").trim();
+
+  let updatedSoc = socDisplay(item);
+  let updatedNoc = nocDisplay(item);
+
+  if (designation === "Human") {
+    updatedSoc = String(el("dlgHumanSoc")?.value || "").trim();
+
+    const pifs = [];
+    document.querySelectorAll(".dlgHumanPifChk").forEach((chk) => {
+      if (chk.checked) {
+        const val = String(chk.getAttribute("data-pif") || "").trim();
+        if (val) pifs.push(val);
+      }
+    });
+    updatedNoc = pifs.join(" | ");
+  } else {
+    updatedSoc = String(el("dlgSocText")?.value || "").trim();
+
+    const checked = document.querySelector('input[name="dlgNocRadio"]:checked');
+    updatedNoc = String(checked?.value || "").trim();
+  }
 
   let selected = Array.isArray(item.pgno_selected) ? item.pgno_selected : [];
 
@@ -1237,6 +1440,17 @@ async function saveObsDialog() {
     pgno_selected: selected,
     updated_at: nowIso(),
   };
+
+  if (designation === "Human") {
+    updated.positive_rank = updatedSoc || null;
+    updated.classification_coding = updatedNoc || null;
+    if (!String(updated.nature_of_concern || "").trim()) {
+      updated.nature_of_concern = null;
+    }
+  } else {
+    updated.classification_coding = updatedSoc || null;
+    updated.nature_of_concern = updatedNoc || null;
+  }
 
   setSaveStatus("Saving…");
   await yieldUI();
@@ -1285,20 +1499,40 @@ async function addManualItem() {
     kind === "positive" ? "positive" :
     "largely";
 
-  const designation = kind === "positive"
-    ? "Human"
-    : (prompt("Category (Human/Process/Hardware/Photo):", "Human") || "");
+  const designation = normDesignation(
+    kind === "positive"
+      ? "Human"
+      : (prompt("Category (Human/Process/Hardware/Photo):", "Human") || "")
+  );
 
-  const nature = prompt(
-    "Nature of concern:",
-    kind === "negative"
-      ? "Not as expected."
-      : kind === "positive"
-        ? "Exceeded normal expectation."
-        : "Largely as expected.",
-  ) || "";
+  let soc = "";
+  let noc = "";
+  let humanRank = null;
 
-  const text = prompt("Observation text:", "") || "";
+  if (designation === "Human") {
+    humanRank = prompt(
+      "Human SOC (Rank Group). Use one of:\n\n" + HUMAN_SOC_OPTIONS.join("\n"),
+      "Junior Deck Officer",
+    ) || "";
+
+    noc = prompt(
+      "Human NOC / PIF(s). Enter one or more exactly as listed, separated by | :\n\n" + HUMAN_PIF_OPTIONS.join("\n"),
+      "1. Recognition of safety criticality of the task or associated steps | 3. Procedures accessible, helpful, understood and accurate for task",
+    ) || "";
+  } else {
+    soc = prompt(
+      `${designation} SOC (copy exactly from the report / coded menu):`,
+      "",
+    ) || "";
+
+    const nocOptions = getNocOptionsByDesignation(designation);
+    noc = prompt(
+      `${designation} NOC (copy exactly from the list):\n\n` + nocOptions.join("\n"),
+      nocOptions[0] || "",
+    ) || "";
+  }
+
+  const text = prompt("Supporting Comment:", "") || "";
 
   const row = {
     report_id: state.activeReport.id,
@@ -1308,10 +1542,10 @@ async function addManualItem() {
     has_observation: true,
     observation_type,
     obs_type,
-    designation: normDesignation(designation) || null,
-    positive_rank: null,
-    nature_of_concern: String(nature).trim() || null,
-    classification_coding: null,
+    designation: designation || null,
+    positive_rank: designation === "Human" ? (String(humanRank).trim() || null) : null,
+    nature_of_concern: designation === "Human" ? null : (String(noc).trim() || null),
+    classification_coding: designation === "Human" ? (String(noc).trim() || null) : (String(soc).trim() || null),
     observation_text: String(text).trim() || null,
     remarks: String(text).trim() || null,
     pgno_selected: [],
@@ -1717,6 +1951,31 @@ function renderKpis() {
   el("kpiPos").value = String(pos);
   el("kpiLae").value = String(lae);
   el("kpiMissingPgno").value = String(miss);
+
+  const topQ = topLines(items, (x) => x.qno);
+  const topCat = topLines(items, (x) => normDesignation(x.designation));
+  const topSoc = topLines(items, (x) => socDisplay(x));
+  const topNoc = topLines(items, (x) => nocDisplay(x));
+  const topHumanSoc = topLines(items.filter((x) => normDesignation(x.designation) === "Human"), (x) => humanSocFromItem(x));
+
+  const humanPifCounts = new Map();
+  for (const it of items.filter((x) => normDesignation(x.designation) === "Human")) {
+    for (const p of humanPifsFromItem(it)) {
+      humanPifCounts.set(p, (humanPifCounts.get(p) || 0) + 1);
+    }
+  }
+  const topHumanPif = [...humanPifCounts.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .slice(0, 12)
+    .map(([k, v]) => `${v} × ${k}`)
+    .join("\n") || "—";
+
+  el("kpiTopQuestions").value = topQ;
+  el("kpiTopCategories").value = topCat;
+  el("kpiTopSoc").value = topSoc;
+  el("kpiTopNoc").value = topNoc;
+  el("kpiTopHumanSoc").value = topHumanSoc;
+  el("kpiTopHumanPif").value = topHumanPif;
 
   el("statsDialog").showModal();
 }
