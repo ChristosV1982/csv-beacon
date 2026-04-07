@@ -77,11 +77,18 @@
       gap:16px;
     }
 
+    .grid-3{
+      display:grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap:16px;
+    }
+
     .pi-field label{
       display:block; font-weight:900; color:#143a63; margin:0 0 6px;
     }
 
     .pi-field input,
+    .pi-field select,
     .pi-field textarea{
       width:100%;
       padding:12px 14px;
@@ -144,8 +151,42 @@
       align-items:center;
     }
 
+    .pgno-list{
+      border:1px solid #dbe8f8;
+      border-radius:14px;
+      padding:10px;
+      background:#fbfdff;
+      max-height:340px;
+      overflow:auto;
+    }
+
+    .pgno-row{
+      display:flex;
+      gap:12px;
+      align-items:flex-start;
+      padding:10px 8px;
+      border-bottom:1px dashed #dbe8f8;
+    }
+    .pgno-row:last-child{ border-bottom:none; }
+    .pgno-row input{ margin-top:4px; flex:0 0 auto; }
+    .pgno-meta{ flex:1 1 auto; }
+    .pgno-no{
+      font-weight:900;
+      color:#0c1b2a;
+      margin-bottom:4px;
+      font-family: Arial, Helvetica, sans-serif;
+      font-size:14px;
+    }
+    .pgno-text{
+      font-family: Arial, Helvetica, sans-serif;
+      font-size:14px;
+      line-height:1.4;
+      color:#22364d;
+    }
+
     @media (max-width: 1100px){
       .grid-2{ grid-template-columns: 1fr; }
+      .grid-3{ grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -196,15 +237,55 @@
         <label>Supporting Comment</label>
         <textarea id="supportingCommentField" readonly style="min-height:140px;"></textarea>
       </div>
-
-      <div class="pi-field" style="margin-top:16px;">
-        <label>PGNO</label>
-        <textarea id="pgnoField" readonly style="min-height:100px;"></textarea>
-      </div>
     </div>
 
     <div class="pi-card">
-      <h2>Response Actions</h2>
+      <h2>PGNO Selection</h2>
+      <div class="muted" style="margin-bottom:12px;">
+        Numbering follows the question numbering pattern from the Questions Editor module.
+      </div>
+
+      <div id="pgnoSelectorArea"></div>
+    </div>
+
+    <div class="pi-card">
+      <h2>Response Tracking</h2>
+
+      <div class="grid-3">
+        <div class="pi-field">
+          <label>Status</label>
+          <select id="responseStatus">
+            <option value="Open">Open</option>
+            <option value="In Progress">In Progress</option>
+            <option value="Closed">Closed</option>
+          </select>
+        </div>
+
+        <div class="pi-field">
+          <label>Responsible Person</label>
+          <select id="responsiblePerson"></select>
+        </div>
+
+        <div class="pi-field">
+          <label>Secondary Responsible Person / Verifier</label>
+          <select id="verifierPerson"></select>
+        </div>
+
+        <div class="pi-field">
+          <label>Target Date</label>
+          <input id="targetDate" type="date" />
+        </div>
+
+        <div class="pi-field">
+          <label>Close-out Date</label>
+          <input id="closeOutDate" type="date" />
+        </div>
+
+        <div class="pi-field">
+          <label>Closed By / Closed At</label>
+          <input id="closedMeta" type="text" readonly />
+        </div>
+      </div>
 
       <div class="response-block">
         <div class="response-topbar">

@@ -1,5 +1,8 @@
-const OBS_DETAIL_BUILD = "post_inspection_observation_detail_v2_sql_response_persistence_2026-04-07";
+import { loadLockedLibraryJson } from "./question_library_loader.js";
+
+const OBS_DETAIL_BUILD = "post_inspection_observation_detail_v3_tracking_and_pgno_restore_2026-04-07";
 const HUMAN_POSITIVE_FIXED_NOC = "Exceeded normal expectation.";
+const LOCKED_LIBRARY_JSON = "./sire_questions_all_columns_named.json";
 
 function el(id) {
   return document.getElementById(id);
@@ -24,6 +27,17 @@ function canonicalQno(qno) {
   return parts.map((p) => String(Number((p.replace(/^0+/, "") || "0")))).join(".");
 }
 
+function pick(obj, keys) {
+  for (const k of keys) {
+    if (obj && obj[k] != null && obj[k] !== "") return obj[k];
+  }
+  return "";
+}
+
+function getQno(q) {
+  return String(pick(q, ["No.", "No", "question_no", "QuestionNo", "Question ID"])).trim();
+}
+
 function normDesignation(d) {
   const s = String(d || "").trim().toLowerCase();
   if (s === "human") return "Human";
@@ -41,6 +55,14 @@ function obsRowTypeLabel(kind) {
 
 function getUrlParam(name) {
   return new URLSearchParams(window.location.search).get(name);
+}
+
+function setSaveStatus(text) {
+  el("saveStatus").textContent = text || "Not saved";
+}
+
+function todayIsoDate() {
+  return new Date().toISOString().slice(0, 10);
 }
 
 const HUMAN_PIF_OPTIONS = [
@@ -104,11 +126,18 @@ function supportingCommentDisplay(item) {
 function selectedPgnoText(pgno_selected) {
   const arr = Array.isArray(pgno_selected) ? pgno_selected : [];
   if (!arr.length) return "";
-  return arr.map((x) => String(x?.text || "").trim()).filter(Boolean).join(" • ");
+  return arr
+    .map((x) => {
+      const no = String(x?.pgno_no || "").trim();
+      const text = String(x?.text || "").trim();
+      return no ? `${no} — ${text}` : text;
+    })
+    .filter(Boolean)
+    .join(" • ");
 }
 
-function setSaveStatus(text) {
-  el("saveStatus").textContent = text || "Not saved";
+function itemNeedsPgno(item) {
+  return item?.obs_type === "negative" || item?.obs_type === "largely";
 }
 
 const state = {
@@ -116,6 +145,10 @@ const state = {
   supabase: null,
   report: null,
   item: null,
+  users: [],
+  lib: [],
+  libByNo: new Map(),
+  libCanonToExact: new Map(),
 };
 
 async function loadReportById(reportId) {
@@ -126,6 +159,35 @@ async function loadReportById(reportId) {
     .single();
   if (error) throw error;
   return data;
+}
+
+async function loadUsers() {
+  const { data, error } = await state.supabase
+    .from("profiles")
+    .select("id, username, role")
+    .order("username", { ascending: true });
+
+  if (error) throw error;
+  return data || [];
+}
+
+function renderUserSelect(selectId, selectedValue) {
+  const sel = el(selectId);
+  sel.innerHTML = "";
+
+  const empty = document.createElement("option");
+  empty.value = "";
+  empty.textContent = "— Select user —";
+  sel.appendChild(empty);
+
+  for (const u of state.users || []) {
+    const o = document.createElement("option");
+    o.value = u.id;
+    o.textContent = `${u.username || "Unnamed"}${u.role ? ` (${u.role})` : ""}`;
+    sel.appendChild(o);
+  }
+
+  sel.value = selectedValue || "";
 }
 
 async function loadObservationItem(reportId, itemId) {
@@ -170,7 +232,6 @@ function renderObservation() {
   el("nocField").value = nocDisplay(item) || "";
   el("questionFullField").value = String(item.question_full || "").trim() || "";
   el("supportingCommentField").value = supportingCommentDisplay(item) || "";
-  el("pgnoField").value = selectedPgnoText(item.pgno_selected) || "";
 }
 
 function setToggleOpen(wrapId, open) {
@@ -193,9 +254,31 @@ function openSubcommentsIfDataExists() {
   }
 }
 
+function getClosedMetaText(item) {
+  const closedById = String(item?.closed_by_user_id || "").trim();
+  const closedAt = String(item?.closed_at || "").trim();
+
+  const user = (state.users || []).find((u) => String(u.id) === closedById);
+  const username = user?.username || "";
+
+  if (!username && !closedAt) return "";
+
+  if (username && closedAt) return `${username} / ${closedAt}`;
+  if (username) return username;
+  return closedAt;
+}
+
 function loadResponseFields() {
   const item = state.item;
   if (!item) return;
+
+  el("responseStatus").value = String(item.response_status || "Open");
+  renderUserSelect("responsiblePerson", item.responsible_person_id || "");
+  renderUserSelect("verifierPerson", item.verifier_person_id || "");
+
+  el("targetDate").value = String(item.target_date || "");
+  el("closeOutDate").value = String(item.close_out_date || "");
+  el("closedMeta").value = getClosedMetaText(item);
 
   el("immediateCause").value = String(item.immediate_cause || "");
   el("immediateCauseComments").value = String(item.immediate_cause_subcomments || "");
@@ -209,9 +292,121 @@ function loadResponseFields() {
   openSubcommentsIfDataExists();
 }
 
+function getPgnoBullets(questionObj) {
+  const bullets = Array.isArray(questionObj?.NegObs_Bullets) ? questionObj.NegObs_Bullets : null;
+  if (bullets && bullets.length) {
+    return bullets.map((t) => String(t || "").trim()).filter(Boolean);
+  }
+
+  const pgTxt = String(questionObj?.["Potential Grounds for Negative Observations"] || "").trim();
+  if (!pgTxt) return [];
+
+  return pgTxt
+    .split("\n")
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .filter((s) => s.length > 6);
+}
+
+function findQuestionFromLibrary(qnoCanon) {
+  const exact = state.libCanonToExact.get(qnoCanon) || qnoCanon;
+  return state.libByNo.get(exact) || null;
+}
+
+function buildPgnoOptions(questionObj, item) {
+  const exactQno = getQno(questionObj) || canonicalQno(item.question_no || item.question_base || "");
+  const bullets = getPgnoBullets(questionObj);
+
+  return bullets.map((text, idx) => ({
+    pgno_no: `${exactQno}.${String(idx + 1).padStart(2, "0")}`,
+    text: String(text || "").trim(),
+  }));
+}
+
+function renderPgnoSelector() {
+  const item = state.item;
+  const area = el("pgnoSelectorArea");
+  if (!item) {
+    area.innerHTML = `<div class="muted">No observation loaded.</div>`;
+    return;
+  }
+
+  if (!itemNeedsPgno(item)) {
+    area.innerHTML = `<div class="muted">PGNO selection is not required for Positive observations.</div>`;
+    return;
+  }
+
+  const qnoCanon = canonicalQno(item.question_no || item.question_base || "");
+  const questionObj = findQuestionFromLibrary(qnoCanon);
+
+  if (!questionObj) {
+    area.innerHTML = `<div class="muted">Question not found in locked library. PGNO options unavailable.</div>`;
+    return;
+  }
+
+  const options = buildPgnoOptions(questionObj, item);
+  if (!options.length) {
+    area.innerHTML = `<div class="muted">No PGNO bullets found for this question in the library.</div>`;
+    return;
+  }
+
+  const selected = Array.isArray(item.pgno_selected) ? item.pgno_selected : [];
+  const selectedKeys = new Set(
+    selected.map((x) => {
+      const no = String(x?.pgno_no || "").trim();
+      const text = String(x?.text || "").trim();
+      return no ? `${no}||${text}` : text;
+    })
+  );
+
+  area.innerHTML = `
+    <div class="pgno-list">
+      ${options.map((opt) => {
+        const key = `${opt.pgno_no}||${opt.text}`;
+        const checked =
+          selectedKeys.has(key) ||
+          selectedKeys.has(opt.text)
+            ? "checked"
+            : "";
+        return `
+          <label class="pgno-row">
+            <input
+              type="checkbox"
+              class="pgnoChk"
+              data-pgno-no="${opt.pgno_no}"
+              data-text="${opt.text.replaceAll('"', "&quot;")}"
+              ${checked}
+            />
+            <div class="pgno-meta">
+              <div class="pgno-no">${opt.pgno_no}</div>
+              <div class="pgno-text">${opt.text}</div>
+            </div>
+          </label>
+        `;
+      }).join("")}
+    </div>
+  `;
+}
+
+function collectSelectedPgno() {
+  const rows = [];
+  document.querySelectorAll(".pgnoChk").forEach((chk) => {
+    if (!chk.checked) return;
+    const pgno_no = String(chk.getAttribute("data-pgno-no") || "").trim();
+    const text = String(chk.getAttribute("data-text") || "").trim();
+    if (!text) return;
+    rows.push({
+      pgno_no: pgno_no || null,
+      text,
+    });
+  });
+  return rows;
+}
+
 async function saveResponseFields() {
   const item = state.item;
   if (!item) return;
+
   if (String(item.id).startsWith("legacy-")) {
     alert("This item comes from the legacy table and cannot store response fields there. Re-import it into the new multi-item table first.");
     return;
@@ -219,7 +414,32 @@ async function saveResponseFields() {
 
   setSaveStatus("Saving…");
 
+  const newStatus = String(el("responseStatus").value || "Open");
+  let closeOutDate = String(el("closeOutDate").value || "").trim() || null;
+  let closedByUserId = item.closed_by_user_id || null;
+  let closedAt = item.closed_at || null;
+
+  if (newStatus === "Closed") {
+    if (!closeOutDate) closeOutDate = todayIsoDate();
+    if (!closedAt) {
+      closedAt = new Date().toISOString();
+      closedByUserId = state.me?.id || null;
+    }
+  } else {
+    closedAt = null;
+    closedByUserId = null;
+    closeOutDate = null;
+  }
+
   const payload = {
+    response_status: newStatus,
+    responsible_person_id: String(el("responsiblePerson").value || "").trim() || null,
+    verifier_person_id: String(el("verifierPerson").value || "").trim() || null,
+    target_date: String(el("targetDate").value || "").trim() || null,
+    close_out_date: closeOutDate,
+    closed_by_user_id: closedByUserId,
+    closed_at: closedAt,
+
     immediate_cause: String(el("immediateCause").value || "").trim() || null,
     immediate_cause_subcomments: String(el("immediateCauseComments").value || "").trim() || null,
     root_cause: String(el("rootCause").value || "").trim() || null,
@@ -228,6 +448,8 @@ async function saveResponseFields() {
     corrective_action_subcomments: String(el("correctiveActionComments").value || "").trim() || null,
     preventative_action: String(el("preventativeAction").value || "").trim() || null,
     preventative_action_subcomments: String(el("preventativeActionComments").value || "").trim() || null,
+
+    pgno_selected: collectSelectedPgno(),
   };
 
   const { data, error } = await state.supabase
@@ -245,6 +467,8 @@ async function saveResponseFields() {
   }
 
   state.item = data;
+  renderObservation();
+  renderPgnoSelector();
   loadResponseFields();
   setSaveStatus("Saved");
 }
@@ -256,6 +480,7 @@ async function reloadItemFromDb() {
 
   state.item = await loadObservationItem(reportId, itemId);
   renderObservation();
+  renderPgnoSelector();
   loadResponseFields();
   setSaveStatus("Loaded");
 }
@@ -281,6 +506,19 @@ async function init() {
     throw new Error("Missing report_id or item_id in URL.");
   }
 
+  state.users = await loadUsers();
+
+  state.lib = await loadLockedLibraryJson(LOCKED_LIBRARY_JSON);
+  for (const q of state.lib) {
+    const qno = getQno(q);
+    if (!qno) continue;
+    state.libByNo.set(qno, q);
+    const canon = canonicalQno(qno);
+    if (canon && !state.libCanonToExact.has(canon)) {
+      state.libCanonToExact.set(canon, qno);
+    }
+  }
+
   state.report = await loadReportById(reportId);
   state.item = await loadObservationItem(reportId, itemId);
 
@@ -304,6 +542,7 @@ async function init() {
   });
 
   renderObservation();
+  renderPgnoSelector();
   loadResponseFields();
   setSaveStatus("Loaded");
 
