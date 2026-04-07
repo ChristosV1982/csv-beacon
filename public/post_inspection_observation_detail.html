@@ -81,7 +81,6 @@
       display:block; font-weight:900; color:#143a63; margin:0 0 6px;
     }
 
-    /* Improved editable text styling */
     .pi-field input,
     .pi-field textarea{
       width:100%;
@@ -112,6 +111,39 @@
 
     .muted{ color:#55708f; font-weight:700; }
 
+    .response-block{
+      border:1px solid #dbe8f8;
+      border-radius:16px;
+      padding:14px;
+      margin-top:18px;
+      background:#fbfdff;
+    }
+
+    .response-topbar{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:12px;
+      margin-bottom:10px;
+      flex-wrap:wrap;
+    }
+
+    .subcomment-wrap{
+      margin-top:12px;
+      display:none;
+    }
+    .subcomment-wrap.open{
+      display:block;
+    }
+
+    .save-row{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      margin-top:18px;
+      align-items:center;
+    }
+
     @media (max-width: 1100px){
       .grid-2{ grid-template-columns: 1fr; }
     }
@@ -122,7 +154,7 @@
   <div class="pi-wrap">
     <div class="pi-hero">
       <h1>Observation Detail</h1>
-      <p>Dedicated page for one extracted observation, with space for response drafting.</p>
+      <p>Dedicated page for one extracted observation, with permanent response storage.</p>
 
       <div class="pi-toprow">
         <span class="pi-pill" id="userBadge">Not signed in</span>
@@ -130,6 +162,7 @@
         <button class="btn light" id="backToListBtn" type="button">Back to Stored Inspections</button>
         <button class="btn primary" id="logoutBtn" type="button">Logout</button>
         <span class="pi-pill" id="buildPill">build: —</span>
+        <span class="pi-pill" id="saveStatus">Not saved</span>
       </div>
     </div>
 
@@ -171,51 +204,83 @@
     </div>
 
     <div class="pi-card">
-      <h2>Response Drafting</h2>
-      <div class="muted" style="margin-bottom:12px;">
-        This step stores drafts locally in the browser for now. SQL persistence can be added next.
+      <h2>Response Actions</h2>
+
+      <div class="response-block">
+        <div class="response-topbar">
+          <h3 style="margin:0; color:#113a63;">Immediate Cause</h3>
+          <button class="btn btn-muted toggle-subcomment-btn" type="button" data-target="immediateCauseSubWrap">
+            Subsequent Comment(s)
+          </button>
+        </div>
+        <div class="pi-field">
+          <textarea id="immediateCause"></textarea>
+        </div>
+        <div class="subcomment-wrap" id="immediateCauseSubWrap">
+          <div class="pi-field">
+            <label>Subsequent Comment(s) — Immediate Cause</label>
+            <textarea id="immediateCauseComments"></textarea>
+          </div>
+        </div>
       </div>
 
-      <div class="pi-field">
-        <label>Immediate Cause</label>
-        <textarea id="immediateCause"></textarea>
-      </div>
-      <div class="pi-field" style="margin-top:12px;">
-        <label>Subsequent Comment(s) — Immediate Cause</label>
-        <textarea id="immediateCauseComments"></textarea>
-      </div>
-
-      <div class="pi-field" style="margin-top:20px;">
-        <label>Root Cause</label>
-        <textarea id="rootCause"></textarea>
-      </div>
-      <div class="pi-field" style="margin-top:12px;">
-        <label>Subsequent Comment(s) — Root Cause</label>
-        <textarea id="rootCauseComments"></textarea>
-      </div>
-
-      <div class="pi-field" style="margin-top:20px;">
-        <label>Corrective Action</label>
-        <textarea id="correctiveAction"></textarea>
-      </div>
-      <div class="pi-field" style="margin-top:12px;">
-        <label>Subsequent Comment(s) — Corrective Action</label>
-        <textarea id="correctiveActionComments"></textarea>
+      <div class="response-block">
+        <div class="response-topbar">
+          <h3 style="margin:0; color:#113a63;">Root Cause</h3>
+          <button class="btn btn-muted toggle-subcomment-btn" type="button" data-target="rootCauseSubWrap">
+            Subsequent Comment(s)
+          </button>
+        </div>
+        <div class="pi-field">
+          <textarea id="rootCause"></textarea>
+        </div>
+        <div class="subcomment-wrap" id="rootCauseSubWrap">
+          <div class="pi-field">
+            <label>Subsequent Comment(s) — Root Cause</label>
+            <textarea id="rootCauseComments"></textarea>
+          </div>
+        </div>
       </div>
 
-      <div class="pi-field" style="margin-top:20px;">
-        <label>Preventative Action</label>
-        <textarea id="preventativeAction"></textarea>
-      </div>
-      <div class="pi-field" style="margin-top:12px;">
-        <label>Subsequent Comment(s) — Preventative Action</label>
-        <textarea id="preventativeActionComments"></textarea>
+      <div class="response-block">
+        <div class="response-topbar">
+          <h3 style="margin:0; color:#113a63;">Corrective Action</h3>
+          <button class="btn btn-muted toggle-subcomment-btn" type="button" data-target="correctiveActionSubWrap">
+            Subsequent Comment(s)
+          </button>
+        </div>
+        <div class="pi-field">
+          <textarea id="correctiveAction"></textarea>
+        </div>
+        <div class="subcomment-wrap" id="correctiveActionSubWrap">
+          <div class="pi-field">
+            <label>Subsequent Comment(s) — Corrective Action</label>
+            <textarea id="correctiveActionComments"></textarea>
+          </div>
+        </div>
       </div>
 
-      <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:16px;">
-        <button class="btn primary" id="saveDraftBtn" type="button">Save Draft</button>
-        <button class="btn btn-muted" id="reloadDraftBtn" type="button">Reload Draft</button>
-        <button class="btn btn-muted" id="clearDraftBtn" type="button">Clear Draft</button>
+      <div class="response-block">
+        <div class="response-topbar">
+          <h3 style="margin:0; color:#113a63;">Preventative Action</h3>
+          <button class="btn btn-muted toggle-subcomment-btn" type="button" data-target="preventativeActionSubWrap">
+            Subsequent Comment(s)
+          </button>
+        </div>
+        <div class="pi-field">
+          <textarea id="preventativeAction"></textarea>
+        </div>
+        <div class="subcomment-wrap" id="preventativeActionSubWrap">
+          <div class="pi-field">
+            <label>Subsequent Comment(s) — Preventative Action</label>
+            <textarea id="preventativeActionComments"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="save-row">
+        <button class="btn primary" id="saveResponseBtn" type="button">Save Response</button>
+        <button class="btn btn-muted" id="reloadResponseBtn" type="button">Reload</button>
       </div>
     </div>
   </div>

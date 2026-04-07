@@ -1,4 +1,4 @@
-const OBS_DETAIL_BUILD = "post_inspection_observation_detail_v1_page_split_2026-04-07";
+const OBS_DETAIL_BUILD = "post_inspection_observation_detail_v2_sql_response_persistence_2026-04-07";
 const HUMAN_POSITIVE_FIXED_NOC = "Exceeded normal expectation.";
 
 function el(id) {
@@ -107,8 +107,8 @@ function selectedPgnoText(pgno_selected) {
   return arr.map((x) => String(x?.text || "").trim()).filter(Boolean).join(" • ");
 }
 
-function draftKey(itemId) {
-  return `pi_response_draft_${itemId}`;
+function setSaveStatus(text) {
+  el("saveStatus").textContent = text || "Not saved";
 }
 
 const state = {
@@ -173,65 +173,91 @@ function renderObservation() {
   el("pgnoField").value = selectedPgnoText(item.pgno_selected) || "";
 }
 
-function loadDraft() {
-  const item = state.item;
-  if (!item) return;
+function setToggleOpen(wrapId, open) {
+  const wrap = el(wrapId);
+  if (!wrap) return;
+  wrap.classList.toggle("open", !!open);
+}
 
-  try {
-    const raw = localStorage.getItem(draftKey(item.id));
-    if (!raw) return;
-    const d = JSON.parse(raw);
+function openSubcommentsIfDataExists() {
+  const pairs = [
+    ["immediateCauseSubWrap", "immediateCauseComments"],
+    ["rootCauseSubWrap", "rootCauseComments"],
+    ["correctiveActionSubWrap", "correctiveActionComments"],
+    ["preventativeActionSubWrap", "preventativeActionComments"],
+  ];
 
-    el("immediateCause").value = d.immediateCause || "";
-    el("immediateCauseComments").value = d.immediateCauseComments || "";
-    el("rootCause").value = d.rootCause || "";
-    el("rootCauseComments").value = d.rootCauseComments || "";
-    el("correctiveAction").value = d.correctiveAction || "";
-    el("correctiveActionComments").value = d.correctiveActionComments || "";
-    el("preventativeAction").value = d.preventativeAction || "";
-    el("preventativeActionComments").value = d.preventativeActionComments || "";
-  } catch (e) {
-    console.warn("draft load failed", e);
+  for (const [wrapId, fieldId] of pairs) {
+    const hasData = String(el(fieldId)?.value || "").trim().length > 0;
+    setToggleOpen(wrapId, hasData);
   }
 }
 
-function saveDraft() {
+function loadResponseFields() {
   const item = state.item;
   if (!item) return;
 
-  const d = {
-    immediateCause: el("immediateCause").value || "",
-    immediateCauseComments: el("immediateCauseComments").value || "",
-    rootCause: el("rootCause").value || "",
-    rootCauseComments: el("rootCauseComments").value || "",
-    correctiveAction: el("correctiveAction").value || "",
-    correctiveActionComments: el("correctiveActionComments").value || "",
-    preventativeAction: el("preventativeAction").value || "",
-    preventativeActionComments: el("preventativeActionComments").value || "",
-    saved_at: new Date().toISOString(),
-  };
+  el("immediateCause").value = String(item.immediate_cause || "");
+  el("immediateCauseComments").value = String(item.immediate_cause_subcomments || "");
+  el("rootCause").value = String(item.root_cause || "");
+  el("rootCauseComments").value = String(item.root_cause_subcomments || "");
+  el("correctiveAction").value = String(item.corrective_action || "");
+  el("correctiveActionComments").value = String(item.corrective_action_subcomments || "");
+  el("preventativeAction").value = String(item.preventative_action || "");
+  el("preventativeActionComments").value = String(item.preventative_action_subcomments || "");
 
-  localStorage.setItem(draftKey(item.id), JSON.stringify(d));
-  alert("Draft saved locally in this browser.");
+  openSubcommentsIfDataExists();
 }
 
-function clearDraft() {
+async function saveResponseFields() {
   const item = state.item;
   if (!item) return;
+  if (String(item.id).startsWith("legacy-")) {
+    alert("This item comes from the legacy table and cannot store response fields there. Re-import it into the new multi-item table first.");
+    return;
+  }
 
-  const ok = confirm("Clear local draft for this observation?");
-  if (!ok) return;
+  setSaveStatus("Saving…");
 
-  localStorage.removeItem(draftKey(item.id));
+  const payload = {
+    immediate_cause: String(el("immediateCause").value || "").trim() || null,
+    immediate_cause_subcomments: String(el("immediateCauseComments").value || "").trim() || null,
+    root_cause: String(el("rootCause").value || "").trim() || null,
+    root_cause_subcomments: String(el("rootCauseComments").value || "").trim() || null,
+    corrective_action: String(el("correctiveAction").value || "").trim() || null,
+    corrective_action_subcomments: String(el("correctiveActionComments").value || "").trim() || null,
+    preventative_action: String(el("preventativeAction").value || "").trim() || null,
+    preventative_action_subcomments: String(el("preventativeActionComments").value || "").trim() || null,
+  };
 
-  el("immediateCause").value = "";
-  el("immediateCauseComments").value = "";
-  el("rootCause").value = "";
-  el("rootCauseComments").value = "";
-  el("correctiveAction").value = "";
-  el("correctiveActionComments").value = "";
-  el("preventativeAction").value = "";
-  el("preventativeActionComments").value = "";
+  const { data, error } = await state.supabase
+    .from("post_inspection_observation_items")
+    .update(payload)
+    .eq("id", item.id)
+    .select("*")
+    .single();
+
+  if (error) {
+    console.error(error);
+    setSaveStatus("Error");
+    alert("Save failed: " + (error.message || String(error)));
+    return;
+  }
+
+  state.item = data;
+  loadResponseFields();
+  setSaveStatus("Saved");
+}
+
+async function reloadItemFromDb() {
+  const reportId = getUrlParam("report_id");
+  const itemId = getUrlParam("item_id");
+  if (!reportId || !itemId) return;
+
+  state.item = await loadObservationItem(reportId, itemId);
+  renderObservation();
+  loadResponseFields();
+  setSaveStatus("Loaded");
 }
 
 async function init() {
@@ -268,12 +294,21 @@ async function init() {
     window.location.href = "./post_inspection.html";
   });
 
-  renderObservation();
-  loadDraft();
+  document.querySelectorAll(".toggle-subcomment-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const target = btn.getAttribute("data-target");
+      const wrap = el(target);
+      if (!wrap) return;
+      wrap.classList.toggle("open");
+    });
+  });
 
-  el("saveDraftBtn").addEventListener("click", saveDraft);
-  el("reloadDraftBtn").addEventListener("click", loadDraft);
-  el("clearDraftBtn").addEventListener("click", clearDraft);
+  renderObservation();
+  loadResponseFields();
+  setSaveStatus("Loaded");
+
+  el("saveResponseBtn").addEventListener("click", saveResponseFields);
+  el("reloadResponseBtn").addEventListener("click", reloadItemFromDb);
 }
 
 (async () => {
