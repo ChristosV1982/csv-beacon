@@ -1,4 +1,4 @@
-const DETAIL_BUILD = "post_inspection_detail_v1_page_split_2026-04-07";
+const DETAIL_BUILD = "post_inspection_detail_v2_fix_vessel_and_examined_count_2026-04-07";
 const PDF_BUCKET_DEFAULT = "inspection-reports";
 const PDF_FOLDER_PREFIX = "post_inspections";
 const HUMAN_POSITIVE_FIXED_NOC = "Exceeded normal expectation.";
@@ -63,6 +63,23 @@ function obsRowTypeLabel(kind) {
 
 function getUrlParam(name) {
   return new URLSearchParams(window.location.search).get(name);
+}
+
+async function safeNavigate(candidates) {
+  const list = Array.isArray(candidates) ? candidates : [];
+  for (const url of list) {
+    try {
+      const r = await fetch(url, { method: "GET", cache: "no-store" });
+      if (r && r.ok) {
+        window.location.href = url;
+        return;
+      }
+    } catch {}
+  }
+  alert(
+    "Navigation failed.\n\nNone of these pages were found:\n" +
+      list.map((x) => `- ${x}`).join("\n"),
+  );
 }
 
 const HARDWARE_NOC_OPTIONS = [
@@ -162,6 +179,50 @@ function missingPgnoForItem(item) {
   return arr.length === 0;
 }
 
+function splitSocNocFromCombinedCoding(raw) {
+  const s = String(raw || "").trim();
+  if (!s) return { soc: "", noc: "" };
+  const idx = s.indexOf(":");
+  if (idx < 0) return { soc: s, noc: "" };
+  return {
+    soc: s.slice(0, idx).trim(),
+    noc: s.slice(idx + 1).trim(),
+  };
+}
+
+function normalizeImportedSocNocFields(designation, obsType, classificationCoding, natureOfConcern) {
+  const d = normDesignation(designation);
+  const k = String(obsType || "").trim().toLowerCase();
+  const cc = String(classificationCoding || "").trim();
+  const noc = String(natureOfConcern || "").trim();
+
+  if (d === "Human") {
+    if (k === "positive") {
+      return {
+        classification_coding: null,
+        nature_of_concern: HUMAN_POSITIVE_FIXED_NOC,
+      };
+    }
+    return {
+      classification_coding: cc || null,
+      nature_of_concern: noc || null,
+    };
+  }
+
+  const split = splitSocNocFromCombinedCoding(cc);
+  if (split.soc && split.noc) {
+    return {
+      classification_coding: split.soc || null,
+      nature_of_concern: split.noc || null,
+    };
+  }
+
+  return {
+    classification_coding: cc || null,
+    nature_of_concern: noc || null,
+  };
+}
+
 const state = {
   me: null,
   supabase: null,
@@ -187,6 +248,14 @@ async function loadVessels() {
     .order("name", { ascending: true });
   if (error) throw error;
   return data || [];
+}
+
+function findVesselByName(name) {
+  const target = String(name || "").trim().toLowerCase();
+  if (!target) return null;
+  return (state.vessels || []).find(
+    (v) => String(v.name || "").trim().toLowerCase() === target
+  ) || null;
 }
 
 function renderVesselsSelect() {
@@ -312,6 +381,21 @@ async function updateReportHeader(reportId, payload) {
   }
 }
 
+async function persistExaminedFields(reportId, examined_questions, examined_count) {
+  try {
+    const { error } = await state.supabase
+      .from("post_inspection_reports")
+      .update({
+        examined_questions,
+        examined_count,
+      })
+      .eq("id", reportId);
+    if (error) throw error;
+  } catch (e) {
+    console.warn("Could not persist examined fields", e);
+  }
+}
+
 async function deleteReport(reportId) {
   const { error } = await state.supabase
     .from("post_inspection_reports")
@@ -329,7 +413,22 @@ async function loadObservationItemsForReport(reportId) {
     .order("sort_index", { ascending: true })
     .order("created_at", { ascending: true });
   if (error) throw error;
-  return data || [];
+  return (data || []).map((row) => {
+    const normalized = normalizeImportedSocNocFields(
+      row.designation,
+      row.obs_type,
+      row.classification_coding,
+      row.nature_of_concern
+    );
+    return {
+      ...row,
+      question_no: canonicalQno(row.question_no || row.question_base || ""),
+      question_base: canonicalQno(row.question_base || row.question_no || ""),
+      designation: normDesignation(row.designation),
+      classification_coding: normalized.classification_coding,
+      nature_of_concern: normalized.nature_of_concern,
+    };
+  });
 }
 
 async function loadLegacyObservationsForReport(reportId) {
@@ -339,26 +438,44 @@ async function loadLegacyObservationsForReport(reportId) {
     .eq("report_id", reportId);
   if (error) throw error;
 
-  return (data || []).map((row, idx) => ({
-    id: `legacy-${reportId}-${row.question_no}-${idx}`,
-    report_id: row.report_id,
-    question_no: canonicalQno(row.question_no || row.question_base || ""),
-    question_base: canonicalQno(row.question_base || row.question_no || ""),
-    question_full: null,
-    has_observation: row.has_observation !== false,
-    observation_type: row.observation_type,
-    obs_type: row.obs_type ||
-      (row.observation_type === "negative_observation" ? "negative" :
-       row.observation_type === "positive_observation" ? "positive" : "largely"),
-    designation: normDesignation(row.designation),
-    positive_rank: row.positive_rank || null,
-    nature_of_concern: row.nature_of_concern || null,
-    classification_coding: row.classification_coding || null,
-    observation_text: row.observation_text || null,
-    remarks: row.remarks || null,
-    pgno_selected: Array.isArray(row.pgno_selected) ? row.pgno_selected : [],
-    sort_index: idx
-  }));
+  return (data || []).map((row, idx) => {
+    const obs_type =
+      row.obs_type ||
+      (row.observation_type === "negative_observation"
+        ? "negative"
+        : row.observation_type === "positive_observation"
+          ? "positive"
+          : "largely");
+
+    const normalized = normalizeImportedSocNocFields(
+      row.designation,
+      obs_type,
+      row.classification_coding,
+      row.nature_of_concern
+    );
+
+    return {
+      id: `legacy-${reportId}-${row.question_no}-${idx}`,
+      report_id: row.report_id,
+      question_no: canonicalQno(row.question_no || row.question_base || ""),
+      question_base: canonicalQno(row.question_base || row.question_no || ""),
+      question_full: null,
+      has_observation: row.has_observation !== false,
+      observation_type: row.observation_type,
+      obs_type,
+      designation: normDesignation(row.designation),
+      positive_rank: row.positive_rank || null,
+      nature_of_concern: normalized.nature_of_concern,
+      classification_coding: normalized.classification_coding,
+      observation_text: row.observation_text || null,
+      remarks: row.remarks || null,
+      pgno_selected: Array.isArray(row.pgno_selected) ? row.pgno_selected : [],
+      sort_index: idx,
+      page_hint: null,
+      source_excerpt: null,
+      confidence: null,
+    };
+  });
 }
 
 function rebuildExtractedItems() {
@@ -615,8 +732,18 @@ async function importReportPdfAiFromFile(file) {
   const examined_questions = Array.isArray(extracted.examined_questions) ? extracted.examined_questions : [];
   const examined_count = Number(extracted.examined_count || examined_questions.length || 0);
 
+  const extractedVesselName = String(h.vessel_name || "").trim();
+  const matchedVessel = findVesselByName(extractedVesselName);
+
+  if (extractedVesselName && !matchedVessel) {
+    throw new Error(
+      `Vessel from PDF not found in vessels table: "${extractedVesselName}". Add it first or correct the vessel list.`
+    );
+  }
+
   const payload = {
     ...headerInputs(),
+    vessel_id: matchedVessel?.id || headerInputs().vessel_id,
     port_name: String(h.port_name || headerInputs().port_name || "").trim() || null,
     port_code: String(h.port_code || headerInputs().port_code || "").trim() || null,
     ocimf_inspecting_company: String(h.ocimf_inspecting_company || headerInputs().ocimf_inspecting_company || "").trim() || null,
@@ -627,7 +754,9 @@ async function importReportPdfAiFromFile(file) {
     examined_count,
   };
 
-  if (!payload.vessel_id) throw new Error("Select vessel first.");
+  if (!payload.vessel_id) {
+    throw new Error("No vessel selected or matched from PDF.");
+  }
 
   let report;
   if (state.activeReport?.id) {
@@ -636,8 +765,22 @@ async function importReportPdfAiFromFile(file) {
     report = await createReportHeader(payload);
   }
 
-  state.activeReport = report;
-  loadReportIntoHeader(report);
+  await persistExaminedFields(report.id, examined_questions, examined_count);
+
+  state.activeReport = {
+    ...report,
+    vessel_id: payload.vessel_id,
+    port_name: payload.port_name,
+    port_code: payload.port_code,
+    ocimf_inspecting_company: payload.ocimf_inspecting_company,
+    report_ref: payload.report_ref,
+    inspection_date: payload.inspection_date,
+    pdf_storage_path: payload.pdf_storage_path,
+    examined_questions,
+    examined_count,
+  };
+
+  loadReportIntoHeader(state.activeReport);
   setActivePill("Loaded");
 
   await state.supabase.from("post_inspection_observation_items").delete().eq("report_id", report.id);
@@ -646,17 +789,12 @@ async function importReportPdfAiFromFile(file) {
     const item = obs[i];
     const designation = normDesignation(item.designation) || (item.obs_type === "positive" ? "Human" : null);
 
-    let classification_coding = String(item.classification_coding || "").trim() || null;
-    let nature_of_concern = String(item.nature_of_concern || "").trim() || null;
-
-    if (designation === "Human" && item.obs_type === "positive") {
-      classification_coding = null;
-      nature_of_concern = HUMAN_POSITIVE_FIXED_NOC;
-    } else if (designation !== "Human" && classification_coding && classification_coding.includes(":")) {
-      const idx = classification_coding.indexOf(":");
-      nature_of_concern = classification_coding.slice(idx + 1).trim() || nature_of_concern;
-      classification_coding = classification_coding.slice(0, idx).trim() || classification_coding;
-    }
+    const normalized = normalizeImportedSocNocFields(
+      designation,
+      item.obs_type,
+      item.classification_coding,
+      item.nature_of_concern
+    );
 
     const row = {
       report_id: report.id,
@@ -672,8 +810,8 @@ async function importReportPdfAiFromFile(file) {
       obs_type: String(item.obs_type || "").trim(),
       designation,
       positive_rank: String(item.positive_rank || "").trim() || null,
-      nature_of_concern,
-      classification_coding,
+      nature_of_concern: normalized.nature_of_concern,
+      classification_coding: normalized.classification_coding,
       observation_text: String(item.observation_text || "").trim() || null,
       remarks: String(item.observation_text || "").trim() || null,
       pgno_selected: [],
@@ -690,8 +828,14 @@ async function importReportPdfAiFromFile(file) {
   }
 
   const fresh = await loadReportById(report.id);
-  state.activeReport = fresh;
-  loadReportIntoHeader(fresh);
+  state.activeReport = {
+    ...fresh,
+    examined_questions,
+    examined_count,
+    vessel_id: payload.vessel_id,
+  };
+
+  loadReportIntoHeader(state.activeReport);
 
   let items = [];
   try {
@@ -706,6 +850,10 @@ async function importReportPdfAiFromFile(file) {
   renderObsTable();
   renderObsSummary();
   setSaveStatus("AI import done");
+
+  if (!getUrlParam("report_id") && report.id) {
+    window.history.replaceState({}, "", `./post_inspection_detail.html?report_id=${encodeURIComponent(report.id)}`);
+  }
 }
 
 function buildExportPayload() {
@@ -753,6 +901,17 @@ async function importJsonFile(file) {
     if (error) throw error;
   }
 
+  if (payload?.report_header?.examined_questions || payload?.report_header?.examined_count) {
+    const examined_questions = Array.isArray(payload.report_header.examined_questions)
+      ? payload.report_header.examined_questions
+      : [];
+    const examined_count = Number(payload.report_header.examined_count || examined_questions.length || 0);
+
+    await persistExaminedFields(state.activeReport.id, examined_questions, examined_count);
+    state.activeReport.examined_questions = examined_questions;
+    state.activeReport.examined_count = examined_count;
+  }
+
   let freshItems = [];
   try {
     freshItems = await loadObservationItemsForReport(state.activeReport.id);
@@ -777,13 +936,25 @@ async function saveHeader() {
 
   let report;
   if (state.activeReport?.id) {
-    report = await updateReportHeader(state.activeReport.id, payload);
+    report = await updateReportHeader(state.activeReport.id, {
+      ...payload,
+      examined_questions: state.activeReport.examined_questions || [],
+      examined_count: state.activeReport.examined_count || 0,
+    });
   } else {
-    report = await createReportHeader(payload);
+    report = await createReportHeader({
+      ...payload,
+      examined_questions: state.activeReport?.examined_questions || [],
+      examined_count: state.activeReport?.examined_count || 0,
+    });
   }
 
-  state.activeReport = report;
-  loadReportIntoHeader(report);
+  state.activeReport = {
+    ...state.activeReport,
+    ...report,
+  };
+
+  loadReportIntoHeader(state.activeReport);
   setActivePill("Loaded");
   setSaveStatus("Saved");
 
