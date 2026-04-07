@@ -4,7 +4,7 @@ import { loadLockedLibraryJson } from "./question_library_loader.js";
  * HARD BUILD STAMP
  */
 const POST_INSPECTION_BUILD =
-  "post_inspection_ui_v34_soc_noc_split_left_aligned_2026-04-07";
+  "post_inspection_ui_v35_soc_noc_import_autoselect_fix_2026-04-07";
 
 /**
  * Locked library JSON
@@ -207,23 +207,41 @@ function getNocOptionsByDesignation(designation) {
   return [];
 }
 
-function splitSocNocFromClassification(item) {
-  const d = normDesignation(item?.designation);
+function splitSocNocFromCombinedCoding(raw) {
+  const s = String(raw || "").trim();
+  if (!s) return { soc: "", noc: "" };
+  const idx = s.indexOf(":");
+  if (idx < 0) return { soc: s, noc: "" };
+  return {
+    soc: s.slice(0, idx).trim(),
+    noc: s.slice(idx + 1).trim(),
+  };
+}
+
+function normalizeImportedSocNocFields(designation, classificationCoding, natureOfConcern) {
+  const d = normDesignation(designation);
+  const cc = String(classificationCoding || "").trim();
+  const noc = String(natureOfConcern || "").trim();
+
   if (d === "Human") {
-    return { soc: "", noc: "" };
+    return {
+      classification_coding: cc || null,
+      nature_of_concern: noc || null,
+    };
   }
 
-  const raw = String(item?.classification_coding || "").trim();
-  if (!raw) return { soc: "", noc: "" };
-
-  const idx = raw.indexOf(":");
-  if (idx < 0) {
-    return { soc: raw, noc: "" };
+  const split = splitSocNocFromCombinedCoding(cc);
+  if (split.soc && split.noc) {
+    return {
+      classification_coding: split.soc || null,
+      nature_of_concern: split.noc || null,
+    };
   }
 
-  const soc = raw.slice(0, idx).trim();
-  const noc = raw.slice(idx + 1).trim();
-  return { soc, noc };
+  return {
+    classification_coding: cc || null,
+    nature_of_concern: noc || null,
+  };
 }
 
 function humanSocFromItem(item) {
@@ -260,8 +278,7 @@ function socDisplay(item) {
     return humanSocFromItem(item);
   }
 
-  const split = splitSocNocFromClassification(item);
-  return split.soc || String(item.classification_coding || "").trim();
+  return String(item.classification_coding || "").trim();
 }
 
 function nocDisplay(item) {
@@ -273,11 +290,7 @@ function nocDisplay(item) {
     return arr.join(" | ");
   }
 
-  const direct = String(item.nature_of_concern || "").trim();
-  if (direct) return direct;
-
-  const split = splitSocNocFromClassification(item);
-  return split.noc || "";
+  return String(item.nature_of_concern || "").trim();
 }
 
 function supportingCommentDisplay(item) {
@@ -565,6 +578,13 @@ async function loadLegacyObservationsForReport(reportId) {
 }
 
 function normalizeObservationItemFromDb(row) {
+  const designation = normDesignation(row.designation);
+  const normalized = normalizeImportedSocNocFields(
+    designation,
+    row.classification_coding,
+    row.nature_of_concern,
+  );
+
   return {
     id: row.id,
     report_id: row.report_id,
@@ -574,10 +594,10 @@ function normalizeObservationItemFromDb(row) {
     has_observation: row.has_observation !== false,
     observation_type: String(row.observation_type || "").trim(),
     obs_type: String(row.obs_type || "").trim(),
-    designation: normDesignation(row.designation),
+    designation,
     positive_rank: String(row.positive_rank || "").trim() || null,
-    nature_of_concern: String(row.nature_of_concern || "").trim() || null,
-    classification_coding: String(row.classification_coding || "").trim() || null,
+    nature_of_concern: String(normalized.nature_of_concern || "").trim() || null,
+    classification_coding: String(normalized.classification_coding || "").trim() || null,
     observation_text: String(row.observation_text || "").trim() || null,
     remarks: String(row.remarks || "").trim() || null,
     pgno_selected: Array.isArray(row.pgno_selected) ? row.pgno_selected : [],
@@ -600,6 +620,12 @@ async function deleteObservationItemsForReport(reportId) {
 }
 
 async function insertObservationItem(row) {
+  const normalized = normalizeImportedSocNocFields(
+    row.designation,
+    row.classification_coding,
+    row.nature_of_concern,
+  );
+
   const payload = {
     report_id: row.report_id,
     question_no: row.question_no,
@@ -610,8 +636,8 @@ async function insertObservationItem(row) {
     obs_type: row.obs_type,
     designation: row.designation || null,
     positive_rank: row.positive_rank || null,
-    nature_of_concern: row.nature_of_concern || null,
-    classification_coding: row.classification_coding || null,
+    nature_of_concern: normalized.nature_of_concern,
+    classification_coding: normalized.classification_coding,
     observation_text: row.observation_text || null,
     remarks: row.remarks || null,
     pgno_selected: Array.isArray(row.pgno_selected) ? row.pgno_selected : [],
@@ -636,6 +662,12 @@ async function updateObservationItem(row) {
     return await insertObservationItem(row);
   }
 
+  const normalized = normalizeImportedSocNocFields(
+    row.designation,
+    row.classification_coding,
+    row.nature_of_concern,
+  );
+
   const payload = {
     question_no: row.question_no,
     question_base: row.question_base || row.question_no,
@@ -645,8 +677,8 @@ async function updateObservationItem(row) {
     obs_type: row.obs_type,
     designation: row.designation || null,
     positive_rank: row.positive_rank || null,
-    nature_of_concern: row.nature_of_concern || null,
-    classification_coding: row.classification_coding || null,
+    nature_of_concern: normalized.nature_of_concern,
+    classification_coding: normalized.classification_coding,
     observation_text: row.observation_text || null,
     remarks: row.remarks || null,
     pgno_selected: Array.isArray(row.pgno_selected) ? row.pgno_selected : [],
@@ -1763,6 +1795,13 @@ async function importReportPdfAiFromFile(file) {
         k === "positive" ? "positive" :
         "largely";
 
+      const designation = normDesignation(item?.designation) || (k === "positive" ? "Human" : null);
+      const normalized = normalizeImportedSocNocFields(
+        designation,
+        item?.classification_coding,
+        item?.nature_of_concern,
+      );
+
       const row = {
         report_id: report.id,
         question_no: canonicalQno(qno),
@@ -1771,10 +1810,10 @@ async function importReportPdfAiFromFile(file) {
         has_observation: true,
         observation_type,
         obs_type,
-        designation: normDesignation(item?.designation) || (k === "positive" ? "Human" : null),
+        designation,
         positive_rank: String(item?.positive_rank || "").trim() || null,
-        nature_of_concern: String(item?.nature_of_concern || "").trim() || null,
-        classification_coding: String(item?.classification_coding || "").trim() || null,
+        nature_of_concern: normalized.nature_of_concern,
+        classification_coding: normalized.classification_coding,
         observation_text: String(item?.observation_text || "").trim() || null,
         remarks: String(item?.observation_text || "").trim() || null,
         pgno_selected: [],
@@ -1902,6 +1941,12 @@ async function importJsonFile(file) {
     const inserted = [];
     for (let i = 0; i < items.length; i++) {
       const x = items[i];
+      const normalized = normalizeImportedSocNocFields(
+        x.designation,
+        x.classification_coding,
+        x.nature_of_concern,
+      );
+
       const row = {
         report_id: state.activeReport.id,
         question_no: canonicalQno(x.question_no || x.question_base || ""),
@@ -1912,8 +1957,8 @@ async function importJsonFile(file) {
         obs_type: String(x.obs_type || "").trim(),
         designation: normDesignation(x.designation),
         positive_rank: String(x.positive_rank || "").trim() || null,
-        nature_of_concern: String(x.nature_of_concern || "").trim() || null,
-        classification_coding: String(x.classification_coding || "").trim() || null,
+        nature_of_concern: normalized.nature_of_concern,
+        classification_coding: normalized.classification_coding,
         observation_text: String(x.observation_text || "").trim() || null,
         remarks: String(x.remarks || "").trim() || null,
         pgno_selected: Array.isArray(x.pgno_selected) ? x.pgno_selected : [],
