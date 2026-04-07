@@ -1,4 +1,4 @@
-const DETAIL_BUILD = "post_inspection_detail_v2_fix_vessel_and_examined_count_2026-04-07";
+const DETAIL_BUILD = "post_inspection_detail_v3_restore_examined_from_local_cache_2026-04-07";
 const PDF_BUCKET_DEFAULT = "inspection-reports";
 const PDF_FOLDER_PREFIX = "post_inspections";
 const HUMAN_POSITIVE_FIXED_NOC = "Exceeded normal expectation.";
@@ -82,28 +82,41 @@ async function safeNavigate(candidates) {
   );
 }
 
-const HARDWARE_NOC_OPTIONS = [
-  "Maintenance task available – not completed",
-  "Maintenance task available – records incompatible with condition seen",
-  "No maintenance task developed",
-  "Maintenance deferred – awaiting spares",
-  "Maintenance deferred – awaiting technician",
-  "Maintenance deferred – awaiting out of service / gas free",
-  "Sudden failure – maintenance tasks available and up to date",
-  "Other - text",
-];
+function examinedCacheKey(reportId) {
+  return `post_inspection_examined_cache_${reportId}`;
+}
 
-const PROCESS_NOC_OPTIONS = [
-  "No procedure",
-  "Procedure not present/available/accessible",
-  "Too many/conflicting procedures",
-  "Procedure clarity and understandability",
-  "Procedure accuracy/correctness",
-  "Procedure realism/feasibility/suitability",
-  "Procedure completeness/validity/version",
-  "Communication of procedure/practice updates",
-  "Other - text",
-];
+function saveExaminedCache(reportId, examined_questions, examined_count) {
+  if (!reportId) return;
+  try {
+    localStorage.setItem(
+      examinedCacheKey(reportId),
+      JSON.stringify({
+        examined_questions: Array.isArray(examined_questions) ? examined_questions : [],
+        examined_count: Number(examined_count || 0),
+        saved_at: nowIso(),
+      })
+    );
+  } catch (e) {
+    console.warn("saveExaminedCache failed", e);
+  }
+}
+
+function loadExaminedCache(reportId) {
+  if (!reportId) return null;
+  try {
+    const raw = localStorage.getItem(examinedCacheKey(reportId));
+    if (!raw) return null;
+    const obj = JSON.parse(raw);
+    return {
+      examined_questions: Array.isArray(obj?.examined_questions) ? obj.examined_questions : [],
+      examined_count: Number(obj?.examined_count || 0),
+    };
+  } catch (e) {
+    console.warn("loadExaminedCache failed", e);
+    return null;
+  }
+}
 
 const HUMAN_PIF_OPTIONS = [
   "1. Recognition of safety criticality of the task or associated steps",
@@ -382,6 +395,7 @@ async function updateReportHeader(reportId, payload) {
 }
 
 async function persistExaminedFields(reportId, examined_questions, examined_count) {
+  saveExaminedCache(reportId, examined_questions, examined_count);
   try {
     const { error } = await state.supabase
       .from("post_inspection_reports")
@@ -394,6 +408,22 @@ async function persistExaminedFields(reportId, examined_questions, examined_coun
   } catch (e) {
     console.warn("Could not persist examined fields", e);
   }
+}
+
+function applyExaminedFallback(report) {
+  if (!report?.id) return report;
+  const count = Number(report.examined_count || 0);
+  const arr = Array.isArray(report.examined_questions) ? report.examined_questions : [];
+  if (count > 0 || arr.length > 0) return report;
+
+  const cached = loadExaminedCache(report.id);
+  if (!cached) return report;
+
+  return {
+    ...report,
+    examined_questions: cached.examined_questions,
+    examined_count: Number(cached.examined_count || cached.examined_questions.length || 0),
+  };
 }
 
 async function deleteReport(reportId) {
@@ -780,6 +810,8 @@ async function importReportPdfAiFromFile(file) {
     examined_count,
   };
 
+  saveExaminedCache(report.id, examined_questions, examined_count);
+
   loadReportIntoHeader(state.activeReport);
   setActivePill("Loaded");
 
@@ -828,12 +860,10 @@ async function importReportPdfAiFromFile(file) {
   }
 
   const fresh = await loadReportById(report.id);
-  state.activeReport = {
+  state.activeReport = applyExaminedFallback({
     ...fresh,
-    examined_questions,
-    examined_count,
     vessel_id: payload.vessel_id,
-  };
+  });
 
   loadReportIntoHeader(state.activeReport);
 
@@ -910,6 +940,7 @@ async function importJsonFile(file) {
     await persistExaminedFields(state.activeReport.id, examined_questions, examined_count);
     state.activeReport.examined_questions = examined_questions;
     state.activeReport.examined_count = examined_count;
+    saveExaminedCache(state.activeReport.id, examined_questions, examined_count);
   }
 
   let freshItems = [];
@@ -934,25 +965,32 @@ async function saveHeader() {
 
   setSaveStatus("Saving…");
 
+  const examined_questions = state.activeReport?.examined_questions || [];
+  const examined_count = Number(state.activeReport?.examined_count || examined_questions.length || 0);
+
   let report;
   if (state.activeReport?.id) {
     report = await updateReportHeader(state.activeReport.id, {
       ...payload,
-      examined_questions: state.activeReport.examined_questions || [],
-      examined_count: state.activeReport.examined_count || 0,
+      examined_questions,
+      examined_count,
     });
   } else {
     report = await createReportHeader({
       ...payload,
-      examined_questions: state.activeReport?.examined_questions || [],
-      examined_count: state.activeReport?.examined_count || 0,
+      examined_questions,
+      examined_count,
     });
   }
 
-  state.activeReport = {
+  state.activeReport = applyExaminedFallback({
     ...state.activeReport,
     ...report,
-  };
+    examined_questions,
+    examined_count,
+  });
+
+  saveExaminedCache(report.id, examined_questions, examined_count);
 
   loadReportIntoHeader(state.activeReport);
   setActivePill("Loaded");
@@ -1065,7 +1103,8 @@ async function init() {
 
   const reportId = getUrlParam("report_id");
   if (reportId) {
-    state.activeReport = await loadReportById(reportId);
+    const loaded = await loadReportById(reportId);
+    state.activeReport = applyExaminedFallback(loaded);
     loadReportIntoHeader(state.activeReport);
     setActivePill("Loaded");
 
