@@ -66,7 +66,6 @@
       margin-top:16px;
     }
 
-    /* Header fields grid */
     .pi-fields{
       display:grid;
       grid-template-columns: 260px 1fr 220px 1fr 220px 1fr;
@@ -93,7 +92,6 @@
     .pi-span3{ grid-column: span 3; }
     .pi-span6{ grid-column: 1 / -1; }
 
-    /* Actions row */
     .pi-actions{
       display:flex; gap:10px; flex-wrap:wrap;
       margin-top:12px;
@@ -101,7 +99,6 @@
       border-top:1px solid #e5eefc;
     }
 
-    /* Buttons */
     .btn{
       border-radius:12px !important;
       padding:9px 12px !important;
@@ -128,7 +125,6 @@
       color:#143a63 !important;
     }
 
-    /* Stored inspections */
     .stored-note{
       margin:-2px 0 10px;
       color:#143a63;
@@ -203,16 +199,31 @@
       overflow:auto;
       background:#fff;
     }
+
+    /* FIXED: keep inputs at left edge, not centered */
     .chk-row{
       display:flex;
       gap:10px;
-      align-items:center;
+      align-items:flex-start;
+      justify-content:flex-start;
       padding:8px 6px;
       border-bottom:1px dashed #e6eefc;
       font-weight:700;
       color:#0c1b2a;
+      text-align:left;
     }
     .chk-row:last-child{ border-bottom:none; }
+    .chk-row input{
+      flex:0 0 auto;
+      margin:3px 0 0 0;
+    }
+    .chk-row span{
+      flex:1 1 auto;
+      text-align:left;
+      white-space:normal;
+      word-break:break-word;
+      line-height:1.35;
+    }
 
     .dlg-search{
       width:100%;
@@ -447,7 +458,7 @@
         <div style="margin-top:10px; color:#0f3a63; font-weight:800;">
           <ul style="margin:0; padding-left:18px;">
             <li><b>Negative</b>: Category + SOC + NOC + Supporting Comment. Requires PGNO.</li>
-            <li><b>Positive</b>: Keep Question No as KPI dimension and record Human/Process/Hardware category as extracted. No PGNO.</li>
+            <li><b>Positive</b>: Keep Question No as KPI dimension and record Category / SOC / NOC as extracted.</li>
             <li><b>Largely as expected</b>: Category + SOC + NOC + Supporting Comment. KPI item. <b>Requires PGNO.</b></li>
           </ul>
           <div style="margin-top:8px;">

@@ -4,7 +4,7 @@ import { loadLockedLibraryJson } from "./question_library_loader.js";
  * HARD BUILD STAMP
  */
 const POST_INSPECTION_BUILD =
-  "post_inspection_ui_v33_soc_noc_kpi_2026-04-07";
+  "post_inspection_ui_v34_soc_noc_split_left_aligned_2026-04-07";
 
 /**
  * Locked library JSON
@@ -150,7 +150,6 @@ async function safeNavigate(candidates) {
   );
 }
 
-
 /* ---------- SIRE 2.0 official SOC / NOC helpers ---------- */
 
 const HARDWARE_NOC_OPTIONS = [
@@ -208,6 +207,25 @@ function getNocOptionsByDesignation(designation) {
   return [];
 }
 
+function splitSocNocFromClassification(item) {
+  const d = normDesignation(item?.designation);
+  if (d === "Human") {
+    return { soc: "", noc: "" };
+  }
+
+  const raw = String(item?.classification_coding || "").trim();
+  if (!raw) return { soc: "", noc: "" };
+
+  const idx = raw.indexOf(":");
+  if (idx < 0) {
+    return { soc: raw, noc: "" };
+  }
+
+  const soc = raw.slice(0, idx).trim();
+  const noc = raw.slice(idx + 1).trim();
+  return { soc, noc };
+}
+
 function humanSocFromItem(item) {
   const direct = String(item?.positive_rank || "").trim();
   if (direct) return direct;
@@ -237,20 +255,29 @@ function humanPifsFromItem(item) {
 function socDisplay(item) {
   if (!item) return "";
   const d = normDesignation(item.designation);
+
   if (d === "Human") {
     return humanSocFromItem(item);
   }
-  return String(item.classification_coding || "").trim();
+
+  const split = splitSocNocFromClassification(item);
+  return split.soc || String(item.classification_coding || "").trim();
 }
 
 function nocDisplay(item) {
   if (!item) return "";
   const d = normDesignation(item.designation);
+
   if (d === "Human") {
     const arr = humanPifsFromItem(item);
     return arr.join(" | ");
   }
-  return String(item.nature_of_concern || "").trim();
+
+  const direct = String(item.nature_of_concern || "").trim();
+  if (direct) return direct;
+
+  const split = splitSocNocFromClassification(item);
+  return split.noc || "";
 }
 
 function supportingCommentDisplay(item) {
@@ -287,7 +314,6 @@ const state = {
   reports: [],
   activeReport: null,
 
-  // NEW canonical in-app model
   observationItems: [],
   extractedItems: [],
   dialogItemId: null,
@@ -973,7 +999,6 @@ async function setActiveReportById(reportId) {
 
   loadReportIntoHeader(rep);
 
-  // NEW table first
   let items = [];
   try {
     items = await loadObservationItemsForReport(rep.id);
@@ -981,7 +1006,6 @@ async function setActiveReportById(reportId) {
     console.error("loadObservationItemsForReport failed", e);
   }
 
-  // fallback to legacy only if new table empty
   if (!items.length) {
     try {
       items = await loadLegacyObservationsForReport(rep.id);
@@ -1334,7 +1358,7 @@ function openObsDialog(itemId) {
       <div class="pi-field" style="margin-top:10px;">
         <label>Nature of Concern (NOC) — Human PIF(s)</label>
         <div class="chk-list" id="dlgHumanPifList">
-          ${HUMAN_PIF_OPTIONS.map((opt, idx) => `
+          ${HUMAN_PIF_OPTIONS.map((opt) => `
             <label class="chk-row">
               <input type="checkbox" class="dlgHumanPifChk" data-pif="${esc(opt)}" ${selectedPifs.has(opt) ? "checked" : ""}/>
               <span>${esc(opt)}</span>
@@ -1702,12 +1726,10 @@ async function importReportPdfAiFromFile(file) {
     el("inspectorCompany").value = "";
   }
 
-  // clear current items for this report in NEW table only
   setSaveStatus("Replacing extracted items…");
   await yieldUI();
   await deleteObservationItemsForReport(report.id);
 
-  // now insert all extracted items
   setSaveStatus(`Saving ${obs.length} item(s)…`);
   await yieldUI();
 
@@ -1875,7 +1897,6 @@ async function importJsonFile(file) {
     const items = Array.isArray(payload?.observation_items) ? payload.observation_items : [];
     const examined = payload?.examined;
 
-    // replace current new-table items for this report
     await deleteObservationItemsForReport(state.activeReport.id);
 
     const inserted = [];
@@ -2033,7 +2054,6 @@ async function init() {
     await safeNavigate(["./mode_selection.html", "./mode-selection.html", "./index.html", "./"]);
   });
 
-  // titles
   state.titles = loadTitles();
   renderTitleSelect();
   el("manageTitlesBtn").addEventListener("click", openTitlesModal);
@@ -2115,15 +2135,12 @@ async function init() {
     renderStoredTable();
   });
 
-  // header buttons
   el("newReportBtn").addEventListener("click", handleNewReport);
   el("saveHeaderBtn").addEventListener("click", handleSaveHeader);
   el("deleteReportBtn").addEventListener("click", handleDeleteReport);
 
-  // download PDF
   el("downloadPdfBtn").addEventListener("click", downloadActivePdf);
 
-  // import PDF
   el("importPdfBtn").addEventListener("click", () => el("importPdfFile").click());
   el("importPdfFile").addEventListener("change", async (e) => {
     const f = e.target.files && e.target.files[0];
@@ -2139,7 +2156,6 @@ async function init() {
     }
   });
 
-  // export / import JSON
   el("exportBtn").addEventListener("click", exportJson);
   el("importBtn").addEventListener("click", () => el("importFile").click());
   el("importFile").addEventListener("change", async (e) => {
@@ -2151,21 +2167,17 @@ async function init() {
     }
   });
 
-  // KPIs + finalize
   el("statsBtn").addEventListener("click", renderKpis);
   el("finalizeBtn").addEventListener("click", finalizeCheck);
   el("closeStatsBtn").addEventListener("click", () => el("statsDialog").close());
 
-  // manual
   el("addManualBtn").addEventListener("click", addManualItem);
 
-  // extracted filters
   el("obsSearch").addEventListener("input", renderObsTable);
   el("obsTypeFilter").addEventListener("change", renderObsTable);
   el("obsDesignationFilter").addEventListener("change", renderObsTable);
   el("onlyMissingPgno").addEventListener("change", renderObsTable);
 
-  // dialog
   el("dlgCancelBtn").addEventListener("click", closeObsDialog);
   el("dlgSaveBtn").addEventListener("click", saveObsDialog);
 
