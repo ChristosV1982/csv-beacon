@@ -4,7 +4,7 @@ import { loadLockedLibraryJson } from "./question_library_loader.js";
  * HARD BUILD STAMP
  */
 const POST_INSPECTION_BUILD =
-  "post_inspection_ui_v35_soc_noc_import_autoselect_fix_2026-04-07";
+  "post_inspection_ui_v36_human_positive_fixed_noc_2026-04-07";
 
 /**
  * Locked library JSON
@@ -26,6 +26,8 @@ const DEFAULT_TITLES = [
   "Company Audit",
   "Third Party Audit",
 ];
+
+const HUMAN_POSITIVE_FIXED_NOC = "Exceeded normal expectation.";
 
 function el(id) {
   return document.getElementById(id);
@@ -207,6 +209,12 @@ function getNocOptionsByDesignation(designation) {
   return [];
 }
 
+function isHumanPositive(itemOrFields) {
+  const designation = normDesignation(itemOrFields?.designation);
+  const obsType = String(itemOrFields?.obs_type || "").trim().toLowerCase();
+  return designation === "Human" && obsType === "positive";
+}
+
 function splitSocNocFromCombinedCoding(raw) {
   const s = String(raw || "").trim();
   if (!s) return { soc: "", noc: "" };
@@ -218,12 +226,20 @@ function splitSocNocFromCombinedCoding(raw) {
   };
 }
 
-function normalizeImportedSocNocFields(designation, classificationCoding, natureOfConcern) {
+function normalizeImportedSocNocFields(designation, obsType, classificationCoding, natureOfConcern) {
   const d = normDesignation(designation);
+  const k = String(obsType || "").trim().toLowerCase();
   const cc = String(classificationCoding || "").trim();
   const noc = String(natureOfConcern || "").trim();
 
   if (d === "Human") {
+    if (k === "positive") {
+      return {
+        classification_coding: null,
+        nature_of_concern: HUMAN_POSITIVE_FIXED_NOC,
+      };
+    }
+
     return {
       classification_coding: cc || null,
       nature_of_concern: noc || null,
@@ -259,6 +275,8 @@ function humanSocFromItem(item) {
 }
 
 function humanPifsFromItem(item) {
+  if (isHumanPositive(item)) return [];
+
   const candidates = [];
   const cc = String(item?.classification_coding || "").trim();
   const noc = String(item?.nature_of_concern || "").trim();
@@ -286,6 +304,7 @@ function nocDisplay(item) {
   const d = normDesignation(item.designation);
 
   if (d === "Human") {
+    if (isHumanPositive(item)) return HUMAN_POSITIVE_FIXED_NOC;
     const arr = humanPifsFromItem(item);
     return arr.join(" | ");
   }
@@ -579,8 +598,10 @@ async function loadLegacyObservationsForReport(reportId) {
 
 function normalizeObservationItemFromDb(row) {
   const designation = normDesignation(row.designation);
+  const obsType = String(row.obs_type || "").trim().toLowerCase();
   const normalized = normalizeImportedSocNocFields(
     designation,
+    obsType,
     row.classification_coding,
     row.nature_of_concern,
   );
@@ -593,7 +614,7 @@ function normalizeObservationItemFromDb(row) {
     question_full: String(row.question_full || "").trim() || null,
     has_observation: row.has_observation !== false,
     observation_type: String(row.observation_type || "").trim(),
-    obs_type: String(row.obs_type || "").trim(),
+    obs_type: obsType,
     designation,
     positive_rank: String(row.positive_rank || "").trim() || null,
     nature_of_concern: String(normalized.nature_of_concern || "").trim() || null,
@@ -622,6 +643,7 @@ async function deleteObservationItemsForReport(reportId) {
 async function insertObservationItem(row) {
   const normalized = normalizeImportedSocNocFields(
     row.designation,
+    row.obs_type,
     row.classification_coding,
     row.nature_of_concern,
   );
@@ -664,6 +686,7 @@ async function updateObservationItem(row) {
 
   const normalized = normalizeImportedSocNocFields(
     row.designation,
+    row.obs_type,
     row.classification_coding,
     row.nature_of_concern,
   );
@@ -1385,20 +1408,29 @@ function openObsDialog(itemId) {
 
   let nocHtml = "";
   if (designation === "Human") {
-    const selectedPifs = new Set(humanPifsFromItem(item));
-    nocHtml = `
-      <div class="pi-field" style="margin-top:10px;">
-        <label>Nature of Concern (NOC) — Human PIF(s)</label>
-        <div class="chk-list" id="dlgHumanPifList">
-          ${HUMAN_PIF_OPTIONS.map((opt) => `
-            <label class="chk-row">
-              <input type="checkbox" class="dlgHumanPifChk" data-pif="${esc(opt)}" ${selectedPifs.has(opt) ? "checked" : ""}/>
-              <span>${esc(opt)}</span>
-            </label>
-          `).join("")}
+    if (isHumanPositive(item)) {
+      nocHtml = `
+        <div class="pi-field" style="margin-top:10px;">
+          <label>Nature of Concern (NOC)</label>
+          <input id="dlgHumanPositiveNoc" type="text" value="${esc(HUMAN_POSITIVE_FIXED_NOC)}" readonly />
         </div>
-      </div>
-    `;
+      `;
+    } else {
+      const selectedPifs = new Set(humanPifsFromItem(item));
+      nocHtml = `
+        <div class="pi-field" style="margin-top:10px;">
+          <label>Nature of Concern (NOC) — Human PIF(s)</label>
+          <div class="chk-list" id="dlgHumanPifList">
+            ${HUMAN_PIF_OPTIONS.map((opt) => `
+              <label class="chk-row">
+                <input type="checkbox" class="dlgHumanPifChk" data-pif="${esc(opt)}" ${selectedPifs.has(opt) ? "checked" : ""}/>
+                <span>${esc(opt)}</span>
+              </label>
+            `).join("")}
+          </div>
+        </div>
+      `;
+    }
   } else {
     const options = getNocOptionsByDesignation(designation);
     nocHtml = `
@@ -1462,14 +1494,18 @@ async function saveObsDialog() {
   if (designation === "Human") {
     updatedSoc = String(el("dlgHumanSoc")?.value || "").trim();
 
-    const pifs = [];
-    document.querySelectorAll(".dlgHumanPifChk").forEach((chk) => {
-      if (chk.checked) {
-        const val = String(chk.getAttribute("data-pif") || "").trim();
-        if (val) pifs.push(val);
-      }
-    });
-    updatedNoc = pifs.join(" | ");
+    if (isHumanPositive(item)) {
+      updatedNoc = HUMAN_POSITIVE_FIXED_NOC;
+    } else {
+      const pifs = [];
+      document.querySelectorAll(".dlgHumanPifChk").forEach((chk) => {
+        if (chk.checked) {
+          const val = String(chk.getAttribute("data-pif") || "").trim();
+          if (val) pifs.push(val);
+        }
+      });
+      updatedNoc = pifs.join(" | ");
+    }
   } else {
     updatedSoc = String(el("dlgSocText")?.value || "").trim();
 
@@ -1499,9 +1535,15 @@ async function saveObsDialog() {
 
   if (designation === "Human") {
     updated.positive_rank = updatedSoc || null;
-    updated.classification_coding = updatedNoc || null;
-    if (!String(updated.nature_of_concern || "").trim()) {
-      updated.nature_of_concern = null;
+
+    if (isHumanPositive(item)) {
+      updated.classification_coding = null;
+      updated.nature_of_concern = HUMAN_POSITIVE_FIXED_NOC;
+    } else {
+      updated.classification_coding = updatedNoc || null;
+      if (!String(updated.nature_of_concern || "").trim()) {
+        updated.nature_of_concern = null;
+      }
     }
   } else {
     updated.classification_coding = updatedSoc || null;
@@ -1571,10 +1613,14 @@ async function addManualItem() {
       "Junior Deck Officer",
     ) || "";
 
-    noc = prompt(
-      "Human NOC / PIF(s). Enter one or more exactly as listed, separated by | :\n\n" + HUMAN_PIF_OPTIONS.join("\n"),
-      "1. Recognition of safety criticality of the task or associated steps | 3. Procedures accessible, helpful, understood and accurate for task",
-    ) || "";
+    if (kind === "positive") {
+      noc = HUMAN_POSITIVE_FIXED_NOC;
+    } else {
+      noc = prompt(
+        "Human NOC / PIF(s). Enter one or more exactly as listed, separated by | :\n\n" + HUMAN_PIF_OPTIONS.join("\n"),
+        "1. Recognition of safety criticality of the task or associated steps | 3. Procedures accessible, helpful, understood and accurate for task",
+      ) || "";
+    }
   } else {
     soc = prompt(
       `${designation} SOC (copy exactly from the report / coded menu):`,
@@ -1600,8 +1646,10 @@ async function addManualItem() {
     obs_type,
     designation: designation || null,
     positive_rank: designation === "Human" ? (String(humanRank).trim() || null) : null,
-    nature_of_concern: designation === "Human" ? null : (String(noc).trim() || null),
-    classification_coding: designation === "Human" ? (String(noc).trim() || null) : (String(soc).trim() || null),
+    nature_of_concern: designation === "Human" ? String(noc).trim() || null : String(noc).trim() || null,
+    classification_coding: designation === "Human"
+      ? (kind === "positive" ? null : (String(noc).trim() || null))
+      : (String(soc).trim() || null),
     observation_text: String(text).trim() || null,
     remarks: String(text).trim() || null,
     pgno_selected: [],
@@ -1798,6 +1846,7 @@ async function importReportPdfAiFromFile(file) {
       const designation = normDesignation(item?.designation) || (k === "positive" ? "Human" : null);
       const normalized = normalizeImportedSocNocFields(
         designation,
+        obs_type,
         item?.classification_coding,
         item?.nature_of_concern,
       );
@@ -1943,6 +1992,7 @@ async function importJsonFile(file) {
       const x = items[i];
       const normalized = normalizeImportedSocNocFields(
         x.designation,
+        x.obs_type,
         x.classification_coding,
         x.nature_of_concern,
       );
