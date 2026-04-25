@@ -1,6 +1,6 @@
 import { loadLockedLibraryJson } from "./question_library_loader.js";
 
-const OBS_DETAIL_BUILD = "post_inspection_observation_detail_v4_overdue_and_configurable_roles_2026-04-25";
+const OBS_DETAIL_BUILD = "post_inspection_observation_detail_v5_overdue_configurable_roles_pgno_merge_fix_2026-04-25";
 const HUMAN_POSITIVE_FIXED_NOC = "Exceeded normal expectation.";
 const LOCKED_LIBRARY_JSON = "./sire_questions_all_columns_named.json";
 
@@ -456,11 +456,50 @@ function getPgnoBullets(questionObj) {
   const pgTxt = String(questionObj?.["Potential Grounds for Negative Observations"] || "").trim();
   if (!pgTxt) return [];
 
-  return pgTxt
+  const rawLines = pgTxt
     .split("\n")
     .map((s) => s.trim())
-    .filter(Boolean)
-    .filter((s) => s.length > 6);
+    .filter(Boolean);
+
+  const merged = [];
+  let current = "";
+
+  function startsNewPgno(line) {
+    return (
+      /^[-•*]\s+/.test(line) ||
+      /^\d+[\).]\s+/.test(line) ||
+      /^PGNO\s*\d+/i.test(line)
+    );
+  }
+
+  function cleanPgnoLine(line) {
+    return String(line || "")
+      .replace(/^[-•*]\s+/, "")
+      .replace(/^\d+[\).]\s+/, "")
+      .replace(/^PGNO\s*\d+\s*[:.)-]?\s*/i, "")
+      .trim();
+  }
+
+  for (const line of rawLines) {
+    const cleaned = cleanPgnoLine(line);
+    if (!cleaned) continue;
+
+    if (!current) {
+      current = cleaned;
+      continue;
+    }
+
+    if (startsNewPgno(line)) {
+      merged.push(current.trim());
+      current = cleaned;
+    } else {
+      current = `${current} ${cleaned}`.trim();
+    }
+  }
+
+  if (current) merged.push(current.trim());
+
+  return merged.filter((s) => s.length > 6);
 }
 
 function findQuestionFromLibrary(qnoCanon) {
