@@ -1,8 +1,14 @@
 import { loadLockedLibraryJson } from "./question_library_loader.js";
 
-const OBS_DETAIL_BUILD = "post_inspection_observation_detail_v3_tracking_and_pgno_restore_2026-04-07";
+const OBS_DETAIL_BUILD = "post_inspection_observation_detail_v4_overdue_and_configurable_roles_2026-04-25";
 const HUMAN_POSITIVE_FIXED_NOC = "Exceeded normal expectation.";
 const LOCKED_LIBRARY_JSON = "./sire_questions_all_columns_named.json";
+
+const DEFAULT_WORKFLOW_SETTINGS = {
+  coordinator_roles: ["super_admin", "company_admin", "company_superintendent"],
+  responsible_roles: ["super_admin", "company_admin", "company_superintendent", "vessel"],
+  verifier_roles: ["super_admin", "company_admin", "company_superintendent"],
+};
 
 function el(id) {
   return document.getElementById(id);
@@ -65,6 +71,143 @@ function todayIsoDate() {
   return new Date().toISOString().slice(0, 10);
 }
 
+function parseIsoDateOnly(value) {
+  const s = String(value || "").trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
+  const [y, m, d] = s.split("-").map(Number);
+  return new Date(y, m - 1, d);
+}
+
+function diffDaysFromToday(dateIso) {
+  const target = parseIsoDateOnly(dateIso);
+  if (!target) return null;
+
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+  const ms = today.getTime() - target.getTime();
+  return Math.floor(ms / 86400000);
+}
+
+function isClosedStatus(status) {
+  return String(status || "").trim().toLowerCase() === "closed";
+}
+
+function getWorkflowStatusSnapshot() {
+  const status = el("responseStatus") ? String(el("responseStatus").value || "") : String(state.item?.response_status || "");
+  const targetDate = el("targetDate") ? String(el("targetDate").value || "") : String(state.item?.target_date || "");
+
+  const overdueDays = diffDaysFromToday(targetDate);
+  const isOverdue = !isClosedStatus(status) && overdueDays != null && overdueDays > 0;
+
+  return {
+    status: status || "Open",
+    targetDate,
+    overdueDays,
+    isOverdue,
+  };
+}
+
+function ensureWorkflowBadgeArea() {
+  let area = el("workflowBadgeArea");
+  if (area) return area;
+
+  area = document.createElement("div");
+  area.id = "workflowBadgeArea";
+  area.style.marginTop = "10px";
+  area.style.display = "flex";
+  area.style.flexWrap = "wrap";
+  area.style.gap = "8px";
+  area.style.alignItems = "center";
+
+  const anchor =
+    el("obsCategoryLabel") ||
+    el("obsQuestionLabel") ||
+    el("obsTypeBadge");
+
+  if (anchor && anchor.parentElement) {
+    anchor.parentElement.appendChild(area);
+  } else {
+    document.body.prepend(area);
+  }
+
+  return area;
+}
+
+function pillHtml(text, bg, fg = "#111827", border = "#d1d5db") {
+  return `
+    <span style="
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      border:1px solid ${border};
+      background:${bg};
+      color:${fg};
+      border-radius:999px;
+      padding:4px 10px;
+      font-size:12px;
+      font-weight:700;
+      line-height:1.2;
+      white-space:nowrap;
+    ">${text}</span>
+  `;
+}
+
+function renderWorkflowBadges() {
+  const area = ensureWorkflowBadgeArea();
+  const snap = getWorkflowStatusSnapshot();
+
+  let overdueHtml = "";
+  if (snap.isOverdue) {
+    overdueHtml = pillHtml(`OVERDUE ${snap.overdueDays} DAY${snap.overdueDays === 1 ? "" : "S"}`, "#fee2e2", "#991b1b", "#fecaca");
+  } else if (isClosedStatus(snap.status)) {
+    overdueHtml = pillHtml("NOT OVERDUE — CLOSED", "#dcfce7", "#166534", "#bbf7d0");
+  } else if (snap.targetDate) {
+    overdueHtml = pillHtml("NOT OVERDUE", "#e0f2fe", "#075985", "#bae6fd");
+  } else {
+    overdueHtml = pillHtml("NO TARGET DATE", "#f3f4f6", "#374151", "#d1d5db");
+  }
+
+  area.innerHTML = `
+    ${pillHtml(`STATUS: ${snap.status || "Open"}`, "#f8fafc", "#111827", "#cbd5e1")}
+    ${overdueHtml}
+  `;
+}
+
+function normalizeRoleList(value, fallback) {
+  if (Array.isArray(value)) return value.map((x) => String(x || "").trim()).filter(Boolean);
+  return fallback;
+}
+
+async function loadWorkflowSettings() {
+  const settings = { ...DEFAULT_WORKFLOW_SETTINGS };
+
+  try {
+    const { data, error } = await state.supabase
+      .from("post_inspection_workflow_settings")
+      .select("setting_key, setting_value")
+      .in("setting_key", ["coordinator_roles", "responsible_roles", "verifier_roles"]);
+
+    if (error) {
+      console.warn("Workflow settings unavailable. Using defaults.", error);
+      return settings;
+    }
+
+    for (const row of data || []) {
+      if (!row?.setting_key) continue;
+      settings[row.setting_key] = normalizeRoleList(
+        row.setting_value,
+        settings[row.setting_key] || []
+      );
+    }
+
+    return settings;
+  } catch (e) {
+    console.warn("Workflow settings load failed. Using defaults.", e);
+    return settings;
+  }
+}
+
 const HUMAN_PIF_OPTIONS = [
   "1. Recognition of safety criticality of the task or associated steps",
   "2. Custom and practice surrounding use of procedures",
@@ -123,19 +266,6 @@ function supportingCommentDisplay(item) {
   return String(item?.observation_text || item?.remarks || "").trim();
 }
 
-function selectedPgnoText(pgno_selected) {
-  const arr = Array.isArray(pgno_selected) ? pgno_selected : [];
-  if (!arr.length) return "";
-  return arr
-    .map((x) => {
-      const no = String(x?.pgno_no || "").trim();
-      const text = String(x?.text || "").trim();
-      return no ? `${no} — ${text}` : text;
-    })
-    .filter(Boolean)
-    .join(" • ");
-}
-
 function itemNeedsPgno(item) {
   return item?.obs_type === "negative" || item?.obs_type === "largely";
 }
@@ -146,6 +276,7 @@ const state = {
   report: null,
   item: null,
   users: [],
+  workflowSettings: { ...DEFAULT_WORKFLOW_SETTINGS },
   lib: [],
   libByNo: new Map(),
   libCanonToExact: new Map(),
@@ -171,7 +302,12 @@ async function loadUsers() {
   return data || [];
 }
 
-function renderUserSelect(selectId, selectedValue) {
+function userAllowedForRoles(user, allowedRoles) {
+  const role = String(user?.role || "").trim();
+  return allowedRoles.includes(role);
+}
+
+function renderUserSelect(selectId, selectedValue, allowedRoles) {
   const sel = el(selectId);
   sel.innerHTML = "";
 
@@ -180,7 +316,13 @@ function renderUserSelect(selectId, selectedValue) {
   empty.textContent = "— Select user —";
   sel.appendChild(empty);
 
+  const roleList = Array.isArray(allowedRoles) && allowedRoles.length
+    ? allowedRoles
+    : ["super_admin", "company_admin", "company_superintendent", "vessel"];
+
   for (const u of state.users || []) {
+    if (!userAllowedForRoles(u, roleList)) continue;
+
     const o = document.createElement("option");
     o.value = u.id;
     o.textContent = `${u.username || "Unnamed"}${u.role ? ` (${u.role})` : ""}`;
@@ -232,6 +374,8 @@ function renderObservation() {
   el("nocField").value = nocDisplay(item) || "";
   el("questionFullField").value = String(item.question_full || "").trim() || "";
   el("supportingCommentField").value = supportingCommentDisplay(item) || "";
+
+  renderWorkflowBadges();
 }
 
 function setToggleOpen(wrapId, open) {
@@ -273,8 +417,18 @@ function loadResponseFields() {
   if (!item) return;
 
   el("responseStatus").value = String(item.response_status || "Open");
-  renderUserSelect("responsiblePerson", item.responsible_person_id || "");
-  renderUserSelect("verifierPerson", item.verifier_person_id || "");
+
+  renderUserSelect(
+    "responsiblePerson",
+    item.responsible_person_id || "",
+    state.workflowSettings.responsible_roles
+  );
+
+  renderUserSelect(
+    "verifierPerson",
+    item.verifier_person_id || "",
+    state.workflowSettings.verifier_roles
+  );
 
   el("targetDate").value = String(item.target_date || "");
   el("closeOutDate").value = String(item.close_out_date || "");
@@ -290,6 +444,7 @@ function loadResponseFields() {
   el("preventativeActionComments").value = String(item.preventative_action_subcomments || "");
 
   openSubcommentsIfDataExists();
+  renderWorkflowBadges();
 }
 
 function getPgnoBullets(questionObj) {
@@ -493,7 +648,14 @@ async function init() {
 
   state.supabase = window.AUTH.ensureSupabase();
   const R = window.AUTH.ROLES;
-  state.me = await window.AUTH.requireAuth([R.SUPER_ADMIN, R.COMPANY_ADMIN]);
+
+  const allowedPageRoles = [
+    R.SUPER_ADMIN,
+    R.COMPANY_ADMIN,
+    R.COMPANY_SUPERINTENDENT,
+  ].filter(Boolean);
+
+  state.me = await window.AUTH.requireAuth(allowedPageRoles);
   if (!state.me) return;
 
   window.AUTH.fillUserBadge(state.me, "userBadge");
@@ -506,6 +668,7 @@ async function init() {
     throw new Error("Missing report_id or item_id in URL.");
   }
 
+  state.workflowSettings = await loadWorkflowSettings();
   state.users = await loadUsers();
 
   state.lib = await loadLockedLibraryJson(LOCKED_LIBRARY_JSON);
@@ -545,6 +708,9 @@ async function init() {
   renderPgnoSelector();
   loadResponseFields();
   setSaveStatus("Loaded");
+
+  el("responseStatus").addEventListener("change", renderWorkflowBadges);
+  el("targetDate").addEventListener("change", renderWorkflowBadges);
 
   el("saveResponseBtn").addEventListener("click", saveResponseFields);
   el("reloadResponseBtn").addEventListener("click", reloadItemFromDb);
