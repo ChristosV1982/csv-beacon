@@ -116,6 +116,14 @@
         </div>
       </div>
 
+      <div class="card" data-card="audit_observations">
+        <div class="title">Audit Observations</div>
+        <div class="muted">Internal and external audit findings using SIRE 2.0 classification fields.</div>
+        <div style="margin-top:12px;">
+          <button class="btn2" type="button" onclick="location.href='./audit_observations.html'">Open</button>
+        </div>
+      </div>
+
       <div class="card" data-card="reports">
         <div class="title">Reports</div>
         <div class="muted">Reporting & exports for office users.</div>
@@ -200,6 +208,7 @@
         "post",
         "poststats",
         "inspector_intelligence",
+        "audit_observations",
         "reports",
         "inspector",
         "qeditor",
@@ -222,6 +231,7 @@
           "post",
           "poststats",
           "inspector_intelligence",
+          "audit_observations",
           "reports",
           "inspector",
           "qeditor",
@@ -236,6 +246,7 @@
         setVisible("post", false);
         setVisible("poststats", false);
         setVisible("inspector_intelligence", false);
+        setVisible("audit_observations", false);
         setVisible("reports", false);
         setVisible("inspector", false);
         setVisible("qeditor", false);
@@ -250,6 +261,7 @@
           "post",
           "poststats",
           "inspector_intelligence",
+          "audit_observations",
           "reports",
           "inspector",
           "qeditor"
@@ -264,6 +276,7 @@
         setVisible("post", true);
         setVisible("poststats", true);
         setVisible("inspector_intelligence", true);
+        setVisible("audit_observations", true);
         setVisible("reports", true);
         setVisible("inspector", true);
         setVisible("qeditor", true);
@@ -275,6 +288,7 @@
         setVisible("vessel", false);
         setVisible("inspector", true);
         setVisible("inspector_intelligence", false);
+        setVisible("audit_observations", false);
         setVisible("qeditor", false);
         return;
       }
