@@ -1,5 +1,5 @@
 const POST_INSPECTION_INDEX_BUILD =
-  "post_inspection_index_v1_page_split_2026-04-07";
+  "post_inspection_index_v2_sort_by_inspection_date_desc_2026-04-26";
 
 function el(id) {
   return document.getElementById(id);
@@ -76,6 +76,7 @@ async function loadReportsFromDb() {
     const { data, error } = await state.supabase
       .from("post_inspection_reports")
       .select(selectA)
+      .order("inspection_date", { ascending: false })
       .order("updated_at", { ascending: false });
     if (error) throw error;
     rows = data || [];
@@ -83,6 +84,7 @@ async function loadReportsFromDb() {
     const { data, error } = await state.supabase
       .from("post_inspection_reports")
       .select(selectB)
+      .order("inspection_date", { ascending: false })
       .order("updated_at", { ascending: false });
     if (error) throw error;
     rows = data || [];
@@ -329,7 +331,7 @@ async function init() {
   el("logoutBtn").addEventListener("click", window.AUTH.logoutAndGoLogin);
 
   el("dashboardBtn").addEventListener("click", async () => {
-    await safeNavigate(["./dashboard.html", "./su-admin.html", "./index.html", "./"]);
+    await safeNavigate(["./q-dashboard.html", "./dashboard.html", "./su-admin.html", "./index.html", "./"]);
   });
 
   el("modeSelectBtn").addEventListener("click", async () => {
