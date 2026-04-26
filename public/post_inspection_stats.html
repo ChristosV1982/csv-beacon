@@ -64,6 +64,7 @@
       border-radius:16px;
       padding:14px;
       box-shadow: 0 4px 18px rgba(18, 44, 87, 0.16);
+      overflow-x:auto;
     }
 
     .row{ display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; }
@@ -117,7 +118,7 @@
       font-size:0.9rem;
     }
 
-    table{ width:100%; border-collapse: collapse; margin-top:10px; }
+    table{ width:100%; border-collapse: collapse; margin-top:10px; min-width:900px; }
     th, td{ border-bottom:1px solid #e3ecfb; padding:10px; text-align:left; vertical-align:top; }
     th{ color:#1a4170; font-weight:950; background:#f1f6ff; }
     td{ color:#223a66; font-weight:850; }
@@ -172,13 +173,6 @@
       font-weight:950;
       color:#1a4170;
       margin-bottom:10px;
-    }
-    .chartNote{
-      color:#48628e;
-      font-weight:800;
-      font-size:0.88rem;
-      margin-bottom:8px;
-      line-height:1.35;
     }
     .barRow{
       display:grid;
@@ -342,22 +336,10 @@
         <h3 class="sectionTitle">Visual Overview — Negative Observations</h3>
         <div class="statL">Negative observations split by category/designation and time period.</div>
         <div class="chartGrid4" style="margin-top:12px;">
-          <div class="chartBox">
-            <div class="chartTitle">Negative — Category / Designation</div>
-            <div id="chartNegCategory"></div>
-          </div>
-          <div class="chartBox">
-            <div class="chartTitle">Negative — Monthly Trend</div>
-            <div id="chartNegMonthly"></div>
-          </div>
-          <div class="chartBox">
-            <div class="chartTitle">Negative — Quarterly Trend</div>
-            <div id="chartNegQuarterly"></div>
-          </div>
-          <div class="chartBox">
-            <div class="chartTitle">Negative — Annual Trend</div>
-            <div id="chartNegAnnual"></div>
-          </div>
+          <div class="chartBox"><div class="chartTitle">Negative — Category / Designation</div><div id="chartNegCategory"></div></div>
+          <div class="chartBox"><div class="chartTitle">Negative — Monthly Trend</div><div id="chartNegMonthly"></div></div>
+          <div class="chartBox"><div class="chartTitle">Negative — Quarterly Trend</div><div id="chartNegQuarterly"></div></div>
+          <div class="chartBox"><div class="chartTitle">Negative — Annual Trend</div><div id="chartNegAnnual"></div></div>
         </div>
       </div>
     </div>
@@ -367,22 +349,10 @@
         <h3 class="sectionTitle">Visual Overview — Largely as Expected Observations</h3>
         <div class="statL">Largely as expected observations split by category/designation and time period.</div>
         <div class="chartGrid4" style="margin-top:12px;">
-          <div class="chartBox">
-            <div class="chartTitle">Largely — Category / Designation</div>
-            <div id="chartLargelyCategory"></div>
-          </div>
-          <div class="chartBox">
-            <div class="chartTitle">Largely — Monthly Trend</div>
-            <div id="chartLargelyMonthly"></div>
-          </div>
-          <div class="chartBox">
-            <div class="chartTitle">Largely — Quarterly Trend</div>
-            <div id="chartLargelyQuarterly"></div>
-          </div>
-          <div class="chartBox">
-            <div class="chartTitle">Largely — Annual Trend</div>
-            <div id="chartLargelyAnnual"></div>
-          </div>
+          <div class="chartBox"><div class="chartTitle">Largely — Category / Designation</div><div id="chartLargelyCategory"></div></div>
+          <div class="chartBox"><div class="chartTitle">Largely — Monthly Trend</div><div id="chartLargelyMonthly"></div></div>
+          <div class="chartBox"><div class="chartTitle">Largely — Quarterly Trend</div><div id="chartLargelyQuarterly"></div></div>
+          <div class="chartBox"><div class="chartTitle">Largely — Annual Trend</div><div id="chartLargelyAnnual"></div></div>
         </div>
       </div>
     </div>
@@ -392,18 +362,9 @@
         <h3 class="sectionTitle">Visual Overview — Positive Observations</h3>
         <div class="statL">Positive observations are treated as Human observations. Time-period trends are shown below.</div>
         <div class="chartGrid" style="margin-top:12px;">
-          <div class="chartBox">
-            <div class="chartTitle">Positive — Monthly Trend</div>
-            <div id="chartPositiveMonthly"></div>
-          </div>
-          <div class="chartBox">
-            <div class="chartTitle">Positive — Quarterly Trend</div>
-            <div id="chartPositiveQuarterly"></div>
-          </div>
-          <div class="chartBox">
-            <div class="chartTitle">Positive — Annual Trend</div>
-            <div id="chartPositiveAnnual"></div>
-          </div>
+          <div class="chartBox"><div class="chartTitle">Positive — Monthly Trend</div><div id="chartPositiveMonthly"></div></div>
+          <div class="chartBox"><div class="chartTitle">Positive — Quarterly Trend</div><div id="chartPositiveQuarterly"></div></div>
+          <div class="chartBox"><div class="chartTitle">Positive — Annual Trend</div><div id="chartPositiveAnnual"></div></div>
         </div>
       </div>
     </div>
@@ -420,9 +381,37 @@
               <th>Negative</th>
               <th>Largely as expected</th>
               <th>Positive</th>
+              <th>Avg Neg / Insp.</th>
+              <th>Avg Largely / Insp.</th>
+              <th>Avg Pos / Insp.</th>
+              <th>Avg Total / Insp.</th>
             </tr>
           </thead>
           <tbody id="byVesselTbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="card">
+        <h3 class="sectionTitle">Averages — Selected Scope</h3>
+        <div class="statL">Average observations per inspection, based on the current filters.</div>
+        <table>
+          <thead>
+            <tr>
+              <th>Scope</th>
+              <th>Inspections</th>
+              <th>Negative</th>
+              <th>Largely as expected</th>
+              <th>Positive</th>
+              <th>Total Observations</th>
+              <th>Avg Neg / Insp.</th>
+              <th>Avg Largely / Insp.</th>
+              <th>Avg Pos / Insp.</th>
+              <th>Avg Total / Insp.</th>
+            </tr>
+          </thead>
+          <tbody id="avgFleetTbody"></tbody>
         </table>
       </div>
     </div>
@@ -540,22 +529,76 @@
 
     <div class="panel">
       <div class="card">
+        <h3 class="sectionTitle">By OCIMF Inspecting Company</h3>
+        <div class="statL">Observation count and average observations per inspection by OCIMF inspecting company.</div>
+        <table>
+          <thead>
+            <tr>
+              <th>OCIMF Company</th>
+              <th>Inspections</th>
+              <th>Negative</th>
+              <th>Largely as expected</th>
+              <th>Positive</th>
+              <th>Total Observations</th>
+              <th>Avg Total / Insp.</th>
+            </tr>
+          </thead>
+          <tbody id="byOcimfTbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="card">
+        <h3 class="sectionTitle">By Inspector</h3>
+        <div class="statL">Observation count and average observations per inspection by inspector name.</div>
+        <table>
+          <thead>
+            <tr>
+              <th>Inspector</th>
+              <th>Inspections</th>
+              <th>Negative</th>
+              <th>Largely as expected</th>
+              <th>Positive</th>
+              <th>Total Observations</th>
+              <th>Avg Total / Insp.</th>
+            </tr>
+          </thead>
+          <tbody id="byInspectorTbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="card">
+        <h3 class="sectionTitle">By Inspector Company</h3>
+        <div class="statL">Observation count and average observations per inspection by inspector company.</div>
+        <table>
+          <thead>
+            <tr>
+              <th>Inspector Company</th>
+              <th>Inspections</th>
+              <th>Negative</th>
+              <th>Largely as expected</th>
+              <th>Positive</th>
+              <th>Total Observations</th>
+              <th>Avg Total / Insp.</th>
+            </tr>
+          </thead>
+          <tbody id="byInspectorCompanyTbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="card">
         <h3 class="sectionTitle">PGNO Analytics</h3>
         <div class="statL">PGNO analytics are based on assigned PGNOs only. They are separate from objective observation statistics because PGNO assignment may be software-suggested or user-confirmed.</div>
 
         <div class="chartGrid" style="margin-top:12px;">
-          <div class="chartBox">
-            <div class="chartTitle">Top PGNO</div>
-            <div id="chartPgno"></div>
-          </div>
-          <div class="chartBox">
-            <div class="chartTitle">PGNO by Question</div>
-            <div id="chartPgnoQuestion"></div>
-          </div>
-          <div class="chartBox">
-            <div class="chartTitle">Missing PGNO Trend</div>
-            <div id="chartPgnoMissing"></div>
-          </div>
+          <div class="chartBox"><div class="chartTitle">Top PGNO</div><div id="chartPgno"></div></div>
+          <div class="chartBox"><div class="chartTitle">PGNO by Question</div><div id="chartPgnoQuestion"></div></div>
+          <div class="chartBox"><div class="chartTitle">Missing PGNO Trend</div><div id="chartPgnoMissing"></div></div>
         </div>
 
         <table>

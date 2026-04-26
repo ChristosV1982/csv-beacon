@@ -29,7 +29,29 @@ const MONTHS = [
   { value: "12", label: "12 — December" },
 ];
 
-function el(id) { return document.getElementById(id); }
+function el(id) {
+  return document.getElementById(id);
+}
+
+function safeEl(id) {
+  const node = el(id);
+  if (!node) console.warn(`Missing element id="${id}"`);
+  return node;
+}
+
+function safeTbody(id) {
+  const node = el(id);
+  if (!node) {
+    console.warn(`Missing tbody id="${id}"`);
+    return null;
+  }
+  return node;
+}
+
+function setText(id, value) {
+  const node = safeEl(id);
+  if (node) node.textContent = String(value ?? "");
+}
 
 function esc(s) {
   return String(s ?? "")
@@ -59,7 +81,7 @@ const state = {
 };
 
 function setStatus(text) {
-  el("statusPill").textContent = text || "Ready";
+  setText("statusPill", text || "Ready");
 }
 
 function pick(obj, keys) {
@@ -160,6 +182,7 @@ function avg(numerator, denominator) {
 }
 
 function ensureTbodyMessage(tbody, colspan, message) {
+  if (!tbody) return;
   tbody.innerHTML = `<tr><td colspan="${colspan}" class="mono">${esc(message)}</td></tr>`;
 }
 
@@ -183,7 +206,8 @@ async function loadVessels() {
 }
 
 function renderVesselFilter() {
-  const sel = el("vesselFilter");
+  const sel = safeEl("vesselFilter");
+  if (!sel) return;
   sel.innerHTML = "";
 
   const optAll = document.createElement("option");
@@ -200,7 +224,8 @@ function renderVesselFilter() {
 }
 
 function renderTypeFilter() {
-  const sel = el("typeFilter");
+  const sel = safeEl("typeFilter");
+  if (!sel) return;
   sel.innerHTML = "";
 
   for (const t of OBS_TYPES) {
@@ -212,20 +237,12 @@ function renderTypeFilter() {
 }
 
 function getFilters() {
-  const vessel_id = el("vesselFilter").value || null;
-  const p_from = el("dateFrom").value || null;
-  const p_to = el("dateTo").value || null;
-  const p_observation_type = el("typeFilter").value || null;
-
-  return { vessel_id, p_from, p_to, p_observation_type };
-}
-
-function dateInRange(dateStr, from, to) {
-  const d = String(dateStr || "").slice(0, 10);
-  if (!d) return false;
-  if (from && d < from) return false;
-  if (to && d > to) return false;
-  return true;
+  return {
+    vessel_id: el("vesselFilter")?.value || null,
+    p_from: el("dateFrom")?.value || null,
+    p_to: el("dateTo")?.value || null,
+    p_observation_type: el("typeFilter")?.value || null,
+  };
 }
 
 async function loadFilteredObservationRows() {
@@ -296,14 +313,12 @@ function collectYearsFromRows(rows, reportRows) {
     if (/^\d{4}$/.test(y)) set.add(y);
   }
 
-  const currentYear = String(new Date().getFullYear());
-  set.add(currentYear);
-
+  set.add(String(new Date().getFullYear()));
   return [...set].sort((a, b) => b.localeCompare(a));
 }
 
 function renderYearSelect(selectId, years, includeAll, preferredYear) {
-  const sel = el(selectId);
+  const sel = safeEl(selectId);
   if (!sel) return;
 
   const existing = String(sel.value || "").trim();
@@ -323,19 +338,14 @@ function renderYearSelect(selectId, years, includeAll, preferredYear) {
     sel.appendChild(o);
   }
 
-  if (existing && years.includes(existing)) {
-    sel.value = existing;
-  } else if (preferredYear && years.includes(preferredYear)) {
-    sel.value = preferredYear;
-  } else if (!includeAll && years.length) {
-    sel.value = years[0];
-  } else {
-    sel.value = "";
-  }
+  if (existing && years.includes(existing)) sel.value = existing;
+  else if (preferredYear && years.includes(preferredYear)) sel.value = preferredYear;
+  else if (!includeAll && years.length) sel.value = years[0];
+  else sel.value = "";
 }
 
 function renderMonthSelect(selectId) {
-  const sel = el(selectId);
+  const sel = safeEl(selectId);
   if (!sel) return;
 
   const existing = String(sel.value || "").trim();
@@ -370,9 +380,7 @@ function groupObjectiveRows(rows, keyFn) {
     item.reports.add(reportKey(row));
 
     const date = String(row.inspection_date || "").trim();
-    if (date && (!item.last_seen || date > item.last_seen)) {
-      item.last_seen = date;
-    }
+    if (date && (!item.last_seen || date > item.last_seen)) item.last_seen = date;
   }
 
   return [...map.values()]
@@ -465,7 +473,8 @@ function groupSplitByType(rows, keyFn) {
 }
 
 function renderSplitTable(tbodyId, rows, keyLabel, limit = 50) {
-  const tbody = el(tbodyId);
+  const tbody = safeTbody(tbodyId);
+  if (!tbody) return;
   tbody.innerHTML = "";
 
   const list = rows.slice(0, limit);
@@ -481,9 +490,7 @@ function renderSplitTable(tbodyId, rows, keyLabel, limit = 50) {
     tbody.appendChild(tr);
   }
 
-  if (!list.length) {
-    ensureTbodyMessage(tbody, 4, `No ${keyLabel} data for current filters.`);
-  }
+  if (!list.length) ensureTbodyMessage(tbody, 4, `No ${keyLabel} data for current filters.`);
 }
 
 function buildMonthlyRows(rows, yearFilter = "") {
@@ -533,10 +540,7 @@ function buildPeriodRows(rows, keyFn) {
     if (!key || key === "—") continue;
 
     if (!map.has(key)) {
-      map.set(key, {
-        key,
-        observation_count: 0,
-      });
+      map.set(key, { key, observation_count: 0 });
     }
 
     map.get(key).observation_count += 1;
@@ -546,7 +550,8 @@ function buildPeriodRows(rows, keyFn) {
 }
 
 function renderMonthlyTrend(rows) {
-  const tbody = el("monthlyTbody");
+  const tbody = safeTbody("monthlyTbody");
+  if (!tbody) return;
   tbody.innerHTML = "";
 
   const trendYear = selectedYear("trendYearFilter");
@@ -565,13 +570,11 @@ function renderMonthlyTrend(rows) {
     tbody.appendChild(tr);
   }
 
-  if (!grouped.length) {
-    ensureTbodyMessage(tbody, 6, "No monthly data for current filters.");
-  }
+  if (!grouped.length) ensureTbodyMessage(tbody, 6, "No monthly data for current filters.");
 }
 
 function renderBarChart(containerId, rows, options = {}) {
-  const box = el(containerId);
+  const box = safeEl(containerId);
   if (!box) return;
 
   const labelFn = options.labelFn || ((r) => r.key);
@@ -633,7 +636,8 @@ function renderTypeVisuals(rows) {
 }
 
 function renderByVessel(rows, byVesselReportRows) {
-  const tbody = el("byVesselTbody");
+  const tbody = safeTbody("byVesselTbody");
+  if (!tbody) return;
   tbody.innerHTML = "";
 
   const byName = new Map();
@@ -691,13 +695,12 @@ function renderByVessel(rows, byVesselReportRows) {
     tbody.appendChild(tr);
   }
 
-  if (!list.length) {
-    ensureTbodyMessage(tbody, 9, "No vessel data for current filters.");
-  }
+  if (!list.length) ensureTbodyMessage(tbody, 9, "No vessel data for current filters.");
 }
 
 function renderFleetAverage(rows) {
-  const tbody = el("avgFleetTbody");
+  const tbody = safeTbody("avgFleetTbody");
+  if (!tbody) return;
   tbody.innerHTML = "";
 
   const s = buildAverageStats(rows);
@@ -719,7 +722,8 @@ function renderFleetAverage(rows) {
 }
 
 function renderAverageGroupTable(rows, keyFn, tbodyId, emptyLabel) {
-  const tbody = el(tbodyId);
+  const tbody = safeTbody(tbodyId);
+  if (!tbody) return;
   tbody.innerHTML = "";
 
   const grouped = groupAverageRows(rows, keyFn);
@@ -738,13 +742,12 @@ function renderAverageGroupTable(rows, keyFn, tbodyId, emptyLabel) {
     tbody.appendChild(tr);
   }
 
-  if (!grouped.length) {
-    ensureTbodyMessage(tbody, 7, `No ${emptyLabel} data for current filters.`);
-  }
+  if (!grouped.length) ensureTbodyMessage(tbody, 7, `No ${emptyLabel} data for current filters.`);
 }
 
 function renderByType(rows) {
-  const tbody = el("byTypeTbody");
+  const tbody = safeTbody("byTypeTbody");
+  if (!tbody) return;
   tbody.innerHTML = "";
 
   const groups = groupObjectiveRows(rows, (r) => typeLabel(r.observation_type));
@@ -759,9 +762,7 @@ function renderByType(rows) {
     tbody.appendChild(tr);
   }
 
-  if (!groups.length) {
-    ensureTbodyMessage(tbody, 3, "No type data for current filters.");
-  }
+  if (!groups.length) ensureTbodyMessage(tbody, 3, "No type data for current filters.");
 }
 
 function recurringFilteredRows(rows) {
@@ -776,7 +777,8 @@ function recurringFilteredRows(rows) {
 }
 
 function renderTopRecurringQuestions(rows) {
-  const tbody = el("topQnsTbody");
+  const tbody = safeTbody("topQnsTbody");
+  if (!tbody) return;
   tbody.innerHTML = "";
 
   const minCount = Math.max(1, Number(el("recurringMinCount")?.value || 4));
@@ -812,9 +814,7 @@ function renderTopRecurringQuestions(rows) {
     tbody.appendChild(tr);
   }
 
-  if (!grouped.length) {
-    ensureTbodyMessage(tbody, 6, `No recurring questions found at threshold ${minCount}.`);
-  }
+  if (!grouped.length) ensureTbodyMessage(tbody, 6, `No recurring questions found at threshold ${minCount}.`);
 }
 
 function renderByCategory(rows) {
@@ -887,7 +887,8 @@ function renderPgnoAnalytics(rows) {
     emptyText: "No missing PGNOs for current filters.",
   });
 
-  const tbody = el("pgnoTableTbody");
+  const tbody = safeTbody("pgnoTableTbody");
+  if (!tbody) return;
   tbody.innerHTML = "";
 
   for (const r of byPgno) {
@@ -901,16 +902,14 @@ function renderPgnoAnalytics(rows) {
     tbody.appendChild(tr);
   }
 
-  if (!byPgno.length) {
-    ensureTbodyMessage(tbody, 4, "No assigned PGNO data for current filters.");
-  }
+  if (!byPgno.length) ensureTbodyMessage(tbody, 4, "No assigned PGNO data for current filters.");
 }
 
 function renderSummaryFromRows(rows, summary) {
-  el("sumReports").textContent = String(summary?.report_count ?? 0);
-  el("sumObs").textContent = String(summary?.observation_count ?? rows.length ?? 0);
-  el("sumMissing").textContent = String(summary?.missing_pgno_count ?? 0);
-  el("sumDistinct").textContent = String(summary?.distinct_questions ?? 0);
+  setText("sumReports", String(summary?.report_count ?? 0));
+  setText("sumObs", String(summary?.observation_count ?? rows.length ?? 0));
+  setText("sumMissing", String(summary?.missing_pgno_count ?? 0));
+  setText("sumDistinct", String(summary?.distinct_questions ?? 0));
 
   const missingNeg = (rows || []).filter((r) => {
     const arr = Array.isArray(r.pgno_selected) ? r.pgno_selected : [];
@@ -922,7 +921,7 @@ function renderSummaryFromRows(rows, summary) {
     return normalizeType(r.observation_type) === "largely" && arr.length === 0;
   }).length;
 
-  el("sumMissingSplit").textContent = `Negative: ${missingNeg} | Largely: ${missingLargely}`;
+  setText("sumMissingSplit", `Negative: ${missingNeg} | Largely: ${missingLargely}`);
 }
 
 async function renderAllStats(summary, byVesselReportRows, rows) {
@@ -1060,13 +1059,26 @@ async function exportFilteredCsv() {
   setStatus("Ready");
 }
 
+function bindClick(id, fn) {
+  const node = safeEl(id);
+  if (!node) return;
+  node.addEventListener("click", fn);
+}
+
+function bindChange(id, fn) {
+  const node = safeEl(id);
+  if (!node) return;
+  node.addEventListener("change", fn);
+}
+
 async function init() {
   const R = window.AUTH?.ROLES;
   state.me = await window.AUTH.requireAuth([R.SUPER_ADMIN, R.COMPANY_ADMIN]);
   if (!state.me) return;
 
   window.AUTH.fillUserBadge(state.me, "userBadge");
-  el("logoutBtn").addEventListener("click", window.AUTH.logoutAndGoLogin);
+
+  bindClick("logoutBtn", window.AUTH.logoutAndGoLogin);
 
   state.supabase = window.__supabaseClient;
   if (!state.supabase) {
@@ -1086,8 +1098,10 @@ async function init() {
   const from = new Date();
   from.setDate(from.getDate() - 365);
 
-  el("dateFrom").value = ymd(from);
-  el("dateTo").value = ymd(to);
+  const fromInput = safeEl("dateFrom");
+  const toInput = safeEl("dateTo");
+  if (fromInput) fromInput.value = ymd(from);
+  if (toInput) toInput.value = ymd(to);
 
   const lib = await loadLockedLibraryJson(LOCKED_LIBRARY_JSON);
   for (const q of lib) {
@@ -1106,7 +1120,7 @@ async function init() {
   renderYearSelect("recurringYearFilter", years, true, "");
   renderYearSelect("trendYearFilter", years, false, currentYear);
 
-  el("applyBtn").addEventListener("click", async () => {
+  bindClick("applyBtn", async () => {
     try {
       await applyFilters();
     } catch (e) {
@@ -1116,7 +1130,7 @@ async function init() {
     }
   });
 
-  el("exportCsvBtn").addEventListener("click", async () => {
+  bindClick("exportCsvBtn", async () => {
     try {
       await exportFilteredCsv();
     } catch (e) {
@@ -1126,41 +1140,19 @@ async function init() {
     }
   });
 
-  el("recurringMinCount").addEventListener("change", async () => {
+  const refresh = async () => {
     try {
       await applyFilters();
     } catch (e) {
       console.error(e);
       setStatus("Error");
     }
-  });
+  };
 
-  el("recurringYearFilter").addEventListener("change", async () => {
-    try {
-      await applyFilters();
-    } catch (e) {
-      console.error(e);
-      setStatus("Error");
-    }
-  });
-
-  el("recurringMonthFilter").addEventListener("change", async () => {
-    try {
-      await applyFilters();
-    } catch (e) {
-      console.error(e);
-      setStatus("Error");
-    }
-  });
-
-  el("trendYearFilter").addEventListener("change", async () => {
-    try {
-      await applyFilters();
-    } catch (e) {
-      console.error(e);
-      setStatus("Error");
-    }
-  });
+  bindChange("recurringMinCount", refresh);
+  bindChange("recurringYearFilter", refresh);
+  bindChange("recurringMonthFilter", refresh);
+  bindChange("trendYearFilter", refresh);
 
   await applyFilters();
 }
