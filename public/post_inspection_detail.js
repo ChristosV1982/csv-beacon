@@ -1,7 +1,10 @@
-const DETAIL_BUILD = "post_inspection_detail_v3_restore_examined_from_local_cache_2026-04-07";
+import { loadLockedLibraryJson } from "./question_library_loader.js";
+
+const DETAIL_BUILD = "post_inspection_detail_v4_auto_pgno_match_on_import_2026-04-25";
 const PDF_BUCKET_DEFAULT = "inspection-reports";
 const PDF_FOLDER_PREFIX = "post_inspections";
 const HUMAN_POSITIVE_FIXED_NOC = "Exceeded normal expectation.";
+const LOCKED_LIBRARY_JSON = "./sire_questions_all_columns_named.json";
 
 function el(id) {
   return document.getElementById(id);
@@ -44,6 +47,17 @@ function canonicalQno(qno) {
   const parts = String(qno || "").trim().split(".").filter(Boolean);
   if (!parts.length) return "";
   return parts.map((p) => String(Number((p.replace(/^0+/, "") || "0")))).join(".");
+}
+
+function pick(obj, keys) {
+  for (const k of keys) {
+    if (obj && obj[k] != null && obj[k] !== "") return obj[k];
+  }
+  return "";
+}
+
+function getQno(q) {
+  return String(pick(q, ["No.", "No", "question_no", "QuestionNo", "Question ID"])).trim();
 }
 
 function normDesignation(d) {
@@ -130,6 +144,50 @@ const HUMAN_PIF_OPTIONS = [
   "9. Opportunity to learn or practice",
   "10. Not Identified",
 ];
+
+const STOP_WORDS = new Set([
+  "the", "and", "or", "to", "of", "in", "on", "for", "with", "as", "by", "at",
+  "from", "was", "were", "is", "are", "be", "been", "being", "had", "has",
+  "have", "that", "this", "these", "those", "it", "its", "an", "a", "any",
+  "not", "no", "but", "however", "where", "which", "who", "whom", "when",
+  "then", "there", "their", "such", "per", "into", "within", "without",
+  "available", "provided", "evidence", "operator", "vessel", "ship", "system",
+]);
+
+function tokenizeForMatch(text) {
+  return String(text || "")
+    .toLowerCase()
+    .replace(/[“”‘’]/g, "'")
+    .replace(/[^a-z0-9]+/g, " ")
+    .split(/\s+/)
+    .map((x) => x.trim())
+    .filter((x) => x.length >= 3)
+    .filter((x) => !STOP_WORDS.has(x));
+}
+
+function uniqueTokens(text) {
+  return [...new Set(tokenizeForMatch(text))];
+}
+
+function textMatchScore(observationText, pgnoText) {
+  const obsTokens = uniqueTokens(observationText);
+  const pgnoTokens = uniqueTokens(pgnoText);
+
+  if (!obsTokens.length || !pgnoTokens.length) return 0;
+
+  const obsSet = new Set(obsTokens);
+  const pgnoSet = new Set(pgnoTokens);
+
+  let overlap = 0;
+  for (const t of pgnoSet) {
+    if (obsSet.has(t)) overlap++;
+  }
+
+  const pgnoCoverage = overlap / pgnoSet.size;
+  const obsCoverage = overlap / obsSet.size;
+
+  return (pgnoCoverage * 0.75) + (obsCoverage * 0.25);
+}
 
 function isHumanPositive(item) {
   return normDesignation(item?.designation) === "Human" &&
@@ -236,6 +294,121 @@ function normalizeImportedSocNocFields(designation, obsType, classificationCodin
   };
 }
 
+function getPgnoBullets(questionObj) {
+  const bullets = Array.isArray(questionObj?.NegObs_Bullets) ? questionObj.NegObs_Bullets : null;
+  if (bullets && bullets.length) {
+    return bullets.map((t) => String(t || "").trim()).filter(Boolean);
+  }
+
+  const pgTxt = String(questionObj?.["Potential Grounds for Negative Observations"] || "").trim();
+  if (!pgTxt) return [];
+
+  const rawLines = pgTxt
+    .split("\n")
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  const merged = [];
+  let current = "";
+
+  function startsNewPgno(line) {
+    return (
+      /^[-•*]\s+/.test(line) ||
+      /^\d+[\).]\s+/.test(line) ||
+      /^PGNO\s*\d+/i.test(line)
+    );
+  }
+
+  function cleanPgnoLine(line) {
+    return String(line || "")
+      .replace(/^[-•*]\s+/, "")
+      .replace(/^\d+[\).]\s+/, "")
+      .replace(/^PGNO\s*\d+\s*[:.)-]?\s*/i, "")
+      .trim();
+  }
+
+  for (const line of rawLines) {
+    const cleaned = cleanPgnoLine(line);
+    if (!cleaned) continue;
+
+    if (!current) {
+      current = cleaned;
+      continue;
+    }
+
+    if (startsNewPgno(line)) {
+      merged.push(current.trim());
+      current = cleaned;
+    } else {
+      current = `${current} ${cleaned}`.trim();
+    }
+  }
+
+  if (current) merged.push(current.trim());
+
+  return merged.filter((s) => s.length > 6);
+}
+
+function findQuestionFromLibrary(qnoCanon) {
+  const exact = state.libCanonToExact.get(qnoCanon) || qnoCanon;
+  return state.libByNo.get(exact) || null;
+}
+
+function buildPgnoOptions(questionObj, item) {
+  const exactQno = getQno(questionObj) || canonicalQno(item.question_no || item.question_base || "");
+  const bullets = getPgnoBullets(questionObj);
+
+  return bullets.map((text, idx) => ({
+    pgno_no: `${exactQno}.${String(idx + 1).padStart(2, "0")}`,
+    text: String(text || "").trim(),
+  }));
+}
+
+function autoMatchPgnoForImportedItem(item) {
+  if (!itemNeedsPgno(item)) return [];
+
+  const qnoCanon = canonicalQno(item.question_no || item.question_base || "");
+  const questionObj = findQuestionFromLibrary(qnoCanon);
+  if (!questionObj) return [];
+
+  const options = buildPgnoOptions(questionObj, item);
+  if (!options.length) return [];
+
+  const observationMatchText = [
+    item.question_full || "",
+    item.designation || "",
+    item.classification_coding || "",
+    item.nature_of_concern || "",
+    item.observation_text || "",
+    item.remarks || "",
+    item.source_excerpt || "",
+  ].join(" ");
+
+  let best = null;
+  for (const opt of options) {
+    const score = textMatchScore(observationMatchText, opt.text);
+    if (!best || score > best.score) {
+      best = { ...opt, score };
+    }
+  }
+
+  if (!best) return [];
+
+  /*
+    Conservative threshold:
+    - If score is weak, leave unchecked for user assignment.
+    - This avoids false PGNO pre-selections.
+  */
+  if (best.score < 0.28) return [];
+
+  return [{
+    pgno_no: best.pgno_no,
+    text: best.text,
+    auto_matched: true,
+    match_score: Number(best.score.toFixed(3)),
+  }];
+}
+
 const state = {
   me: null,
   supabase: null,
@@ -243,6 +416,9 @@ const state = {
   activeReport: null,
   observationItems: [],
   extractedItems: [],
+  lib: [],
+  libByNo: new Map(),
+  libCanonToExact: new Map(),
 };
 
 function setSaveStatus(text) {
@@ -853,6 +1029,8 @@ async function importReportPdfAiFromFile(file) {
       sort_index: i,
     };
 
+    row.pgno_selected = autoMatchPgnoForImportedItem(row);
+
     const { error: insErr } = await state.supabase
       .from("post_inspection_observation_items")
       .insert([row]);
@@ -1022,6 +1200,17 @@ async function init() {
 
   window.AUTH.fillUserBadge(state.me, "userBadge");
   el("logoutBtn").addEventListener("click", window.AUTH.logoutAndGoLogin);
+
+  state.lib = await loadLockedLibraryJson(LOCKED_LIBRARY_JSON);
+  for (const q of state.lib) {
+    const qno = getQno(q);
+    if (!qno) continue;
+    state.libByNo.set(qno, q);
+    const canon = canonicalQno(qno);
+    if (canon && !state.libCanonToExact.has(canon)) {
+      state.libCanonToExact.set(canon, qno);
+    }
+  }
 
   el("backToListBtn").addEventListener("click", () => {
     window.location.href = "./post_inspection.html";
