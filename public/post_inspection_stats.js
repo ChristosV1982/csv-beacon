@@ -1,5 +1,5 @@
 // public/post_inspection_stats.js
-// Fleet/vessel stats via RPC functions.
+// Fleet/vessel stats via RPC functions + client-side multi-filtering.
 // Current observation model: post_inspection_observation_items.obs_type = negative | positive | largely
 
 import { loadLockedLibraryJson } from "./question_library_loader.js";
@@ -7,14 +7,12 @@ import { loadLockedLibraryJson } from "./question_library_loader.js";
 const LOCKED_LIBRARY_JSON = "./sire_questions_all_columns_named.json";
 
 const OBS_TYPES = [
-  { value: "", label: "All types" },
   { value: "negative", label: "Negative" },
-  { value: "positive", label: "Positive" },
   { value: "largely", label: "Largely as expected" },
+  { value: "positive", label: "Positive" },
 ];
 
 const MONTHS = [
-  { value: "", label: "All months" },
   { value: "01", label: "01 — January" },
   { value: "02", label: "02 — February" },
   { value: "03", label: "03 — March" },
@@ -186,12 +184,99 @@ function ensureTbodyMessage(tbody, colspan, message) {
   tbody.innerHTML = `<tr><td colspan="${colspan}" class="mono">${esc(message)}</td></tr>`;
 }
 
-function selectedYear(id) {
-  return String(el(id)?.value || "").trim();
+function inDateRange(dateStr, fromDate, toDate) {
+  const d = String(dateStr || "").slice(0, 10);
+  if (!d) return false;
+  if (fromDate && d < fromDate) return false;
+  if (toDate && d > toDate) return false;
+  return true;
 }
 
-function selectedMonth(id) {
-  return String(el(id)?.value || "").trim();
+function selectedCheckboxValues(containerId) {
+  const box = safeEl(containerId);
+  if (!box) return [];
+  return [...box.querySelectorAll("input[type='checkbox']:checked")]
+    .map((x) => String(x.value || "").trim())
+    .filter(Boolean);
+}
+
+function setAllCheckboxes(containerId, checked) {
+  const box = safeEl(containerId);
+  if (!box) return;
+  box.querySelectorAll("input[type='checkbox']").forEach((x) => {
+    x.checked = !!checked;
+  });
+}
+
+function renderCheckboxList(containerId, className, items, checkedByDefault = true) {
+  const box = safeEl(containerId);
+  if (!box) return;
+  box.innerHTML = "";
+
+  for (const item of items) {
+    const row = document.createElement("label");
+    row.className = "checkRow";
+    row.innerHTML = `
+      <input type="checkbox" class="${esc(className)}" value="${esc(item.value)}" ${checkedByDefault ? "checked" : ""}/>
+      <span>${esc(item.label)}</span>
+    `;
+    box.appendChild(row);
+  }
+}
+
+function getSelectedVesselIds() {
+  return selectedCheckboxValues("vesselCheckList");
+}
+
+function getSelectedVesselNames() {
+  const ids = new Set(getSelectedVesselIds());
+  return new Set((state.vessels || []).filter((v) => ids.has(String(v.id))).map((v) => String(v.name || "").trim()));
+}
+
+function getSelectedTypes() {
+  return selectedCheckboxValues("typeCheckList");
+}
+
+function getSelectedRecurringYears() {
+  return selectedCheckboxValues("recurringYearCheckList");
+}
+
+function getSelectedRecurringMonths() {
+  return selectedCheckboxValues("recurringMonthCheckList");
+}
+
+function getFilters() {
+  return {
+    selected_vessel_ids: getSelectedVesselIds(),
+    selected_vessel_names: getSelectedVesselNames(),
+    p_from: el("dateFrom")?.value || null,
+    p_to: el("dateTo")?.value || null,
+    selected_types: getSelectedTypes(),
+  };
+}
+
+function filterReportsBase(reportRows) {
+  const { selected_vessel_ids, p_from, p_to } = getFilters();
+  const vesselSet = new Set(selected_vessel_ids);
+
+  return (reportRows || []).filter((r) => {
+    if (vesselSet.size > 0 && !vesselSet.has(String(r.vessel_id))) return false;
+    if (!inDateRange(r.inspection_date, p_from, p_to)) return false;
+    return true;
+  });
+}
+
+function filterRowsBase(rows, ignoreTypeFilter = false) {
+  const { selected_vessel_names, p_from, p_to, selected_types } = getFilters();
+  const typeSet = new Set(selected_types);
+
+  return (rows || []).filter((r) => {
+    const vesselName = String(r.vessel_name || "").trim();
+    if (selected_vessel_names.size > 0 && !selected_vessel_names.has(vesselName)) return false;
+    if (!inDateRange(r.inspection_date, p_from, p_to)) return false;
+    if (!ignoreTypeFilter && typeSet.size > 0 && !typeSet.has(normalizeType(r.observation_type))) return false;
+    return true;
+  });
 }
 
 async function loadVessels() {
@@ -205,72 +290,25 @@ async function loadVessels() {
   return data || [];
 }
 
-function renderVesselFilter() {
-  const sel = safeEl("vesselFilter");
-  if (!sel) return;
-  sel.innerHTML = "";
-
-  const optAll = document.createElement("option");
-  optAll.value = "";
-  optAll.textContent = "All vessels";
-  sel.appendChild(optAll);
-
-  for (const v of state.vessels) {
-    const o = document.createElement("option");
-    o.value = v.id;
-    o.textContent = v.name;
-    sel.appendChild(o);
-  }
-}
-
-function renderTypeFilter() {
-  const sel = safeEl("typeFilter");
-  if (!sel) return;
-  sel.innerHTML = "";
-
-  for (const t of OBS_TYPES) {
-    const o = document.createElement("option");
-    o.value = t.value;
-    o.textContent = t.label;
-    sel.appendChild(o);
-  }
-}
-
-function getFilters() {
-  return {
-    vessel_id: el("vesselFilter")?.value || null,
-    p_from: el("dateFrom")?.value || null,
-    p_to: el("dateTo")?.value || null,
-    p_observation_type: el("typeFilter")?.value || null,
-  };
-}
-
-async function loadFilteredObservationRows() {
-  const { vessel_id, p_from, p_to, p_observation_type } = getFilters();
-
+async function loadAllObservationRows() {
   const { data, error } = await state.supabase
     .rpc("post_insp_export_observations", {
-      p_vessel_id: vessel_id,
-      p_from,
-      p_to,
-      p_observation_type,
+      p_vessel_id: null,
+      p_from: null,
+      p_to: null,
+      p_observation_type: null,
     });
 
   if (error) throw error;
-
-  return enrichRowsWithReportMeta(data || []);
+  return data || [];
 }
 
-async function loadAllReportRowsForYearSelectors() {
+async function loadAllReportRows() {
   const { data, error } = await state.supabase
     .from("post_inspection_reports")
     .select("id, vessel_id, inspection_date, report_ref, title, ocimf_inspecting_company, inspector_name, inspector_company");
 
-  if (error) {
-    console.warn("Report rows unavailable for year selector.", error);
-    return [];
-  }
-
+  if (error) throw error;
   return data || [];
 }
 
@@ -281,6 +319,8 @@ function rebuildReportMetaMap() {
     const k = reportKeyFromReport(r);
     if (!k) continue;
     state.reportMetaByKey.set(k, {
+      vessel_id: r.vessel_id,
+      vessel_name: vesselNameById(r.vessel_id),
       ocimf_inspecting_company: String(r.ocimf_inspecting_company || "").trim() || "—",
       inspector_name: String(r.inspector_name || "").trim() || "—",
       inspector_company: String(r.inspector_company || "").trim() || "—",
@@ -293,11 +333,23 @@ function enrichRowsWithReportMeta(rows) {
     const meta = state.reportMetaByKey.get(reportKey(r)) || {};
     return {
       ...r,
+      vessel_id: meta.vessel_id || null,
       ocimf_inspecting_company: meta.ocimf_inspecting_company || "—",
       inspector_name: meta.inspector_name || "—",
       inspector_company: meta.inspector_company || "—",
     };
   });
+}
+
+function enrichReports(reportRows) {
+  return (reportRows || []).map((r) => ({
+    ...r,
+    vessel_name: vesselNameById(r.vessel_id),
+    ocimf_inspecting_company: String(r.ocimf_inspecting_company || "").trim() || "—",
+    inspector_name: String(r.inspector_name || "").trim() || "—",
+    inspector_company: String(r.inspector_company || "").trim() || "—",
+    report_key: reportKeyFromReport(r),
+  }));
 }
 
 function collectYearsFromRows(rows, reportRows) {
@@ -317,19 +369,12 @@ function collectYearsFromRows(rows, reportRows) {
   return [...set].sort((a, b) => b.localeCompare(a));
 }
 
-function renderYearSelect(selectId, years, includeAll, preferredYear) {
+function renderYearSelect(selectId, years, preferredYear) {
   const sel = safeEl(selectId);
   if (!sel) return;
 
   const existing = String(sel.value || "").trim();
   sel.innerHTML = "";
-
-  if (includeAll) {
-    const all = document.createElement("option");
-    all.value = "";
-    all.textContent = "All years";
-    sel.appendChild(all);
-  }
 
   for (const y of years) {
     const o = document.createElement("option");
@@ -340,25 +385,8 @@ function renderYearSelect(selectId, years, includeAll, preferredYear) {
 
   if (existing && years.includes(existing)) sel.value = existing;
   else if (preferredYear && years.includes(preferredYear)) sel.value = preferredYear;
-  else if (!includeAll && years.length) sel.value = years[0];
+  else if (years.length) sel.value = years[0];
   else sel.value = "";
-}
-
-function renderMonthSelect(selectId) {
-  const sel = safeEl(selectId);
-  if (!sel) return;
-
-  const existing = String(sel.value || "").trim();
-  sel.innerHTML = "";
-
-  for (const m of MONTHS) {
-    const o = document.createElement("option");
-    o.value = m.value;
-    o.textContent = m.label;
-    sel.appendChild(o);
-  }
-
-  sel.value = MONTHS.some((m) => m.value === existing) ? existing : "";
 }
 
 function groupObjectiveRows(rows, keyFn) {
@@ -388,6 +416,7 @@ function groupObjectiveRows(rows, keyFn) {
       key: x.key,
       observation_count: x.observation_count,
       report_count: x.reports.size,
+      avg_per_inspection: avg(x.observation_count, x.reports.size),
       last_seen: x.last_seen,
     }))
     .sort((a, b) =>
@@ -397,82 +426,78 @@ function groupObjectiveRows(rows, keyFn) {
     );
 }
 
-function buildAverageStats(rows) {
-  const reports = new Set();
+function typeCountsFromRows(rows) {
   let negative = 0;
   let largely = 0;
   let positive = 0;
 
   for (const row of rows || []) {
-    reports.add(reportKey(row));
     const t = normalizeType(row.observation_type);
     if (t === "negative") negative += 1;
     if (t === "largely") largely += 1;
     if (t === "positive") positive += 1;
   }
 
-  const inspections = reports.size;
-  const total = negative + largely + positive;
-
   return {
-    inspections,
     negative,
     largely,
     positive,
-    total,
-    avg_negative: avg(negative, inspections),
-    avg_largely: avg(largely, inspections),
-    avg_positive: avg(positive, inspections),
-    avg_total: avg(total, inspections),
+    total: negative + largely + positive,
   };
 }
 
-function groupAverageRows(rows, keyFn) {
+function groupTypeSplitRows(rows, keyFn, reportCountFn = null) {
   const map = new Map();
 
   for (const row of rows || []) {
     const key = String(keyFn(row) || "—").trim() || "—";
-    if (!map.has(key)) map.set(key, []);
-    map.get(key).push(row);
-  }
-
-  return [...map.entries()]
-    .map(([key, list]) => ({
-      key,
-      ...buildAverageStats(list),
-    }))
-    .sort((a, b) => b.total - a.total || Number(b.avg_total) - Number(a.avg_total) || a.key.localeCompare(b.key));
-}
-
-function groupSplitByType(rows, keyFn) {
-  const map = new Map();
-
-  for (const row of rows || []) {
-    const key = String(keyFn(row) || "—").trim() || "—";
-    const t = normalizeType(row.observation_type);
-
     if (!map.has(key)) {
       map.set(key, {
         key,
+        reports: new Set(),
         negative: 0,
         largely: 0,
         positive: 0,
-        total: 0,
       });
     }
 
     const item = map.get(key);
-    item.total += 1;
+    item.reports.add(reportKey(row));
 
+    const t = normalizeType(row.observation_type);
     if (t === "negative") item.negative += 1;
     if (t === "largely") item.largely += 1;
     if (t === "positive") item.positive += 1;
   }
 
-  return [...map.values()].sort((a, b) => b.total - a.total || String(a.key).localeCompare(String(b.key)));
+  return [...map.values()].map((x) => {
+    const inspections = reportCountFn ? Number(reportCountFn(x.key) || 0) : x.reports.size;
+    return {
+      key: x.key,
+      inspections,
+      negative: x.negative,
+      largely: x.largely,
+      positive: x.positive,
+      total: x.negative + x.largely + x.positive,
+      avg_negative: avg(x.negative, inspections),
+      avg_largely: avg(x.largely, inspections),
+      avg_positive: avg(x.positive, inspections),
+    };
+  }).sort((a, b) => b.total - a.total || String(a.key).localeCompare(String(b.key)));
 }
 
-function renderSplitTable(tbodyId, rows, keyLabel, limit = 50) {
+function reportCountsByKey(reportRows, keyFn) {
+  const map = new Map();
+
+  for (const r of reportRows || []) {
+    const key = String(keyFn(r) || "—").trim() || "—";
+    map.set(key, (map.get(key) || 0) + 1);
+  }
+
+  return map;
+}
+
+function renderTypeSplitTable(tbodyId, rows, keyLabel, limit = 100) {
   const tbody = safeTbody(tbodyId);
   if (!tbody) return;
   tbody.innerHTML = "";
@@ -486,14 +511,17 @@ function renderSplitTable(tbodyId, rows, keyLabel, limit = 50) {
       <td>${esc(r.negative)}</td>
       <td>${esc(r.largely)}</td>
       <td>${esc(r.positive)}</td>
+      <td>${esc(r.avg_negative)}</td>
+      <td>${esc(r.avg_largely)}</td>
+      <td>${esc(r.avg_positive)}</td>
     `;
     tbody.appendChild(tr);
   }
 
-  if (!list.length) ensureTbodyMessage(tbody, 4, `No ${keyLabel} data for current filters.`);
+  if (!list.length) ensureTbodyMessage(tbody, 7, `No ${keyLabel} data for current filters.`);
 }
 
-function buildMonthlyRows(rows, yearFilter = "") {
+function buildMonthlyRows(rows, reportRows, yearFilter = "") {
   const selected = String(yearFilter || "").trim();
   const year = selected || String(new Date().getFullYear());
 
@@ -512,6 +540,13 @@ function buildMonthlyRows(rows, yearFilter = "") {
     });
   }
 
+  for (const report of reportRows || []) {
+    const y = yearOf(report);
+    if (y !== year) continue;
+    const key = monthKey(report);
+    if (map.has(key)) map.get(key).reports.add(report.report_key || reportKeyFromReport(report));
+  }
+
   for (const row of rows || []) {
     const y = yearOf(row);
     if (y !== year) continue;
@@ -520,7 +555,6 @@ function buildMonthlyRows(rows, yearFilter = "") {
     if (!map.has(key)) continue;
 
     const item = map.get(key);
-    item.reports.add(reportKey(row));
     item.observations += 1;
 
     const t = normalizeType(row.observation_type);
@@ -532,45 +566,73 @@ function buildMonthlyRows(rows, yearFilter = "") {
   return [...map.values()].sort((a, b) => String(a.month).localeCompare(String(b.month)));
 }
 
-function buildPeriodRows(rows, keyFn) {
+function buildPeriodRows(rows, reportRows, keyFn) {
   const map = new Map();
+
+  for (const report of reportRows || []) {
+    const key = String(keyFn(report) || "—");
+    if (!key || key === "—") continue;
+
+    if (!map.has(key)) {
+      map.set(key, {
+        key,
+        observations: 0,
+        inspections: 0,
+      });
+    }
+
+    map.get(key).inspections += 1;
+  }
 
   for (const row of rows || []) {
     const key = String(keyFn(row) || "—");
     if (!key || key === "—") continue;
 
     if (!map.has(key)) {
-      map.set(key, { key, observation_count: 0 });
+      map.set(key, {
+        key,
+        observations: 0,
+        inspections: 0,
+      });
     }
 
-    map.get(key).observation_count += 1;
+    map.get(key).observations += 1;
   }
 
-  return [...map.values()].sort((a, b) => String(a.key).localeCompare(String(b.key)));
+  return [...map.values()]
+    .map((x) => ({
+      ...x,
+      avg_per_inspection: avg(x.observations, x.inspections),
+    }))
+    .sort((a, b) => String(a.key).localeCompare(String(b.key)));
 }
 
-function renderMonthlyTrend(rows) {
+function renderMonthlyTrend(rows, reportRows) {
   const tbody = safeTbody("monthlyTbody");
   if (!tbody) return;
   tbody.innerHTML = "";
 
-  const trendYear = selectedYear("trendYearFilter");
-  const grouped = buildMonthlyRows(rows, trendYear);
+  const trendYear = String(el("trendYearFilter")?.value || "").trim();
+  const grouped = buildMonthlyRows(rows, reportRows, trendYear);
 
   for (const r of grouped) {
+    const insp = r.reports.size;
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td class="mono">${esc(r.month)}</td>
-      <td>${esc(r.reports.size)}</td>
+      <td>${esc(insp)}</td>
       <td>${esc(r.observations)}</td>
       <td>${esc(r.negative)}</td>
       <td>${esc(r.positive)}</td>
       <td>${esc(r.largely)}</td>
+      <td>${esc(avg(r.negative, insp))}</td>
+      <td>${esc(avg(r.positive, insp))}</td>
+      <td>${esc(avg(r.largely, insp))}</td>
     `;
     tbody.appendChild(tr);
   }
 
-  if (!grouped.length) ensureTbodyMessage(tbody, 6, "No monthly data for current filters.");
+  if (!grouped.length) ensureTbodyMessage(tbody, 9, "No monthly data for current filters.");
 }
 
 function renderBarChart(containerId, rows, options = {}) {
@@ -578,12 +640,13 @@ function renderBarChart(containerId, rows, options = {}) {
   if (!box) return;
 
   const labelFn = options.labelFn || ((r) => r.key);
-  const valueFn = options.valueFn || ((r) => r.observation_count);
+  const obsFn = options.obsFn || ((r) => r.observation_count ?? r.observations ?? 0);
+  const inspFn = options.inspFn || ((r) => r.report_count ?? r.inspections ?? 0);
   const limit = Number(options.limit || 10);
   const emptyText = options.emptyText || "No chart data for current filters.";
 
   const chartRows = (rows || [])
-    .filter((r) => Number(valueFn(r) || 0) > 0)
+    .filter((r) => Number(obsFn(r) || 0) > 0)
     .slice(0, limit);
 
   if (!chartRows.length) {
@@ -591,20 +654,22 @@ function renderBarChart(containerId, rows, options = {}) {
     return;
   }
 
-  const max = Math.max(...chartRows.map((r) => Number(valueFn(r) || 0)), 1);
+  const max = Math.max(...chartRows.map((r) => Number(obsFn(r) || 0)), 1);
 
   box.innerHTML = chartRows.map((r) => {
     const label = String(labelFn(r) || "—");
-    const value = Number(valueFn(r) || 0);
-    const pct = Math.max(3, Math.round((value / max) * 100));
+    const obs = Number(obsFn(r) || 0);
+    const inspections = Number(inspFn(r) || 0);
+    const average = avg(obs, inspections);
+    const pct = Math.max(3, Math.round((obs / max) * 100));
 
     return `
-      <div class="barRow" title="${esc(label)}: ${esc(value)}">
+      <div class="barRow" title="${esc(label)}: ${esc(obs)} obs / ${esc(inspections)} insp. / avg ${esc(average)}">
         <div class="barLabel">${esc(label)}</div>
         <div class="barTrack">
           <div class="barFill" style="width:${pct}%"></div>
         </div>
-        <div class="barValue">${esc(value)}</div>
+        <div class="barValue">${esc(obs)} / ${esc(inspections)} / ${esc(average)}</div>
       </div>
     `;
   }).join("");
@@ -614,7 +679,7 @@ function rowsOfType(rows, type) {
   return (rows || []).filter((r) => normalizeType(r.observation_type) === type);
 }
 
-function renderTypeVisuals(rows) {
+function renderTypeVisuals(rows, reportRows) {
   const neg = rowsOfType(rows, "negative");
   const largely = rowsOfType(rows, "largely");
   const positive = rowsOfType(rows, "positive");
@@ -622,111 +687,45 @@ function renderTypeVisuals(rows) {
   renderBarChart("chartNegCategory", groupObjectiveRows(neg, (r) => r.designation), { limit: 10 });
   renderBarChart("chartLargelyCategory", groupObjectiveRows(largely, (r) => r.designation), { limit: 10 });
 
-  renderBarChart("chartNegMonthly", buildPeriodRows(neg, monthKey), { labelFn: (r) => r.key, valueFn: (r) => r.observation_count, limit: 18 });
-  renderBarChart("chartLargelyMonthly", buildPeriodRows(largely, monthKey), { labelFn: (r) => r.key, valueFn: (r) => r.observation_count, limit: 18 });
-  renderBarChart("chartPositiveMonthly", buildPeriodRows(positive, monthKey), { labelFn: (r) => r.key, valueFn: (r) => r.observation_count, limit: 18 });
+  renderBarChart("chartNegMonthly", buildPeriodRows(neg, reportRows, monthKey), { labelFn: (r) => r.key, obsFn: (r) => r.observations, inspFn: (r) => r.inspections, limit: 18 });
+  renderBarChart("chartLargelyMonthly", buildPeriodRows(largely, reportRows, monthKey), { labelFn: (r) => r.key, obsFn: (r) => r.observations, inspFn: (r) => r.inspections, limit: 18 });
+  renderBarChart("chartPositiveMonthly", buildPeriodRows(positive, reportRows, monthKey), { labelFn: (r) => r.key, obsFn: (r) => r.observations, inspFn: (r) => r.inspections, limit: 18 });
 
-  renderBarChart("chartNegQuarterly", buildPeriodRows(neg, quarterOf), { labelFn: (r) => r.key, valueFn: (r) => r.observation_count, limit: 16 });
-  renderBarChart("chartLargelyQuarterly", buildPeriodRows(largely, quarterOf), { labelFn: (r) => r.key, valueFn: (r) => r.observation_count, limit: 16 });
-  renderBarChart("chartPositiveQuarterly", buildPeriodRows(positive, quarterOf), { labelFn: (r) => r.key, valueFn: (r) => r.observation_count, limit: 16 });
+  renderBarChart("chartNegQuarterly", buildPeriodRows(neg, reportRows, quarterOf), { labelFn: (r) => r.key, obsFn: (r) => r.observations, inspFn: (r) => r.inspections, limit: 16 });
+  renderBarChart("chartLargelyQuarterly", buildPeriodRows(largely, reportRows, quarterOf), { labelFn: (r) => r.key, obsFn: (r) => r.observations, inspFn: (r) => r.inspections, limit: 16 });
+  renderBarChart("chartPositiveQuarterly", buildPeriodRows(positive, reportRows, quarterOf), { labelFn: (r) => r.key, obsFn: (r) => r.observations, inspFn: (r) => r.inspections, limit: 16 });
 
-  renderBarChart("chartNegAnnual", buildPeriodRows(neg, yearOf), { labelFn: (r) => r.key, valueFn: (r) => r.observation_count, limit: 10 });
-  renderBarChart("chartLargelyAnnual", buildPeriodRows(largely, yearOf), { labelFn: (r) => r.key, valueFn: (r) => r.observation_count, limit: 10 });
-  renderBarChart("chartPositiveAnnual", buildPeriodRows(positive, yearOf), { labelFn: (r) => r.key, valueFn: (r) => r.observation_count, limit: 10 });
+  renderBarChart("chartNegAnnual", buildPeriodRows(neg, reportRows, yearOf), { labelFn: (r) => r.key, obsFn: (r) => r.observations, inspFn: (r) => r.inspections, limit: 10 });
+  renderBarChart("chartLargelyAnnual", buildPeriodRows(largely, reportRows, yearOf), { labelFn: (r) => r.key, obsFn: (r) => r.observations, inspFn: (r) => r.inspections, limit: 10 });
+  renderBarChart("chartPositiveAnnual", buildPeriodRows(positive, reportRows, yearOf), { labelFn: (r) => r.key, obsFn: (r) => r.observations, inspFn: (r) => r.inspections, limit: 10 });
 }
 
-function renderByVessel(rows, byVesselReportRows) {
+function renderByVessel(rows, reportRows) {
   const tbody = safeTbody("byVesselTbody");
   if (!tbody) return;
   tbody.innerHTML = "";
 
-  const byName = new Map();
+  const reportCountMap = reportCountsByKey(reportRows, (r) => r.vessel_name);
+  const grouped = groupTypeSplitRows(rows, (r) => r.vessel_name, (key) => reportCountMap.get(key) || 0);
 
-  for (const r of byVesselReportRows || []) {
-    const name = String(r.vessel_name || "—").trim() || "—";
-    if (!byName.has(name)) {
-      byName.set(name, {
-        vessel_name: name,
-        report_count: Number(r.report_count || 0),
+  const allVesselsWithReports = [...reportCountMap.keys()];
+  for (const name of allVesselsWithReports) {
+    if (!grouped.some((x) => x.key === name)) {
+      grouped.push({
+        key: name,
+        inspections: reportCountMap.get(name) || 0,
         negative: 0,
         largely: 0,
         positive: 0,
-      });
-    } else {
-      byName.get(name).report_count = Number(r.report_count || 0);
-    }
-  }
-
-  for (const row of rows || []) {
-    const name = String(row.vessel_name || "—").trim() || "—";
-    if (!byName.has(name)) {
-      byName.set(name, {
-        vessel_name: name,
-        report_count: 0,
-        negative: 0,
-        largely: 0,
-        positive: 0,
+        total: 0,
+        avg_negative: "0.00",
+        avg_largely: "0.00",
+        avg_positive: "0.00",
       });
     }
-
-    const item = byName.get(name);
-    const t = normalizeType(row.observation_type);
-    if (t === "negative") item.negative += 1;
-    if (t === "largely") item.largely += 1;
-    if (t === "positive") item.positive += 1;
   }
 
-  const list = [...byName.values()].sort((a, b) => a.vessel_name.localeCompare(b.vessel_name));
-
-  for (const r of list) {
-    const total = r.negative + r.largely + r.positive;
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>${esc(r.vessel_name)}</td>
-      <td>${esc(r.report_count)}</td>
-      <td>${esc(r.negative)}</td>
-      <td>${esc(r.largely)}</td>
-      <td>${esc(r.positive)}</td>
-      <td>${esc(avg(r.negative, r.report_count))}</td>
-      <td>${esc(avg(r.largely, r.report_count))}</td>
-      <td>${esc(avg(r.positive, r.report_count))}</td>
-      <td>${esc(avg(total, r.report_count))}</td>
-    `;
-    tbody.appendChild(tr);
-  }
-
-  if (!list.length) ensureTbodyMessage(tbody, 9, "No vessel data for current filters.");
-}
-
-function renderFleetAverage(rows) {
-  const tbody = safeTbody("avgFleetTbody");
-  if (!tbody) return;
-  tbody.innerHTML = "";
-
-  const s = buildAverageStats(rows);
-
-  const tr = document.createElement("tr");
-  tr.innerHTML = `
-    <td>Selected scope</td>
-    <td>${esc(s.inspections)}</td>
-    <td>${esc(s.negative)}</td>
-    <td>${esc(s.largely)}</td>
-    <td>${esc(s.positive)}</td>
-    <td>${esc(s.total)}</td>
-    <td>${esc(s.avg_negative)}</td>
-    <td>${esc(s.avg_largely)}</td>
-    <td>${esc(s.avg_positive)}</td>
-    <td>${esc(s.avg_total)}</td>
-  `;
-  tbody.appendChild(tr);
-}
-
-function renderAverageGroupTable(rows, keyFn, tbodyId, emptyLabel) {
-  const tbody = safeTbody(tbodyId);
-  if (!tbody) return;
-  tbody.innerHTML = "";
-
-  const grouped = groupAverageRows(rows, keyFn);
+  grouped.sort((a, b) => String(a.key).localeCompare(String(b.key)));
 
   for (const r of grouped) {
     const tr = document.createElement("tr");
@@ -736,42 +735,108 @@ function renderAverageGroupTable(rows, keyFn, tbodyId, emptyLabel) {
       <td>${esc(r.negative)}</td>
       <td>${esc(r.largely)}</td>
       <td>${esc(r.positive)}</td>
-      <td>${esc(r.total)}</td>
-      <td>${esc(r.avg_total)}</td>
+      <td>${esc(r.avg_negative)}</td>
+      <td>${esc(r.avg_largely)}</td>
+      <td>${esc(r.avg_positive)}</td>
     `;
     tbody.appendChild(tr);
   }
 
-  if (!grouped.length) ensureTbodyMessage(tbody, 7, `No ${emptyLabel} data for current filters.`);
+  if (!grouped.length) ensureTbodyMessage(tbody, 8, "No vessel data for current filters.");
 }
 
-function renderByType(rows) {
+function renderFleetAverage(rows, reportRows) {
+  const tbody = safeTbody("avgFleetTbody");
+  if (!tbody) return;
+  tbody.innerHTML = "";
+
+  const counts = typeCountsFromRows(rows);
+  const inspections = reportRows.length;
+
+  const tr = document.createElement("tr");
+  tr.innerHTML = `
+    <td>Selected scope</td>
+    <td>${esc(inspections)}</td>
+    <td>${esc(counts.negative)}</td>
+    <td>${esc(counts.largely)}</td>
+    <td>${esc(counts.positive)}</td>
+    <td>${esc(avg(counts.negative, inspections))}</td>
+    <td>${esc(avg(counts.largely, inspections))}</td>
+    <td>${esc(avg(counts.positive, inspections))}</td>
+  `;
+  tbody.appendChild(tr);
+}
+
+function renderAverageGroupTable(rows, reportRows, keyFnRows, keyFnReports, tbodyId, emptyLabel) {
+  const tbody = safeTbody(tbodyId);
+  if (!tbody) return;
+  tbody.innerHTML = "";
+
+  const reportCountMap = reportCountsByKey(reportRows, keyFnReports);
+  const grouped = groupTypeSplitRows(rows, keyFnRows, (key) => reportCountMap.get(key) || 0);
+
+  for (const key of reportCountMap.keys()) {
+    if (!grouped.some((x) => x.key === key)) {
+      grouped.push({
+        key,
+        inspections: reportCountMap.get(key) || 0,
+        negative: 0,
+        largely: 0,
+        positive: 0,
+        total: 0,
+        avg_negative: "0.00",
+        avg_largely: "0.00",
+        avg_positive: "0.00",
+      });
+    }
+  }
+
+  grouped.sort((a, b) => b.total - a.total || String(a.key).localeCompare(String(b.key)));
+
+  for (const r of grouped) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${esc(r.key)}</td>
+      <td>${esc(r.inspections)}</td>
+      <td>${esc(r.negative)}</td>
+      <td>${esc(r.largely)}</td>
+      <td>${esc(r.positive)}</td>
+      <td>${esc(r.avg_negative)}</td>
+      <td>${esc(r.avg_largely)}</td>
+      <td>${esc(r.avg_positive)}</td>
+    `;
+    tbody.appendChild(tr);
+  }
+
+  if (!grouped.length) ensureTbodyMessage(tbody, 8, `No ${emptyLabel} data for current filters.`);
+}
+
+function renderByType(rowsIgnoreTypeFilter, reportRows) {
   const tbody = safeTbody("byTypeTbody");
   if (!tbody) return;
   tbody.innerHTML = "";
 
-  const groups = groupObjectiveRows(rows, (r) => typeLabel(r.observation_type));
-
-  for (const r of groups) {
+  for (const t of OBS_TYPES) {
+    const rows = rowsOfType(rowsIgnoreTypeFilter, t.value);
+    const reports = new Set(rows.map((r) => reportKey(r)));
     const tr = document.createElement("tr");
     tr.innerHTML = `
-      <td>${esc(r.key)}</td>
-      <td>${esc(r.report_count)}</td>
-      <td>${esc(r.observation_count)}</td>
+      <td>${esc(t.label)}</td>
+      <td>${esc(reports.size)}</td>
+      <td>${esc(rows.length)}</td>
+      <td>${esc(avg(rows.length, reportRows.length))}</td>
     `;
     tbody.appendChild(tr);
   }
-
-  if (!groups.length) ensureTbodyMessage(tbody, 3, "No type data for current filters.");
 }
 
 function recurringFilteredRows(rows) {
-  const year = selectedYear("recurringYearFilter");
-  const month = selectedMonth("recurringMonthFilter");
+  const selectedYears = new Set(getSelectedRecurringYears());
+  const selectedMonths = new Set(getSelectedRecurringMonths());
 
   return (rows || []).filter((r) => {
-    if (year && yearOf(r) !== year) return false;
-    if (month && monthOf(r) !== month) return false;
+    if (selectedYears.size > 0 && !selectedYears.has(yearOf(r))) return false;
+    if (selectedMonths.size > 0 && !selectedMonths.has(monthOf(r))) return false;
     return true;
   });
 }
@@ -817,16 +882,16 @@ function renderTopRecurringQuestions(rows) {
   if (!grouped.length) ensureTbodyMessage(tbody, 6, `No recurring questions found at threshold ${minCount}.`);
 }
 
-function renderByCategory(rows) {
-  renderSplitTable("byCategoryTbody", groupSplitByType(rows, (r) => r.designation), "category");
+function renderByCategory(rows, reportRows) {
+  renderTypeSplitTable("byCategoryTbody", groupTypeSplitRows(rows, (r) => r.designation, () => reportRows.length), "category");
 }
 
-function renderTopSoc(rows) {
-  renderSplitTable("topSocTbody", groupSplitByType(rows, (r) => r.soc), "SOC", 100);
+function renderTopSoc(rows, reportRows) {
+  renderTypeSplitTable("topSocTbody", groupTypeSplitRows(rows, (r) => r.soc, () => reportRows.length), "SOC", 100);
 }
 
-function renderTopNoc(rows) {
-  renderSplitTable("topNocTbody", groupSplitByType(rows, (r) => r.noc), "NOC", 100);
+function renderTopNoc(rows, reportRows) {
+  renderTypeSplitTable("topNocTbody", groupTypeSplitRows(rows, (r) => r.noc, () => reportRows.length), "NOC", 100);
 }
 
 function extractPgnoAnalyticsRows(rows) {
@@ -853,21 +918,23 @@ function extractPgnoAnalyticsRows(rows) {
   return out;
 }
 
-function renderPgnoAnalytics(rows) {
+function renderPgnoAnalytics(rows, reportRows) {
   const pgRows = extractPgnoAnalyticsRows(rows);
   const byPgno = groupObjectiveRows(pgRows, (r) => r.pgno_label).slice(0, 50);
   const byPgnoQuestion = groupObjectiveRows(pgRows, (r) => r.question_no).slice(0, 50);
 
   renderBarChart("chartPgno", byPgno, {
     labelFn: (r) => r.key,
-    valueFn: (r) => r.observation_count,
+    obsFn: (r) => r.observation_count,
+    inspFn: (r) => r.report_count,
     limit: 10,
     emptyText: "No assigned PGNOs for current filters.",
   });
 
   renderBarChart("chartPgnoQuestion", byPgnoQuestion, {
     labelFn: (r) => r.key,
-    valueFn: (r) => r.observation_count,
+    obsFn: (r) => r.observation_count,
+    inspFn: (r) => r.report_count,
     limit: 10,
     emptyText: "No PGNO/question data for current filters.",
   });
@@ -878,11 +945,10 @@ function renderPgnoAnalytics(rows) {
     return (type === "negative" || type === "largely") && arr.length === 0;
   });
 
-  const missingMonthly = buildPeriodRows(missingRows, monthKey);
-
-  renderBarChart("chartPgnoMissing", missingMonthly, {
+  renderBarChart("chartPgnoMissing", buildPeriodRows(missingRows, reportRows, monthKey), {
     labelFn: (r) => r.key,
-    valueFn: (r) => r.observation_count,
+    obsFn: (r) => r.observations,
+    inspFn: (r) => r.inspections,
     limit: 18,
     emptyText: "No missing PGNOs for current filters.",
   });
@@ -897,19 +963,21 @@ function renderPgnoAnalytics(rows) {
       <td>${esc(r.key)}</td>
       <td>${esc(r.observation_count)}</td>
       <td>${esc(r.report_count)}</td>
+      <td>${esc(r.avg_per_inspection)}</td>
       <td>${esc(r.last_seen || "")}</td>
     `;
     tbody.appendChild(tr);
   }
 
-  if (!byPgno.length) ensureTbodyMessage(tbody, 4, "No assigned PGNO data for current filters.");
+  if (!byPgno.length) ensureTbodyMessage(tbody, 5, "No assigned PGNO data for current filters.");
 }
 
-function renderSummaryFromRows(rows, summary) {
-  setText("sumReports", String(summary?.report_count ?? 0));
-  setText("sumObs", String(summary?.observation_count ?? rows.length ?? 0));
-  setText("sumMissing", String(summary?.missing_pgno_count ?? 0));
-  setText("sumDistinct", String(summary?.distinct_questions ?? 0));
+function renderSummaryFromRows(rows, reportRows) {
+  const counts = typeCountsFromRows(rows);
+  const questionSet = new Set((rows || []).map((r) => String(r.question_no || "").trim()).filter(Boolean));
+
+  setText("sumReports", String(reportRows.length));
+  setText("sumObs", String(counts.total));
 
   const missingNeg = (rows || []).filter((r) => {
     const arr = Array.isArray(r.pgno_selected) ? r.pgno_selected : [];
@@ -921,56 +989,62 @@ function renderSummaryFromRows(rows, summary) {
     return normalizeType(r.observation_type) === "largely" && arr.length === 0;
   }).length;
 
+  setText("sumMissing", String(missingNeg + missingLargely));
+  setText("sumDistinct", String(questionSet.size));
   setText("sumMissingSplit", `Negative: ${missingNeg} | Largely: ${missingLargely}`);
 }
 
-async function renderAllStats(summary, byVesselReportRows, rows) {
-  renderSummaryFromRows(rows, summary);
+async function renderAllStats(rows, rowsIgnoreTypeFilter, reportRows) {
+  renderSummaryFromRows(rows, reportRows);
 
-  renderTypeVisuals(rows);
-  renderByVessel(rows, byVesselReportRows);
-  renderFleetAverage(rows);
-  renderByType(rows);
+  renderTypeVisuals(rows, reportRows);
+  renderByVessel(rows, reportRows);
+  renderFleetAverage(rows, reportRows);
+  renderByType(rowsIgnoreTypeFilter, reportRows);
   renderTopRecurringQuestions(rows);
-  renderByCategory(rows);
-  renderTopSoc(rows);
-  renderTopNoc(rows);
-  renderMonthlyTrend(rows);
-  renderAverageGroupTable(rows, (r) => r.ocimf_inspecting_company, "byOcimfTbody", "OCIMF company");
-  renderAverageGroupTable(rows, (r) => r.inspector_name, "byInspectorTbody", "inspector");
-  renderAverageGroupTable(rows, (r) => r.inspector_company, "byInspectorCompanyTbody", "inspector company");
-  renderPgnoAnalytics(rows);
+  renderByCategory(rows, reportRows);
+  renderTopSoc(rows, reportRows);
+  renderTopNoc(rows, reportRows);
+  renderMonthlyTrend(rows, reportRows);
+
+  renderAverageGroupTable(
+    rows,
+    reportRows,
+    (r) => r.ocimf_inspecting_company,
+    (r) => r.ocimf_inspecting_company,
+    "byOcimfTbody",
+    "OCIMF company"
+  );
+
+  renderAverageGroupTable(
+    rows,
+    reportRows,
+    (r) => r.inspector_name,
+    (r) => r.inspector_name,
+    "byInspectorTbody",
+    "inspector"
+  );
+
+  renderAverageGroupTable(
+    rows,
+    reportRows,
+    (r) => r.inspector_company,
+    (r) => r.inspector_company,
+    "byInspectorCompanyTbody",
+    "inspector company"
+  );
+
+  renderPgnoAnalytics(rows, reportRows);
 }
 
 async function applyFilters() {
   setStatus("Loading…");
 
-  const { vessel_id, p_from, p_to, p_observation_type } = getFilters();
+  const reportRows = filterReportsBase(state.allReportRows);
+  const rows = filterRowsBase(state.allRows, false);
+  const rowsIgnoreTypeFilter = filterRowsBase(state.allRows, true);
 
-  const { data: sum, error: sumErr } = await state.supabase
-    .rpc("post_insp_stats_summary", {
-      p_vessel_id: vessel_id,
-      p_from,
-      p_to,
-      p_observation_type,
-    });
-
-  if (sumErr) throw sumErr;
-
-  const summary = Array.isArray(sum) ? sum[0] : sum;
-
-  const { data: byV, error: byVErr } = await state.supabase
-    .rpc("post_insp_stats_by_vessel", {
-      p_from,
-      p_to,
-      p_observation_type,
-    });
-
-  if (byVErr) throw byVErr;
-
-  const rows = await loadFilteredObservationRows();
-
-  await renderAllStats(summary, byV || [], rows);
+  await renderAllStats(rows, rowsIgnoreTypeFilter, reportRows);
 
   setStatus("Ready");
 }
@@ -978,19 +1052,7 @@ async function applyFilters() {
 async function exportFilteredCsv() {
   setStatus("Exporting…");
 
-  const { vessel_id, p_from, p_to, p_observation_type } = getFilters();
-
-  const { data, error } = await state.supabase
-    .rpc("post_insp_export_observations", {
-      p_vessel_id: vessel_id,
-      p_from,
-      p_to,
-      p_observation_type,
-    });
-
-  if (error) throw error;
-
-  const rows = enrichRowsWithReportMeta(data || []);
+  const rows = filterRowsBase(state.allRows, false);
 
   const header = [
     "vessel_name",
@@ -1043,12 +1105,10 @@ async function exportFilteredCsv() {
   const blob = new Blob([csv.join("\n")], { type: "text/csv;charset=utf-8" });
   const a = document.createElement("a");
 
-  const safeV = (vessel_id ? (state.vessels.find(v => v.id === vessel_id)?.name || "vessel") : "fleet")
-    .replace(/[^a-z0-9]+/gi, "_");
-  const safeFrom = (p_from || "from").replace(/[^0-9-]+/g, "_");
-  const safeTo = (p_to || "to").replace(/[^0-9-]+/g, "_");
+  const safeFrom = (el("dateFrom")?.value || "from").replace(/[^0-9-]+/g, "_");
+  const safeTo = (el("dateTo")?.value || "to").replace(/[^0-9-]+/g, "_");
 
-  a.download = `post_inspection_export_${safeV}_${safeFrom}_${safeTo}.csv`;
+  a.download = `post_inspection_export_filtered_${safeFrom}_${safeTo}.csv`;
   a.href = URL.createObjectURL(blob);
 
   document.body.appendChild(a);
@@ -1071,13 +1131,34 @@ function bindChange(id, fn) {
   node.addEventListener("change", fn);
 }
 
+function bindAllNone(allId, noneId, containerId, refresh = null) {
+  bindClick(allId, async () => {
+    setAllCheckboxes(containerId, true);
+    if (refresh) await refresh();
+  });
+
+  bindClick(noneId, async () => {
+    setAllCheckboxes(containerId, false);
+    if (refresh) await refresh();
+  });
+}
+
+function bindCheckboxRefresh(containerId, refresh) {
+  const box = safeEl(containerId);
+  if (!box) return;
+  box.addEventListener("change", async (e) => {
+    if (e.target && e.target.matches("input[type='checkbox']")) {
+      await refresh();
+    }
+  });
+}
+
 async function init() {
   const R = window.AUTH?.ROLES;
   state.me = await window.AUTH.requireAuth([R.SUPER_ADMIN, R.COMPANY_ADMIN]);
   if (!state.me) return;
 
   window.AUTH.fillUserBadge(state.me, "userBadge");
-
   bindClick("logoutBtn", window.AUTH.logoutAndGoLogin);
 
   state.supabase = window.__supabaseClient;
@@ -1085,14 +1166,19 @@ async function init() {
     throw new Error("Supabase client missing. Ensure supabase-js CDN and auth.js are loaded.");
   }
 
-  state.labelMap = new Map(
-    OBS_TYPES.filter((x) => x.value).map((x) => [x.value, x.label])
-  );
+  state.labelMap = new Map(OBS_TYPES.map((x) => [x.value, x.label]));
 
   state.vessels = await loadVessels();
-  renderVesselFilter();
-  renderTypeFilter();
-  renderMonthSelect("recurringMonthFilter");
+
+  renderCheckboxList(
+    "vesselCheckList",
+    "vesselChk",
+    state.vessels.map((v) => ({ value: v.id, label: v.name })),
+    true
+  );
+
+  renderCheckboxList("typeCheckList", "typeChk", OBS_TYPES, true);
+  renderCheckboxList("recurringMonthCheckList", "recMonthChk", MONTHS, true);
 
   const to = new Date();
   const from = new Date();
@@ -1109,18 +1195,23 @@ async function init() {
     if (qno) state.libByNo.set(qno, q);
   }
 
-  state.allReportRows = await loadAllReportRowsForYearSelectors();
+  state.allReportRows = enrichReports(await loadAllReportRows());
   rebuildReportMetaMap();
-
-  state.allRows = await loadFilteredObservationRows().catch(() => []);
+  state.allRows = enrichRowsWithReportMeta(await loadAllObservationRows());
 
   const years = collectYearsFromRows(state.allRows, state.allReportRows);
   const currentYear = String(new Date().getFullYear());
 
-  renderYearSelect("recurringYearFilter", years, true, "");
-  renderYearSelect("trendYearFilter", years, false, currentYear);
+  renderCheckboxList(
+    "recurringYearCheckList",
+    "recYearChk",
+    years.map((y) => ({ value: y, label: y })),
+    true
+  );
 
-  bindClick("applyBtn", async () => {
+  renderYearSelect("trendYearFilter", years, currentYear);
+
+  const refresh = async () => {
     try {
       await applyFilters();
     } catch (e) {
@@ -1128,7 +1219,9 @@ async function init() {
       alert("Apply filters failed: " + (e?.message || String(e)));
       setStatus("Error");
     }
-  });
+  };
+
+  bindClick("applyBtn", refresh);
 
   bindClick("exportCsvBtn", async () => {
     try {
@@ -1140,19 +1233,20 @@ async function init() {
     }
   });
 
-  const refresh = async () => {
-    try {
-      await applyFilters();
-    } catch (e) {
-      console.error(e);
-      setStatus("Error");
-    }
-  };
+  bindAllNone("vesselAllBtn", "vesselNoneBtn", "vesselCheckList", refresh);
+  bindAllNone("typeAllBtn", "typeNoneBtn", "typeCheckList", refresh);
+  bindAllNone("recYearAllBtn", "recYearNoneBtn", "recurringYearCheckList", refresh);
+  bindAllNone("recMonthAllBtn", "recMonthNoneBtn", "recurringMonthCheckList", refresh);
+
+  bindCheckboxRefresh("vesselCheckList", refresh);
+  bindCheckboxRefresh("typeCheckList", refresh);
+  bindCheckboxRefresh("recurringYearCheckList", refresh);
+  bindCheckboxRefresh("recurringMonthCheckList", refresh);
 
   bindChange("recurringMinCount", refresh);
-  bindChange("recurringYearFilter", refresh);
-  bindChange("recurringMonthFilter", refresh);
   bindChange("trendYearFilter", refresh);
+  bindChange("dateFrom", refresh);
+  bindChange("dateTo", refresh);
 
   await applyFilters();
 }
