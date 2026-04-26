@@ -55,6 +55,7 @@ const state = {
   labelMap: new Map(),
   allRows: [],
   allReportRows: [],
+  reportMetaByKey: new Map(),
 };
 
 function setStatus(text) {
@@ -100,9 +101,23 @@ function pgnoExportText(pgnoSelected) {
     .join("; ");
 }
 
+function vesselNameById(vesselId) {
+  const v = (state.vessels || []).find((x) => String(x.id) === String(vesselId));
+  return String(v?.name || "").trim();
+}
+
 function reportKey(row) {
   return [
     String(row.vessel_name || "").trim(),
+    String(row.inspection_date || "").trim(),
+    String(row.report_ref || "").trim(),
+    String(row.title || "").trim(),
+  ].join("|");
+}
+
+function reportKeyFromReport(row) {
+  return [
+    vesselNameById(row.vessel_id),
     String(row.inspection_date || "").trim(),
     String(row.report_ref || "").trim(),
     String(row.title || "").trim(),
@@ -135,6 +150,13 @@ function typeLabel(type) {
 
 function normalizeType(type) {
   return String(type || "").trim();
+}
+
+function avg(numerator, denominator) {
+  const n = Number(numerator || 0);
+  const d = Number(denominator || 0);
+  if (!d) return "0.00";
+  return (n / d).toFixed(2);
 }
 
 function ensureTbodyMessage(tbody, colspan, message) {
@@ -206,16 +228,6 @@ function dateInRange(dateStr, from, to) {
   return true;
 }
 
-function rowPassesMainFilters(row, includeType = true) {
-  const { vessel_id, p_from, p_to, p_observation_type } = getFilters();
-
-  if (vessel_id && String(row.vessel_id || "") !== String(vessel_id)) return false;
-  if (!dateInRange(row.inspection_date, p_from, p_to)) return false;
-  if (includeType && p_observation_type && normalizeType(row.observation_type) !== p_observation_type) return false;
-
-  return true;
-}
-
 async function loadFilteredObservationRows() {
   const { vessel_id, p_from, p_to, p_observation_type } = getFilters();
 
@@ -228,13 +240,14 @@ async function loadFilteredObservationRows() {
     });
 
   if (error) throw error;
-  return data || [];
+
+  return enrichRowsWithReportMeta(data || []);
 }
 
 async function loadAllReportRowsForYearSelectors() {
   const { data, error } = await state.supabase
     .from("post_inspection_reports")
-    .select("id, vessel_id, inspection_date, report_ref, title");
+    .select("id, vessel_id, inspection_date, report_ref, title, ocimf_inspecting_company, inspector_name, inspector_company");
 
   if (error) {
     console.warn("Report rows unavailable for year selector.", error);
@@ -242,6 +255,32 @@ async function loadAllReportRowsForYearSelectors() {
   }
 
   return data || [];
+}
+
+function rebuildReportMetaMap() {
+  state.reportMetaByKey = new Map();
+
+  for (const r of state.allReportRows || []) {
+    const k = reportKeyFromReport(r);
+    if (!k) continue;
+    state.reportMetaByKey.set(k, {
+      ocimf_inspecting_company: String(r.ocimf_inspecting_company || "").trim() || "—",
+      inspector_name: String(r.inspector_name || "").trim() || "—",
+      inspector_company: String(r.inspector_company || "").trim() || "—",
+    });
+  }
+}
+
+function enrichRowsWithReportMeta(rows) {
+  return (rows || []).map((r) => {
+    const meta = state.reportMetaByKey.get(reportKey(r)) || {};
+    return {
+      ...r,
+      ocimf_inspecting_company: meta.ocimf_inspecting_company || "—",
+      inspector_name: meta.inspector_name || "—",
+      inspector_company: meta.inspector_company || "—",
+    };
+  });
 }
 
 function collectYearsFromRows(rows, reportRows) {
@@ -348,6 +387,53 @@ function groupObjectiveRows(rows, keyFn) {
       b.report_count - a.report_count ||
       String(a.key).localeCompare(String(b.key))
     );
+}
+
+function buildAverageStats(rows) {
+  const reports = new Set();
+  let negative = 0;
+  let largely = 0;
+  let positive = 0;
+
+  for (const row of rows || []) {
+    reports.add(reportKey(row));
+    const t = normalizeType(row.observation_type);
+    if (t === "negative") negative += 1;
+    if (t === "largely") largely += 1;
+    if (t === "positive") positive += 1;
+  }
+
+  const inspections = reports.size;
+  const total = negative + largely + positive;
+
+  return {
+    inspections,
+    negative,
+    largely,
+    positive,
+    total,
+    avg_negative: avg(negative, inspections),
+    avg_largely: avg(largely, inspections),
+    avg_positive: avg(positive, inspections),
+    avg_total: avg(total, inspections),
+  };
+}
+
+function groupAverageRows(rows, keyFn) {
+  const map = new Map();
+
+  for (const row of rows || []) {
+    const key = String(keyFn(row) || "—").trim() || "—";
+    if (!map.has(key)) map.set(key, []);
+    map.get(key).push(row);
+  }
+
+  return [...map.entries()]
+    .map(([key, list]) => ({
+      key,
+      ...buildAverageStats(list),
+    }))
+    .sort((a, b) => b.total - a.total || Number(b.avg_total) - Number(a.avg_total) || a.key.localeCompare(b.key));
 }
 
 function groupSplitByType(rows, keyFn) {
@@ -589,6 +675,7 @@ function renderByVessel(rows, byVesselReportRows) {
   const list = [...byName.values()].sort((a, b) => a.vessel_name.localeCompare(b.vessel_name));
 
   for (const r of list) {
+    const total = r.negative + r.largely + r.positive;
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>${esc(r.vessel_name)}</td>
@@ -596,12 +683,63 @@ function renderByVessel(rows, byVesselReportRows) {
       <td>${esc(r.negative)}</td>
       <td>${esc(r.largely)}</td>
       <td>${esc(r.positive)}</td>
+      <td>${esc(avg(r.negative, r.report_count))}</td>
+      <td>${esc(avg(r.largely, r.report_count))}</td>
+      <td>${esc(avg(r.positive, r.report_count))}</td>
+      <td>${esc(avg(total, r.report_count))}</td>
     `;
     tbody.appendChild(tr);
   }
 
   if (!list.length) {
-    ensureTbodyMessage(tbody, 5, "No vessel data for current filters.");
+    ensureTbodyMessage(tbody, 9, "No vessel data for current filters.");
+  }
+}
+
+function renderFleetAverage(rows) {
+  const tbody = el("avgFleetTbody");
+  tbody.innerHTML = "";
+
+  const s = buildAverageStats(rows);
+
+  const tr = document.createElement("tr");
+  tr.innerHTML = `
+    <td>Selected scope</td>
+    <td>${esc(s.inspections)}</td>
+    <td>${esc(s.negative)}</td>
+    <td>${esc(s.largely)}</td>
+    <td>${esc(s.positive)}</td>
+    <td>${esc(s.total)}</td>
+    <td>${esc(s.avg_negative)}</td>
+    <td>${esc(s.avg_largely)}</td>
+    <td>${esc(s.avg_positive)}</td>
+    <td>${esc(s.avg_total)}</td>
+  `;
+  tbody.appendChild(tr);
+}
+
+function renderAverageGroupTable(rows, keyFn, tbodyId, emptyLabel) {
+  const tbody = el(tbodyId);
+  tbody.innerHTML = "";
+
+  const grouped = groupAverageRows(rows, keyFn);
+
+  for (const r of grouped) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${esc(r.key)}</td>
+      <td>${esc(r.inspections)}</td>
+      <td>${esc(r.negative)}</td>
+      <td>${esc(r.largely)}</td>
+      <td>${esc(r.positive)}</td>
+      <td>${esc(r.total)}</td>
+      <td>${esc(r.avg_total)}</td>
+    `;
+    tbody.appendChild(tr);
+  }
+
+  if (!grouped.length) {
+    ensureTbodyMessage(tbody, 7, `No ${emptyLabel} data for current filters.`);
   }
 }
 
@@ -792,12 +930,16 @@ async function renderAllStats(summary, byVesselReportRows, rows) {
 
   renderTypeVisuals(rows);
   renderByVessel(rows, byVesselReportRows);
+  renderFleetAverage(rows);
   renderByType(rows);
   renderTopRecurringQuestions(rows);
   renderByCategory(rows);
   renderTopSoc(rows);
   renderTopNoc(rows);
   renderMonthlyTrend(rows);
+  renderAverageGroupTable(rows, (r) => r.ocimf_inspecting_company, "byOcimfTbody", "OCIMF company");
+  renderAverageGroupTable(rows, (r) => r.inspector_name, "byInspectorTbody", "inspector");
+  renderAverageGroupTable(rows, (r) => r.inspector_company, "byInspectorCompanyTbody", "inspector company");
   renderPgnoAnalytics(rows);
 }
 
@@ -849,7 +991,7 @@ async function exportFilteredCsv() {
 
   if (error) throw error;
 
-  const rows = data || [];
+  const rows = enrichRowsWithReportMeta(data || []);
 
   const header = [
     "vessel_name",
@@ -861,6 +1003,9 @@ async function exportFilteredCsv() {
     "designation",
     "soc",
     "noc",
+    "ocimf_inspecting_company",
+    "inspector_name",
+    "inspector_company",
     "pgno_selected",
     "pgno_count",
     "remarks",
@@ -884,6 +1029,9 @@ async function exportFilteredCsv() {
       r.designation || "",
       r.soc || "",
       r.noc || "",
+      r.ocimf_inspecting_company || "",
+      r.inspector_name || "",
+      r.inspector_company || "",
       pgTxt,
       String(pgCount),
       r.remarks || "",
@@ -947,8 +1095,10 @@ async function init() {
     if (qno) state.libByNo.set(qno, q);
   }
 
-  state.allRows = await loadFilteredObservationRows().catch(() => []);
   state.allReportRows = await loadAllReportRowsForYearSelectors();
+  rebuildReportMetaMap();
+
+  state.allRows = await loadFilteredObservationRows().catch(() => []);
 
   const years = collectYearsFromRows(state.allRows, state.allReportRows);
   const currentYear = String(new Date().getFullYear());
