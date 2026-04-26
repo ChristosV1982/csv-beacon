@@ -1,6 +1,8 @@
 // public/post_inspection_stats.js
 // Fleet/vessel stats via RPC functions + client-side multi-filtering + drilldown views.
-// Current observation model: post_inspection_observation_items.obs_type = negative | positive | largely
+// Modes:
+// 1) Post-Inspection only: uses post_insp_export_observations + post_inspection_reports.
+// 2) Combined Analytics: uses fleet_obs_analytics_export view/function output normalized into same client model.
 
 import { loadLockedLibraryJson } from "./question_library_loader.js";
 
@@ -11,6 +13,15 @@ const OBS_TYPES = [
   { value: "largely", label: "Largely as expected" },
   { value: "positive", label: "Positive" },
 ];
+
+const RECORD_SOURCES = [
+  { value: "vetting_inspection", label: "Vetting inspections" },
+  { value: "audit_internal_superintendent", label: "Audit — Internal Superintendent" },
+  { value: "audit_internal_master", label: "Audit — Internal Master" },
+  { value: "audit_external_contractor", label: "Audit — External Contractor" },
+];
+
+const RECORD_SOURCE_LABELS = new Map(RECORD_SOURCES.map((x) => [x.value, x.label]));
 
 const MONTHS = [
   { value: "01", label: "01 — January" },
@@ -73,8 +84,16 @@ const state = {
   vessels: [],
   libByNo: new Map(),
   labelMap: new Map(),
+
+  postRows: [],
+  postReportRows: [],
+
+  combinedRows: [],
+  combinedReportRows: [],
+
   allRows: [],
   allReportRows: [],
+
   reportMetaByKey: new Map(),
   currentRows: [],
   currentRowsIgnoreType: [],
@@ -85,6 +104,18 @@ const state = {
 
 function setStatus(text) {
   setText("statusPill", text || "Ready");
+}
+
+function getMode() {
+  return String(el("statsMode")?.value || "post");
+}
+
+function isCombinedMode() {
+  return getMode() === "combined";
+}
+
+function sourceLabel(value) {
+  return RECORD_SOURCE_LABELS.get(value) || value || "Post-Inspection";
 }
 
 function pick(obj, keys) {
@@ -133,6 +164,8 @@ function vesselNameById(vesselId) {
 
 function reportKey(row) {
   return [
+    String(row.record_source || "vetting_inspection").trim(),
+    String(row.source_report_id || "").trim(),
     String(row.vessel_name || "").trim(),
     String(row.inspection_date || "").trim(),
     String(row.report_ref || "").trim(),
@@ -142,6 +175,8 @@ function reportKey(row) {
 
 function reportKeyFromReport(row) {
   return [
+    String(row.record_source || "vetting_inspection").trim(),
+    String(row.id || row.source_report_id || "").trim(),
     vesselNameById(row.vessel_id),
     String(row.inspection_date || "").trim(),
     String(row.report_ref || "").trim(),
@@ -242,6 +277,10 @@ function getSelectedTypes() {
   return selectedCheckboxValues("typeCheckList");
 }
 
+function getSelectedRecordSources() {
+  return selectedCheckboxValues("recordSourceCheckList");
+}
+
 function getSelectedRecurringYears() {
   return selectedCheckboxValues("recurringYearCheckList");
 }
@@ -254,6 +293,7 @@ function getFilters() {
   return {
     selected_vessel_ids: getSelectedVesselIds(),
     selected_vessel_names: getSelectedVesselNames(),
+    selected_record_sources: getSelectedRecordSources(),
     p_from: el("dateFrom")?.value || null,
     p_to: el("dateTo")?.value || null,
     selected_types: getSelectedTypes(),
@@ -261,23 +301,27 @@ function getFilters() {
 }
 
 function filterReportsBase(reportRows) {
-  const { selected_vessel_ids, p_from, p_to } = getFilters();
+  const { selected_vessel_ids, selected_record_sources, p_from, p_to } = getFilters();
   const vesselSet = new Set(selected_vessel_ids);
+  const sourceSet = new Set(selected_record_sources);
 
   return (reportRows || []).filter((r) => {
     if (vesselSet.size > 0 && !vesselSet.has(String(r.vessel_id))) return false;
+    if (isCombinedMode() && sourceSet.size > 0 && !sourceSet.has(String(r.record_source || "vetting_inspection"))) return false;
     if (!inDateRange(r.inspection_date, p_from, p_to)) return false;
     return true;
   });
 }
 
 function filterRowsBase(rows, ignoreTypeFilter = false) {
-  const { selected_vessel_names, p_from, p_to, selected_types } = getFilters();
+  const { selected_vessel_names, selected_record_sources, p_from, p_to, selected_types } = getFilters();
   const typeSet = new Set(selected_types);
+  const sourceSet = new Set(selected_record_sources);
 
   return (rows || []).filter((r) => {
     const vesselName = String(r.vessel_name || "").trim();
     if (selected_vessel_names.size > 0 && !selected_vessel_names.has(vesselName)) return false;
+    if (isCombinedMode() && sourceSet.size > 0 && !sourceSet.has(String(r.record_source || "vetting_inspection"))) return false;
     if (!inDateRange(r.inspection_date, p_from, p_to)) return false;
     if (!ignoreTypeFilter && typeSet.size > 0 && !typeSet.has(normalizeType(r.observation_type))) return false;
     return true;
@@ -295,7 +339,7 @@ async function loadVessels() {
   return data || [];
 }
 
-async function loadAllObservationRows() {
+async function loadPostObservationRows() {
   const { data, error } = await state.supabase
     .rpc("post_insp_export_observations", {
       p_vessel_id: null,
@@ -308,7 +352,7 @@ async function loadAllObservationRows() {
   return data || [];
 }
 
-async function loadAllReportRows() {
+async function loadPostReportRows() {
   const { data, error } = await state.supabase
     .from("post_inspection_reports")
     .select("id, vessel_id, inspection_date, report_ref, title, ocimf_inspecting_company, inspector_name, inspector_company");
@@ -317,10 +361,96 @@ async function loadAllReportRows() {
   return data || [];
 }
 
+async function loadCombinedObservationRows() {
+  const { data, error } = await state.supabase
+    .rpc("fleet_obs_analytics_export", {
+      p_vessel_id: null,
+      p_from: null,
+      p_to: null,
+      p_record_source: null,
+      p_observation_type: null,
+    });
+
+  if (error) throw error;
+
+  return normalizeCombinedRows(data || []);
+}
+
+function normalizeCombinedRows(rows) {
+  return (rows || []).map((r) => {
+    const recordSource = String(r.record_source || "").trim() || "vetting_inspection";
+    const isAudit = recordSource.startsWith("audit_");
+
+    const inspectingCompany =
+      isAudit
+        ? String(r.contractor_company || r.inspector_company || r.inspecting_company || "").trim()
+        : String(r.inspecting_company || "").trim();
+
+    const title =
+      isAudit
+        ? String(r.audit_type_name || r.report_title || "").trim()
+        : String(r.report_title || "").trim();
+
+    return {
+      ...r,
+      record_source: recordSource,
+      record_source_label: sourceLabel(recordSource),
+
+      vessel_id: r.vessel_id || null,
+      vessel_name: String(r.vessel_name || "").trim(),
+
+      inspection_date: String(r.event_date || "").slice(0, 10),
+      report_ref: String(r.report_reference || "").trim(),
+      title,
+
+      observation_type: String(r.obs_type || "").trim(),
+      designation: String(r.designation || "").trim(),
+
+      soc: String(r.soc || "").trim(),
+      noc: String(r.noc || "").trim(),
+
+      ocimf_inspecting_company: inspectingCompany || "—",
+      inspector_name: String(r.inspector_name || "").trim() || "—",
+      inspector_company: String(r.inspector_company || r.contractor_company || "").trim() || "—",
+
+      remarks: String(r.observation_text || "").trim(),
+      pgno_selected: Array.isArray(r.pgno_selected) ? r.pgno_selected : [],
+      pgno_count: Array.isArray(r.pgno_selected) ? r.pgno_selected.length : 0,
+    };
+  });
+}
+
+function buildReportRowsFromObservationRows(rows) {
+  const map = new Map();
+
+  for (const r of rows || []) {
+    const key = reportKey(r);
+    if (!map.has(key)) {
+      map.set(key, {
+        id: r.source_report_id || key,
+        source_report_id: r.source_report_id || null,
+        record_source: r.record_source || "vetting_inspection",
+        record_source_label: sourceLabel(r.record_source || "vetting_inspection"),
+        vessel_id: r.vessel_id || null,
+        vessel_name: r.vessel_name || "",
+        inspection_date: r.inspection_date || "",
+        report_ref: r.report_ref || "",
+        title: r.title || "",
+        ocimf_inspecting_company: r.ocimf_inspecting_company || "—",
+        inspector_name: r.inspector_name || "—",
+        inspector_company: r.inspector_company || "—",
+        report_key: key,
+      });
+    }
+  }
+
+  return [...map.values()];
+}
+
 function rebuildReportMetaMap() {
   state.reportMetaByKey = new Map();
 
-  for (const r of state.allReportRows || []) {
+  for (const r of state.postReportRows || []) {
     const k = reportKeyFromReport(r);
     if (!k) continue;
     state.reportMetaByKey.set(k, {
@@ -335,9 +465,31 @@ function rebuildReportMetaMap() {
 
 function enrichRowsWithReportMeta(rows) {
   return (rows || []).map((r) => {
-    const meta = state.reportMetaByKey.get(reportKey(r)) || {};
+    const key = [
+      "vetting_inspection",
+      "",
+      String(r.vessel_name || "").trim(),
+      String(r.inspection_date || "").trim(),
+      String(r.report_ref || "").trim(),
+      String(r.title || "").trim(),
+    ].join("|");
+
+    const fallbackKey = [
+      "vetting_inspection",
+      String(r.vessel_name || "").trim(),
+      String(r.inspection_date || "").trim(),
+      String(r.report_ref || "").trim(),
+      String(r.title || "").trim(),
+    ].join("|");
+
+    const meta = state.reportMetaByKey.get(key) || state.reportMetaByKey.get(fallbackKey) || {};
+
     return {
       ...r,
+      record_source: "vetting_inspection",
+      record_source_label: "Vetting inspections",
+      source_report_id: r.source_report_id || null,
+      source_observation_id: r.source_observation_id || null,
       vessel_id: meta.vessel_id || null,
       ocimf_inspecting_company: meta.ocimf_inspecting_company || "—",
       inspector_name: meta.inspector_name || "—",
@@ -349,11 +501,16 @@ function enrichRowsWithReportMeta(rows) {
 function enrichReports(reportRows) {
   return (reportRows || []).map((r) => ({
     ...r,
+    record_source: "vetting_inspection",
+    record_source_label: "Vetting inspections",
     vessel_name: vesselNameById(r.vessel_id),
     ocimf_inspecting_company: String(r.ocimf_inspecting_company || "").trim() || "—",
     inspector_name: String(r.inspector_name || "").trim() || "—",
     inspector_company: String(r.inspector_company || "").trim() || "—",
-    report_key: reportKeyFromReport(r),
+    report_key: reportKeyFromReport({
+      ...r,
+      record_source: "vetting_inspection",
+    }),
   }));
 }
 
@@ -559,11 +716,12 @@ function openDrilldown(title, rows, reportRows = null, sub = "") {
   tbody.innerHTML = "";
 
   if (!state.currentDrillRows.length) {
-    ensureTbodyMessage(tbody, 14, "No records for this selection.");
+    ensureTbodyMessage(tbody, 15, "No records for this selection.");
   } else {
     for (const r of state.currentDrillRows) {
       const tr = document.createElement("tr");
       tr.innerHTML = `
+        <td>${esc(sourceLabel(r.record_source || "vetting_inspection"))}</td>
         <td>${esc(r.vessel_name || "")}</td>
         <td>${esc(r.inspection_date || "")}</td>
         <td>${esc(r.report_ref || "")}</td>
@@ -591,18 +749,19 @@ function exportDrillCsv() {
   const rows = state.currentDrillRows || [];
 
   const header = [
+    "record_source",
     "vessel_name",
     "inspection_date",
     "report_ref",
-    "title",
+    "title_or_audit_type",
     "question_no",
     "observation_type",
     "designation",
     "soc",
     "noc",
-    "ocimf_inspecting_company",
-    "inspector_name",
-    "inspector_company",
+    "inspecting_or_contractor_company",
+    "inspector_or_auditor",
+    "inspector_or_auditor_company",
     "pgno_selected",
     "remarks",
     "updated_at",
@@ -612,6 +771,7 @@ function exportDrillCsv() {
 
   for (const r of rows) {
     const line = [
+      sourceLabel(r.record_source || "vetting_inspection"),
       r.vessel_name || "",
       r.inspection_date || "",
       r.report_ref || "",
@@ -636,7 +796,7 @@ function exportDrillCsv() {
   const a = document.createElement("a");
   const safeName = String(state.currentDrillTitle || "records").replace(/[^a-z0-9]+/gi, "_").slice(0, 80);
 
-  a.download = `post_inspection_drilldown_${safeName}.csv`;
+  a.download = `fleet_observation_drilldown_${safeName}.csv`;
   a.href = URL.createObjectURL(blob);
 
   document.body.appendChild(a);
@@ -849,6 +1009,16 @@ function rowsOfType(rows, type) {
   return (rows || []).filter((r) => normalizeType(r.observation_type) === type);
 }
 
+function groupChartRowsByKey(rows, keyFn) {
+  const reportCountTotal = new Set(rows.map(reportKey)).size;
+  return groupObjectiveRows(rows, keyFn).map((g) => ({
+    ...g,
+    inspections: g.report_count || reportCountTotal,
+    observations: g.observation_count,
+    rows: rows.filter((r) => String(keyFn(r) || "—").trim() === g.key),
+  }));
+}
+
 function renderTypeVisuals(rows, reportRows) {
   const neg = rowsOfType(rows, "negative");
   const largely = rowsOfType(rows, "largely");
@@ -868,16 +1038,6 @@ function renderTypeVisuals(rows, reportRows) {
   renderBarChart("chartNegAnnual", buildPeriodRows(neg, reportRows, yearOf), { labelFn: (r) => r.key, obsFn: (r) => r.observations, inspFn: (r) => r.inspections, limit: 10, titleFn: (r) => `Negative — ${r.key}` });
   renderBarChart("chartLargelyAnnual", buildPeriodRows(largely, reportRows, yearOf), { labelFn: (r) => r.key, obsFn: (r) => r.observations, inspFn: (r) => r.inspections, limit: 10, titleFn: (r) => `Largely — ${r.key}` });
   renderBarChart("chartPositiveAnnual", buildPeriodRows(positive, reportRows, yearOf), { labelFn: (r) => r.key, obsFn: (r) => r.observations, inspFn: (r) => r.inspections, limit: 10, titleFn: (r) => `Positive — ${r.key}` });
-}
-
-function groupChartRowsByKey(rows, keyFn) {
-  const reportCountTotal = new Set(rows.map(reportKey)).size;
-  return groupObjectiveRows(rows, keyFn).map((g) => ({
-    ...g,
-    inspections: g.report_count || reportCountTotal,
-    observations: g.observation_count,
-    rows: rows.filter((r) => String(keyFn(r) || "—").trim() === g.key),
-  }));
 }
 
 function renderByVessel(rows, reportRows) {
@@ -1011,7 +1171,7 @@ function renderByType(rowsIgnoreTypeFilter, reportRows) {
   for (const t of OBS_TYPES) {
     const rows = rowsOfType(rowsIgnoreTypeFilter, t.value);
     const reports = new Set(rows.map((r) => reportKey(r)));
-    const drillId = registerDrill(`Observation Type: ${t.label}`, rows, null, `All ${t.label} observations for the selected vessel/date scope.`);
+    const drillId = registerDrill(`Observation Type: ${t.label}`, rows, null, `All ${t.label} observations for the selected vessel/date/source scope.`);
 
     const tr = document.createElement("tr");
     tr.innerHTML = `
@@ -1234,7 +1394,7 @@ function bindSummaryDrills(rows, reportRows) {
     btn.onclick = () => openDrilldown(title, matchedRows, matchedReports, sub);
   };
 
-  bind("viewSummaryReportsBtn", "Reports / Inspections — current scope", reportObsRows, reportRows, "Observations linked with reports inside current filter scope.");
+  bind("viewSummaryReportsBtn", "Reports / Inspections — current scope", reportObsRows, reportRows, "Observations linked with reports/audits inside current filter scope.");
   bind("viewSummaryObsBtn", "Total Observations — current scope", rows, null, "All matching observations.");
   bind("viewSummaryMissingBtn", "Missing PGNO ticks — current scope", missingRows, null, "Negative and Largely as expected observations without PGNO tick.");
   bind("viewSummaryDistinctBtn", "Unique Questions Observed — representative records", distinctRows, null, "One representative record per unique question number.");
@@ -1259,15 +1419,29 @@ async function renderAllStats(rows, rowsIgnoreTypeFilter, reportRows) {
   renderTopNoc(rows, reportRows);
   renderMonthlyTrend(rows, reportRows);
 
-  renderAverageGroupTable(rows, reportRows, (r) => r.ocimf_inspecting_company, (r) => r.ocimf_inspecting_company, "byOcimfTbody", "OCIMF company");
-  renderAverageGroupTable(rows, reportRows, (r) => r.inspector_name, (r) => r.inspector_name, "byInspectorTbody", "inspector");
-  renderAverageGroupTable(rows, reportRows, (r) => r.inspector_company, (r) => r.inspector_company, "byInspectorCompanyTbody", "inspector company");
+  renderAverageGroupTable(rows, reportRows, (r) => r.ocimf_inspecting_company, (r) => r.ocimf_inspecting_company, "byOcimfTbody", "company");
+  renderAverageGroupTable(rows, reportRows, (r) => r.inspector_name, (r) => r.inspector_name, "byInspectorTbody", "inspector/auditor");
+  renderAverageGroupTable(rows, reportRows, (r) => r.inspector_company, (r) => r.inspector_company, "byInspectorCompanyTbody", "inspector/auditor company");
 
   renderPgnoAnalytics(rows, reportRows);
 }
 
+function activateCurrentDataset() {
+  if (isCombinedMode()) {
+    state.allRows = state.combinedRows;
+    state.allReportRows = state.combinedReportRows;
+    setText("modeNote", "Combined Analytics mode includes Vetting inspections + Audit observations. Use Record Source(s) to include/exclude specific sources.");
+  } else {
+    state.allRows = state.postRows;
+    state.allReportRows = state.postReportRows;
+    setText("modeNote", "Post-Inspection only mode uses only vetting/SIRE post-inspection observations. Record Source filter is ignored.");
+  }
+}
+
 async function applyFilters() {
   setStatus("Loading…");
+
+  activateCurrentDataset();
 
   const reportRows = filterReportsBase(state.allReportRows);
   const rows = filterRowsBase(state.allRows, false);
@@ -1282,21 +1456,24 @@ async function applyFilters() {
 async function exportFilteredCsv() {
   setStatus("Exporting…");
 
+  activateCurrentDataset();
+
   const rows = filterRowsBase(state.allRows, false);
 
   const header = [
+    "record_source",
     "vessel_name",
     "inspection_date",
     "report_ref",
-    "title",
+    "title_or_audit_type",
     "question_no",
     "observation_type",
     "designation",
     "soc",
     "noc",
-    "ocimf_inspecting_company",
-    "inspector_name",
-    "inspector_company",
+    "inspecting_or_contractor_company",
+    "inspector_or_auditor",
+    "inspector_or_auditor_company",
     "pgno_selected",
     "pgno_count",
     "remarks",
@@ -1311,6 +1488,7 @@ async function exportFilteredCsv() {
     const pgCount = Number(r.pgno_count || 0);
 
     const line = [
+      sourceLabel(r.record_source || "vetting_inspection"),
       r.vessel_name || "",
       r.inspection_date || "",
       r.report_ref || "",
@@ -1335,10 +1513,11 @@ async function exportFilteredCsv() {
   const blob = new Blob([csv.join("\n")], { type: "text/csv;charset=utf-8" });
   const a = document.createElement("a");
 
+  const mode = isCombinedMode() ? "combined_analytics" : "post_inspection";
   const safeFrom = (el("dateFrom")?.value || "from").replace(/[^0-9-]+/g, "_");
   const safeTo = (el("dateTo")?.value || "to").replace(/[^0-9-]+/g, "_");
 
-  a.download = `post_inspection_export_filtered_${safeFrom}_${safeTo}.csv`;
+  a.download = `${mode}_export_filtered_${safeFrom}_${safeTo}.csv`;
   a.href = URL.createObjectURL(blob);
 
   document.body.appendChild(a);
@@ -1399,6 +1578,7 @@ function updateDropSummary(buttonId, label, selectedCount, totalCount) {
 function updateFilterSummaries() {
   updateDropSummary("vesselDropBtn", "Vessels", getSelectedVesselIds().length, state.vessels.length);
   updateDropSummary("typeDropBtn", "Types", getSelectedTypes().length, OBS_TYPES.length);
+  updateDropSummary("recordSourceDropBtn", "Sources", getSelectedRecordSources().length, RECORD_SOURCES.length);
   updateDropSummary("recYearDropBtn", "Recurring years", getSelectedRecurringYears().length, safeEl("recurringYearCheckList")?.querySelectorAll("input").length || 0);
   updateDropSummary("recMonthDropBtn", "Recurring months", getSelectedRecurringMonths().length, MONTHS.length);
 }
@@ -1426,15 +1606,47 @@ function closeAllDropdowns() {
   document.querySelectorAll(".filterDrop.open").forEach((x) => x.classList.remove("open"));
 }
 
+async function reloadAllData() {
+  setStatus("Loading source data…");
+
+  state.postReportRows = enrichReports(await loadPostReportRows());
+  rebuildReportMetaMap();
+  state.postRows = enrichRowsWithReportMeta(await loadPostObservationRows());
+
+  try {
+    state.combinedRows = await loadCombinedObservationRows();
+    state.combinedReportRows = buildReportRowsFromObservationRows(state.combinedRows);
+  } catch (e) {
+    console.warn("Combined analytics load failed. Combined mode will be empty.", e);
+    state.combinedRows = [];
+    state.combinedReportRows = [];
+  }
+
+  activateCurrentDataset();
+
+  setStatus("Ready");
+}
+
+function refreshYearControls() {
+  const rows = [...state.postRows, ...state.combinedRows];
+  const reports = [...state.postReportRows, ...state.combinedReportRows];
+
+  const years = collectYearsFromRows(rows, reports);
+  const currentYear = String(new Date().getFullYear());
+
+  renderCheckboxList("recurringYearCheckList", "recYearChk", years.map((y) => ({ value: y, label: y })), true);
+  renderYearSelect("trendYearFilter", years, currentYear);
+}
+
 async function init() {
   const R = window.AUTH?.ROLES;
-  state.me = await window.AUTH.requireAuth([R.SUPER_ADMIN, R.COMPANY_ADMIN]);
+  state.me = await window.AUTH.requireAuth([R.SUPER_ADMIN, R.COMPANY_ADMIN, R.COMPANY_SUPERINTENDENT].filter(Boolean));
   if (!state.me) return;
 
   window.AUTH.fillUserBadge(state.me, "userBadge");
   bindClick("logoutBtn", window.AUTH.logoutAndGoLogin);
 
-  state.supabase = window.__supabaseClient;
+  state.supabase = window.__supabaseClient || (window.AUTH?.ensureSupabase ? window.AUTH.ensureSupabase() : null);
   if (!state.supabase) {
     throw new Error("Supabase client missing. Ensure supabase-js CDN and auth.js are loaded.");
   }
@@ -1445,6 +1657,7 @@ async function init() {
 
   renderCheckboxList("vesselCheckList", "vesselChk", state.vessels.map((v) => ({ value: v.id, label: v.name })), true);
   renderCheckboxList("typeCheckList", "typeChk", OBS_TYPES, true);
+  renderCheckboxList("recordSourceCheckList", "recordSourceChk", RECORD_SOURCES, true);
   renderCheckboxList("recurringMonthCheckList", "recMonthChk", MONTHS, true);
 
   const to = new Date();
@@ -1462,15 +1675,8 @@ async function init() {
     if (qno) state.libByNo.set(qno, q);
   }
 
-  state.allReportRows = enrichReports(await loadAllReportRows());
-  rebuildReportMetaMap();
-  state.allRows = enrichRowsWithReportMeta(await loadAllObservationRows());
-
-  const years = collectYearsFromRows(state.allRows, state.allReportRows);
-  const currentYear = String(new Date().getFullYear());
-
-  renderCheckboxList("recurringYearCheckList", "recYearChk", years.map((y) => ({ value: y, label: y })), true);
-  renderYearSelect("trendYearFilter", years, currentYear);
+  await reloadAllData();
+  refreshYearControls();
 
   const refresh = async () => {
     try {
@@ -1482,6 +1688,7 @@ async function init() {
     }
   };
 
+  bindDropdown("recordSourceDrop", "recordSourceDropBtn");
   bindDropdown("vesselDrop", "vesselDropBtn");
   bindDropdown("typeDrop", "typeDropBtn");
   bindDropdown("recYearDrop", "recYearDropBtn");
@@ -1491,6 +1698,8 @@ async function init() {
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") closeAllDropdowns();
   });
+
+  bindChange("statsMode", refresh);
 
   bindClick("applyBtn", refresh);
 
@@ -1504,11 +1713,13 @@ async function init() {
     }
   });
 
+  bindAllNone("recordSourceAllBtn", "recordSourceNoneBtn", "recordSourceCheckList", refresh);
   bindAllNone("vesselAllBtn", "vesselNoneBtn", "vesselCheckList", refresh);
   bindAllNone("typeAllBtn", "typeNoneBtn", "typeCheckList", refresh);
   bindAllNone("recYearAllBtn", "recYearNoneBtn", "recurringYearCheckList", refresh);
   bindAllNone("recMonthAllBtn", "recMonthNoneBtn", "recurringMonthCheckList", refresh);
 
+  bindCheckboxRefresh("recordSourceCheckList", refresh);
   bindCheckboxRefresh("vesselCheckList", refresh);
   bindCheckboxRefresh("typeCheckList", refresh);
   bindCheckboxRefresh("recurringYearCheckList", refresh);

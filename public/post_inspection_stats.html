@@ -387,7 +387,7 @@
     }
     .drillTableWrap table{
       margin:0;
-      min-width:1450px;
+      min-width:1650px;
     }
     .drillRemarks{
       max-width:420px;
@@ -408,6 +408,7 @@
         <div id="userBadge" style="font-weight:900; opacity:0.95;"></div>
         <a class="btn btn-outline" href="./q-dashboard.html">Dashboard</a>
         <a class="btn btn-outline" href="./post_inspection.html">Post-Inspection</a>
+        <a class="btn btn-outline" href="./audit_observations.html">Audit Observations</a>
         <button class="btn" id="logoutBtn">Logout</button>
       </div>
     </div>
@@ -415,6 +416,26 @@
     <div class="panel">
       <div class="card">
         <div class="row">
+          <div class="field-small">
+            <label for="statsMode">Statistics mode</label>
+            <select id="statsMode">
+              <option value="post">Post-Inspection only</option>
+              <option value="combined">Combined Analytics</option>
+            </select>
+          </div>
+
+          <div class="filterDrop" id="recordSourceDrop">
+            <label>Record source(s)</label>
+            <button type="button" class="filterDropBtn" id="recordSourceDropBtn">Sources: all</button>
+            <div class="filterPanel">
+              <div class="checkTools">
+                <button type="button" class="miniBtn" id="recordSourceAllBtn">All</button>
+                <button type="button" class="miniBtn" id="recordSourceNoneBtn">None</button>
+              </div>
+              <div class="checkPanel" id="recordSourceCheckList"></div>
+            </div>
+          </div>
+
           <div class="filterDrop" id="vesselDrop">
             <label>Vessel(s)</label>
             <button type="button" class="filterDropBtn" id="vesselDropBtn">Vessels: all</button>
@@ -494,8 +515,8 @@
           </div>
         </div>
 
-        <div class="filterNote">
-          Filter panels are compact dropdowns. Every View button opens the actual records used for that statistic.
+        <div class="filterNote" id="modeNote">
+          Post-Inspection only mode uses only vetting/SIRE inspection observations. Combined Analytics mode includes vetting inspections plus internal/external audit observations.
         </div>
 
         <div class="statusLine">
@@ -570,7 +591,7 @@
 
     <div class="panel"><div class="card">
       <h3 class="sectionTitle">By Vessel (Fleet)</h3>
-      <div class="statL">Applies selected date range, selected vessel(s), and selected observation type(s).</div>
+      <div class="statL">Applies selected date range, selected vessel(s), selected observation type(s), and selected source(s) in Combined Analytics mode.</div>
       <table><thead><tr>
         <th>Vessel</th><th>Reports</th><th>Negative</th><th>Largely as expected</th><th>Positive</th>
         <th>Avg Negative / Insp.</th><th>Avg Largely / Insp.</th><th>Avg Positive / Insp.</th><th>Records</th>
@@ -588,7 +609,7 @@
 
     <div class="panel"><div class="card">
       <h3 class="sectionTitle">By Observation Type</h3>
-      <div class="statL">Applies selected vessel(s) and date range. Observation type checkbox filter is ignored for this section.</div>
+      <div class="statL">Applies selected vessel(s), date range, and selected source(s). Observation type checkbox filter is ignored for this section.</div>
       <table><thead><tr>
         <th>Type</th><th>Reports</th><th>Observations</th><th>Avg Obs / Insp.</th><th>Records</th>
       </tr></thead><tbody id="byTypeTbody"></tbody></table>
@@ -596,7 +617,7 @@
 
     <div class="panel"><div class="card">
       <h3 class="sectionTitle">Top Recurring Questions</h3>
-      <div class="statL">Applies selected vessel(s), date range, selected observation type(s), recurring threshold, recurring year(s), and recurring month(s).</div>
+      <div class="statL">Applies selected vessel(s), date range, selected observation type(s), recurring threshold, recurring year(s), recurring month(s), and selected source(s).</div>
       <table><thead><tr>
         <th>Question No</th><th>Chapter</th><th>Section</th><th>Short text</th><th>Type</th><th>Obs count</th><th>Records</th>
       </tr></thead><tbody id="topQnsTbody"></tbody></table>
@@ -631,7 +652,7 @@
 
     <div class="panel"><div class="card">
       <h3 class="sectionTitle">Monthly Trend</h3>
-      <div class="statL">Objective observation count by inspection month. The selected trend year always shows all 12 months, including zero-count months.</div>
+      <div class="statL">Objective observation count by inspection/audit month. The selected trend year always shows all 12 months, including zero-count months.</div>
       <table><thead><tr>
         <th>Month</th><th>Reports</th><th>Observations</th><th>Negative</th><th>Positive</th><th>Largely</th>
         <th>Avg Negative / Insp.</th><th>Avg Positive / Insp.</th><th>Avg Largely / Insp.</th><th>Records</th>
@@ -639,28 +660,28 @@
     </div></div>
 
     <div class="panel"><div class="card">
-      <h3 class="sectionTitle">By OCIMF Inspecting Company</h3>
-      <div class="statL">Observation count and average observations per inspection by OCIMF inspecting company, separately per observation type.</div>
+      <h3 class="sectionTitle">By OCIMF / Inspecting Company</h3>
+      <div class="statL">In Combined Analytics mode this includes OCIMF inspecting company for vetting and auditor/contractor company for audits.</div>
       <table><thead><tr>
-        <th>OCIMF Company</th><th>Inspections</th><th>Negative</th><th>Largely as expected</th><th>Positive</th>
+        <th>Company</th><th>Inspections</th><th>Negative</th><th>Largely as expected</th><th>Positive</th>
         <th>Avg Negative / Insp.</th><th>Avg Largely / Insp.</th><th>Avg Positive / Insp.</th><th>Records</th>
       </tr></thead><tbody id="byOcimfTbody"></tbody></table>
     </div></div>
 
     <div class="panel"><div class="card">
-      <h3 class="sectionTitle">By Inspector</h3>
-      <div class="statL">Observation count and average observations per inspection by inspector name, separately per observation type.</div>
+      <h3 class="sectionTitle">By Inspector / Auditor</h3>
+      <div class="statL">Observation count and average observations per inspection/audit by inspector or auditor name.</div>
       <table><thead><tr>
-        <th>Inspector</th><th>Inspections</th><th>Negative</th><th>Largely as expected</th><th>Positive</th>
+        <th>Inspector / Auditor</th><th>Inspections</th><th>Negative</th><th>Largely as expected</th><th>Positive</th>
         <th>Avg Negative / Insp.</th><th>Avg Largely / Insp.</th><th>Avg Positive / Insp.</th><th>Records</th>
       </tr></thead><tbody id="byInspectorTbody"></tbody></table>
     </div></div>
 
     <div class="panel"><div class="card">
-      <h3 class="sectionTitle">By Inspector Company</h3>
-      <div class="statL">Observation count and average observations per inspection by inspector company, separately per observation type.</div>
+      <h3 class="sectionTitle">By Inspector / Auditor Company</h3>
+      <div class="statL">Observation count and average observations per inspection/audit by inspector or auditor company.</div>
       <table><thead><tr>
-        <th>Inspector Company</th><th>Inspections</th><th>Negative</th><th>Largely as expected</th><th>Positive</th>
+        <th>Inspector / Auditor Company</th><th>Inspections</th><th>Negative</th><th>Largely as expected</th><th>Positive</th>
         <th>Avg Negative / Insp.</th><th>Avg Largely / Insp.</th><th>Avg Positive / Insp.</th><th>Records</th>
       </tr></thead><tbody id="byInspectorCompanyTbody"></tbody></table>
     </div></div>
@@ -706,18 +727,19 @@
         <table>
           <thead>
             <tr>
+              <th>Source</th>
               <th>Vessel</th>
               <th>Date</th>
               <th>Report Ref</th>
-              <th>Title</th>
+              <th>Title / Audit Type</th>
               <th>Question No</th>
               <th>Type</th>
               <th>Designation</th>
               <th>SOC</th>
               <th>NOC</th>
-              <th>OCIMF Company</th>
-              <th>Inspector</th>
-              <th>Inspector Company</th>
+              <th>Inspecting / Contractor Company</th>
+              <th>Inspector / Auditor</th>
+              <th>Inspector / Auditor Company</th>
               <th>PGNO</th>
               <th>Remarks / Observation Text</th>
             </tr>
