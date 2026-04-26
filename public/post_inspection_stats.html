@@ -68,7 +68,16 @@
 
     .row{ display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; }
     .field{ min-width: 220px; flex: 1; }
-    label{ display:block; margin: 10px 0 6px 0; font-weight: 900; color:#1a4170; font-size: 0.95rem; }
+    .field-small{ min-width: 160px; flex: 0.7; }
+
+    label{
+      display:block;
+      margin: 10px 0 6px 0;
+      font-weight: 900;
+      color:#1a4170;
+      font-size: 0.95rem;
+    }
+
     input, select{
       width: 100%;
       box-sizing:border-box;
@@ -100,6 +109,13 @@
     }
     .statN{ font-size:1.6rem; font-weight:950; color:#1a4170; }
     .statL{ margin-top:6px; color:#35507b; font-weight:850; line-height:1.35; white-space:pre-wrap; }
+    .statSub{
+      margin-top:8px;
+      color:#48628e;
+      font-weight:850;
+      line-height:1.45;
+      font-size:0.9rem;
+    }
 
     table{ width:100%; border-collapse: collapse; margin-top:10px; }
     th, td{ border-bottom:1px solid #e3ecfb; padding:10px; text-align:left; vertical-align:top; }
@@ -132,8 +148,17 @@
       grid-template-columns: repeat(3, minmax(0, 1fr));
       gap:12px;
     }
+    .chartGrid4{
+      display:grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap:12px;
+    }
+    @media (max-width: 1400px){
+      .chartGrid4{ grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
     @media (max-width: 1200px){
       .chartGrid{ grid-template-columns:1fr; }
+      .chartGrid4{ grid-template-columns:1fr; }
     }
 
     .chartBox{
@@ -147,6 +172,13 @@
       font-weight:950;
       color:#1a4170;
       margin-bottom:10px;
+    }
+    .chartNote{
+      color:#48628e;
+      font-weight:800;
+      font-size:0.88rem;
+      margin-bottom:8px;
+      line-height:1.35;
     }
     .barRow{
       display:grid;
@@ -187,6 +219,20 @@
       font-weight:850;
       padding:8px 0;
     }
+
+    .sectionTitle{
+      margin:0 0 8px 0;
+      color:#1a4170;
+      font-weight:950;
+    }
+
+    .filterNote{
+      margin-top:8px;
+      color:#48628e;
+      font-weight:800;
+      line-height:1.35;
+      font-size:0.92rem;
+    }
   </style>
 </head>
 
@@ -195,7 +241,7 @@
     <div class="topbar">
       <div>
         <div class="title">Post-Inspection Statistics (Fleet / Vessel)</div>
-        <div class="sub">DB-driven statistics and exports. Filters apply to all sections below.</div>
+        <div class="sub">DB-driven statistics and exports. Filters apply to all sections below unless otherwise stated.</div>
       </div>
       <div class="actions">
         <div id="userBadge" style="font-weight:900; opacity:0.95;"></div>
@@ -237,6 +283,32 @@
           </div>
         </div>
 
+        <div class="row" style="margin-top:8px;">
+          <div class="field-small">
+            <label for="recurringMinCount">Recurring threshold</label>
+            <input id="recurringMinCount" type="number" min="1" step="1" value="4" />
+          </div>
+
+          <div class="field-small">
+            <label for="recurringYearFilter">Recurring year</label>
+            <select id="recurringYearFilter"></select>
+          </div>
+
+          <div class="field-small">
+            <label for="recurringMonthFilter">Recurring month</label>
+            <select id="recurringMonthFilter"></select>
+          </div>
+
+          <div class="field-small">
+            <label for="trendYearFilter">Monthly trend year</label>
+            <select id="trendYearFilter"></select>
+          </div>
+        </div>
+
+        <div class="filterNote">
+          Recurring threshold affects only the Top Recurring Questions table. Monthly trend year affects the Monthly Trend table and always shows all 12 months.
+        </div>
+
         <div class="statusLine">
           <span class="statusPill" id="statusPill">Ready</span>
         </div>
@@ -248,15 +320,18 @@
           </div>
           <div class="stat">
             <div class="statN" id="sumObs">0</div>
-            <div class="statL">Observations</div>
+            <div class="statL">Total Observations</div>
+            <div class="statSub">All inclusive: Negative + Largely as expected + Positive</div>
           </div>
           <div class="stat">
             <div class="statN" id="sumMissing">0</div>
             <div class="statL">Missing PGNO tick</div>
+            <div class="statSub" id="sumMissingSplit">Negative: 0 | Largely: 0</div>
           </div>
           <div class="stat">
             <div class="statN" id="sumDistinct">0</div>
-            <div class="statL">Distinct questions observed</div>
+            <div class="statL">Unique Questions Observed</div>
+            <div class="statSub">Unique question numbers with at least one recorded observation.</div>
           </div>
         </div>
       </div>
@@ -264,20 +339,70 @@
 
     <div class="panel">
       <div class="card">
-        <h3 style="margin:0 0 8px 0;">Visual Overview</h3>
-        <div class="statL">Charts are generated from the same filtered objective dataset used by the tables below.</div>
+        <h3 class="sectionTitle">Visual Overview — Negative Observations</h3>
+        <div class="statL">Negative observations split by category/designation and time period.</div>
+        <div class="chartGrid4" style="margin-top:12px;">
+          <div class="chartBox">
+            <div class="chartTitle">Negative — Category / Designation</div>
+            <div id="chartNegCategory"></div>
+          </div>
+          <div class="chartBox">
+            <div class="chartTitle">Negative — Monthly Trend</div>
+            <div id="chartNegMonthly"></div>
+          </div>
+          <div class="chartBox">
+            <div class="chartTitle">Negative — Quarterly Trend</div>
+            <div id="chartNegQuarterly"></div>
+          </div>
+          <div class="chartBox">
+            <div class="chartTitle">Negative — Annual Trend</div>
+            <div id="chartNegAnnual"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="card">
+        <h3 class="sectionTitle">Visual Overview — Largely as Expected Observations</h3>
+        <div class="statL">Largely as expected observations split by category/designation and time period.</div>
+        <div class="chartGrid4" style="margin-top:12px;">
+          <div class="chartBox">
+            <div class="chartTitle">Largely — Category / Designation</div>
+            <div id="chartLargelyCategory"></div>
+          </div>
+          <div class="chartBox">
+            <div class="chartTitle">Largely — Monthly Trend</div>
+            <div id="chartLargelyMonthly"></div>
+          </div>
+          <div class="chartBox">
+            <div class="chartTitle">Largely — Quarterly Trend</div>
+            <div id="chartLargelyQuarterly"></div>
+          </div>
+          <div class="chartBox">
+            <div class="chartTitle">Largely — Annual Trend</div>
+            <div id="chartLargelyAnnual"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="card">
+        <h3 class="sectionTitle">Visual Overview — Positive Observations</h3>
+        <div class="statL">Positive observations are treated as Human observations. Time-period trends are shown below.</div>
         <div class="chartGrid" style="margin-top:12px;">
           <div class="chartBox">
-            <div class="chartTitle">Observation Type</div>
-            <div id="chartType"></div>
+            <div class="chartTitle">Positive — Monthly Trend</div>
+            <div id="chartPositiveMonthly"></div>
           </div>
           <div class="chartBox">
-            <div class="chartTitle">Category / Designation</div>
-            <div id="chartCategory"></div>
+            <div class="chartTitle">Positive — Quarterly Trend</div>
+            <div id="chartPositiveQuarterly"></div>
           </div>
           <div class="chartBox">
-            <div class="chartTitle">Monthly Trend</div>
-            <div id="chartMonthly"></div>
+            <div class="chartTitle">Positive — Annual Trend</div>
+            <div id="chartPositiveAnnual"></div>
           </div>
         </div>
       </div>
@@ -285,16 +410,16 @@
 
     <div class="panel">
       <div class="card">
-        <h3 style="margin:0 0 8px 0;">By Vessel (Fleet)</h3>
-        <div class="statL">Applies date range + observation type filter (vessel filter ignored for this section).</div>
+        <h3 class="sectionTitle">By Vessel (Fleet)</h3>
+        <div class="statL">Applies date range + observation type filter. Vessel filter is ignored for this fleet table.</div>
         <table>
           <thead>
             <tr>
               <th>Vessel</th>
               <th>Reports</th>
-              <th>Observations</th>
-              <th>Missing PGNO</th>
-              <th>Last inspection</th>
+              <th>Negative</th>
+              <th>Largely as expected</th>
+              <th>Positive</th>
             </tr>
           </thead>
           <tbody id="byVesselTbody"></tbody>
@@ -304,16 +429,14 @@
 
     <div class="panel">
       <div class="card">
-        <h3 style="margin:0 0 8px 0;">By Observation Type</h3>
-        <div class="statL">Applies vessel + date range filters (type filter ignored for this section).</div>
+        <h3 class="sectionTitle">By Observation Type</h3>
+        <div class="statL">Applies vessel + date range filters. Type filter is ignored for this section.</div>
         <table>
           <thead>
             <tr>
               <th>Type</th>
               <th>Reports</th>
               <th>Observations</th>
-              <th>Missing PGNO</th>
-              <th>Last seen</th>
             </tr>
           </thead>
           <tbody id="byTypeTbody"></tbody>
@@ -323,8 +446,8 @@
 
     <div class="panel">
       <div class="card">
-        <h3 style="margin:0 0 8px 0;">Top Recurring Questions</h3>
-        <div class="statL">Applies vessel + date range + type filters. Question metadata comes from the locked JSON library.</div>
+        <h3 class="sectionTitle">Top Recurring Questions</h3>
+        <div class="statL">Applies vessel + date range + type filters, plus recurring threshold / recurring year / recurring month filters.</div>
         <table>
           <thead>
             <tr>
@@ -334,8 +457,6 @@
               <th>Short text</th>
               <th>Type</th>
               <th>Obs count</th>
-              <th>Report count</th>
-              <th>Last seen</th>
             </tr>
           </thead>
           <tbody id="topQnsTbody"></tbody>
@@ -345,15 +466,15 @@
 
     <div class="panel">
       <div class="card">
-        <h3 style="margin:0 0 8px 0;">By Category / Designation</h3>
+        <h3 class="sectionTitle">By Category / Designation</h3>
         <div class="statL">Objective breakdown by recorded designation: Human, Process, Hardware, Photo.</div>
         <table>
           <thead>
             <tr>
               <th>Category</th>
-              <th>Observations</th>
-              <th>Reports</th>
-              <th>Last seen</th>
+              <th>Negative</th>
+              <th>Largely as expected</th>
+              <th>Positive</th>
             </tr>
           </thead>
           <tbody id="byCategoryTbody"></tbody>
@@ -363,15 +484,15 @@
 
     <div class="panel">
       <div class="card">
-        <h3 style="margin:0 0 8px 0;">Top SOC</h3>
+        <h3 class="sectionTitle">Top SOC</h3>
         <div class="statL">Objective breakdown by recorded Subject of Concern (SOC).</div>
         <table>
           <thead>
             <tr>
               <th>SOC</th>
-              <th>Observations</th>
-              <th>Reports</th>
-              <th>Last seen</th>
+              <th>Negative</th>
+              <th>Largely as expected</th>
+              <th>Positive</th>
             </tr>
           </thead>
           <tbody id="topSocTbody"></tbody>
@@ -381,15 +502,15 @@
 
     <div class="panel">
       <div class="card">
-        <h3 style="margin:0 0 8px 0;">Top NOC</h3>
+        <h3 class="sectionTitle">Top NOC</h3>
         <div class="statL">Objective breakdown by recorded Nature of Concern (NOC).</div>
         <table>
           <thead>
             <tr>
               <th>NOC</th>
-              <th>Observations</th>
-              <th>Reports</th>
-              <th>Last seen</th>
+              <th>Negative</th>
+              <th>Largely as expected</th>
+              <th>Positive</th>
             </tr>
           </thead>
           <tbody id="topNocTbody"></tbody>
@@ -399,8 +520,8 @@
 
     <div class="panel">
       <div class="card">
-        <h3 style="margin:0 0 8px 0;">Monthly Trend</h3>
-        <div class="statL">Objective observation count by inspection month.</div>
+        <h3 class="sectionTitle">Monthly Trend</h3>
+        <div class="statL">Objective observation count by inspection month. The selected trend year always shows all 12 months, including zero-count months.</div>
         <table>
           <thead>
             <tr>
@@ -419,7 +540,7 @@
 
     <div class="panel">
       <div class="card">
-        <h3 style="margin:0 0 8px 0;">PGNO Analytics</h3>
+        <h3 class="sectionTitle">PGNO Analytics</h3>
         <div class="statL">PGNO analytics are based on assigned PGNOs only. They are separate from objective observation statistics because PGNO assignment may be software-suggested or user-confirmed.</div>
 
         <div class="chartGrid" style="margin-top:12px;">

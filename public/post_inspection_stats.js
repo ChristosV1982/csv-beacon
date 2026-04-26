@@ -13,6 +13,22 @@ const OBS_TYPES = [
   { value: "largely", label: "Largely as expected" },
 ];
 
+const MONTHS = [
+  { value: "", label: "All months" },
+  { value: "01", label: "01 — January" },
+  { value: "02", label: "02 — February" },
+  { value: "03", label: "03 — March" },
+  { value: "04", label: "04 — April" },
+  { value: "05", label: "05 — May" },
+  { value: "06", label: "06 — June" },
+  { value: "07", label: "07 — July" },
+  { value: "08", label: "08 — August" },
+  { value: "09", label: "09 — September" },
+  { value: "10", label: "10 — October" },
+  { value: "11", label: "11 — November" },
+  { value: "12", label: "12 — December" },
+];
+
 function el(id) { return document.getElementById(id); }
 
 function esc(s) {
@@ -37,6 +53,8 @@ const state = {
   vessels: [],
   libByNo: new Map(),
   labelMap: new Map(),
+  allRows: [],
+  allReportRows: [],
 };
 
 function setStatus(text) {
@@ -95,12 +113,40 @@ function monthKey(row) {
   return String(row.inspection_date || "").slice(0, 7) || "—";
 }
 
+function yearOf(row) {
+  return String(row.inspection_date || "").slice(0, 4);
+}
+
+function monthOf(row) {
+  return String(row.inspection_date || "").slice(5, 7);
+}
+
+function quarterOf(row) {
+  const y = yearOf(row);
+  const m = Number(monthOf(row));
+  if (!y || !m) return "—";
+  const q = Math.ceil(m / 3);
+  return `${y}-Q${q}`;
+}
+
 function typeLabel(type) {
   return state.labelMap.get(type) || type || "—";
 }
 
+function normalizeType(type) {
+  return String(type || "").trim();
+}
+
 function ensureTbodyMessage(tbody, colspan, message) {
   tbody.innerHTML = `<tr><td colspan="${colspan}" class="mono">${esc(message)}</td></tr>`;
+}
+
+function selectedYear(id) {
+  return String(el(id)?.value || "").trim();
+}
+
+function selectedMonth(id) {
+  return String(el(id)?.value || "").trim();
 }
 
 async function loadVessels() {
@@ -152,6 +198,24 @@ function getFilters() {
   return { vessel_id, p_from, p_to, p_observation_type };
 }
 
+function dateInRange(dateStr, from, to) {
+  const d = String(dateStr || "").slice(0, 10);
+  if (!d) return false;
+  if (from && d < from) return false;
+  if (to && d > to) return false;
+  return true;
+}
+
+function rowPassesMainFilters(row, includeType = true) {
+  const { vessel_id, p_from, p_to, p_observation_type } = getFilters();
+
+  if (vessel_id && String(row.vessel_id || "") !== String(vessel_id)) return false;
+  if (!dateInRange(row.inspection_date, p_from, p_to)) return false;
+  if (includeType && p_observation_type && normalizeType(row.observation_type) !== p_observation_type) return false;
+
+  return true;
+}
+
 async function loadFilteredObservationRows() {
   const { vessel_id, p_from, p_to, p_observation_type } = getFilters();
 
@@ -165,6 +229,87 @@ async function loadFilteredObservationRows() {
 
   if (error) throw error;
   return data || [];
+}
+
+async function loadAllReportRowsForYearSelectors() {
+  const { data, error } = await state.supabase
+    .from("post_inspection_reports")
+    .select("id, vessel_id, inspection_date, report_ref, title");
+
+  if (error) {
+    console.warn("Report rows unavailable for year selector.", error);
+    return [];
+  }
+
+  return data || [];
+}
+
+function collectYearsFromRows(rows, reportRows) {
+  const set = new Set();
+
+  for (const r of rows || []) {
+    const y = String(r.inspection_date || "").slice(0, 4);
+    if (/^\d{4}$/.test(y)) set.add(y);
+  }
+
+  for (const r of reportRows || []) {
+    const y = String(r.inspection_date || "").slice(0, 4);
+    if (/^\d{4}$/.test(y)) set.add(y);
+  }
+
+  const currentYear = String(new Date().getFullYear());
+  set.add(currentYear);
+
+  return [...set].sort((a, b) => b.localeCompare(a));
+}
+
+function renderYearSelect(selectId, years, includeAll, preferredYear) {
+  const sel = el(selectId);
+  if (!sel) return;
+
+  const existing = String(sel.value || "").trim();
+  sel.innerHTML = "";
+
+  if (includeAll) {
+    const all = document.createElement("option");
+    all.value = "";
+    all.textContent = "All years";
+    sel.appendChild(all);
+  }
+
+  for (const y of years) {
+    const o = document.createElement("option");
+    o.value = y;
+    o.textContent = y;
+    sel.appendChild(o);
+  }
+
+  if (existing && years.includes(existing)) {
+    sel.value = existing;
+  } else if (preferredYear && years.includes(preferredYear)) {
+    sel.value = preferredYear;
+  } else if (!includeAll && years.length) {
+    sel.value = years[0];
+  } else {
+    sel.value = "";
+  }
+}
+
+function renderMonthSelect(selectId) {
+  const sel = el(selectId);
+  if (!sel) return;
+
+  const existing = String(sel.value || "").trim();
+  sel.innerHTML = "";
+
+  for (const m of MONTHS) {
+    const o = document.createElement("option");
+    o.value = m.value;
+    o.textContent = m.label;
+    sel.appendChild(o);
+  }
+
+  sel.value = MONTHS.some((m) => m.value === existing) ? existing : "";
 }
 
 function groupObjectiveRows(rows, keyFn) {
@@ -205,93 +350,87 @@ function groupObjectiveRows(rows, keyFn) {
     );
 }
 
-function renderByCategory(rows) {
-  const tbody = el("byCategoryTbody");
-  tbody.innerHTML = "";
-
-  const grouped = groupObjectiveRows(rows, (r) => r.designation).slice(0, 50);
-
-  for (const r of grouped) {
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>${esc(r.key)}</td>
-      <td>${esc(r.observation_count)}</td>
-      <td>${esc(r.report_count)}</td>
-      <td>${esc(r.last_seen || "")}</td>
-    `;
-    tbody.appendChild(tr);
-  }
-
-  if (!grouped.length) {
-    ensureTbodyMessage(tbody, 4, "No category data for current filters.");
-  }
-}
-
-function renderTopSoc(rows) {
-  const tbody = el("topSocTbody");
-  tbody.innerHTML = "";
-
-  const grouped = groupObjectiveRows(rows, (r) => r.soc).slice(0, 50);
-
-  for (const r of grouped) {
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>${esc(r.key)}</td>
-      <td>${esc(r.observation_count)}</td>
-      <td>${esc(r.report_count)}</td>
-      <td>${esc(r.last_seen || "")}</td>
-    `;
-    tbody.appendChild(tr);
-  }
-
-  if (!grouped.length) {
-    ensureTbodyMessage(tbody, 4, "No SOC data for current filters.");
-  }
-}
-
-function renderTopNoc(rows) {
-  const tbody = el("topNocTbody");
-  tbody.innerHTML = "";
-
-  const grouped = groupObjectiveRows(rows, (r) => r.noc).slice(0, 50);
-
-  for (const r of grouped) {
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>${esc(r.key)}</td>
-      <td>${esc(r.observation_count)}</td>
-      <td>${esc(r.report_count)}</td>
-      <td>${esc(r.last_seen || "")}</td>
-    `;
-    tbody.appendChild(tr);
-  }
-
-  if (!grouped.length) {
-    ensureTbodyMessage(tbody, 4, "No NOC data for current filters.");
-  }
-}
-
-function buildMonthlyRows(rows) {
+function groupSplitByType(rows, keyFn) {
   const map = new Map();
 
   for (const row of rows || []) {
-    const key = monthKey(row);
+    const key = String(keyFn(row) || "—").trim() || "—";
+    const t = normalizeType(row.observation_type);
+
     if (!map.has(key)) {
       map.set(key, {
-        month: key,
-        reports: new Set(),
-        observations: 0,
+        key,
         negative: 0,
-        positive: 0,
         largely: 0,
+        positive: 0,
+        total: 0,
       });
     }
+
+    const item = map.get(key);
+    item.total += 1;
+
+    if (t === "negative") item.negative += 1;
+    if (t === "largely") item.largely += 1;
+    if (t === "positive") item.positive += 1;
+  }
+
+  return [...map.values()].sort((a, b) => b.total - a.total || String(a.key).localeCompare(String(b.key)));
+}
+
+function renderSplitTable(tbodyId, rows, keyLabel, limit = 50) {
+  const tbody = el(tbodyId);
+  tbody.innerHTML = "";
+
+  const list = rows.slice(0, limit);
+
+  for (const r of list) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${esc(r.key)}</td>
+      <td>${esc(r.negative)}</td>
+      <td>${esc(r.largely)}</td>
+      <td>${esc(r.positive)}</td>
+    `;
+    tbody.appendChild(tr);
+  }
+
+  if (!list.length) {
+    ensureTbodyMessage(tbody, 4, `No ${keyLabel} data for current filters.`);
+  }
+}
+
+function buildMonthlyRows(rows, yearFilter = "") {
+  const selected = String(yearFilter || "").trim();
+  const year = selected || String(new Date().getFullYear());
+
+  const map = new Map();
+
+  for (let i = 1; i <= 12; i++) {
+    const mm = String(i).padStart(2, "0");
+    const key = `${year}-${mm}`;
+    map.set(key, {
+      month: key,
+      reports: new Set(),
+      observations: 0,
+      negative: 0,
+      positive: 0,
+      largely: 0,
+    });
+  }
+
+  for (const row of rows || []) {
+    const y = yearOf(row);
+    if (y !== year) continue;
+
+    const key = monthKey(row);
+    if (!map.has(key)) continue;
 
     const item = map.get(key);
     item.reports.add(reportKey(row));
     item.observations += 1;
 
-    const t = String(row.observation_type || "").trim();
+    const t = normalizeType(row.observation_type);
     if (t === "negative") item.negative += 1;
     if (t === "positive") item.positive += 1;
     if (t === "largely") item.largely += 1;
@@ -300,11 +439,32 @@ function buildMonthlyRows(rows) {
   return [...map.values()].sort((a, b) => String(a.month).localeCompare(String(b.month)));
 }
 
+function buildPeriodRows(rows, keyFn) {
+  const map = new Map();
+
+  for (const row of rows || []) {
+    const key = String(keyFn(row) || "—");
+    if (!key || key === "—") continue;
+
+    if (!map.has(key)) {
+      map.set(key, {
+        key,
+        observation_count: 0,
+      });
+    }
+
+    map.get(key).observation_count += 1;
+  }
+
+  return [...map.values()].sort((a, b) => String(a.key).localeCompare(String(b.key)));
+}
+
 function renderMonthlyTrend(rows) {
   const tbody = el("monthlyTbody");
   tbody.innerHTML = "";
 
-  const grouped = buildMonthlyRows(rows);
+  const trendYear = selectedYear("trendYearFilter");
+  const grouped = buildMonthlyRows(rows, trendYear);
 
   for (const r of grouped) {
     const tr = document.createElement("tr");
@@ -361,28 +521,174 @@ function renderBarChart(containerId, rows, options = {}) {
   }).join("");
 }
 
-function renderCharts(rows) {
-  const byType = groupObjectiveRows(rows, (r) => typeLabel(r.observation_type));
-  const byCategory = groupObjectiveRows(rows, (r) => r.designation);
-  const monthly = buildMonthlyRows(rows);
+function rowsOfType(rows, type) {
+  return (rows || []).filter((r) => normalizeType(r.observation_type) === type);
+}
 
-  renderBarChart("chartType", byType, {
-    labelFn: (r) => r.key,
-    valueFn: (r) => r.observation_count,
-    limit: 10,
-  });
+function renderTypeVisuals(rows) {
+  const neg = rowsOfType(rows, "negative");
+  const largely = rowsOfType(rows, "largely");
+  const positive = rowsOfType(rows, "positive");
 
-  renderBarChart("chartCategory", byCategory, {
-    labelFn: (r) => r.key,
-    valueFn: (r) => r.observation_count,
-    limit: 10,
-  });
+  renderBarChart("chartNegCategory", groupObjectiveRows(neg, (r) => r.designation), { limit: 10 });
+  renderBarChart("chartLargelyCategory", groupObjectiveRows(largely, (r) => r.designation), { limit: 10 });
 
-  renderBarChart("chartMonthly", monthly, {
-    labelFn: (r) => r.month,
-    valueFn: (r) => r.observations,
-    limit: 18,
+  renderBarChart("chartNegMonthly", buildPeriodRows(neg, monthKey), { labelFn: (r) => r.key, valueFn: (r) => r.observation_count, limit: 18 });
+  renderBarChart("chartLargelyMonthly", buildPeriodRows(largely, monthKey), { labelFn: (r) => r.key, valueFn: (r) => r.observation_count, limit: 18 });
+  renderBarChart("chartPositiveMonthly", buildPeriodRows(positive, monthKey), { labelFn: (r) => r.key, valueFn: (r) => r.observation_count, limit: 18 });
+
+  renderBarChart("chartNegQuarterly", buildPeriodRows(neg, quarterOf), { labelFn: (r) => r.key, valueFn: (r) => r.observation_count, limit: 16 });
+  renderBarChart("chartLargelyQuarterly", buildPeriodRows(largely, quarterOf), { labelFn: (r) => r.key, valueFn: (r) => r.observation_count, limit: 16 });
+  renderBarChart("chartPositiveQuarterly", buildPeriodRows(positive, quarterOf), { labelFn: (r) => r.key, valueFn: (r) => r.observation_count, limit: 16 });
+
+  renderBarChart("chartNegAnnual", buildPeriodRows(neg, yearOf), { labelFn: (r) => r.key, valueFn: (r) => r.observation_count, limit: 10 });
+  renderBarChart("chartLargelyAnnual", buildPeriodRows(largely, yearOf), { labelFn: (r) => r.key, valueFn: (r) => r.observation_count, limit: 10 });
+  renderBarChart("chartPositiveAnnual", buildPeriodRows(positive, yearOf), { labelFn: (r) => r.key, valueFn: (r) => r.observation_count, limit: 10 });
+}
+
+function renderByVessel(rows, byVesselReportRows) {
+  const tbody = el("byVesselTbody");
+  tbody.innerHTML = "";
+
+  const byName = new Map();
+
+  for (const r of byVesselReportRows || []) {
+    const name = String(r.vessel_name || "—").trim() || "—";
+    if (!byName.has(name)) {
+      byName.set(name, {
+        vessel_name: name,
+        report_count: Number(r.report_count || 0),
+        negative: 0,
+        largely: 0,
+        positive: 0,
+      });
+    } else {
+      byName.get(name).report_count = Number(r.report_count || 0);
+    }
+  }
+
+  for (const row of rows || []) {
+    const name = String(row.vessel_name || "—").trim() || "—";
+    if (!byName.has(name)) {
+      byName.set(name, {
+        vessel_name: name,
+        report_count: 0,
+        negative: 0,
+        largely: 0,
+        positive: 0,
+      });
+    }
+
+    const item = byName.get(name);
+    const t = normalizeType(row.observation_type);
+    if (t === "negative") item.negative += 1;
+    if (t === "largely") item.largely += 1;
+    if (t === "positive") item.positive += 1;
+  }
+
+  const list = [...byName.values()].sort((a, b) => a.vessel_name.localeCompare(b.vessel_name));
+
+  for (const r of list) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${esc(r.vessel_name)}</td>
+      <td>${esc(r.report_count)}</td>
+      <td>${esc(r.negative)}</td>
+      <td>${esc(r.largely)}</td>
+      <td>${esc(r.positive)}</td>
+    `;
+    tbody.appendChild(tr);
+  }
+
+  if (!list.length) {
+    ensureTbodyMessage(tbody, 5, "No vessel data for current filters.");
+  }
+}
+
+function renderByType(rows) {
+  const tbody = el("byTypeTbody");
+  tbody.innerHTML = "";
+
+  const groups = groupObjectiveRows(rows, (r) => typeLabel(r.observation_type));
+
+  for (const r of groups) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${esc(r.key)}</td>
+      <td>${esc(r.report_count)}</td>
+      <td>${esc(r.observation_count)}</td>
+    `;
+    tbody.appendChild(tr);
+  }
+
+  if (!groups.length) {
+    ensureTbodyMessage(tbody, 3, "No type data for current filters.");
+  }
+}
+
+function recurringFilteredRows(rows) {
+  const year = selectedYear("recurringYearFilter");
+  const month = selectedMonth("recurringMonthFilter");
+
+  return (rows || []).filter((r) => {
+    if (year && yearOf(r) !== year) return false;
+    if (month && monthOf(r) !== month) return false;
+    return true;
   });
+}
+
+function renderTopRecurringQuestions(rows) {
+  const tbody = el("topQnsTbody");
+  tbody.innerHTML = "";
+
+  const minCount = Math.max(1, Number(el("recurringMinCount")?.value || 4));
+  const filtered = recurringFilteredRows(rows);
+
+  const grouped = groupObjectiveRows(
+    filtered,
+    (r) => `${r.question_no || "—"}||${normalizeType(r.observation_type)}`
+  )
+    .filter((r) => r.observation_count >= minCount)
+    .slice(0, 100);
+
+  for (const r of grouped) {
+    const parts = String(r.key || "").split("||");
+    const qno = parts[0] || "";
+    const obsType = parts[1] || "";
+
+    const meta = state.libByNo.get(qno) || null;
+    const ch = meta ? getChap(meta) : "";
+    const sec = meta ? getSection(meta) : "";
+    const sh = meta ? getShort(meta) : "";
+    const label = typeLabel(obsType);
+
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td class="mono">${esc(qno)}</td>
+      <td>${esc(ch)}</td>
+      <td>${esc(sec)}</td>
+      <td>${esc(sh)}</td>
+      <td>${esc(label)}</td>
+      <td>${esc(r.observation_count)}</td>
+    `;
+    tbody.appendChild(tr);
+  }
+
+  if (!grouped.length) {
+    ensureTbodyMessage(tbody, 6, `No recurring questions found at threshold ${minCount}.`);
+  }
+}
+
+function renderByCategory(rows) {
+  renderSplitTable("byCategoryTbody", groupSplitByType(rows, (r) => r.designation), "category");
+}
+
+function renderTopSoc(rows) {
+  renderSplitTable("topSocTbody", groupSplitByType(rows, (r) => r.soc), "SOC", 100);
+}
+
+function renderTopNoc(rows) {
+  renderSplitTable("topNocTbody", groupSplitByType(rows, (r) => r.noc), "NOC", 100);
 }
 
 function extractPgnoAnalyticsRows(rows) {
@@ -430,15 +736,15 @@ function renderPgnoAnalytics(rows) {
 
   const missingRows = (rows || []).filter((r) => {
     const arr = Array.isArray(r.pgno_selected) ? r.pgno_selected : [];
-    const type = String(r.observation_type || "").trim();
+    const type = normalizeType(r.observation_type);
     return (type === "negative" || type === "largely") && arr.length === 0;
   });
 
-  const missingMonthly = buildMonthlyRows(missingRows);
+  const missingMonthly = buildPeriodRows(missingRows, monthKey);
 
   renderBarChart("chartPgnoMissing", missingMonthly, {
-    labelFn: (r) => r.month,
-    valueFn: (r) => r.observations,
+    labelFn: (r) => r.key,
+    valueFn: (r) => r.observation_count,
     limit: 18,
     emptyText: "No missing PGNOs for current filters.",
   });
@@ -462,10 +768,32 @@ function renderPgnoAnalytics(rows) {
   }
 }
 
-async function renderObjectiveKpis() {
-  const rows = await loadFilteredObservationRows();
+function renderSummaryFromRows(rows, summary) {
+  el("sumReports").textContent = String(summary?.report_count ?? 0);
+  el("sumObs").textContent = String(summary?.observation_count ?? rows.length ?? 0);
+  el("sumMissing").textContent = String(summary?.missing_pgno_count ?? 0);
+  el("sumDistinct").textContent = String(summary?.distinct_questions ?? 0);
 
-  renderCharts(rows);
+  const missingNeg = (rows || []).filter((r) => {
+    const arr = Array.isArray(r.pgno_selected) ? r.pgno_selected : [];
+    return normalizeType(r.observation_type) === "negative" && arr.length === 0;
+  }).length;
+
+  const missingLargely = (rows || []).filter((r) => {
+    const arr = Array.isArray(r.pgno_selected) ? r.pgno_selected : [];
+    return normalizeType(r.observation_type) === "largely" && arr.length === 0;
+  }).length;
+
+  el("sumMissingSplit").textContent = `Negative: ${missingNeg} | Largely: ${missingLargely}`;
+}
+
+async function renderAllStats(summary, byVesselReportRows, rows) {
+  renderSummaryFromRows(rows, summary);
+
+  renderTypeVisuals(rows);
+  renderByVessel(rows, byVesselReportRows);
+  renderByType(rows);
+  renderTopRecurringQuestions(rows);
   renderByCategory(rows);
   renderTopSoc(rows);
   renderTopNoc(rows);
@@ -488,11 +816,7 @@ async function applyFilters() {
 
   if (sumErr) throw sumErr;
 
-  const s = Array.isArray(sum) ? sum[0] : sum;
-  el("sumReports").textContent = String(s?.report_count ?? 0);
-  el("sumObs").textContent = String(s?.observation_count ?? 0);
-  el("sumMissing").textContent = String(s?.missing_pgno_count ?? 0);
-  el("sumDistinct").textContent = String(s?.distinct_questions ?? 0);
+  const summary = Array.isArray(sum) ? sum[0] : sum;
 
   const { data: byV, error: byVErr } = await state.supabase
     .rpc("post_insp_stats_by_vessel", {
@@ -503,94 +827,9 @@ async function applyFilters() {
 
   if (byVErr) throw byVErr;
 
-  const vb = el("byVesselTbody");
-  vb.innerHTML = "";
+  const rows = await loadFilteredObservationRows();
 
-  for (const r of byV || []) {
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>${esc(r.vessel_name || "")}</td>
-      <td>${esc(r.report_count)}</td>
-      <td>${esc(r.observation_count)}</td>
-      <td>${esc(r.missing_pgno_count)}</td>
-      <td>${esc(r.last_inspection_date || "")}</td>
-    `;
-    vb.appendChild(tr);
-  }
-
-  if (!(byV || []).length) {
-    vb.innerHTML = `<tr><td colspan="5" class="mono">No data for current date/type filters.</td></tr>`;
-  }
-
-  const { data: byT, error: byTErr } = await state.supabase
-    .rpc("post_insp_stats_by_type", {
-      p_vessel_id: vessel_id,
-      p_from,
-      p_to,
-    });
-
-  if (byTErr) throw byTErr;
-
-  const tb = el("byTypeTbody");
-  tb.innerHTML = "";
-
-  for (const r of byT || []) {
-    const label = state.labelMap.get(r.observation_type) || r.observation_type;
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>${esc(label)}</td>
-      <td>${esc(r.report_count)}</td>
-      <td>${esc(r.observation_count)}</td>
-      <td>${esc(r.missing_pgno_count)}</td>
-      <td>${esc(r.last_seen || "")}</td>
-    `;
-    tb.appendChild(tr);
-  }
-
-  if (!(byT || []).length) {
-    tb.innerHTML = `<tr><td colspan="5" class="mono">No data for current vessel/date filters.</td></tr>`;
-  }
-
-  const { data: topQ, error: topQErr } = await state.supabase
-    .rpc("post_insp_stats_top_questions", {
-      p_vessel_id: vessel_id,
-      p_from,
-      p_to,
-      p_observation_type,
-      p_limit: 50,
-    });
-
-  if (topQErr) throw topQErr;
-
-  const qb = el("topQnsTbody");
-  qb.innerHTML = "";
-
-  for (const r of topQ || []) {
-    const meta = state.libByNo.get(r.question_no) || null;
-    const ch = meta ? getChap(meta) : "";
-    const sec = meta ? getSection(meta) : "";
-    const sh = meta ? getShort(meta) : "";
-    const label = state.labelMap.get(r.observation_type) || r.observation_type;
-
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td class="mono">${esc(r.question_no)}</td>
-      <td>${esc(ch)}</td>
-      <td>${esc(sec)}</td>
-      <td>${esc(sh)}</td>
-      <td>${esc(label)}</td>
-      <td>${esc(r.observation_count)}</td>
-      <td>${esc(r.report_count)}</td>
-      <td>${esc(r.last_seen || "")}</td>
-    `;
-    qb.appendChild(tr);
-  }
-
-  if (!(topQ || []).length) {
-    qb.innerHTML = `<tr><td colspan="8" class="mono">No data for current filters.</td></tr>`;
-  }
-
-  await renderObjectiveKpis();
+  await renderAllStats(summary, byV || [], rows);
 
   setStatus("Ready");
 }
@@ -693,6 +932,7 @@ async function init() {
   state.vessels = await loadVessels();
   renderVesselFilter();
   renderTypeFilter();
+  renderMonthSelect("recurringMonthFilter");
 
   const to = new Date();
   const from = new Date();
@@ -706,6 +946,15 @@ async function init() {
     const qno = getQno(q);
     if (qno) state.libByNo.set(qno, q);
   }
+
+  state.allRows = await loadFilteredObservationRows().catch(() => []);
+  state.allReportRows = await loadAllReportRowsForYearSelectors();
+
+  const years = collectYearsFromRows(state.allRows, state.allReportRows);
+  const currentYear = String(new Date().getFullYear());
+
+  renderYearSelect("recurringYearFilter", years, true, "");
+  renderYearSelect("trendYearFilter", years, false, currentYear);
 
   el("applyBtn").addEventListener("click", async () => {
     try {
@@ -723,6 +972,42 @@ async function init() {
     } catch (e) {
       console.error(e);
       alert("Export failed: " + (e?.message || String(e)));
+      setStatus("Error");
+    }
+  });
+
+  el("recurringMinCount").addEventListener("change", async () => {
+    try {
+      await applyFilters();
+    } catch (e) {
+      console.error(e);
+      setStatus("Error");
+    }
+  });
+
+  el("recurringYearFilter").addEventListener("change", async () => {
+    try {
+      await applyFilters();
+    } catch (e) {
+      console.error(e);
+      setStatus("Error");
+    }
+  });
+
+  el("recurringMonthFilter").addEventListener("change", async () => {
+    try {
+      await applyFilters();
+    } catch (e) {
+      console.error(e);
+      setStatus("Error");
+    }
+  });
+
+  el("trendYearFilter").addEventListener("change", async () => {
+    try {
+      await applyFilters();
+    } catch (e) {
+      console.error(e);
       setStatus("Error");
     }
   });
