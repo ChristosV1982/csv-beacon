@@ -3,669 +3,413 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Post-Inspection Stats</title>
+  <title>Post-Inspection Entry</title>
 
   <link rel="stylesheet" href="./tekmerion-theme.css?v=20260212_1" />
   <link rel="stylesheet" href="./style.css" />
 
   <style>
-    body{
-      margin:0; min-height:100vh;
-      font-family:"Segoe UI", Arial, sans-serif;
-      background: radial-gradient(1200px 700px at 20% 10%, #1a4170 0%, #0b1c33 55%, #071426 100%);
-      color:#fff;
-      padding:18px 14px;
-      box-sizing:border-box;
+    :root{
+      --pi-navy:#0b2a4a;
+      --pi-navy2:#0f3a63;
+      --pi-bg:#08131f;
+      --pi-card:#ffffff;
+      --pi-border:#cfe0f4;
+      --pi-text:#0c1b2a;
+      --pi-muted:#55708f;
     }
-    .wrap{ max-width: 1650px; margin: 0 auto; }
 
-    .topbar{
-      display:flex; gap:12px; flex-wrap:wrap;
-      align-items:center; justify-content:space-between;
-      margin-bottom: 12px;
-      background: rgba(12,33,58,0.68);
-      border: 1px solid rgba(213,222,239,0.35);
-      border-radius: 16px;
-      padding:12px 14px;
-      box-shadow: 0 10px 46px rgba(0,0,0,0.35);
-      backdrop-filter: blur(3px);
+    *{ box-sizing:border-box; }
+
+    body{
+      margin:0;
+      min-height:100vh;
+      font-family:"Segoe UI", Arial, sans-serif;
+      background:var(--pi-bg);
+      color:var(--pi-text);
+      padding:18px 14px;
     }
-    .title{ margin:0; font-weight:900; letter-spacing:0.03em; font-size:1.15rem; }
-    .sub{ margin-top:4px; opacity:0.92; font-weight:800; line-height:1.35; font-size:0.95rem; }
-    .actions{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+
+    .wrap{
+      max-width:1700px;
+      margin:0 auto;
+    }
+
+    .hero{
+      background:linear-gradient(180deg,var(--pi-navy2),var(--pi-navy));
+      border:1px solid rgba(255,255,255,.10);
+      border-radius:18px;
+      padding:18px;
+      color:#fff;
+      box-shadow:0 10px 30px rgba(0,0,0,.30);
+      margin-bottom:18px;
+    }
+
+    .hero h1{
+      margin:0 0 6px;
+      font-size:24px;
+      font-weight:950;
+    }
+
+    .hero p{
+      margin:0;
+      color:rgba(255,255,255,.85);
+      font-weight:800;
+      line-height:1.35;
+    }
+
+    .toprow{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      align-items:center;
+      margin-top:12px;
+    }
+
+    .pill{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding:8px 12px;
+      border-radius:999px;
+      background:rgba(255,255,255,.08);
+      border:1px solid rgba(255,255,255,.15);
+      font-weight:800;
+      color:#fff;
+    }
 
     .btn{
-      border:none; border-radius:10px;
-      padding:10px 14px;
+      border-radius:12px;
+      padding:9px 12px;
       font-weight:900;
       cursor:pointer;
+      border:none;
       text-decoration:none;
       display:inline-block;
-      background:#295eb0; color:#fff;
-      white-space: nowrap;
     }
-    .btn-outline{ background:transparent; border:1px solid rgba(255,255,255,0.65); color:#fff; }
-    .btn-muted{ background:#eaf1fb; border:1px solid #d5deef; color:#1a4170; }
 
-    .panel{
-      background: rgba(12,33,58,0.68);
-      border: 1px solid rgba(213,222,239,0.35);
-      border-radius: 18px;
-      padding: 14px;
-      box-shadow: 0 10px 46px rgba(0,0,0,0.35);
-      backdrop-filter: blur(3px);
-      margin-bottom:12px;
+    .btn.primary{
+      background:#1f6feb;
+      color:#fff;
+    }
+
+    .btn.light{
+      background:#ffffff;
+      color:#0c1b2a;
+      border:1px solid rgba(255,255,255,.35);
+    }
+
+    .btn.muted{
+      background:#eef6ff;
+      border:1px solid #cfe0f4;
+      color:#143a63;
     }
 
     .card{
       background:#fff;
-      color:#1a4170;
-      border:1px solid #d5deef;
-      border-radius:16px;
-      padding:14px;
-      box-shadow: 0 4px 18px rgba(18, 44, 87, 0.16);
+      border:1px solid var(--pi-border);
+      border-radius:18px;
+      padding:16px;
+      box-shadow:0 10px 24px rgba(0,0,0,.20);
+      overflow:hidden;
+      margin-bottom:18px;
     }
 
-    .row{ display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; }
-    .field{ min-width: 220px; flex: 1; }
-    .field-small{ min-width: 160px; flex: 0.7; }
-
-    label{
-      display:block;
-      margin: 10px 0 6px 0;
-      font-weight: 900;
-      color:#1a4170;
-      font-size: 0.95rem;
-    }
-
-    input, select{
-      width: 100%;
-      box-sizing:border-box;
-      border-radius:10px;
-      border:1px solid #cbd7ee;
-      padding: 10px 12px;
-      font-size: 1rem;
-      font-family:"Segoe UI", Arial, sans-serif;
-      background:#fff;
-      color:#1a4170;
-      outline:none;
-    }
-
-    .statGrid{
-      display:grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap:10px;
-      margin-top:10px;
-    }
-    @media (max-width: 980px){
-      .statGrid{ grid-template-columns: 1fr; }
-    }
-    .stat{
-      border:1px solid #d5deef;
-      border-radius:14px;
-      padding:12px;
-      background:#f8fbff;
-      box-shadow: 0 4px 16px rgba(18, 44, 87, 0.10);
-    }
-    .statN{ font-size:1.6rem; font-weight:950; color:#1a4170; }
-    .statL{ margin-top:6px; color:#35507b; font-weight:850; line-height:1.35; white-space:pre-wrap; }
-    .statSub{
-      margin-top:8px;
-      color:#48628e;
-      font-weight:850;
-      line-height:1.45;
-      font-size:0.9rem;
-    }
-
-    table{ width:100%; border-collapse: collapse; margin-top:10px; }
-    th, td{ border-bottom:1px solid #e3ecfb; padding:10px; text-align:left; vertical-align:top; }
-    th{ color:#1a4170; font-weight:950; background:#f1f6ff; }
-    td{ color:#223a66; font-weight:850; }
-    .mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
-
-    .statusLine{
-      margin-top:10px;
+    .card h2{
+      margin:0 0 12px;
+      color:#113a63;
       font-weight:950;
-      color: rgba(255,255,255,0.92);
-      display:flex;
-      gap:10px;
-      align-items:center;
-      flex-wrap:wrap;
-    }
-    .statusPill{
-      display:inline-block;
-      padding:3px 10px;
-      border-radius:999px;
-      font-weight:950;
-      font-size:0.85rem;
-      border:1px solid rgba(255,255,255,0.35);
-      background: rgba(255,255,255,0.10);
-      color:#fff;
     }
 
-    .chartGrid{
-      display:grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap:12px;
-    }
-    .chartGrid4{
-      display:grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap:12px;
-    }
-    @media (max-width: 1400px){
-      .chartGrid4{ grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    }
-    @media (max-width: 1200px){
-      .chartGrid{ grid-template-columns:1fr; }
-      .chartGrid4{ grid-template-columns:1fr; }
-    }
-
-    .chartBox{
-      border:1px solid #d5deef;
-      border-radius:14px;
-      background:#f8fbff;
-      padding:12px;
-      min-height:260px;
-    }
-    .chartTitle{
-      font-weight:950;
-      color:#1a4170;
-      margin-bottom:10px;
-    }
-    .chartNote{
-      color:#48628e;
+    .muted{
+      color:var(--pi-muted);
       font-weight:800;
-      font-size:0.88rem;
-      margin-bottom:8px;
       line-height:1.35;
     }
-    .barRow{
-      display:grid;
-      grid-template-columns: 150px 1fr 54px;
-      gap:10px;
+
+    .tableTop{
+      display:flex;
+      justify-content:space-between;
       align-items:center;
-      margin:8px 0;
-      color:#223a66;
-      font-weight:850;
-      font-size:0.9rem;
+      gap:12px;
+      flex-wrap:wrap;
+      margin-bottom:10px;
     }
-    .barLabel{
+
+    .tableCount{
+      color:#143a63;
+      font-weight:950;
+    }
+
+    .tbl-wrap{
+      overflow:auto;
+      border:1px solid #e5eefc;
+      border-radius:16px;
+      max-height:70vh;
+    }
+
+    table{
+      width:100%;
+      min-width:1200px;
+      border-collapse:separate;
+      border-spacing:0;
+      table-layout:fixed;
+    }
+
+    thead th{
+      text-align:left;
+      font-weight:950;
+      color:#143a63;
+      padding:10px;
+      border-bottom:1px solid #e5eefc;
+      background:#f8fbff;
+      position:sticky;
+      top:0;
+      z-index:1;
+      vertical-align:bottom;
+    }
+
+    tbody td{
+      padding:10px;
+      border-bottom:1px solid #eef4ff;
+      vertical-align:top;
+      font-weight:700;
+      color:#0c1b2a;
       overflow:hidden;
       text-overflow:ellipsis;
       white-space:nowrap;
     }
-    .barTrack{
-      height:18px;
-      border-radius:999px;
-      background:#e8effa;
-      overflow:hidden;
-      border:1px solid #d5deef;
-    }
-    .barFill{
-      height:100%;
-      min-width:3px;
-      border-radius:999px;
-      background:#295eb0;
-    }
-    .barValue{
-      text-align:right;
-      font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
-      color:#1a4170;
-      font-weight:950;
-    }
-    .emptyChart{
-      color:#55708f;
-      font-weight:850;
-      padding:8px 0;
+
+    tbody tr{
+      cursor:pointer;
     }
 
-    .sectionTitle{
-      margin:0 0 8px 0;
-      color:#1a4170;
+    tbody tr:hover td{
+      background:#f8fbff;
+    }
+
+    .vessel-bold{
+      font-weight:950;
+      color:#143a63;
+    }
+
+    .filter-head{
+      display:flex;
+      align-items:center;
+      gap:6px;
+    }
+
+    .filter-btn{
+      border:1px solid #cfe0f4;
+      background:#eef6ff;
+      color:#143a63;
+      border-radius:8px;
+      padding:4px 7px;
+      font-weight:950;
+      cursor:pointer;
+      line-height:1;
+    }
+
+    dialog{
+      border:none;
+      border-radius:18px;
+      padding:0;
+      width:min(720px, 94vw);
+      box-shadow:0 20px 80px rgba(0,0,0,.45);
+    }
+
+    dialog::backdrop{
+      background:rgba(2,12,25,.62);
+    }
+
+    .dlg{
+      padding:16px;
+      background:#fff;
+      color:#143a63;
+    }
+
+    .dlg h3{
+      margin:0 0 6px;
+      color:#143a63;
       font-weight:950;
     }
 
-    .filterNote{
-      margin-top:8px;
-      color:#48628e;
+    .dlg-sub{
       font-weight:800;
+      color:#55708f;
+      margin-bottom:12px;
       line-height:1.35;
-      font-size:0.92rem;
+    }
+
+    .dlg input[type="text"]{
+      width:100%;
+      padding:10px 12px;
+      border:1px solid #cfe0f4;
+      border-radius:12px;
+      font-weight:800;
+      background:#fff;
+      margin-bottom:12px;
+    }
+
+    .chk-list{
+      border:1px solid #cfe0f4;
+      border-radius:14px;
+      background:#f8fbff;
+      padding:10px;
+      max-height:340px;
+      overflow:auto;
+    }
+
+    .chk-row{
+      display:flex;
+      gap:9px;
+      align-items:center;
+      padding:5px 0;
+      font-weight:850;
+      color:#143a63;
+      line-height:1.3;
+    }
+
+    .chk-row input{
+      transform:scale(1.05);
+    }
+
+    .date-filter-grid{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:12px;
+    }
+
+    .date-filter-card{
+      border:1px solid #cfe0f4;
+      border-radius:14px;
+      background:#f8fbff;
+      padding:10px;
+    }
+
+    .date-filter-card h4{
+      margin:0 0 8px;
+      color:#143a63;
+      font-weight:950;
+    }
+
+    .dlg-actions{
+      display:flex;
+      gap:10px;
+      justify-content:flex-end;
+      flex-wrap:wrap;
+      margin-top:12px;
+      padding-top:12px;
+      border-top:1px solid #e5eefc;
+    }
+
+    @media(max-width:900px){
+      .date-filter-grid{ grid-template-columns:1fr; }
+      table{ table-layout:auto; }
+      tbody td{ white-space:normal; }
     }
   </style>
 </head>
 
 <body>
   <div class="wrap">
-    <div class="topbar">
-      <div>
-        <div class="title">Post-Inspection Statistics (Fleet / Vessel)</div>
-        <div class="sub">DB-driven statistics and exports. Filters apply to all sections below unless otherwise stated.</div>
-      </div>
-      <div class="actions">
-        <div id="userBadge" style="font-weight:900; opacity:0.95;"></div>
-        <a class="btn btn-outline" href="./q-dashboard.html">Dashboard</a>
-        <a class="btn btn-outline" href="./post_inspection.html">Post-Inspection</a>
-        <button class="btn" id="logoutBtn">Logout</button>
+    <div class="hero">
+      <h1>Post-Inspection Entry</h1>
+      <p>Stored SIRE 2.0 post-inspection reports. Open a report to review extracted items, import PDF, edit header, and manage PGNO assignment.</p>
+
+      <div class="toprow">
+        <span class="pill" id="userBadge">Not signed in</span>
+        <button class="btn light" id="dashboardBtn" type="button">Dashboard</button>
+        <button class="btn light" id="modeSelectBtn" type="button">Mode Selection</button>
+        <button class="btn primary" id="newReportBtn" type="button">New Post-Inspection Report</button>
+        <button class="btn primary" id="logoutBtn" type="button">Logout</button>
+        <span class="pill" id="buildPill">build: —</span>
       </div>
     </div>
 
-    <div class="panel">
-      <div class="card">
-        <div class="row">
-          <div class="field">
-            <label for="vesselFilter">Vessel</label>
-            <select id="vesselFilter"></select>
-          </div>
-
-          <div class="field">
-            <label for="dateFrom">From date</label>
-            <input id="dateFrom" type="date" />
-          </div>
-
-          <div class="field">
-            <label for="dateTo">To date</label>
-            <input id="dateTo" type="date" />
-          </div>
-
-          <div class="field">
-            <label for="typeFilter">Observation type</label>
-            <select id="typeFilter"></select>
-          </div>
-
-          <div class="field" style="min-width:340px; flex:1.3;">
-            <label>&nbsp;</label>
-            <div style="display:flex; gap:10px; flex-wrap:wrap;">
-              <button class="btn btn-muted" id="applyBtn">Apply filters</button>
-              <button class="btn btn-muted" id="exportCsvBtn">Export filtered CSV</button>
-            </div>
-          </div>
+    <div class="card">
+      <div class="tableTop">
+        <div>
+          <h2>Stored Inspections</h2>
+          <div class="muted">Click any row to open the inspection detail page.</div>
         </div>
 
-        <div class="row" style="margin-top:8px;">
-          <div class="field-small">
-            <label for="recurringMinCount">Recurring threshold</label>
-            <input id="recurringMinCount" type="number" min="1" step="1" value="4" />
-          </div>
-
-          <div class="field-small">
-            <label for="recurringYearFilter">Recurring year</label>
-            <select id="recurringYearFilter"></select>
-          </div>
-
-          <div class="field-small">
-            <label for="recurringMonthFilter">Recurring month</label>
-            <select id="recurringMonthFilter"></select>
-          </div>
-
-          <div class="field-small">
-            <label for="trendYearFilter">Monthly trend year</label>
-            <select id="trendYearFilter"></select>
-          </div>
-        </div>
-
-        <div class="filterNote">
-          Recurring threshold affects only the Top Recurring Questions table. Monthly trend year affects the Monthly Trend table and always shows all 12 months.
-        </div>
-
-        <div class="statusLine">
-          <span class="statusPill" id="statusPill">Ready</span>
-        </div>
-
-        <div class="statGrid">
-          <div class="stat">
-            <div class="statN" id="sumReports">0</div>
-            <div class="statL">Reports</div>
-          </div>
-          <div class="stat">
-            <div class="statN" id="sumObs">0</div>
-            <div class="statL">Total Observations</div>
-            <div class="statSub">All inclusive: Negative + Largely as expected + Positive</div>
-          </div>
-          <div class="stat">
-            <div class="statN" id="sumMissing">0</div>
-            <div class="statL">Missing PGNO tick</div>
-            <div class="statSub" id="sumMissingSplit">Negative: 0 | Largely: 0</div>
-          </div>
-          <div class="stat">
-            <div class="statN" id="sumDistinct">0</div>
-            <div class="statL">Unique Questions Observed</div>
-            <div class="statSub">Unique question numbers with at least one recorded observation.</div>
-          </div>
+        <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+          <span class="tableCount" id="storedCount">0 inspection(s)</span>
+          <button class="btn muted" id="clearStoredFiltersBtn" type="button">Clear table filters</button>
         </div>
       </div>
-    </div>
 
-    <div class="panel">
-      <div class="card">
-        <h3 class="sectionTitle">Visual Overview — Negative Observations</h3>
-        <div class="statL">Negative observations split by category/designation and time period.</div>
-        <div class="chartGrid4" style="margin-top:12px;">
-          <div class="chartBox">
-            <div class="chartTitle">Negative — Category / Designation</div>
-            <div id="chartNegCategory"></div>
-          </div>
-          <div class="chartBox">
-            <div class="chartTitle">Negative — Monthly Trend</div>
-            <div id="chartNegMonthly"></div>
-          </div>
-          <div class="chartBox">
-            <div class="chartTitle">Negative — Quarterly Trend</div>
-            <div id="chartNegQuarterly"></div>
-          </div>
-          <div class="chartBox">
-            <div class="chartTitle">Negative — Annual Trend</div>
-            <div id="chartNegAnnual"></div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="panel">
-      <div class="card">
-        <h3 class="sectionTitle">Visual Overview — Largely as Expected Observations</h3>
-        <div class="statL">Largely as expected observations split by category/designation and time period.</div>
-        <div class="chartGrid4" style="margin-top:12px;">
-          <div class="chartBox">
-            <div class="chartTitle">Largely — Category / Designation</div>
-            <div id="chartLargelyCategory"></div>
-          </div>
-          <div class="chartBox">
-            <div class="chartTitle">Largely — Monthly Trend</div>
-            <div id="chartLargelyMonthly"></div>
-          </div>
-          <div class="chartBox">
-            <div class="chartTitle">Largely — Quarterly Trend</div>
-            <div id="chartLargelyQuarterly"></div>
-          </div>
-          <div class="chartBox">
-            <div class="chartTitle">Largely — Annual Trend</div>
-            <div id="chartLargelyAnnual"></div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="panel">
-      <div class="card">
-        <h3 class="sectionTitle">Visual Overview — Positive Observations</h3>
-        <div class="statL">Positive observations are treated as Human observations. Time-period trends are shown below.</div>
-        <div class="chartGrid" style="margin-top:12px;">
-          <div class="chartBox">
-            <div class="chartTitle">Positive — Monthly Trend</div>
-            <div id="chartPositiveMonthly"></div>
-          </div>
-          <div class="chartBox">
-            <div class="chartTitle">Positive — Quarterly Trend</div>
-            <div id="chartPositiveQuarterly"></div>
-          </div>
-          <div class="chartBox">
-            <div class="chartTitle">Positive — Annual Trend</div>
-            <div id="chartPositiveAnnual"></div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="panel">
-      <div class="card">
-        <h3 class="sectionTitle">By Vessel (Fleet)</h3>
-        <div class="statL">Applies date range + observation type filter. Vessel filter is ignored for this fleet table.</div>
+      <div class="tbl-wrap">
         <table>
           <thead>
             <tr>
-              <th>Vessel</th>
-              <th>Reports</th>
-              <th>Negative</th>
-              <th>Largely as expected</th>
-              <th>Positive</th>
-              <th>Avg Neg / Insp.</th>
-              <th>Avg Largely / Insp.</th>
-              <th>Avg Pos / Insp.</th>
-              <th>Avg Total / Insp.</th>
+              <th style="width:180px;">
+                <div class="filter-head">
+                  <span>Vessel</span>
+                  <button class="filter-btn" type="button" data-filter-col="vessel_name">▼</button>
+                </div>
+              </th>
+              <th style="width:140px;">
+                <div class="filter-head">
+                  <span>Date</span>
+                  <button class="filter-btn" type="button" data-filter-col="inspection_date">▼</button>
+                </div>
+              </th>
+              <th style="width:190px;">Report Ref</th>
+              <th style="width:260px;">
+                <div class="filter-head">
+                  <span>Title</span>
+                  <button class="filter-btn" type="button" data-filter-col="title">▼</button>
+                </div>
+              </th>
+              <th style="width:260px;">
+                <div class="filter-head">
+                  <span>OCIMF Inspecting Company</span>
+                  <button class="filter-btn" type="button" data-filter-col="ocimf_inspecting_company">▼</button>
+                </div>
+              </th>
+              <th style="width:220px;">
+                <div class="filter-head">
+                  <span>Inspector Name</span>
+                  <button class="filter-btn" type="button" data-filter-col="inspector_name">▼</button>
+                </div>
+              </th>
+              <th style="width:240px;">
+                <div class="filter-head">
+                  <span>Inspector’s Company</span>
+                  <button class="filter-btn" type="button" data-filter-col="inspector_company">▼</button>
+                </div>
+              </th>
             </tr>
           </thead>
-          <tbody id="byVesselTbody"></tbody>
-        </table>
-      </div>
-    </div>
-
-    <div class="panel">
-      <div class="card">
-        <h3 class="sectionTitle">Averages — Selected Scope</h3>
-        <div class="statL">Average observations per inspection, based on the current filters.</div>
-        <table>
-          <thead>
-            <tr>
-              <th>Scope</th>
-              <th>Inspections</th>
-              <th>Negative</th>
-              <th>Largely as expected</th>
-              <th>Positive</th>
-              <th>Total Observations</th>
-              <th>Avg Neg / Insp.</th>
-              <th>Avg Largely / Insp.</th>
-              <th>Avg Pos / Insp.</th>
-              <th>Avg Total / Insp.</th>
-            </tr>
-          </thead>
-          <tbody id="avgFleetTbody"></tbody>
-        </table>
-      </div>
-    </div>
-
-    <div class="panel">
-      <div class="card">
-        <h3 class="sectionTitle">By Observation Type</h3>
-        <div class="statL">Applies vessel + date range filters. Type filter is ignored for this section.</div>
-        <table>
-          <thead>
-            <tr>
-              <th>Type</th>
-              <th>Reports</th>
-              <th>Observations</th>
-            </tr>
-          </thead>
-          <tbody id="byTypeTbody"></tbody>
-        </table>
-      </div>
-    </div>
-
-    <div class="panel">
-      <div class="card">
-        <h3 class="sectionTitle">Top Recurring Questions</h3>
-        <div class="statL">Applies vessel + date range + type filters, plus recurring threshold / recurring year / recurring month filters.</div>
-        <table>
-          <thead>
-            <tr>
-              <th>Question No</th>
-              <th>Chapter</th>
-              <th>Section</th>
-              <th>Short text</th>
-              <th>Type</th>
-              <th>Obs count</th>
-            </tr>
-          </thead>
-          <tbody id="topQnsTbody"></tbody>
-        </table>
-      </div>
-    </div>
-
-    <div class="panel">
-      <div class="card">
-        <h3 class="sectionTitle">By Category / Designation</h3>
-        <div class="statL">Objective breakdown by recorded designation: Human, Process, Hardware, Photo.</div>
-        <table>
-          <thead>
-            <tr>
-              <th>Category</th>
-              <th>Negative</th>
-              <th>Largely as expected</th>
-              <th>Positive</th>
-            </tr>
-          </thead>
-          <tbody id="byCategoryTbody"></tbody>
-        </table>
-      </div>
-    </div>
-
-    <div class="panel">
-      <div class="card">
-        <h3 class="sectionTitle">Top SOC</h3>
-        <div class="statL">Objective breakdown by recorded Subject of Concern (SOC).</div>
-        <table>
-          <thead>
-            <tr>
-              <th>SOC</th>
-              <th>Negative</th>
-              <th>Largely as expected</th>
-              <th>Positive</th>
-            </tr>
-          </thead>
-          <tbody id="topSocTbody"></tbody>
-        </table>
-      </div>
-    </div>
-
-    <div class="panel">
-      <div class="card">
-        <h3 class="sectionTitle">Top NOC</h3>
-        <div class="statL">Objective breakdown by recorded Nature of Concern (NOC).</div>
-        <table>
-          <thead>
-            <tr>
-              <th>NOC</th>
-              <th>Negative</th>
-              <th>Largely as expected</th>
-              <th>Positive</th>
-            </tr>
-          </thead>
-          <tbody id="topNocTbody"></tbody>
-        </table>
-      </div>
-    </div>
-
-    <div class="panel">
-      <div class="card">
-        <h3 class="sectionTitle">Monthly Trend</h3>
-        <div class="statL">Objective observation count by inspection month. The selected trend year always shows all 12 months, including zero-count months.</div>
-        <table>
-          <thead>
-            <tr>
-              <th>Month</th>
-              <th>Reports</th>
-              <th>Observations</th>
-              <th>Negative</th>
-              <th>Positive</th>
-              <th>Largely</th>
-            </tr>
-          </thead>
-          <tbody id="monthlyTbody"></tbody>
-        </table>
-      </div>
-    </div>
-
-    <div class="panel">
-      <div class="card">
-        <h3 class="sectionTitle">By OCIMF Inspecting Company</h3>
-        <div class="statL">Observation count and average observations per inspection by OCIMF inspecting company.</div>
-        <table>
-          <thead>
-            <tr>
-              <th>OCIMF Company</th>
-              <th>Inspections</th>
-              <th>Negative</th>
-              <th>Largely as expected</th>
-              <th>Positive</th>
-              <th>Total Observations</th>
-              <th>Avg Total / Insp.</th>
-            </tr>
-          </thead>
-          <tbody id="byOcimfTbody"></tbody>
-        </table>
-      </div>
-    </div>
-
-    <div class="panel">
-      <div class="card">
-        <h3 class="sectionTitle">By Inspector</h3>
-        <div class="statL">Observation count and average observations per inspection by inspector name.</div>
-        <table>
-          <thead>
-            <tr>
-              <th>Inspector</th>
-              <th>Inspections</th>
-              <th>Negative</th>
-              <th>Largely as expected</th>
-              <th>Positive</th>
-              <th>Total Observations</th>
-              <th>Avg Total / Insp.</th>
-            </tr>
-          </thead>
-          <tbody id="byInspectorTbody"></tbody>
-        </table>
-      </div>
-    </div>
-
-    <div class="panel">
-      <div class="card">
-        <h3 class="sectionTitle">By Inspector Company</h3>
-        <div class="statL">Observation count and average observations per inspection by inspector company.</div>
-        <table>
-          <thead>
-            <tr>
-              <th>Inspector Company</th>
-              <th>Inspections</th>
-              <th>Negative</th>
-              <th>Largely as expected</th>
-              <th>Positive</th>
-              <th>Total Observations</th>
-              <th>Avg Total / Insp.</th>
-            </tr>
-          </thead>
-          <tbody id="byInspectorCompanyTbody"></tbody>
-        </table>
-      </div>
-    </div>
-
-    <div class="panel">
-      <div class="card">
-        <h3 class="sectionTitle">PGNO Analytics</h3>
-        <div class="statL">PGNO analytics are based on assigned PGNOs only. They are separate from objective observation statistics because PGNO assignment may be software-suggested or user-confirmed.</div>
-
-        <div class="chartGrid" style="margin-top:12px;">
-          <div class="chartBox">
-            <div class="chartTitle">Top PGNO</div>
-            <div id="chartPgno"></div>
-          </div>
-          <div class="chartBox">
-            <div class="chartTitle">PGNO by Question</div>
-            <div id="chartPgnoQuestion"></div>
-          </div>
-          <div class="chartBox">
-            <div class="chartTitle">Missing PGNO Trend</div>
-            <div id="chartPgnoMissing"></div>
-          </div>
-        </div>
-
-        <table>
-          <thead>
-            <tr>
-              <th>PGNO</th>
-              <th>Observations</th>
-              <th>Reports</th>
-              <th>Last seen</th>
-            </tr>
-          </thead>
-          <tbody id="pgnoTableTbody"></tbody>
+          <tbody id="storedTableBody">
+            <tr><td colspan="7" class="muted">Loading inspections…</td></tr>
+          </tbody>
         </table>
       </div>
     </div>
   </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="./auth.js"></script>
-  <script type="module" src="./post_inspection_stats.js"></script>
+  <dialog id="storedFilterDialog">
+    <div class="dlg">
+      <h3 id="storedFilterTitle">Filter</h3>
+      <div class="dlg-sub" id="storedFilterSub">Select values to include.</div>
+
+      <input id="storedFilterSearch" type="text" placeholder="Search filter values..." />
+
+      <div id="storedFilterList" class="chk-list"></div>
+
+      <div class="dlg-actions">
+        <button class="btn muted" id="storedFilterClearBtn" type="button">Clear this filter</button>
+        <button class="btn primary" id="storedFilterApplyBtn" type="button">Apply</button>
+      </div>
+    </div>
+  </dialog>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js" defer></script>
+  <script src="./app-config.js" defer></script>
+  <script src="./auth.js" defer></script>
+  <script type="module" src="./post_inspection.js"></script>
 </body>
 </html>
