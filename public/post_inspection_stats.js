@@ -1,5 +1,6 @@
 // public/post_inspection_stats.js
-// Fleet/vessel stats via RPC functions (efficient, production-safe)
+// Fleet/vessel stats via RPC functions.
+// Current observation model: post_inspection_observation_items.obs_type = negative | positive | largely
 
 import { loadLockedLibraryJson } from "./question_library_loader.js";
 
@@ -7,12 +8,9 @@ const LOCKED_LIBRARY_JSON = "./sire_questions_all_columns_named.json";
 
 const OBS_TYPES = [
   { value: "", label: "All types" },
-  { value: "negative_observation", label: "Negative observation" },
-  { value: "observation_comment", label: "Observation / comment" },
-  { value: "note_improvement", label: "Note / improvement" },
-  { value: "best_practice", label: "Best practice" },
-  { value: "office_finding", label: "Office finding" },
-  { value: "other", label: "Other" },
+  { value: "negative", label: "Negative" },
+  { value: "positive", label: "Positive" },
+  { value: "largely", label: "Largely as expected" },
 ];
 
 function el(id) { return document.getElementById(id); }
@@ -55,14 +53,33 @@ function pick(obj, keys) {
 function getQno(q) {
   return String(pick(q, ["No.", "No", "question_no", "QuestionNo", "Question ID"])).trim();
 }
+
 function getChap(q) {
   return String(pick(q, ["Chap", "chapter", "Chapter"])).trim();
 }
+
 function getSection(q) {
   return String(pick(q, ["Section Name", "Sect", "section", "Section"])).trim();
 }
+
 function getShort(q) {
   return String(pick(q, ["Short Text", "short_text", "ShortText"])).trim();
+}
+
+function pgnoExportText(pgnoSelected) {
+  const arr = Array.isArray(pgnoSelected) ? pgnoSelected : [];
+  if (!arr.length) return "";
+
+  return arr
+    .map((x) => {
+      const no = String(x?.pgno_no || x?.idx || "").trim();
+      const text = String(x?.text || "").trim();
+      if (no && text) return `${no} — ${text}`;
+      if (no) return no;
+      return text;
+    })
+    .filter(Boolean)
+    .join("; ");
 }
 
 async function loadVessels() {
@@ -71,6 +88,7 @@ async function loadVessels() {
     .select("id, name, is_active")
     .eq("is_active", true)
     .order("name", { ascending: true });
+
   if (error) throw error;
   return data || [];
 }
@@ -95,6 +113,7 @@ function renderVesselFilter() {
 function renderTypeFilter() {
   const sel = el("typeFilter");
   sel.innerHTML = "";
+
   for (const t of OBS_TYPES) {
     const o = document.createElement("option");
     o.value = t.value;
@@ -117,13 +136,12 @@ async function applyFilters() {
 
   const { vessel_id, p_from, p_to, p_observation_type } = getFilters();
 
-  // Summary
   const { data: sum, error: sumErr } = await state.supabase
     .rpc("post_insp_stats_summary", {
       p_vessel_id: vessel_id,
-      p_from: p_from,
-      p_to: p_to,
-      p_observation_type: p_observation_type,
+      p_from,
+      p_to,
+      p_observation_type,
     });
 
   if (sumErr) throw sumErr;
@@ -134,18 +152,18 @@ async function applyFilters() {
   el("sumMissing").textContent = String(s?.missing_pgno_count ?? 0);
   el("sumDistinct").textContent = String(s?.distinct_questions ?? 0);
 
-  // By vessel (fleet view): ignores vessel filter, uses date + type only
   const { data: byV, error: byVErr } = await state.supabase
     .rpc("post_insp_stats_by_vessel", {
-      p_from: p_from,
-      p_to: p_to,
-      p_observation_type: p_observation_type,
+      p_from,
+      p_to,
+      p_observation_type,
     });
 
   if (byVErr) throw byVErr;
 
   const vb = el("byVesselTbody");
   vb.innerHTML = "";
+
   for (const r of byV || []) {
     const tr = document.createElement("tr");
     tr.innerHTML = `
@@ -157,25 +175,26 @@ async function applyFilters() {
     `;
     vb.appendChild(tr);
   }
+
   if (!(byV || []).length) {
     vb.innerHTML = `<tr><td colspan="5" class="mono">No data for current date/type filters.</td></tr>`;
   }
 
-  // By type: ignores type filter, uses vessel + date
   const { data: byT, error: byTErr } = await state.supabase
     .rpc("post_insp_stats_by_type", {
       p_vessel_id: vessel_id,
-      p_from: p_from,
-      p_to: p_to,
+      p_from,
+      p_to,
     });
 
   if (byTErr) throw byTErr;
 
   const tb = el("byTypeTbody");
   tb.innerHTML = "";
+
   for (const r of byT || []) {
-    const tr = document.createElement("tr");
     const label = state.labelMap.get(r.observation_type) || r.observation_type;
+    const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>${esc(label)}</td>
       <td>${esc(r.report_count)}</td>
@@ -185,17 +204,17 @@ async function applyFilters() {
     `;
     tb.appendChild(tr);
   }
+
   if (!(byT || []).length) {
     tb.innerHTML = `<tr><td colspan="5" class="mono">No data for current vessel/date filters.</td></tr>`;
   }
 
-  // Top questions: vessel + date + type
   const { data: topQ, error: topQErr } = await state.supabase
     .rpc("post_insp_stats_top_questions", {
       p_vessel_id: vessel_id,
-      p_from: p_from,
-      p_to: p_to,
-      p_observation_type: p_observation_type,
+      p_from,
+      p_to,
+      p_observation_type,
       p_limit: 50,
     });
 
@@ -203,6 +222,7 @@ async function applyFilters() {
 
   const qb = el("topQnsTbody");
   qb.innerHTML = "";
+
   for (const r of topQ || []) {
     const meta = state.libByNo.get(r.question_no) || null;
     const ch = meta ? getChap(meta) : "";
@@ -223,6 +243,7 @@ async function applyFilters() {
     `;
     qb.appendChild(tr);
   }
+
   if (!(topQ || []).length) {
     qb.innerHTML = `<tr><td colspan="8" class="mono">No data for current filters.</td></tr>`;
   }
@@ -238,9 +259,9 @@ async function exportFilteredCsv() {
   const { data, error } = await state.supabase
     .rpc("post_insp_export_observations", {
       p_vessel_id: vessel_id,
-      p_from: p_from,
-      p_to: p_to,
-      p_observation_type: p_observation_type,
+      p_from,
+      p_to,
+      p_observation_type,
     });
 
   if (error) throw error;
@@ -254,6 +275,9 @@ async function exportFilteredCsv() {
     "title",
     "question_no",
     "observation_type",
+    "designation",
+    "soc",
+    "noc",
     "pgno_selected",
     "pgno_count",
     "remarks",
@@ -264,9 +288,8 @@ async function exportFilteredCsv() {
 
   for (const r of rows) {
     const label = state.labelMap.get(r.observation_type) || r.observation_type;
-    const pgArr = Array.isArray(r.pgno_selected) ? r.pgno_selected : [];
-    const pgTxt = pgArr.map(x => `PGNO ${x.idx}`).join("; ");
-    const pgCount = pgArr.length;
+    const pgTxt = pgnoExportText(r.pgno_selected);
+    const pgCount = Number(r.pgno_count || 0);
 
     const line = [
       r.vessel_name || "",
@@ -275,11 +298,14 @@ async function exportFilteredCsv() {
       r.title || "",
       r.question_no || "",
       label || "",
+      r.designation || "",
+      r.soc || "",
+      r.noc || "",
       pgTxt,
       String(pgCount),
       r.remarks || "",
       r.updated_at || "",
-    ].map(v => `"${String(v).replaceAll('"', '""')}"`).join(",");
+    ].map((v) => `"${String(v).replaceAll('"', '""')}"`).join(",");
 
     csv.push(line);
   }
@@ -317,17 +343,13 @@ async function init() {
   }
 
   state.labelMap = new Map(
-    OBS_TYPES.filter(x => x.value).map(x => [x.value, x.label])
+    OBS_TYPES.filter((x) => x.value).map((x) => [x.value, x.label])
   );
 
-  // Vessels
   state.vessels = await loadVessels();
   renderVesselFilter();
-
-  // Type filter
   renderTypeFilter();
 
-  // Default date range: last 365 days
   const to = new Date();
   const from = new Date();
   from.setDate(from.getDate() - 365);
@@ -335,7 +357,6 @@ async function init() {
   el("dateFrom").value = ymd(from);
   el("dateTo").value = ymd(to);
 
-  // Load locked library for question metadata mapping
   const lib = await loadLockedLibraryJson(LOCKED_LIBRARY_JSON);
   for (const q of lib) {
     const qno = getQno(q);
@@ -343,8 +364,9 @@ async function init() {
   }
 
   el("applyBtn").addEventListener("click", async () => {
-    try { await applyFilters(); }
-    catch (e) {
+    try {
+      await applyFilters();
+    } catch (e) {
       console.error(e);
       alert("Apply filters failed: " + (e?.message || String(e)));
       setStatus("Error");
@@ -352,8 +374,9 @@ async function init() {
   });
 
   el("exportCsvBtn").addEventListener("click", async () => {
-    try { await exportFilteredCsv(); }
-    catch (e) {
+    try {
+      await exportFilteredCsv();
+    } catch (e) {
       console.error(e);
       alert("Export failed: " + (e?.message || String(e)));
       setStatus("Error");
@@ -364,8 +387,9 @@ async function init() {
 }
 
 (async () => {
-  try { await init(); }
-  catch (e) {
+  try {
+    await init();
+  } catch (e) {
     console.error(e);
     alert("Stats page failed to load: " + (e?.message || String(e)));
     setStatus("Error");
