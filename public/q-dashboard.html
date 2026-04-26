@@ -108,6 +108,14 @@
         </div>
       </div>
 
+      <div class="card" data-card="inspector_intelligence">
+        <div class="title">Inspector Intelligence</div>
+        <div class="muted">Inspector records from own fleet inspections and third-party intelligence. Third-party records do not count toward fleet statistics.</div>
+        <div style="margin-top:12px;">
+          <button class="btn2" type="button" onclick="location.href='./inspector_intelligence.html'">Open</button>
+        </div>
+      </div>
+
       <div class="card" data-card="reports">
         <div class="title">Reports</div>
         <div class="muted">Reporting & exports for office users.</div>
@@ -186,7 +194,18 @@
       }
 
       // Defaults (start hidden)
-      ["company","assignments","post","poststats","reports","inspector","qeditor","suadmin"].forEach(k => setVisible(k,false));
+      [
+        "company",
+        "assignments",
+        "post",
+        "poststats",
+        "inspector_intelligence",
+        "reports",
+        "inspector",
+        "qeditor",
+        "suadmin"
+      ].forEach(k => setVisible(k,false));
+
       // Always visible when logged-in:
       setVisible("library", true);
       setVisible("compare", true);
@@ -197,7 +216,17 @@
       setVisible("qeditor", (isSuper || isCompanyAdmin || isCompanySup));
 
       if (isSuper) {
-        ["company","assignments","post","poststats","reports","inspector","qeditor","suadmin"].forEach(k => setVisible(k,true));
+        [
+          "company",
+          "assignments",
+          "post",
+          "poststats",
+          "inspector_intelligence",
+          "reports",
+          "inspector",
+          "qeditor",
+          "suadmin"
+        ].forEach(k => setVisible(k,true));
         return;
       }
 
@@ -206,6 +235,7 @@
         setVisible("assignments", false);
         setVisible("post", false);
         setVisible("poststats", false);
+        setVisible("inspector_intelligence", false);
         setVisible("reports", false);
         setVisible("inspector", false);
         setVisible("qeditor", false);
@@ -214,7 +244,16 @@
       }
 
       if (isCompanyAdmin) {
-        ["company","assignments","post","poststats","reports","inspector","qeditor"].forEach(k => setVisible(k,true));
+        [
+          "company",
+          "assignments",
+          "post",
+          "poststats",
+          "inspector_intelligence",
+          "reports",
+          "inspector",
+          "qeditor"
+        ].forEach(k => setVisible(k,true));
         setVisible("suadmin", false);
         return;
       }
@@ -224,6 +263,7 @@
         setVisible("assignments", false);
         setVisible("post", true);
         setVisible("poststats", true);
+        setVisible("inspector_intelligence", true);
         setVisible("reports", true);
         setVisible("inspector", true);
         setVisible("qeditor", true);
@@ -234,6 +274,7 @@
         setVisible("tasks", false);
         setVisible("vessel", false);
         setVisible("inspector", true);
+        setVisible("inspector_intelligence", false);
         setVisible("qeditor", false);
         return;
       }
