@@ -46,6 +46,12 @@
     }
     .btn-outline{ background:transparent; border:1px solid rgba(255,255,255,0.65); color:#fff; }
     .btn-muted{ background:#eaf1fb; border:1px solid #d5deef; color:#1a4170; }
+    .btn-small{
+      padding:6px 10px;
+      border-radius:8px;
+      font-size:0.82rem;
+      font-weight:950;
+    }
 
     .panel{
       background: rgba(12,33,58,0.68);
@@ -67,8 +73,8 @@
       overflow-x:auto;
     }
 
-    .row{ display:flex; gap:10px; flex-wrap:wrap; align-items:flex-start; }
-    .field{ min-width: 260px; flex: 1; }
+    .row{ display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; }
+    .field{ min-width: 220px; flex: 1; }
     .field-small{ min-width: 180px; flex: 0.7; }
 
     label{
@@ -92,12 +98,51 @@
       outline:none;
     }
 
+    .filterDrop{
+      position:relative;
+      min-width:220px;
+      flex:1;
+    }
+    .filterDropBtn{
+      width:100%;
+      border:1px solid #cbd7ee;
+      background:#f8fbff;
+      color:#1a4170;
+      border-radius:10px;
+      padding:10px 12px;
+      font-weight:950;
+      text-align:left;
+      cursor:pointer;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:8px;
+    }
+    .filterDropBtn::after{ content:"▼"; font-size:0.75rem; opacity:0.75; }
+    .filterDrop.open .filterDropBtn::after{ content:"▲"; }
+
+    .filterPanel{
+      display:none;
+      position:absolute;
+      z-index:1000;
+      top:calc(100% + 6px);
+      left:0;
+      width:min(440px, 90vw);
+      background:#fff;
+      color:#1a4170;
+      border:1px solid #cbd7ee;
+      border-radius:14px;
+      box-shadow:0 18px 46px rgba(0,0,0,0.22);
+      padding:10px;
+    }
+    .filterDrop.open .filterPanel{ display:block; }
+
     .checkPanel{
       border:1px solid #cbd7ee;
       background:#f8fbff;
       border-radius:12px;
       padding:10px;
-      max-height:170px;
+      max-height:230px;
       overflow:auto;
     }
     .checkRow{
@@ -117,7 +162,7 @@
       display:flex;
       gap:8px;
       flex-wrap:wrap;
-      margin:6px 0 8px 0;
+      margin:0 0 8px 0;
     }
     .miniBtn{
       border:1px solid #cbd7ee;
@@ -221,13 +266,13 @@
     }
     .barRow{
       display:grid;
-      grid-template-columns: 150px 1fr 110px;
-      gap:10px;
+      grid-template-columns: 130px 1fr 118px 56px;
+      gap:8px;
       align-items:center;
       margin:8px 0;
       color:#223a66;
       font-weight:850;
-      font-size:0.9rem;
+      font-size:0.88rem;
     }
     .barLabel{
       overflow:hidden;
@@ -273,6 +318,82 @@
       line-height:1.35;
       font-size:0.92rem;
     }
+
+    dialog{
+      border:none;
+      border-radius:18px;
+      padding:0;
+      width:min(1500px, 96vw);
+      max-height:88vh;
+      box-shadow:0 20px 80px rgba(0,0,0,.45);
+    }
+    dialog::backdrop{ background:rgba(2,12,25,.62); }
+    .modalHead{
+      display:flex;
+      justify-content:space-between;
+      align-items:flex-start;
+      gap:12px;
+      padding:14px 16px;
+      background:#0b2a55;
+      color:#fff;
+    }
+    .modalTitle{
+      font-weight:950;
+      font-size:1.1rem;
+      line-height:1.35;
+    }
+    .modalSub{
+      margin-top:4px;
+      color:#dbeafe;
+      font-weight:800;
+      font-size:0.9rem;
+      line-height:1.35;
+    }
+    .modalBody{
+      padding:14px 16px;
+      background:#fff;
+      color:#1a4170;
+      overflow:auto;
+      max-height:72vh;
+    }
+    .modalActions{
+      display:flex;
+      gap:8px;
+      flex-wrap:wrap;
+      align-items:center;
+      justify-content:flex-end;
+    }
+    .drillSummary{
+      display:grid;
+      grid-template-columns:repeat(4, minmax(0,1fr));
+      gap:10px;
+      margin-bottom:12px;
+    }
+    @media(max-width:900px){
+      .drillSummary{ grid-template-columns:1fr; }
+    }
+    .drillCard{
+      border:1px solid #d5deef;
+      border-radius:14px;
+      padding:10px;
+      background:#f8fbff;
+    }
+    .drillN{ font-size:1.25rem; font-weight:950; color:#1a4170; }
+    .drillL{ color:#48628e; font-weight:850; margin-top:4px; }
+    .drillTableWrap{
+      overflow:auto;
+      border:1px solid #d5deef;
+      border-radius:14px;
+    }
+    .drillTableWrap table{
+      margin:0;
+      min-width:1450px;
+    }
+    .drillRemarks{
+      max-width:420px;
+      white-space:normal;
+      line-height:1.35;
+    }
   </style>
 </head>
 
@@ -294,13 +415,16 @@
     <div class="panel">
       <div class="card">
         <div class="row">
-          <div class="field">
+          <div class="filterDrop" id="vesselDrop">
             <label>Vessel(s)</label>
-            <div class="checkTools">
-              <button type="button" class="miniBtn" id="vesselAllBtn">All</button>
-              <button type="button" class="miniBtn" id="vesselNoneBtn">None</button>
+            <button type="button" class="filterDropBtn" id="vesselDropBtn">Vessels: all</button>
+            <div class="filterPanel">
+              <div class="checkTools">
+                <button type="button" class="miniBtn" id="vesselAllBtn">All</button>
+                <button type="button" class="miniBtn" id="vesselNoneBtn">None</button>
+              </div>
+              <div class="checkPanel" id="vesselCheckList"></div>
             </div>
-            <div class="checkPanel" id="vesselCheckList"></div>
           </div>
 
           <div class="field-small">
@@ -313,13 +437,16 @@
             <input id="dateTo" type="date" />
           </div>
 
-          <div class="field">
+          <div class="filterDrop" id="typeDrop">
             <label>Observation type(s)</label>
-            <div class="checkTools">
-              <button type="button" class="miniBtn" id="typeAllBtn">All</button>
-              <button type="button" class="miniBtn" id="typeNoneBtn">None</button>
+            <button type="button" class="filterDropBtn" id="typeDropBtn">Types: all</button>
+            <div class="filterPanel">
+              <div class="checkTools">
+                <button type="button" class="miniBtn" id="typeAllBtn">All</button>
+                <button type="button" class="miniBtn" id="typeNoneBtn">None</button>
+              </div>
+              <div class="checkPanel" id="typeCheckList"></div>
             </div>
-            <div class="checkPanel" id="typeCheckList"></div>
           </div>
 
           <div class="field" style="min-width:300px; flex:0.8;">
@@ -337,22 +464,28 @@
             <input id="recurringMinCount" type="number" min="1" step="1" value="4" />
           </div>
 
-          <div class="field">
+          <div class="filterDrop" id="recYearDrop">
             <label>Recurring year(s)</label>
-            <div class="checkTools">
-              <button type="button" class="miniBtn" id="recYearAllBtn">All</button>
-              <button type="button" class="miniBtn" id="recYearNoneBtn">None</button>
+            <button type="button" class="filterDropBtn" id="recYearDropBtn">Recurring years: all</button>
+            <div class="filterPanel">
+              <div class="checkTools">
+                <button type="button" class="miniBtn" id="recYearAllBtn">All</button>
+                <button type="button" class="miniBtn" id="recYearNoneBtn">None</button>
+              </div>
+              <div class="checkPanel" id="recurringYearCheckList"></div>
             </div>
-            <div class="checkPanel" id="recurringYearCheckList"></div>
           </div>
 
-          <div class="field">
+          <div class="filterDrop" id="recMonthDrop">
             <label>Recurring month(s)</label>
-            <div class="checkTools">
-              <button type="button" class="miniBtn" id="recMonthAllBtn">All</button>
-              <button type="button" class="miniBtn" id="recMonthNoneBtn">None</button>
+            <button type="button" class="filterDropBtn" id="recMonthDropBtn">Recurring months: all</button>
+            <div class="filterPanel">
+              <div class="checkTools">
+                <button type="button" class="miniBtn" id="recMonthAllBtn">All</button>
+                <button type="button" class="miniBtn" id="recMonthNoneBtn">None</button>
+              </div>
+              <div class="checkPanel" id="recurringMonthCheckList"></div>
             </div>
-            <div class="checkPanel" id="recurringMonthCheckList"></div>
           </div>
 
           <div class="field-small">
@@ -362,7 +495,7 @@
         </div>
 
         <div class="filterNote">
-          Vessel, observation type, recurring year, and recurring month are multi-select checkbox filters. Monthly trend year affects the Monthly Trend table and always shows all 12 months.
+          Filter panels are compact dropdowns. Every View button opens the actual records used for that statistic.
         </div>
 
         <div class="statusLine">
@@ -373,21 +506,25 @@
           <div class="stat">
             <div class="statN" id="sumReports">0</div>
             <div class="statL">Reports / Inspections</div>
+            <div class="statSub"><button class="btn btn-muted btn-small drillBtn" id="viewSummaryReportsBtn">View</button></div>
           </div>
           <div class="stat">
             <div class="statN" id="sumObs">0</div>
             <div class="statL">Total Observations</div>
             <div class="statSub">All inclusive: Negative + Largely as expected + Positive</div>
+            <div class="statSub"><button class="btn btn-muted btn-small drillBtn" id="viewSummaryObsBtn">View</button></div>
           </div>
           <div class="stat">
             <div class="statN" id="sumMissing">0</div>
             <div class="statL">Missing PGNO tick</div>
             <div class="statSub" id="sumMissingSplit">Negative: 0 | Largely: 0</div>
+            <div class="statSub"><button class="btn btn-muted btn-small drillBtn" id="viewSummaryMissingBtn">View</button></div>
           </div>
           <div class="stat">
             <div class="statN" id="sumDistinct">0</div>
             <div class="statL">Unique Questions Observed</div>
             <div class="statSub">Unique question numbers with at least one recorded observation.</div>
+            <div class="statSub"><button class="btn btn-muted btn-small drillBtn" id="viewSummaryDistinctBtn">View</button></div>
           </div>
         </div>
       </div>
@@ -431,239 +568,102 @@
       </div>
     </div>
 
-    <div class="panel">
-      <div class="card">
-        <h3 class="sectionTitle">By Vessel (Fleet)</h3>
-        <div class="statL">Applies selected date range, selected vessel(s), and selected observation type(s).</div>
-        <table>
-          <thead>
-            <tr>
-              <th>Vessel</th>
-              <th>Reports</th>
-              <th>Negative</th>
-              <th>Largely as expected</th>
-              <th>Positive</th>
-              <th>Avg Negative / Insp.</th>
-              <th>Avg Largely / Insp.</th>
-              <th>Avg Positive / Insp.</th>
-            </tr>
-          </thead>
-          <tbody id="byVesselTbody"></tbody>
-        </table>
-      </div>
-    </div>
+    <div class="panel"><div class="card">
+      <h3 class="sectionTitle">By Vessel (Fleet)</h3>
+      <div class="statL">Applies selected date range, selected vessel(s), and selected observation type(s).</div>
+      <table><thead><tr>
+        <th>Vessel</th><th>Reports</th><th>Negative</th><th>Largely as expected</th><th>Positive</th>
+        <th>Avg Negative / Insp.</th><th>Avg Largely / Insp.</th><th>Avg Positive / Insp.</th><th>Records</th>
+      </tr></thead><tbody id="byVesselTbody"></tbody></table>
+    </div></div>
 
-    <div class="panel">
-      <div class="card">
-        <h3 class="sectionTitle">Averages — Selected Scope</h3>
-        <div class="statL">Average observations per inspection, calculated separately per observation type.</div>
-        <table>
-          <thead>
-            <tr>
-              <th>Scope</th>
-              <th>Inspections</th>
-              <th>Negative</th>
-              <th>Largely as expected</th>
-              <th>Positive</th>
-              <th>Avg Negative / Insp.</th>
-              <th>Avg Largely / Insp.</th>
-              <th>Avg Positive / Insp.</th>
-            </tr>
-          </thead>
-          <tbody id="avgFleetTbody"></tbody>
-        </table>
-      </div>
-    </div>
+    <div class="panel"><div class="card">
+      <h3 class="sectionTitle">Averages — Selected Scope</h3>
+      <div class="statL">Average observations per inspection, calculated separately per observation type.</div>
+      <table><thead><tr>
+        <th>Scope</th><th>Inspections</th><th>Negative</th><th>Largely as expected</th><th>Positive</th>
+        <th>Avg Negative / Insp.</th><th>Avg Largely / Insp.</th><th>Avg Positive / Insp.</th><th>Records</th>
+      </tr></thead><tbody id="avgFleetTbody"></tbody></table>
+    </div></div>
 
-    <div class="panel">
-      <div class="card">
-        <h3 class="sectionTitle">By Observation Type</h3>
-        <div class="statL">Applies selected vessel(s) and date range. Observation type checkbox filter is ignored for this section.</div>
-        <table>
-          <thead>
-            <tr>
-              <th>Type</th>
-              <th>Reports</th>
-              <th>Observations</th>
-              <th>Avg Obs / Insp.</th>
-            </tr>
-          </thead>
-          <tbody id="byTypeTbody"></tbody>
-        </table>
-      </div>
-    </div>
+    <div class="panel"><div class="card">
+      <h3 class="sectionTitle">By Observation Type</h3>
+      <div class="statL">Applies selected vessel(s) and date range. Observation type checkbox filter is ignored for this section.</div>
+      <table><thead><tr>
+        <th>Type</th><th>Reports</th><th>Observations</th><th>Avg Obs / Insp.</th><th>Records</th>
+      </tr></thead><tbody id="byTypeTbody"></tbody></table>
+    </div></div>
 
-    <div class="panel">
-      <div class="card">
-        <h3 class="sectionTitle">Top Recurring Questions</h3>
-        <div class="statL">Applies selected vessel(s), date range, selected observation type(s), recurring threshold, recurring year(s), and recurring month(s).</div>
-        <table>
-          <thead>
-            <tr>
-              <th>Question No</th>
-              <th>Chapter</th>
-              <th>Section</th>
-              <th>Short text</th>
-              <th>Type</th>
-              <th>Obs count</th>
-            </tr>
-          </thead>
-          <tbody id="topQnsTbody"></tbody>
-        </table>
-      </div>
-    </div>
+    <div class="panel"><div class="card">
+      <h3 class="sectionTitle">Top Recurring Questions</h3>
+      <div class="statL">Applies selected vessel(s), date range, selected observation type(s), recurring threshold, recurring year(s), and recurring month(s).</div>
+      <table><thead><tr>
+        <th>Question No</th><th>Chapter</th><th>Section</th><th>Short text</th><th>Type</th><th>Obs count</th><th>Records</th>
+      </tr></thead><tbody id="topQnsTbody"></tbody></table>
+    </div></div>
 
-    <div class="panel">
-      <div class="card">
-        <h3 class="sectionTitle">By Category / Designation</h3>
-        <div class="statL">Objective breakdown by recorded designation: Human, Process, Hardware, Photo.</div>
-        <table>
-          <thead>
-            <tr>
-              <th>Category</th>
-              <th>Negative</th>
-              <th>Largely as expected</th>
-              <th>Positive</th>
-              <th>Avg Negative / Insp.</th>
-              <th>Avg Largely / Insp.</th>
-              <th>Avg Positive / Insp.</th>
-            </tr>
-          </thead>
-          <tbody id="byCategoryTbody"></tbody>
-        </table>
-      </div>
-    </div>
+    <div class="panel"><div class="card">
+      <h3 class="sectionTitle">By Category / Designation</h3>
+      <div class="statL">Objective breakdown by recorded designation: Human, Process, Hardware, Photo.</div>
+      <table><thead><tr>
+        <th>Category</th><th>Negative</th><th>Largely as expected</th><th>Positive</th>
+        <th>Avg Negative / Insp.</th><th>Avg Largely / Insp.</th><th>Avg Positive / Insp.</th><th>Records</th>
+      </tr></thead><tbody id="byCategoryTbody"></tbody></table>
+    </div></div>
 
-    <div class="panel">
-      <div class="card">
-        <h3 class="sectionTitle">Top SOC</h3>
-        <div class="statL">Objective breakdown by recorded Subject of Concern (SOC).</div>
-        <table>
-          <thead>
-            <tr>
-              <th>SOC</th>
-              <th>Negative</th>
-              <th>Largely as expected</th>
-              <th>Positive</th>
-              <th>Avg Negative / Insp.</th>
-              <th>Avg Largely / Insp.</th>
-              <th>Avg Positive / Insp.</th>
-            </tr>
-          </thead>
-          <tbody id="topSocTbody"></tbody>
-        </table>
-      </div>
-    </div>
+    <div class="panel"><div class="card">
+      <h3 class="sectionTitle">Top SOC</h3>
+      <div class="statL">Objective breakdown by recorded Subject of Concern (SOC).</div>
+      <table><thead><tr>
+        <th>SOC</th><th>Negative</th><th>Largely as expected</th><th>Positive</th>
+        <th>Avg Negative / Insp.</th><th>Avg Largely / Insp.</th><th>Avg Positive / Insp.</th><th>Records</th>
+      </tr></thead><tbody id="topSocTbody"></tbody></table>
+    </div></div>
 
-    <div class="panel">
-      <div class="card">
-        <h3 class="sectionTitle">Top NOC</h3>
-        <div class="statL">Objective breakdown by recorded Nature of Concern (NOC).</div>
-        <table>
-          <thead>
-            <tr>
-              <th>NOC</th>
-              <th>Negative</th>
-              <th>Largely as expected</th>
-              <th>Positive</th>
-              <th>Avg Negative / Insp.</th>
-              <th>Avg Largely / Insp.</th>
-              <th>Avg Positive / Insp.</th>
-            </tr>
-          </thead>
-          <tbody id="topNocTbody"></tbody>
-        </table>
-      </div>
-    </div>
+    <div class="panel"><div class="card">
+      <h3 class="sectionTitle">Top NOC</h3>
+      <div class="statL">Objective breakdown by recorded Nature of Concern (NOC).</div>
+      <table><thead><tr>
+        <th>NOC</th><th>Negative</th><th>Largely as expected</th><th>Positive</th>
+        <th>Avg Negative / Insp.</th><th>Avg Largely / Insp.</th><th>Avg Positive / Insp.</th><th>Records</th>
+      </tr></thead><tbody id="topNocTbody"></tbody></table>
+    </div></div>
 
-    <div class="panel">
-      <div class="card">
-        <h3 class="sectionTitle">Monthly Trend</h3>
-        <div class="statL">Objective observation count by inspection month. The selected trend year always shows all 12 months, including zero-count months.</div>
-        <table>
-          <thead>
-            <tr>
-              <th>Month</th>
-              <th>Reports</th>
-              <th>Observations</th>
-              <th>Negative</th>
-              <th>Positive</th>
-              <th>Largely</th>
-              <th>Avg Negative / Insp.</th>
-              <th>Avg Positive / Insp.</th>
-              <th>Avg Largely / Insp.</th>
-            </tr>
-          </thead>
-          <tbody id="monthlyTbody"></tbody>
-        </table>
-      </div>
-    </div>
+    <div class="panel"><div class="card">
+      <h3 class="sectionTitle">Monthly Trend</h3>
+      <div class="statL">Objective observation count by inspection month. The selected trend year always shows all 12 months, including zero-count months.</div>
+      <table><thead><tr>
+        <th>Month</th><th>Reports</th><th>Observations</th><th>Negative</th><th>Positive</th><th>Largely</th>
+        <th>Avg Negative / Insp.</th><th>Avg Positive / Insp.</th><th>Avg Largely / Insp.</th><th>Records</th>
+      </tr></thead><tbody id="monthlyTbody"></tbody></table>
+    </div></div>
 
-    <div class="panel">
-      <div class="card">
-        <h3 class="sectionTitle">By OCIMF Inspecting Company</h3>
-        <div class="statL">Observation count and average observations per inspection by OCIMF inspecting company, separately per observation type.</div>
-        <table>
-          <thead>
-            <tr>
-              <th>OCIMF Company</th>
-              <th>Inspections</th>
-              <th>Negative</th>
-              <th>Largely as expected</th>
-              <th>Positive</th>
-              <th>Avg Negative / Insp.</th>
-              <th>Avg Largely / Insp.</th>
-              <th>Avg Positive / Insp.</th>
-            </tr>
-          </thead>
-          <tbody id="byOcimfTbody"></tbody>
-        </table>
-      </div>
-    </div>
+    <div class="panel"><div class="card">
+      <h3 class="sectionTitle">By OCIMF Inspecting Company</h3>
+      <div class="statL">Observation count and average observations per inspection by OCIMF inspecting company, separately per observation type.</div>
+      <table><thead><tr>
+        <th>OCIMF Company</th><th>Inspections</th><th>Negative</th><th>Largely as expected</th><th>Positive</th>
+        <th>Avg Negative / Insp.</th><th>Avg Largely / Insp.</th><th>Avg Positive / Insp.</th><th>Records</th>
+      </tr></thead><tbody id="byOcimfTbody"></tbody></table>
+    </div></div>
 
-    <div class="panel">
-      <div class="card">
-        <h3 class="sectionTitle">By Inspector</h3>
-        <div class="statL">Observation count and average observations per inspection by inspector name, separately per observation type.</div>
-        <table>
-          <thead>
-            <tr>
-              <th>Inspector</th>
-              <th>Inspections</th>
-              <th>Negative</th>
-              <th>Largely as expected</th>
-              <th>Positive</th>
-              <th>Avg Negative / Insp.</th>
-              <th>Avg Largely / Insp.</th>
-              <th>Avg Positive / Insp.</th>
-            </tr>
-          </thead>
-          <tbody id="byInspectorTbody"></tbody>
-        </table>
-      </div>
-    </div>
+    <div class="panel"><div class="card">
+      <h3 class="sectionTitle">By Inspector</h3>
+      <div class="statL">Observation count and average observations per inspection by inspector name, separately per observation type.</div>
+      <table><thead><tr>
+        <th>Inspector</th><th>Inspections</th><th>Negative</th><th>Largely as expected</th><th>Positive</th>
+        <th>Avg Negative / Insp.</th><th>Avg Largely / Insp.</th><th>Avg Positive / Insp.</th><th>Records</th>
+      </tr></thead><tbody id="byInspectorTbody"></tbody></table>
+    </div></div>
 
-    <div class="panel">
-      <div class="card">
-        <h3 class="sectionTitle">By Inspector Company</h3>
-        <div class="statL">Observation count and average observations per inspection by inspector company, separately per observation type.</div>
-        <table>
-          <thead>
-            <tr>
-              <th>Inspector Company</th>
-              <th>Inspections</th>
-              <th>Negative</th>
-              <th>Largely as expected</th>
-              <th>Positive</th>
-              <th>Avg Negative / Insp.</th>
-              <th>Avg Largely / Insp.</th>
-              <th>Avg Positive / Insp.</th>
-            </tr>
-          </thead>
-          <tbody id="byInspectorCompanyTbody"></tbody>
-        </table>
-      </div>
-    </div>
+    <div class="panel"><div class="card">
+      <h3 class="sectionTitle">By Inspector Company</h3>
+      <div class="statL">Observation count and average observations per inspection by inspector company, separately per observation type.</div>
+      <table><thead><tr>
+        <th>Inspector Company</th><th>Inspections</th><th>Negative</th><th>Largely as expected</th><th>Positive</th>
+        <th>Avg Negative / Insp.</th><th>Avg Largely / Insp.</th><th>Avg Positive / Insp.</th><th>Records</th>
+      </tr></thead><tbody id="byInspectorCompanyTbody"></tbody></table>
+    </div></div>
 
     <div class="panel">
       <div class="card">
@@ -677,20 +677,56 @@
         </div>
 
         <table>
-          <thead>
-            <tr>
-              <th>PGNO</th>
-              <th>Observations</th>
-              <th>Reports</th>
-              <th>Avg Obs / Insp.</th>
-              <th>Last seen</th>
-            </tr>
-          </thead>
+          <thead><tr><th>PGNO</th><th>Observations</th><th>Reports</th><th>Avg Obs / Insp.</th><th>Last seen</th><th>Records</th></tr></thead>
           <tbody id="pgnoTableTbody"></tbody>
         </table>
       </div>
     </div>
   </div>
+
+  <dialog id="drillDialog">
+    <div class="modalHead">
+      <div>
+        <div class="modalTitle" id="drillTitle">Records</div>
+        <div class="modalSub" id="drillSub">Filtered records</div>
+      </div>
+      <div class="modalActions">
+        <button class="btn btn-muted" id="drillExportBtn">Export this view CSV</button>
+        <button class="btn btn-outline" id="drillCloseBtn">Close</button>
+      </div>
+    </div>
+    <div class="modalBody">
+      <div class="drillSummary">
+        <div class="drillCard"><div class="drillN" id="drillCountObs">0</div><div class="drillL">Observations</div></div>
+        <div class="drillCard"><div class="drillN" id="drillCountReports">0</div><div class="drillL">Reports / Inspections</div></div>
+        <div class="drillCard"><div class="drillN" id="drillCountQuestions">0</div><div class="drillL">Unique Questions</div></div>
+        <div class="drillCard"><div class="drillN" id="drillAvg">0.00</div><div class="drillL">Avg Obs / Insp.</div></div>
+      </div>
+      <div class="drillTableWrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Vessel</th>
+              <th>Date</th>
+              <th>Report Ref</th>
+              <th>Title</th>
+              <th>Question No</th>
+              <th>Type</th>
+              <th>Designation</th>
+              <th>SOC</th>
+              <th>NOC</th>
+              <th>OCIMF Company</th>
+              <th>Inspector</th>
+              <th>Inspector Company</th>
+              <th>PGNO</th>
+              <th>Remarks / Observation Text</th>
+            </tr>
+          </thead>
+          <tbody id="drillTbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </dialog>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="./auth.js"></script>

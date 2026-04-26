@@ -1,5 +1,5 @@
 // public/post_inspection_stats.js
-// Fleet/vessel stats via RPC functions + client-side multi-filtering.
+// Fleet/vessel stats via RPC functions + client-side multi-filtering + drilldown views.
 // Current observation model: post_inspection_observation_items.obs_type = negative | positive | largely
 
 import { loadLockedLibraryJson } from "./question_library_loader.js";
@@ -76,6 +76,11 @@ const state = {
   allRows: [],
   allReportRows: [],
   reportMetaByKey: new Map(),
+  currentRows: [],
+  currentRowsIgnoreType: [],
+  currentReportRows: [],
+  currentDrillRows: [],
+  currentDrillTitle: "records",
 };
 
 function setStatus(text) {
@@ -497,7 +502,150 @@ function reportCountsByKey(reportRows, keyFn) {
   return map;
 }
 
-function renderTypeSplitTable(tbodyId, rows, keyLabel, limit = 100) {
+function buttonHtml(drillId) {
+  return `<button class="btn btn-muted btn-small drillBtn" data-drill-id="${esc(drillId)}">View</button>`;
+}
+
+function bindDrillButtons(root = document) {
+  root.querySelectorAll(".drillBtn[data-drill-id]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const id = btn.getAttribute("data-drill-id");
+      if (id) openRegisteredDrill(id);
+    });
+  });
+}
+
+const drillRegistry = new Map();
+
+function registerDrill(title, rows, reportRows = null, sub = "") {
+  const id = `drill_${Math.random().toString(36).slice(2)}_${Date.now()}`;
+  drillRegistry.set(id, {
+    title,
+    rows: Array.isArray(rows) ? rows : [],
+    reportRows: Array.isArray(reportRows) ? reportRows : null,
+    sub,
+  });
+  return id;
+}
+
+function uniqueReportCount(rows, reportRows = null) {
+  if (Array.isArray(reportRows)) return reportRows.length;
+  return new Set((rows || []).map(reportKey)).size;
+}
+
+function openRegisteredDrill(id) {
+  const cfg = drillRegistry.get(id);
+  if (!cfg) return;
+  openDrilldown(cfg.title, cfg.rows, cfg.reportRows, cfg.sub);
+}
+
+function openDrilldown(title, rows, reportRows = null, sub = "") {
+  state.currentDrillRows = Array.isArray(rows) ? rows : [];
+  state.currentDrillTitle = title || "records";
+
+  setText("drillTitle", title || "Records");
+  setText("drillSub", sub || "Actual records used for this statistic.");
+
+  const reports = uniqueReportCount(state.currentDrillRows, reportRows);
+  const questions = new Set(state.currentDrillRows.map((r) => String(r.question_no || "").trim()).filter(Boolean)).size;
+
+  setText("drillCountObs", String(state.currentDrillRows.length));
+  setText("drillCountReports", String(reports));
+  setText("drillCountQuestions", String(questions));
+  setText("drillAvg", avg(state.currentDrillRows.length, reports));
+
+  const tbody = safeTbody("drillTbody");
+  if (!tbody) return;
+  tbody.innerHTML = "";
+
+  if (!state.currentDrillRows.length) {
+    ensureTbodyMessage(tbody, 14, "No records for this selection.");
+  } else {
+    for (const r of state.currentDrillRows) {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${esc(r.vessel_name || "")}</td>
+        <td>${esc(r.inspection_date || "")}</td>
+        <td>${esc(r.report_ref || "")}</td>
+        <td>${esc(r.title || "")}</td>
+        <td class="mono">${esc(r.question_no || "")}</td>
+        <td>${esc(typeLabel(r.observation_type))}</td>
+        <td>${esc(r.designation || "")}</td>
+        <td>${esc(r.soc || "")}</td>
+        <td>${esc(r.noc || "")}</td>
+        <td>${esc(r.ocimf_inspecting_company || "")}</td>
+        <td>${esc(r.inspector_name || "")}</td>
+        <td>${esc(r.inspector_company || "")}</td>
+        <td>${esc(pgnoExportText(r.pgno_selected))}</td>
+        <td class="drillRemarks">${esc(r.remarks || r.observation_text || "")}</td>
+      `;
+      tbody.appendChild(tr);
+    }
+  }
+
+  const dlg = safeEl("drillDialog");
+  if (dlg && typeof dlg.showModal === "function") dlg.showModal();
+}
+
+function exportDrillCsv() {
+  const rows = state.currentDrillRows || [];
+
+  const header = [
+    "vessel_name",
+    "inspection_date",
+    "report_ref",
+    "title",
+    "question_no",
+    "observation_type",
+    "designation",
+    "soc",
+    "noc",
+    "ocimf_inspecting_company",
+    "inspector_name",
+    "inspector_company",
+    "pgno_selected",
+    "remarks",
+    "updated_at",
+  ];
+
+  const csv = [header.join(",")];
+
+  for (const r of rows) {
+    const line = [
+      r.vessel_name || "",
+      r.inspection_date || "",
+      r.report_ref || "",
+      r.title || "",
+      r.question_no || "",
+      typeLabel(r.observation_type),
+      r.designation || "",
+      r.soc || "",
+      r.noc || "",
+      r.ocimf_inspecting_company || "",
+      r.inspector_name || "",
+      r.inspector_company || "",
+      pgnoExportText(r.pgno_selected),
+      r.remarks || r.observation_text || "",
+      r.updated_at || "",
+    ].map((v) => `"${String(v).replaceAll('"', '""')}"`).join(",");
+
+    csv.push(line);
+  }
+
+  const blob = new Blob([csv.join("\n")], { type: "text/csv;charset=utf-8" });
+  const a = document.createElement("a");
+  const safeName = String(state.currentDrillTitle || "records").replace(/[^a-z0-9]+/gi, "_").slice(0, 80);
+
+  a.download = `post_inspection_drilldown_${safeName}.csv`;
+  a.href = URL.createObjectURL(blob);
+
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(a.href);
+}
+
+function renderTypeSplitTable(tbodyId, rows, sourceRows, keyFn, keyLabel, limit = 100) {
   const tbody = safeTbody(tbodyId);
   if (!tbody) return;
   tbody.innerHTML = "";
@@ -505,6 +653,9 @@ function renderTypeSplitTable(tbodyId, rows, keyLabel, limit = 100) {
   const list = rows.slice(0, limit);
 
   for (const r of list) {
+    const matched = sourceRows.filter((x) => String(keyFn(x) || "—").trim() === r.key);
+    const drillId = registerDrill(`${keyLabel}: ${r.key}`, matched, null, `Breakdown by ${keyLabel}.`);
+
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>${esc(r.key)}</td>
@@ -514,11 +665,13 @@ function renderTypeSplitTable(tbodyId, rows, keyLabel, limit = 100) {
       <td>${esc(r.avg_negative)}</td>
       <td>${esc(r.avg_largely)}</td>
       <td>${esc(r.avg_positive)}</td>
+      <td>${buttonHtml(drillId)}</td>
     `;
     tbody.appendChild(tr);
   }
 
-  if (!list.length) ensureTbodyMessage(tbody, 7, `No ${keyLabel} data for current filters.`);
+  if (!list.length) ensureTbodyMessage(tbody, 8, `No ${keyLabel} data for current filters.`);
+  bindDrillButtons(tbody);
 }
 
 function buildMonthlyRows(rows, reportRows, yearFilter = "") {
@@ -537,6 +690,7 @@ function buildMonthlyRows(rows, reportRows, yearFilter = "") {
       negative: 0,
       positive: 0,
       largely: 0,
+      rows: [],
     });
   }
 
@@ -556,6 +710,7 @@ function buildMonthlyRows(rows, reportRows, yearFilter = "") {
 
     const item = map.get(key);
     item.observations += 1;
+    item.rows.push(row);
 
     const t = normalizeType(row.observation_type);
     if (t === "negative") item.negative += 1;
@@ -578,6 +733,8 @@ function buildPeriodRows(rows, reportRows, keyFn) {
         key,
         observations: 0,
         inspections: 0,
+        rows: [],
+        reportKeys: new Set(),
       });
     }
 
@@ -593,10 +750,15 @@ function buildPeriodRows(rows, reportRows, keyFn) {
         key,
         observations: 0,
         inspections: 0,
+        rows: [],
+        reportKeys: new Set(),
       });
     }
 
-    map.get(key).observations += 1;
+    const item = map.get(key);
+    item.observations += 1;
+    item.rows.push(row);
+    item.reportKeys.add(reportKey(row));
   }
 
   return [...map.values()]
@@ -617,6 +779,8 @@ function renderMonthlyTrend(rows, reportRows) {
 
   for (const r of grouped) {
     const insp = r.reports.size;
+    const drillId = registerDrill(`Monthly Trend: ${r.month}`, r.rows, null, `Records for ${r.month}.`);
+
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td class="mono">${esc(r.month)}</td>
@@ -628,11 +792,13 @@ function renderMonthlyTrend(rows, reportRows) {
       <td>${esc(avg(r.negative, insp))}</td>
       <td>${esc(avg(r.positive, insp))}</td>
       <td>${esc(avg(r.largely, insp))}</td>
+      <td>${buttonHtml(drillId)}</td>
     `;
     tbody.appendChild(tr);
   }
 
-  if (!grouped.length) ensureTbodyMessage(tbody, 9, "No monthly data for current filters.");
+  if (!grouped.length) ensureTbodyMessage(tbody, 10, "No monthly data for current filters.");
+  bindDrillButtons(tbody);
 }
 
 function renderBarChart(containerId, rows, options = {}) {
@@ -642,6 +808,8 @@ function renderBarChart(containerId, rows, options = {}) {
   const labelFn = options.labelFn || ((r) => r.key);
   const obsFn = options.obsFn || ((r) => r.observation_count ?? r.observations ?? 0);
   const inspFn = options.inspFn || ((r) => r.report_count ?? r.inspections ?? 0);
+  const rowsFn = options.rowsFn || ((r) => r.rows || []);
+  const titleFn = options.titleFn || ((r) => String(labelFn(r) || "Records"));
   const limit = Number(options.limit || 10);
   const emptyText = options.emptyText || "No chart data for current filters.";
 
@@ -662,17 +830,19 @@ function renderBarChart(containerId, rows, options = {}) {
     const inspections = Number(inspFn(r) || 0);
     const average = avg(obs, inspections);
     const pct = Math.max(3, Math.round((obs / max) * 100));
+    const drillId = registerDrill(titleFn(r), rowsFn(r), null, `Chart row: ${label}`);
 
     return `
       <div class="barRow" title="${esc(label)}: ${esc(obs)} obs / ${esc(inspections)} insp. / avg ${esc(average)}">
         <div class="barLabel">${esc(label)}</div>
-        <div class="barTrack">
-          <div class="barFill" style="width:${pct}%"></div>
-        </div>
+        <div class="barTrack"><div class="barFill" style="width:${pct}%"></div></div>
         <div class="barValue">${esc(obs)} / ${esc(inspections)} / ${esc(average)}</div>
+        <div>${buttonHtml(drillId)}</div>
       </div>
     `;
   }).join("");
+
+  bindDrillButtons(box);
 }
 
 function rowsOfType(rows, type) {
@@ -684,20 +854,30 @@ function renderTypeVisuals(rows, reportRows) {
   const largely = rowsOfType(rows, "largely");
   const positive = rowsOfType(rows, "positive");
 
-  renderBarChart("chartNegCategory", groupObjectiveRows(neg, (r) => r.designation), { limit: 10 });
-  renderBarChart("chartLargelyCategory", groupObjectiveRows(largely, (r) => r.designation), { limit: 10 });
+  renderBarChart("chartNegCategory", groupChartRowsByKey(neg, (r) => r.designation), { limit: 10, titleFn: (r) => `Negative — ${r.key}` });
+  renderBarChart("chartLargelyCategory", groupChartRowsByKey(largely, (r) => r.designation), { limit: 10, titleFn: (r) => `Largely — ${r.key}` });
 
-  renderBarChart("chartNegMonthly", buildPeriodRows(neg, reportRows, monthKey), { labelFn: (r) => r.key, obsFn: (r) => r.observations, inspFn: (r) => r.inspections, limit: 18 });
-  renderBarChart("chartLargelyMonthly", buildPeriodRows(largely, reportRows, monthKey), { labelFn: (r) => r.key, obsFn: (r) => r.observations, inspFn: (r) => r.inspections, limit: 18 });
-  renderBarChart("chartPositiveMonthly", buildPeriodRows(positive, reportRows, monthKey), { labelFn: (r) => r.key, obsFn: (r) => r.observations, inspFn: (r) => r.inspections, limit: 18 });
+  renderBarChart("chartNegMonthly", buildPeriodRows(neg, reportRows, monthKey), { labelFn: (r) => r.key, obsFn: (r) => r.observations, inspFn: (r) => r.inspections, limit: 18, titleFn: (r) => `Negative — ${r.key}` });
+  renderBarChart("chartLargelyMonthly", buildPeriodRows(largely, reportRows, monthKey), { labelFn: (r) => r.key, obsFn: (r) => r.observations, inspFn: (r) => r.inspections, limit: 18, titleFn: (r) => `Largely — ${r.key}` });
+  renderBarChart("chartPositiveMonthly", buildPeriodRows(positive, reportRows, monthKey), { labelFn: (r) => r.key, obsFn: (r) => r.observations, inspFn: (r) => r.inspections, limit: 18, titleFn: (r) => `Positive — ${r.key}` });
 
-  renderBarChart("chartNegQuarterly", buildPeriodRows(neg, reportRows, quarterOf), { labelFn: (r) => r.key, obsFn: (r) => r.observations, inspFn: (r) => r.inspections, limit: 16 });
-  renderBarChart("chartLargelyQuarterly", buildPeriodRows(largely, reportRows, quarterOf), { labelFn: (r) => r.key, obsFn: (r) => r.observations, inspFn: (r) => r.inspections, limit: 16 });
-  renderBarChart("chartPositiveQuarterly", buildPeriodRows(positive, reportRows, quarterOf), { labelFn: (r) => r.key, obsFn: (r) => r.observations, inspFn: (r) => r.inspections, limit: 16 });
+  renderBarChart("chartNegQuarterly", buildPeriodRows(neg, reportRows, quarterOf), { labelFn: (r) => r.key, obsFn: (r) => r.observations, inspFn: (r) => r.inspections, limit: 16, titleFn: (r) => `Negative — ${r.key}` });
+  renderBarChart("chartLargelyQuarterly", buildPeriodRows(largely, reportRows, quarterOf), { labelFn: (r) => r.key, obsFn: (r) => r.observations, inspFn: (r) => r.inspections, limit: 16, titleFn: (r) => `Largely — ${r.key}` });
+  renderBarChart("chartPositiveQuarterly", buildPeriodRows(positive, reportRows, quarterOf), { labelFn: (r) => r.key, obsFn: (r) => r.observations, inspFn: (r) => r.inspections, limit: 16, titleFn: (r) => `Positive — ${r.key}` });
 
-  renderBarChart("chartNegAnnual", buildPeriodRows(neg, reportRows, yearOf), { labelFn: (r) => r.key, obsFn: (r) => r.observations, inspFn: (r) => r.inspections, limit: 10 });
-  renderBarChart("chartLargelyAnnual", buildPeriodRows(largely, reportRows, yearOf), { labelFn: (r) => r.key, obsFn: (r) => r.observations, inspFn: (r) => r.inspections, limit: 10 });
-  renderBarChart("chartPositiveAnnual", buildPeriodRows(positive, reportRows, yearOf), { labelFn: (r) => r.key, obsFn: (r) => r.observations, inspFn: (r) => r.inspections, limit: 10 });
+  renderBarChart("chartNegAnnual", buildPeriodRows(neg, reportRows, yearOf), { labelFn: (r) => r.key, obsFn: (r) => r.observations, inspFn: (r) => r.inspections, limit: 10, titleFn: (r) => `Negative — ${r.key}` });
+  renderBarChart("chartLargelyAnnual", buildPeriodRows(largely, reportRows, yearOf), { labelFn: (r) => r.key, obsFn: (r) => r.observations, inspFn: (r) => r.inspections, limit: 10, titleFn: (r) => `Largely — ${r.key}` });
+  renderBarChart("chartPositiveAnnual", buildPeriodRows(positive, reportRows, yearOf), { labelFn: (r) => r.key, obsFn: (r) => r.observations, inspFn: (r) => r.inspections, limit: 10, titleFn: (r) => `Positive — ${r.key}` });
+}
+
+function groupChartRowsByKey(rows, keyFn) {
+  const reportCountTotal = new Set(rows.map(reportKey)).size;
+  return groupObjectiveRows(rows, keyFn).map((g) => ({
+    ...g,
+    inspections: g.report_count || reportCountTotal,
+    observations: g.observation_count,
+    rows: rows.filter((r) => String(keyFn(r) || "—").trim() === g.key),
+  }));
 }
 
 function renderByVessel(rows, reportRows) {
@@ -708,8 +888,7 @@ function renderByVessel(rows, reportRows) {
   const reportCountMap = reportCountsByKey(reportRows, (r) => r.vessel_name);
   const grouped = groupTypeSplitRows(rows, (r) => r.vessel_name, (key) => reportCountMap.get(key) || 0);
 
-  const allVesselsWithReports = [...reportCountMap.keys()];
-  for (const name of allVesselsWithReports) {
+  for (const name of reportCountMap.keys()) {
     if (!grouped.some((x) => x.key === name)) {
       grouped.push({
         key: name,
@@ -728,6 +907,9 @@ function renderByVessel(rows, reportRows) {
   grouped.sort((a, b) => String(a.key).localeCompare(String(b.key)));
 
   for (const r of grouped) {
+    const matched = rows.filter((x) => String(x.vessel_name || "—").trim() === r.key);
+    const drillId = registerDrill(`Vessel: ${r.key}`, matched, null, `All matching observations for vessel ${r.key}.`);
+
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>${esc(r.key)}</td>
@@ -738,11 +920,13 @@ function renderByVessel(rows, reportRows) {
       <td>${esc(r.avg_negative)}</td>
       <td>${esc(r.avg_largely)}</td>
       <td>${esc(r.avg_positive)}</td>
+      <td>${buttonHtml(drillId)}</td>
     `;
     tbody.appendChild(tr);
   }
 
-  if (!grouped.length) ensureTbodyMessage(tbody, 8, "No vessel data for current filters.");
+  if (!grouped.length) ensureTbodyMessage(tbody, 9, "No vessel data for current filters.");
+  bindDrillButtons(tbody);
 }
 
 function renderFleetAverage(rows, reportRows) {
@@ -752,6 +936,7 @@ function renderFleetAverage(rows, reportRows) {
 
   const counts = typeCountsFromRows(rows);
   const inspections = reportRows.length;
+  const drillId = registerDrill("Selected scope — all matching observations", rows, reportRows, "All records inside the currently selected scope.");
 
   const tr = document.createElement("tr");
   tr.innerHTML = `
@@ -763,8 +948,10 @@ function renderFleetAverage(rows, reportRows) {
     <td>${esc(avg(counts.negative, inspections))}</td>
     <td>${esc(avg(counts.largely, inspections))}</td>
     <td>${esc(avg(counts.positive, inspections))}</td>
+    <td>${buttonHtml(drillId)}</td>
   `;
   tbody.appendChild(tr);
+  bindDrillButtons(tbody);
 }
 
 function renderAverageGroupTable(rows, reportRows, keyFnRows, keyFnReports, tbodyId, emptyLabel) {
@@ -794,6 +981,9 @@ function renderAverageGroupTable(rows, reportRows, keyFnRows, keyFnReports, tbod
   grouped.sort((a, b) => b.total - a.total || String(a.key).localeCompare(String(b.key)));
 
   for (const r of grouped) {
+    const matched = rows.filter((x) => String(keyFnRows(x) || "—").trim() === r.key);
+    const drillId = registerDrill(`${emptyLabel}: ${r.key}`, matched, null, `All matching observations for ${emptyLabel}: ${r.key}.`);
+
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>${esc(r.key)}</td>
@@ -804,11 +994,13 @@ function renderAverageGroupTable(rows, reportRows, keyFnRows, keyFnReports, tbod
       <td>${esc(r.avg_negative)}</td>
       <td>${esc(r.avg_largely)}</td>
       <td>${esc(r.avg_positive)}</td>
+      <td>${buttonHtml(drillId)}</td>
     `;
     tbody.appendChild(tr);
   }
 
-  if (!grouped.length) ensureTbodyMessage(tbody, 8, `No ${emptyLabel} data for current filters.`);
+  if (!grouped.length) ensureTbodyMessage(tbody, 9, `No ${emptyLabel} data for current filters.`);
+  bindDrillButtons(tbody);
 }
 
 function renderByType(rowsIgnoreTypeFilter, reportRows) {
@@ -819,15 +1011,20 @@ function renderByType(rowsIgnoreTypeFilter, reportRows) {
   for (const t of OBS_TYPES) {
     const rows = rowsOfType(rowsIgnoreTypeFilter, t.value);
     const reports = new Set(rows.map((r) => reportKey(r)));
+    const drillId = registerDrill(`Observation Type: ${t.label}`, rows, null, `All ${t.label} observations for the selected vessel/date scope.`);
+
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>${esc(t.label)}</td>
       <td>${esc(reports.size)}</td>
       <td>${esc(rows.length)}</td>
       <td>${esc(avg(rows.length, reportRows.length))}</td>
+      <td>${buttonHtml(drillId)}</td>
     `;
     tbody.appendChild(tr);
   }
+
+  bindDrillButtons(tbody);
 }
 
 function recurringFilteredRows(rows) {
@@ -867,6 +1064,9 @@ function renderTopRecurringQuestions(rows) {
     const sh = meta ? getShort(meta) : "";
     const label = typeLabel(obsType);
 
+    const matched = filtered.filter((x) => String(x.question_no || "") === qno && normalizeType(x.observation_type) === obsType);
+    const drillId = registerDrill(`Recurring Question ${qno} — ${label}`, matched, null, `Threshold: ${minCount}.`);
+
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td class="mono">${esc(qno)}</td>
@@ -875,23 +1075,25 @@ function renderTopRecurringQuestions(rows) {
       <td>${esc(sh)}</td>
       <td>${esc(label)}</td>
       <td>${esc(r.observation_count)}</td>
+      <td>${buttonHtml(drillId)}</td>
     `;
     tbody.appendChild(tr);
   }
 
-  if (!grouped.length) ensureTbodyMessage(tbody, 6, `No recurring questions found at threshold ${minCount}.`);
+  if (!grouped.length) ensureTbodyMessage(tbody, 7, `No recurring questions found at threshold ${minCount}.`);
+  bindDrillButtons(tbody);
 }
 
 function renderByCategory(rows, reportRows) {
-  renderTypeSplitTable("byCategoryTbody", groupTypeSplitRows(rows, (r) => r.designation, () => reportRows.length), "category");
+  renderTypeSplitTable("byCategoryTbody", groupTypeSplitRows(rows, (r) => r.designation, () => reportRows.length), rows, (r) => r.designation, "category");
 }
 
 function renderTopSoc(rows, reportRows) {
-  renderTypeSplitTable("topSocTbody", groupTypeSplitRows(rows, (r) => r.soc, () => reportRows.length), "SOC", 100);
+  renderTypeSplitTable("topSocTbody", groupTypeSplitRows(rows, (r) => r.soc, () => reportRows.length), rows, (r) => r.soc, "SOC", 100);
 }
 
 function renderTopNoc(rows, reportRows) {
-  renderTypeSplitTable("topNocTbody", groupTypeSplitRows(rows, (r) => r.noc, () => reportRows.length), "NOC", 100);
+  renderTypeSplitTable("topNocTbody", groupTypeSplitRows(rows, (r) => r.noc, () => reportRows.length), rows, (r) => r.noc, "NOC", 100);
 }
 
 function extractPgnoAnalyticsRows(rows) {
@@ -923,20 +1125,24 @@ function renderPgnoAnalytics(rows, reportRows) {
   const byPgno = groupObjectiveRows(pgRows, (r) => r.pgno_label).slice(0, 50);
   const byPgnoQuestion = groupObjectiveRows(pgRows, (r) => r.question_no).slice(0, 50);
 
-  renderBarChart("chartPgno", byPgno, {
+  renderBarChart("chartPgno", byPgno.map((x) => ({ ...x, rows: pgRows.filter((r) => r.pgno_label === x.key) })), {
     labelFn: (r) => r.key,
     obsFn: (r) => r.observation_count,
     inspFn: (r) => r.report_count,
+    rowsFn: (r) => r.rows,
     limit: 10,
     emptyText: "No assigned PGNOs for current filters.",
+    titleFn: (r) => `PGNO: ${r.key}`,
   });
 
-  renderBarChart("chartPgnoQuestion", byPgnoQuestion, {
+  renderBarChart("chartPgnoQuestion", byPgnoQuestion.map((x) => ({ ...x, rows: pgRows.filter((r) => r.question_no === x.key) })), {
     labelFn: (r) => r.key,
     obsFn: (r) => r.observation_count,
     inspFn: (r) => r.report_count,
+    rowsFn: (r) => r.rows,
     limit: 10,
     emptyText: "No PGNO/question data for current filters.",
+    titleFn: (r) => `PGNO Question: ${r.key}`,
   });
 
   const missingRows = (rows || []).filter((r) => {
@@ -949,8 +1155,10 @@ function renderPgnoAnalytics(rows, reportRows) {
     labelFn: (r) => r.key,
     obsFn: (r) => r.observations,
     inspFn: (r) => r.inspections,
+    rowsFn: (r) => r.rows,
     limit: 18,
     emptyText: "No missing PGNOs for current filters.",
+    titleFn: (r) => `Missing PGNO: ${r.key}`,
   });
 
   const tbody = safeTbody("pgnoTableTbody");
@@ -958,6 +1166,9 @@ function renderPgnoAnalytics(rows, reportRows) {
   tbody.innerHTML = "";
 
   for (const r of byPgno) {
+    const matched = pgRows.filter((x) => x.pgno_label === r.key);
+    const drillId = registerDrill(`PGNO: ${r.key}`, matched, null, "Assigned PGNO records.");
+
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>${esc(r.key)}</td>
@@ -965,11 +1176,13 @@ function renderPgnoAnalytics(rows, reportRows) {
       <td>${esc(r.report_count)}</td>
       <td>${esc(r.avg_per_inspection)}</td>
       <td>${esc(r.last_seen || "")}</td>
+      <td>${buttonHtml(drillId)}</td>
     `;
     tbody.appendChild(tr);
   }
 
-  if (!byPgno.length) ensureTbodyMessage(tbody, 5, "No assigned PGNO data for current filters.");
+  if (!byPgno.length) ensureTbodyMessage(tbody, 6, "No assigned PGNO data for current filters.");
+  bindDrillButtons(tbody);
 }
 
 function renderSummaryFromRows(rows, reportRows) {
@@ -992,9 +1205,48 @@ function renderSummaryFromRows(rows, reportRows) {
   setText("sumMissing", String(missingNeg + missingLargely));
   setText("sumDistinct", String(questionSet.size));
   setText("sumMissingSplit", `Negative: ${missingNeg} | Largely: ${missingLargely}`);
+
+  bindSummaryDrills(rows, reportRows);
+}
+
+function bindSummaryDrills(rows, reportRows) {
+  const reportKeys = new Set(reportRows.map((r) => r.report_key));
+  const reportObsRows = rows.filter((r) => reportKeys.has(reportKey(r)));
+
+  const missingRows = rows.filter((r) => {
+    const arr = Array.isArray(r.pgno_selected) ? r.pgno_selected : [];
+    const type = normalizeType(r.observation_type);
+    return (type === "negative" || type === "largely") && arr.length === 0;
+  });
+
+  const distinctRows = [];
+  const seen = new Set();
+  for (const r of rows) {
+    const q = String(r.question_no || "").trim();
+    if (!q || seen.has(q)) continue;
+    seen.add(q);
+    distinctRows.push(r);
+  }
+
+  const bind = (id, title, matchedRows, matchedReports, sub) => {
+    const btn = safeEl(id);
+    if (!btn) return;
+    btn.onclick = () => openDrilldown(title, matchedRows, matchedReports, sub);
+  };
+
+  bind("viewSummaryReportsBtn", "Reports / Inspections — current scope", reportObsRows, reportRows, "Observations linked with reports inside current filter scope.");
+  bind("viewSummaryObsBtn", "Total Observations — current scope", rows, null, "All matching observations.");
+  bind("viewSummaryMissingBtn", "Missing PGNO ticks — current scope", missingRows, null, "Negative and Largely as expected observations without PGNO tick.");
+  bind("viewSummaryDistinctBtn", "Unique Questions Observed — representative records", distinctRows, null, "One representative record per unique question number.");
 }
 
 async function renderAllStats(rows, rowsIgnoreTypeFilter, reportRows) {
+  drillRegistry.clear();
+
+  state.currentRows = rows;
+  state.currentRowsIgnoreType = rowsIgnoreTypeFilter;
+  state.currentReportRows = reportRows;
+
   renderSummaryFromRows(rows, reportRows);
 
   renderTypeVisuals(rows, reportRows);
@@ -1007,32 +1259,9 @@ async function renderAllStats(rows, rowsIgnoreTypeFilter, reportRows) {
   renderTopNoc(rows, reportRows);
   renderMonthlyTrend(rows, reportRows);
 
-  renderAverageGroupTable(
-    rows,
-    reportRows,
-    (r) => r.ocimf_inspecting_company,
-    (r) => r.ocimf_inspecting_company,
-    "byOcimfTbody",
-    "OCIMF company"
-  );
-
-  renderAverageGroupTable(
-    rows,
-    reportRows,
-    (r) => r.inspector_name,
-    (r) => r.inspector_name,
-    "byInspectorTbody",
-    "inspector"
-  );
-
-  renderAverageGroupTable(
-    rows,
-    reportRows,
-    (r) => r.inspector_company,
-    (r) => r.inspector_company,
-    "byInspectorCompanyTbody",
-    "inspector company"
-  );
+  renderAverageGroupTable(rows, reportRows, (r) => r.ocimf_inspecting_company, (r) => r.ocimf_inspecting_company, "byOcimfTbody", "OCIMF company");
+  renderAverageGroupTable(rows, reportRows, (r) => r.inspector_name, (r) => r.inspector_name, "byInspectorTbody", "inspector");
+  renderAverageGroupTable(rows, reportRows, (r) => r.inspector_company, (r) => r.inspector_company, "byInspectorCompanyTbody", "inspector company");
 
   renderPgnoAnalytics(rows, reportRows);
 }
@@ -1045,6 +1274,7 @@ async function applyFilters() {
   const rowsIgnoreTypeFilter = filterRowsBase(state.allRows, true);
 
   await renderAllStats(rows, rowsIgnoreTypeFilter, reportRows);
+  updateFilterSummaries();
 
   setStatus("Ready");
 }
@@ -1134,11 +1364,13 @@ function bindChange(id, fn) {
 function bindAllNone(allId, noneId, containerId, refresh = null) {
   bindClick(allId, async () => {
     setAllCheckboxes(containerId, true);
+    updateFilterSummaries();
     if (refresh) await refresh();
   });
 
   bindClick(noneId, async () => {
     setAllCheckboxes(containerId, false);
+    updateFilterSummaries();
     if (refresh) await refresh();
   });
 }
@@ -1148,9 +1380,50 @@ function bindCheckboxRefresh(containerId, refresh) {
   if (!box) return;
   box.addEventListener("change", async (e) => {
     if (e.target && e.target.matches("input[type='checkbox']")) {
+      updateFilterSummaries();
       await refresh();
     }
   });
+}
+
+function updateDropSummary(buttonId, label, selectedCount, totalCount) {
+  const text = selectedCount === totalCount
+    ? `${label}: all`
+    : selectedCount === 0
+      ? `${label}: none`
+      : `${label}: ${selectedCount} selected`;
+
+  setText(buttonId, text);
+}
+
+function updateFilterSummaries() {
+  updateDropSummary("vesselDropBtn", "Vessels", getSelectedVesselIds().length, state.vessels.length);
+  updateDropSummary("typeDropBtn", "Types", getSelectedTypes().length, OBS_TYPES.length);
+  updateDropSummary("recYearDropBtn", "Recurring years", getSelectedRecurringYears().length, safeEl("recurringYearCheckList")?.querySelectorAll("input").length || 0);
+  updateDropSummary("recMonthDropBtn", "Recurring months", getSelectedRecurringMonths().length, MONTHS.length);
+}
+
+function bindDropdown(dropId, btnId) {
+  const drop = safeEl(dropId);
+  const btn = safeEl(btnId);
+  if (!drop || !btn) return;
+
+  btn.addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    document.querySelectorAll(".filterDrop.open").forEach((x) => {
+      if (x !== drop) x.classList.remove("open");
+    });
+
+    drop.classList.toggle("open");
+  });
+
+  drop.addEventListener("click", (e) => e.stopPropagation());
+}
+
+function closeAllDropdowns() {
+  document.querySelectorAll(".filterDrop.open").forEach((x) => x.classList.remove("open"));
 }
 
 async function init() {
@@ -1170,13 +1443,7 @@ async function init() {
 
   state.vessels = await loadVessels();
 
-  renderCheckboxList(
-    "vesselCheckList",
-    "vesselChk",
-    state.vessels.map((v) => ({ value: v.id, label: v.name })),
-    true
-  );
-
+  renderCheckboxList("vesselCheckList", "vesselChk", state.vessels.map((v) => ({ value: v.id, label: v.name })), true);
   renderCheckboxList("typeCheckList", "typeChk", OBS_TYPES, true);
   renderCheckboxList("recurringMonthCheckList", "recMonthChk", MONTHS, true);
 
@@ -1202,13 +1469,7 @@ async function init() {
   const years = collectYearsFromRows(state.allRows, state.allReportRows);
   const currentYear = String(new Date().getFullYear());
 
-  renderCheckboxList(
-    "recurringYearCheckList",
-    "recYearChk",
-    years.map((y) => ({ value: y, label: y })),
-    true
-  );
-
+  renderCheckboxList("recurringYearCheckList", "recYearChk", years.map((y) => ({ value: y, label: y })), true);
   renderYearSelect("trendYearFilter", years, currentYear);
 
   const refresh = async () => {
@@ -1220,6 +1481,16 @@ async function init() {
       setStatus("Error");
     }
   };
+
+  bindDropdown("vesselDrop", "vesselDropBtn");
+  bindDropdown("typeDrop", "typeDropBtn");
+  bindDropdown("recYearDrop", "recYearDropBtn");
+  bindDropdown("recMonthDrop", "recMonthDropBtn");
+
+  document.addEventListener("click", closeAllDropdowns);
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") closeAllDropdowns();
+  });
 
   bindClick("applyBtn", refresh);
 
@@ -1248,6 +1519,14 @@ async function init() {
   bindChange("dateFrom", refresh);
   bindChange("dateTo", refresh);
 
+  bindClick("drillCloseBtn", () => {
+    const dlg = safeEl("drillDialog");
+    if (dlg && typeof dlg.close === "function") dlg.close();
+  });
+
+  bindClick("drillExportBtn", exportDrillCsv);
+
+  updateFilterSummaries();
   await applyFilters();
 }
 
