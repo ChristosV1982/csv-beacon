@@ -385,6 +385,83 @@ function renderCharts(rows) {
   });
 }
 
+function extractPgnoAnalyticsRows(rows) {
+  const out = [];
+
+  for (const row of rows || []) {
+    const pgArr = Array.isArray(row.pgno_selected) ? row.pgno_selected : [];
+    for (const pg of pgArr) {
+      const pgnoNo = String(pg?.pgno_no || pg?.idx || "").trim();
+      const pgText = String(pg?.text || "").trim();
+      const label = pgnoNo && pgText ? `${pgnoNo} — ${pgText}` : (pgnoNo || pgText);
+
+      if (!label) continue;
+
+      out.push({
+        ...row,
+        pgno_label: label,
+        pgno_no: pgnoNo,
+        pgno_text: pgText,
+      });
+    }
+  }
+
+  return out;
+}
+
+function renderPgnoAnalytics(rows) {
+  const pgRows = extractPgnoAnalyticsRows(rows);
+  const byPgno = groupObjectiveRows(pgRows, (r) => r.pgno_label).slice(0, 50);
+  const byPgnoQuestion = groupObjectiveRows(pgRows, (r) => r.question_no).slice(0, 50);
+
+  renderBarChart("chartPgno", byPgno, {
+    labelFn: (r) => r.key,
+    valueFn: (r) => r.observation_count,
+    limit: 10,
+    emptyText: "No assigned PGNOs for current filters.",
+  });
+
+  renderBarChart("chartPgnoQuestion", byPgnoQuestion, {
+    labelFn: (r) => r.key,
+    valueFn: (r) => r.observation_count,
+    limit: 10,
+    emptyText: "No PGNO/question data for current filters.",
+  });
+
+  const missingRows = (rows || []).filter((r) => {
+    const arr = Array.isArray(r.pgno_selected) ? r.pgno_selected : [];
+    const type = String(r.observation_type || "").trim();
+    return (type === "negative" || type === "largely") && arr.length === 0;
+  });
+
+  const missingMonthly = buildMonthlyRows(missingRows);
+
+  renderBarChart("chartPgnoMissing", missingMonthly, {
+    labelFn: (r) => r.month,
+    valueFn: (r) => r.observations,
+    limit: 18,
+    emptyText: "No missing PGNOs for current filters.",
+  });
+
+  const tbody = el("pgnoTableTbody");
+  tbody.innerHTML = "";
+
+  for (const r of byPgno) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${esc(r.key)}</td>
+      <td>${esc(r.observation_count)}</td>
+      <td>${esc(r.report_count)}</td>
+      <td>${esc(r.last_seen || "")}</td>
+    `;
+    tbody.appendChild(tr);
+  }
+
+  if (!byPgno.length) {
+    ensureTbodyMessage(tbody, 4, "No assigned PGNO data for current filters.");
+  }
+}
+
 async function renderObjectiveKpis() {
   const rows = await loadFilteredObservationRows();
 
@@ -393,6 +470,7 @@ async function renderObjectiveKpis() {
   renderTopSoc(rows);
   renderTopNoc(rows);
   renderMonthlyTrend(rows);
+  renderPgnoAnalytics(rows);
 }
 
 async function applyFilters() {

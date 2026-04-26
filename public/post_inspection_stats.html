@@ -416,6 +416,40 @@
         </table>
       </div>
     </div>
+
+    <div class="panel">
+      <div class="card">
+        <h3 style="margin:0 0 8px 0;">PGNO Analytics</h3>
+        <div class="statL">PGNO analytics are based on assigned PGNOs only. They are separate from objective observation statistics because PGNO assignment may be software-suggested or user-confirmed.</div>
+
+        <div class="chartGrid" style="margin-top:12px;">
+          <div class="chartBox">
+            <div class="chartTitle">Top PGNO</div>
+            <div id="chartPgno"></div>
+          </div>
+          <div class="chartBox">
+            <div class="chartTitle">PGNO by Question</div>
+            <div id="chartPgnoQuestion"></div>
+          </div>
+          <div class="chartBox">
+            <div class="chartTitle">Missing PGNO Trend</div>
+            <div id="chartPgnoMissing"></div>
+          </div>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>PGNO</th>
+              <th>Observations</th>
+              <th>Reports</th>
+              <th>Last seen</th>
+            </tr>
+          </thead>
+          <tbody id="pgnoTableTbody"></tbody>
+        </table>
+      </div>
+    </div>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
