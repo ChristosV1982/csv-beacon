@@ -271,10 +271,7 @@ function renderTopNoc(rows) {
   }
 }
 
-function renderMonthlyTrend(rows) {
-  const tbody = el("monthlyTbody");
-  tbody.innerHTML = "";
-
+function buildMonthlyRows(rows) {
   const map = new Map();
 
   for (const row of rows || []) {
@@ -300,7 +297,14 @@ function renderMonthlyTrend(rows) {
     if (t === "largely") item.largely += 1;
   }
 
-  const grouped = [...map.values()].sort((a, b) => String(a.month).localeCompare(String(b.month)));
+  return [...map.values()].sort((a, b) => String(a.month).localeCompare(String(b.month)));
+}
+
+function renderMonthlyTrend(rows) {
+  const tbody = el("monthlyTbody");
+  tbody.innerHTML = "";
+
+  const grouped = buildMonthlyRows(rows);
 
   for (const r of grouped) {
     const tr = document.createElement("tr");
@@ -320,9 +324,71 @@ function renderMonthlyTrend(rows) {
   }
 }
 
+function renderBarChart(containerId, rows, options = {}) {
+  const box = el(containerId);
+  if (!box) return;
+
+  const labelFn = options.labelFn || ((r) => r.key);
+  const valueFn = options.valueFn || ((r) => r.observation_count);
+  const limit = Number(options.limit || 10);
+  const emptyText = options.emptyText || "No chart data for current filters.";
+
+  const chartRows = (rows || [])
+    .filter((r) => Number(valueFn(r) || 0) > 0)
+    .slice(0, limit);
+
+  if (!chartRows.length) {
+    box.innerHTML = `<div class="emptyChart">${esc(emptyText)}</div>`;
+    return;
+  }
+
+  const max = Math.max(...chartRows.map((r) => Number(valueFn(r) || 0)), 1);
+
+  box.innerHTML = chartRows.map((r) => {
+    const label = String(labelFn(r) || "—");
+    const value = Number(valueFn(r) || 0);
+    const pct = Math.max(3, Math.round((value / max) * 100));
+
+    return `
+      <div class="barRow" title="${esc(label)}: ${esc(value)}">
+        <div class="barLabel">${esc(label)}</div>
+        <div class="barTrack">
+          <div class="barFill" style="width:${pct}%"></div>
+        </div>
+        <div class="barValue">${esc(value)}</div>
+      </div>
+    `;
+  }).join("");
+}
+
+function renderCharts(rows) {
+  const byType = groupObjectiveRows(rows, (r) => typeLabel(r.observation_type));
+  const byCategory = groupObjectiveRows(rows, (r) => r.designation);
+  const monthly = buildMonthlyRows(rows);
+
+  renderBarChart("chartType", byType, {
+    labelFn: (r) => r.key,
+    valueFn: (r) => r.observation_count,
+    limit: 10,
+  });
+
+  renderBarChart("chartCategory", byCategory, {
+    labelFn: (r) => r.key,
+    valueFn: (r) => r.observation_count,
+    limit: 10,
+  });
+
+  renderBarChart("chartMonthly", monthly, {
+    labelFn: (r) => r.month,
+    valueFn: (r) => r.observations,
+    limit: 18,
+  });
+}
+
 async function renderObjectiveKpis() {
   const rows = await loadFilteredObservationRows();
 
+  renderCharts(rows);
   renderByCategory(rows);
   renderTopSoc(rows);
   renderTopNoc(rows);
