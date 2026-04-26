@@ -82,6 +82,27 @@ function pgnoExportText(pgnoSelected) {
     .join("; ");
 }
 
+function reportKey(row) {
+  return [
+    String(row.vessel_name || "").trim(),
+    String(row.inspection_date || "").trim(),
+    String(row.report_ref || "").trim(),
+    String(row.title || "").trim(),
+  ].join("|");
+}
+
+function monthKey(row) {
+  return String(row.inspection_date || "").slice(0, 7) || "—";
+}
+
+function typeLabel(type) {
+  return state.labelMap.get(type) || type || "—";
+}
+
+function ensureTbodyMessage(tbody, colspan, message) {
+  tbody.innerHTML = `<tr><td colspan="${colspan}" class="mono">${esc(message)}</td></tr>`;
+}
+
 async function loadVessels() {
   const { data, error } = await state.supabase
     .from("vessels")
@@ -129,6 +150,183 @@ function getFilters() {
   const p_observation_type = el("typeFilter").value || null;
 
   return { vessel_id, p_from, p_to, p_observation_type };
+}
+
+async function loadFilteredObservationRows() {
+  const { vessel_id, p_from, p_to, p_observation_type } = getFilters();
+
+  const { data, error } = await state.supabase
+    .rpc("post_insp_export_observations", {
+      p_vessel_id: vessel_id,
+      p_from,
+      p_to,
+      p_observation_type,
+    });
+
+  if (error) throw error;
+  return data || [];
+}
+
+function groupObjectiveRows(rows, keyFn) {
+  const map = new Map();
+
+  for (const row of rows || []) {
+    const key = String(keyFn(row) || "—").trim() || "—";
+    if (!map.has(key)) {
+      map.set(key, {
+        key,
+        observation_count: 0,
+        reports: new Set(),
+        last_seen: "",
+      });
+    }
+
+    const item = map.get(key);
+    item.observation_count += 1;
+    item.reports.add(reportKey(row));
+
+    const date = String(row.inspection_date || "").trim();
+    if (date && (!item.last_seen || date > item.last_seen)) {
+      item.last_seen = date;
+    }
+  }
+
+  return [...map.values()]
+    .map((x) => ({
+      key: x.key,
+      observation_count: x.observation_count,
+      report_count: x.reports.size,
+      last_seen: x.last_seen,
+    }))
+    .sort((a, b) =>
+      b.observation_count - a.observation_count ||
+      b.report_count - a.report_count ||
+      String(a.key).localeCompare(String(b.key))
+    );
+}
+
+function renderByCategory(rows) {
+  const tbody = el("byCategoryTbody");
+  tbody.innerHTML = "";
+
+  const grouped = groupObjectiveRows(rows, (r) => r.designation).slice(0, 50);
+
+  for (const r of grouped) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${esc(r.key)}</td>
+      <td>${esc(r.observation_count)}</td>
+      <td>${esc(r.report_count)}</td>
+      <td>${esc(r.last_seen || "")}</td>
+    `;
+    tbody.appendChild(tr);
+  }
+
+  if (!grouped.length) {
+    ensureTbodyMessage(tbody, 4, "No category data for current filters.");
+  }
+}
+
+function renderTopSoc(rows) {
+  const tbody = el("topSocTbody");
+  tbody.innerHTML = "";
+
+  const grouped = groupObjectiveRows(rows, (r) => r.soc).slice(0, 50);
+
+  for (const r of grouped) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${esc(r.key)}</td>
+      <td>${esc(r.observation_count)}</td>
+      <td>${esc(r.report_count)}</td>
+      <td>${esc(r.last_seen || "")}</td>
+    `;
+    tbody.appendChild(tr);
+  }
+
+  if (!grouped.length) {
+    ensureTbodyMessage(tbody, 4, "No SOC data for current filters.");
+  }
+}
+
+function renderTopNoc(rows) {
+  const tbody = el("topNocTbody");
+  tbody.innerHTML = "";
+
+  const grouped = groupObjectiveRows(rows, (r) => r.noc).slice(0, 50);
+
+  for (const r of grouped) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${esc(r.key)}</td>
+      <td>${esc(r.observation_count)}</td>
+      <td>${esc(r.report_count)}</td>
+      <td>${esc(r.last_seen || "")}</td>
+    `;
+    tbody.appendChild(tr);
+  }
+
+  if (!grouped.length) {
+    ensureTbodyMessage(tbody, 4, "No NOC data for current filters.");
+  }
+}
+
+function renderMonthlyTrend(rows) {
+  const tbody = el("monthlyTbody");
+  tbody.innerHTML = "";
+
+  const map = new Map();
+
+  for (const row of rows || []) {
+    const key = monthKey(row);
+    if (!map.has(key)) {
+      map.set(key, {
+        month: key,
+        reports: new Set(),
+        observations: 0,
+        negative: 0,
+        positive: 0,
+        largely: 0,
+      });
+    }
+
+    const item = map.get(key);
+    item.reports.add(reportKey(row));
+    item.observations += 1;
+
+    const t = String(row.observation_type || "").trim();
+    if (t === "negative") item.negative += 1;
+    if (t === "positive") item.positive += 1;
+    if (t === "largely") item.largely += 1;
+  }
+
+  const grouped = [...map.values()].sort((a, b) => String(a.month).localeCompare(String(b.month)));
+
+  for (const r of grouped) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td class="mono">${esc(r.month)}</td>
+      <td>${esc(r.reports.size)}</td>
+      <td>${esc(r.observations)}</td>
+      <td>${esc(r.negative)}</td>
+      <td>${esc(r.positive)}</td>
+      <td>${esc(r.largely)}</td>
+    `;
+    tbody.appendChild(tr);
+  }
+
+  if (!grouped.length) {
+    ensureTbodyMessage(tbody, 6, "No monthly data for current filters.");
+  }
+}
+
+async function renderObjectiveKpis() {
+  const rows = await loadFilteredObservationRows();
+
+  renderByCategory(rows);
+  renderTopSoc(rows);
+  renderTopNoc(rows);
+  renderMonthlyTrend(rows);
 }
 
 async function applyFilters() {
@@ -247,6 +445,8 @@ async function applyFilters() {
   if (!(topQ || []).length) {
     qb.innerHTML = `<tr><td colspan="8" class="mono">No data for current filters.</td></tr>`;
   }
+
+  await renderObjectiveKpis();
 
   setStatus("Ready");
 }

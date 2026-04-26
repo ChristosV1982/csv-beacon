@@ -260,6 +260,80 @@
         </table>
       </div>
     </div>
+
+    <div class="panel">
+      <div class="card">
+        <h3 style="margin:0 0 8px 0;">By Category / Designation</h3>
+        <div class="statL">Objective breakdown by recorded designation: Human, Process, Hardware, Photo.</div>
+        <table>
+          <thead>
+            <tr>
+              <th>Category</th>
+              <th>Observations</th>
+              <th>Reports</th>
+              <th>Last seen</th>
+            </tr>
+          </thead>
+          <tbody id="byCategoryTbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="card">
+        <h3 style="margin:0 0 8px 0;">Top SOC</h3>
+        <div class="statL">Objective breakdown by recorded Subject of Concern (SOC).</div>
+        <table>
+          <thead>
+            <tr>
+              <th>SOC</th>
+              <th>Observations</th>
+              <th>Reports</th>
+              <th>Last seen</th>
+            </tr>
+          </thead>
+          <tbody id="topSocTbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="card">
+        <h3 style="margin:0 0 8px 0;">Top NOC</h3>
+        <div class="statL">Objective breakdown by recorded Nature of Concern (NOC).</div>
+        <table>
+          <thead>
+            <tr>
+              <th>NOC</th>
+              <th>Observations</th>
+              <th>Reports</th>
+              <th>Last seen</th>
+            </tr>
+          </thead>
+          <tbody id="topNocTbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="card">
+        <h3 style="margin:0 0 8px 0;">Monthly Trend</h3>
+        <div class="statL">Objective observation count by inspection month.</div>
+        <table>
+          <thead>
+            <tr>
+              <th>Month</th>
+              <th>Reports</th>
+              <th>Observations</th>
+              <th>Negative</th>
+              <th>Positive</th>
+              <th>Largely</th>
+            </tr>
+          </thead>
+          <tbody id="monthlyTbody"></tbody>
+        </table>
+      </div>
+    </div>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
