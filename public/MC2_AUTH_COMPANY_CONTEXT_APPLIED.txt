@@ -1,5 +1,0 @@
-MC-2 applied:
-- public/auth.js now loads profile.company_id and company context.
-- window.CSVB_CONTEXT is populated after session/profile load.
-- service worker cache version bumped to v5 if service-worker.js exists.
-- No SQL, RLS, Supabase policy, or module logic restriction changes.
