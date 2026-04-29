@@ -723,7 +723,7 @@ function initAddVessel() {
       if (!company_id) throw new Error("Company is required.");
       if (!name) throw new Error("Vessel name is required.");
 
-      if (imo_number_raw && !/^[0-9]+$/.test(imo_number_raw)) {
+      if (imo_number_raw && !/^\\d+$/.test(imo_number_raw)) {
         throw new Error("IMO number must contain digits only, or remain blank.");
       }
 
