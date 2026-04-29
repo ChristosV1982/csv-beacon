@@ -329,19 +329,14 @@ function filterRowsBase(rows, ignoreTypeFilter = false) {
 }
 
 async function loadVessels() {
-  const { data, error } = await state.supabase.rpc("csvb_accessible_vessels_for_me");
+  const { data, error } = await state.supabase
+    .from("vessels")
+    .select("id, name, is_active")
+    .eq("is_active", true)
+    .order("name", { ascending: true });
 
   if (error) throw error;
-
-  return (data || [])
-    .filter((v) => v.is_active !== false)
-    .map((v) => ({
-      id: v.id,
-      company_id: v.company_id,
-      company_name: v.company_name || "",
-      name: v.name,
-      is_active: v.is_active
-    }));
+  return data || [];
 }
 
 async function loadPostObservationRows() {
@@ -354,39 +349,16 @@ async function loadPostObservationRows() {
     });
 
   if (error) throw error;
-
-  const allowedVesselNames = new Set(
-    (state.vessels || [])
-      .map((v) => String(v.name || "").trim())
-      .filter(Boolean)
-  );
-
-  if (!allowedVesselNames.size) return [];
-
-  return (data || []).filter((r) => {
-    const vesselName = String(r.vessel_name || "").trim();
-    return allowedVesselNames.has(vesselName);
-  });
+  return data || [];
 }
 
 async function loadPostReportRows() {
-  const { data, error } = await state.supabase.rpc("csvb_post_inspection_reports_for_me");
+  const { data, error } = await state.supabase
+    .from("post_inspection_reports")
+    .select("id, vessel_id, inspection_date, report_ref, title, ocimf_inspecting_company, inspector_name, inspector_company");
 
   if (error) throw error;
-
-  return (data || []).map((r) => ({
-    id: r.id,
-    company_id: r.company_id,
-    company_name: r.company_name || "",
-    vessel_id: r.vessel_id,
-    vessel_name: r.vessel_name || "",
-    inspection_date: r.inspection_date,
-    report_ref: r.report_ref,
-    title: r.title,
-    ocimf_inspecting_company: r.ocimf_inspecting_company,
-    inspector_name: r.inspector_name,
-    inspector_company: r.inspector_company
-  }));
+  return data || [];
 }
 
 async function loadCombinedObservationRows() {
@@ -401,18 +373,7 @@ async function loadCombinedObservationRows() {
 
   if (error) throw error;
 
-  const allowedVesselNames = new Set(
-    (state.vessels || [])
-      .map((v) => String(v.name || "").trim())
-      .filter(Boolean)
-  );
-
-  if (!allowedVesselNames.size) return [];
-
-  return normalizeCombinedRows(data || []).filter((r) => {
-    const vesselName = String(r.vessel_name || "").trim();
-    return allowedVesselNames.has(vesselName);
-  });
+  return normalizeCombinedRows(data || []);
 }
 
 function normalizeCombinedRows(rows) {

@@ -44,17 +44,16 @@ function pgnoMissing(pgno_selected) {
 }
 
 async function loadAllReports(supabase, fromDate, toDate) {
-  const { data, error } = await supabase.rpc("csvb_post_inspection_reports_for_me");
+  // inclusive filter: >= fromDate and <= toDate
+  const { data, error } = await supabase
+    .from("post_inspection_reports")
+    .select("id, inspection_date")
+    .gte("inspection_date", fromDate)
+    .lte("inspection_date", toDate)
+    .order("inspection_date", { ascending: true });
 
   if (error) throw error;
-
-  return (data || []).filter((r) => {
-    const d = String(r.inspection_date || "").slice(0, 10);
-    if (!d) return false;
-    if (fromDate && d < fromDate) return false;
-    if (toDate && d > toDate) return false;
-    return true;
-  });
+  return data || [];
 }
 
 async function loadAllObservationsForReports(supabase, reportIds) {
@@ -230,7 +229,7 @@ async function init() {
 
   const sb = window.AUTH.ensureSupabase();
   const R = window.AUTH.ROLES;
-  const me = await window.AUTH.requireAuth([R.SUPER_ADMIN, R.COMPANY_ADMIN, R.COMPANY_SUPERINTENDENT].filter(Boolean));
+  const me = await window.AUTH.requireAuth([R.SUPER_ADMIN, R.COMPANY_ADMIN]);
   if (!me) return;
 
   window.AUTH.fillUserBadge(me, "userBadge");

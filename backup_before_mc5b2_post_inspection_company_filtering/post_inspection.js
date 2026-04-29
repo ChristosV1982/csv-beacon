@@ -66,15 +66,36 @@ const state = {
 };
 
 async function loadReportsFromDb() {
-  const { data, error } = await state.supabase.rpc("csvb_post_inspection_reports_for_me");
+  const selectA =
+    "id, vessel_id, inspection_date, port_name, port_code, ocimf_inspecting_company, report_ref, title, inspector_name, inspector_company, pdf_storage_path, examined_questions, examined_count, created_at, updated_at";
+  const selectB =
+    "id, vessel_id, inspection_date, port_name, port_code, ocimf_inspecting_company, report_ref, title, inspector_name, inspector_company, pdf_storage_path, created_at, updated_at";
 
-  if (error) throw error;
+  let rows = [];
+  try {
+    const { data, error } = await state.supabase
+      .from("post_inspection_reports")
+      .select(selectA)
+      .order("inspection_date", { ascending: false })
+      .order("updated_at", { ascending: false });
+    if (error) throw error;
+    rows = data || [];
+  } catch {
+    const { data, error } = await state.supabase
+      .from("post_inspection_reports")
+      .select(selectB)
+      .order("inspection_date", { ascending: false })
+      .order("updated_at", { ascending: false });
+    if (error) throw error;
+    rows = data || [];
+  }
 
-  return (data || []).map((r) => ({
-    ...r,
-    vessel_name: r.vessel_name || "",
-    company_name: r.company_name || ""
-  }));
+  const vesselIds = [...new Set(rows.map((r) => r.vessel_id).filter(Boolean))];
+  if (!vesselIds.length) return rows.map((r) => ({ ...r, vessel_name: "" }));
+
+  const { data: vessels } = await state.supabase.from("vessels").select("id, name").in("id", vesselIds);
+  const map = new Map((vessels || []).map((v) => [v.id, v.name]));
+  return rows.map((r) => ({ ...r, vessel_name: map.get(r.vessel_id) || "" }));
 }
 
 function uniqueValuesForCol(col) {
@@ -303,7 +324,7 @@ async function init() {
   state.supabase = window.AUTH.ensureSupabase();
 
   const R = window.AUTH.ROLES;
-  state.me = await window.AUTH.requireAuth([R.SUPER_ADMIN, R.COMPANY_ADMIN, R.COMPANY_SUPERINTENDENT].filter(Boolean));
+  state.me = await window.AUTH.requireAuth([R.SUPER_ADMIN, R.COMPANY_ADMIN]);
   if (!state.me) return;
 
   window.AUTH.fillUserBadge(state.me, "userBadge");

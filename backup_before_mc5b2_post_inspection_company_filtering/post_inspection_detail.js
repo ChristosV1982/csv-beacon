@@ -430,19 +430,13 @@ function setActivePill(text) {
 }
 
 async function loadVessels() {
-  const { data, error } = await state.supabase.rpc("csvb_accessible_vessels_for_me");
-
+  const { data, error } = await state.supabase
+    .from("vessels")
+    .select("id, name, is_active")
+    .eq("is_active", true)
+    .order("name", { ascending: true });
   if (error) throw error;
-
-  return (data || [])
-    .filter((v) => v.is_active !== false)
-    .map((v) => ({
-      id: v.id,
-      company_id: v.company_id,
-      company_name: v.company_name || "",
-      name: v.name,
-      is_active: v.is_active
-    }));
+  return data || [];
 }
 
 function findVesselByName(name) {
@@ -465,21 +459,28 @@ function renderVesselsSelect() {
 }
 
 async function loadReportById(reportId) {
-  if (!reportId) throw new Error("report_id is required.");
+  const selectA =
+    "id, vessel_id, inspection_date, port_name, port_code, ocimf_inspecting_company, report_ref, title, inspector_name, inspector_company, pdf_storage_path, examined_questions, examined_count, created_at, updated_at";
+  const selectB =
+    "id, vessel_id, inspection_date, port_name, port_code, ocimf_inspecting_company, report_ref, title, inspector_name, inspector_company, pdf_storage_path, created_at, updated_at";
 
-  const { data, error } = await state.supabase.rpc("csvb_post_inspection_report_by_id_for_me", {
-    p_report_id: reportId
-  });
-
-  if (error) throw error;
-
-  const row = Array.isArray(data) ? data[0] : data;
-
-  if (!row) {
-    throw new Error("Post-Inspection report not found or access denied for your company/vessel.");
+  try {
+    const { data, error } = await state.supabase
+      .from("post_inspection_reports")
+      .select(selectA)
+      .eq("id", reportId)
+      .single();
+    if (error) throw error;
+    return data;
+  } catch {
+    const { data, error } = await state.supabase
+      .from("post_inspection_reports")
+      .select(selectB)
+      .eq("id", reportId)
+      .single();
+    if (error) throw error;
+    return data;
   }
-
-  return row;
 }
 
 function loadReportIntoHeader(r) {
@@ -1194,7 +1195,7 @@ async function init() {
 
   state.supabase = window.AUTH.ensureSupabase();
   const R = window.AUTH.ROLES;
-  state.me = await window.AUTH.requireAuth([R.SUPER_ADMIN, R.COMPANY_ADMIN, R.COMPANY_SUPERINTENDENT].filter(Boolean));
+  state.me = await window.AUTH.requireAuth([R.SUPER_ADMIN, R.COMPANY_ADMIN]);
   if (!state.me) return;
 
   window.AUTH.fillUserBadge(state.me, "userBadge");
