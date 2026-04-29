@@ -488,164 +488,6 @@ function renderVesselDropdown() {
   updateCreateUserCompanyControls();
 }
 
-
-
-/* ======================== MC-3B8 User List Filters ======================== */
-
-function userRoleValue(u) {
-  return String(u?.role || u?.role_name || "");
-}
-
-function userPositionValue(u) {
-  return String(u?.position || u?.user_position || "");
-}
-
-function userCompanyValue(u) {
-  return u?.company_id ? String(u.company_id) : "__platform";
-}
-
-function userVesselValue(u) {
-  return u?.vessel_id ? String(u.vessel_id) : "__none";
-}
-
-function uniqueSorted(values) {
-  return Array.from(new Set(values.filter(Boolean))).sort((a, b) => String(a).localeCompare(String(b)));
-}
-
-function setSelectOptionsPreserve(sel, options, previousValue) {
-  if (!sel) return;
-
-  sel.innerHTML = options.map((o) => {
-    return '<option value="' + esc(o.value) + '">' + esc(o.label) + '</option>';
-  }).join("");
-
-  if (previousValue && Array.from(sel.options).some((o) => String(o.value) === String(previousValue))) {
-    sel.value = previousValue;
-  }
-}
-
-function ensureUserFiltersBar() {
-  const search = document.getElementById("u_search");
-  if (!search) return;
-
-  if (document.getElementById("u_filters_bar")) return;
-
-  const hostRow = search.closest(".row") || search.parentElement;
-
-  const bar = document.createElement("div");
-  bar.id = "u_filters_bar";
-  bar.style.marginTop = "10px";
-  bar.style.marginBottom = "10px";
-  bar.style.padding = "10px";
-  bar.style.border = "1px solid #D6E4F5";
-  bar.style.borderRadius = "12px";
-  bar.style.background = "#F4F8FC";
-
-  bar.innerHTML =
-    '<div style="font-weight:950;color:#062A5E;margin-bottom:8px;">User filters</div>' +
-    '<div style="display:grid;grid-template-columns:repeat(5,minmax(130px,1fr));gap:8px;align-items:end;">' +
-      '<div class="field"><label>Company</label><select id="u_filter_company"><option value="">All companies</option></select></div>' +
-      '<div class="field"><label>Role</label><select id="u_filter_role"><option value="">All roles</option></select></div>' +
-      '<div class="field"><label>Status</label><select id="u_filter_status">' +
-        '<option value="">All statuses</option>' +
-        '<option value="active">Active</option>' +
-        '<option value="disabled">Disabled / inactive</option>' +
-      '</select></div>' +
-      '<div class="field"><label>Vessel</label><select id="u_filter_vessel"><option value="">All vessels</option></select></div>' +
-      '<div class="field"><label>&nbsp;</label><button class="btn2 btnSmall" type="button" id="u_filter_clear">Clear filters</button></div>' +
-    '</div>';
-
-  hostRow.insertAdjacentElement("afterend", bar);
-
-  ["u_filter_company", "u_filter_role", "u_filter_status", "u_filter_vessel"].forEach((id) => {
-    const el = document.getElementById(id);
-    if (el) el.addEventListener("change", renderUsers);
-  });
-
-  const clearBtn = document.getElementById("u_filter_clear");
-  if (clearBtn) {
-    clearBtn.addEventListener("click", () => {
-      const q = document.getElementById("u_search");
-      if (q) q.value = "";
-
-      ["u_filter_company", "u_filter_role", "u_filter_status", "u_filter_vessel"].forEach((id) => {
-        const el = document.getElementById(id);
-        if (el) el.value = "";
-      });
-
-      renderUsers();
-    });
-  }
-}
-
-function renderUserFilterDropdowns() {
-  ensureUserFiltersBar();
-
-  const users = Array.isArray(state.users) ? state.users : [];
-
-  const companySel = document.getElementById("u_filter_company");
-  const roleSel = document.getElementById("u_filter_role");
-  const vesselSel = document.getElementById("u_filter_vessel");
-
-  const prevCompany = companySel?.value || "";
-  const prevRole = roleSel?.value || "";
-  const prevVessel = vesselSel?.value || "";
-
-  const companies = [];
-
-  companies.push({ value: "", label: "All companies" });
-
-  const activeCompanies = Array.isArray(state.companies) ? state.companies : [];
-
-  activeCompanies.forEach((c) => {
-    companies.push({
-      value: String(c.id),
-      label: c.company_name || c.short_name || c.company_code || c.id,
-    });
-  });
-
-  if (users.some((u) => !u.company_id)) {
-    companies.push({ value: "__platform", label: "Platform / no company" });
-  }
-
-  setSelectOptionsPreserve(companySel, companies, prevCompany);
-
-  const roles = uniqueSorted(users.map((u) => userRoleValue(u)));
-
-  setSelectOptionsPreserve(
-    roleSel,
-    [{ value: "", label: "All roles" }, ...roles.map((r) => ({ value: r, label: r }))],
-    prevRole
-  );
-
-  const vesselOptions = [{ value: "", label: "All vessels" }];
-
-  if (users.some((u) => !u.vessel_id)) {
-    vesselOptions.push({ value: "__none", label: "No vessel" });
-  }
-
-  const vesselMap = new Map();
-
-  (Array.isArray(state.vessels) ? state.vessels : []).forEach((v) => {
-    vesselMap.set(String(v.id), v.name || v.vessel_name || v.id);
-  });
-
-  users.forEach((u) => {
-    if (u.vessel_id && !vesselMap.has(String(u.vessel_id))) {
-      vesselMap.set(String(u.vessel_id), u.vessel_name || String(u.vessel_id));
-    }
-  });
-
-  Array.from(vesselMap.entries())
-    .sort((a, b) => String(a[1]).localeCompare(String(b[1])))
-    .forEach(([id, name]) => {
-      vesselOptions.push({ value: id, label: name });
-    });
-
-  setSelectOptionsPreserve(vesselSel, vesselOptions, prevVessel);
-}
-
-
 /* ======================== Render: users ======================== */
 function publicDefaultCompanyId() {
   return state.selectedCompanyId || state.companies?.[0]?.id || null;
@@ -661,53 +503,31 @@ function renderUsers() {
   const tbody = document.getElementById("usersBody");
   if (!tbody) return;
 
-  ensureUserFiltersBar();
-  renderUserFilterDropdowns();
-
   const q = (document.getElementById("u_search")?.value || "").trim().toLowerCase();
-
-  const fCompany = document.getElementById("u_filter_company")?.value || "";
-  const fRole = document.getElementById("u_filter_role")?.value || "";
-  const fStatus = document.getElementById("u_filter_status")?.value || "";
-  const fVessel = document.getElementById("u_filter_vessel")?.value || "";
-
   const users = Array.isArray(state.users) ? state.users : [];
 
   const filtered = users.filter((u) => {
-    const roleName = userRoleValue(u);
-    const positionName = userPositionValue(u);
-    const companyValue = userCompanyValue(u);
-    const vesselValue = userVesselValue(u);
+    if (!q) return true;
 
-    const disabled = !!u.is_disabled || u.is_active === false;
-    const statusValue = disabled ? "disabled" : "active";
+    const hay = [
+      u.company_name,
+      u.username,
+      u.role,
+      u.role_name,
+      u.position,
+      u.user_position,
+      vesselNameById(u.vessel_id),
+      u.vessel_name
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
 
-    if (fCompany && companyValue !== fCompany) return false;
-    if (fRole && roleName !== fRole) return false;
-    if (fStatus && statusValue !== fStatus) return false;
-    if (fVessel && vesselValue !== fVessel) return false;
-
-    if (q) {
-      const hay = [
-        u.company_name,
-        u.username,
-        roleName,
-        positionName,
-        vesselNameById(u.vessel_id),
-        u.vessel_name
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
-
-      if (!hay.includes(q)) return false;
-    }
-
-    return true;
+    return hay.includes(q);
   });
 
   if (!filtered.length) {
-    tbody.innerHTML = '<tr><td colspan="8" class="muted small">No users match the selected filters.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" class="muted small">No users found.</td></tr>';
     return;
   }
 
@@ -746,18 +566,18 @@ function renderUsers() {
       '<button class="btnSmall btn2" data-act="reset_password" data-id="' + esc(uid) + '" type="button">Reset password</button>'
     );
 
-    rows.push(
-      '<tr>' +
-        '<td>' + esc(u.company_name || "") + '</td>' +
-        '<td class="mono">' + esc(u.username || "") + '</td>' +
-        '<td>' + esc(roleName) + '</td>' +
-        '<td>' + esc(positionName) + '</td>' +
-        '<td>' + esc(u.vessel_name || vesselNameById(u.vessel_id) || "") + '</td>' +
-        '<td>' + statusPill + '</td>' +
-        '<td>' + forceReset + '</td>' +
-        '<td><div class="actions">' + actionBtns.join("") + '</div></td>' +
-      '</tr>'
-    );
+    rows.push(`
+      <tr>
+        <td>${esc(u.company_name || "")}</td>
+        <td class="mono">${esc(u.username || "")}</td>
+        <td>${esc(roleName)}</td>
+        <td>${esc(positionName)}</td>
+        <td>${esc(u.vessel_name || vesselNameById(u.vessel_id) || "")}</td>
+        <td>${statusPill}</td>
+        <td>${forceReset}</td>
+        <td><div class="actions">${actionBtns.join("")}</div></td>
+      </tr>
+    `);
   }
 
   tbody.innerHTML = rows.join("");
@@ -1481,7 +1301,6 @@ async function init() {
   initCreateUser();
   initAddVessel();
   initSearch();
-  if (typeof initUserFilters === "function") initUserFilters();
   initRightsMatrixHandlers();
   initCompaniesHandlers();
   initCompanyAssignmentHandlers();
@@ -2138,10 +1957,4 @@ function initCompanyAssignmentHandlers() {
       }
     });
   }
-}
-
-
-function initUserFilters() {
-  ensureUserFiltersBar();
-  renderUserFilterDropdowns();
 }

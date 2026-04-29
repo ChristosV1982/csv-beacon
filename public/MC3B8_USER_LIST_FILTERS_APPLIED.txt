@@ -1,0 +1,1 @@
+Added User List filters for Company, Role, Status, Vessel, and search text. No DB/auth/Supabase key changes.\n
