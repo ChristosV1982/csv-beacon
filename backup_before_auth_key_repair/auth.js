@@ -3,11 +3,11 @@
   "use strict";
 
   // Bump when you change auth behavior (helps confirm cache is cleared)
-  const AUTH_BUILD = "AUTH-2026-04-29-KEY-REPAIR";
+  const AUTH_BUILD = "AUTH-2026-04-29-MC2-COMPANY-CONTEXT";
 
   const SUPABASE_URL = "https://bdidrcyufazskpuwmfca.supabase.co";
   const SUPABASE_ANON_KEY =
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJkaWRyY3l1ZmF6c2twdXdtZmNhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc5NDI4ODMsImV4cCI6MjA4MzUxODg4M30.Uqj4WCzoNS9wnlzI-xew6iTFzTUi77dcGeBjUgFjZbQ";
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJIUzI1NiIsInJlZiI6ImJkaWRyY3l1ZmF6c2twdXdtZmNhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc5NDI4ODMsImV4cCI6MjA4MzUxODg4M30.Uqj4WCzoNS9wnlzI-xew6iTFzTUi77dcGeBjUgFjZbQ";
 
   const USERNAME_DOMAIN = "csvtest.local";
 

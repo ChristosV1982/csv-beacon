@@ -1,0 +1,1 @@
+Auth key repaired. Supabase anon key restored to original working public anon key. Service worker cache version bumped if present.
