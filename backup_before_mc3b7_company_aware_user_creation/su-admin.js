@@ -1,3 +1,96 @@
+
+
+/* ======================== MC-3B7 Company-aware User Creation Helpers ======================== */
+
+function isPlatformUserRole(role) {
+  return String(role || "") === "super_admin" || String(role || "") === "platform_owner";
+}
+
+function renderUserCompanyDropdown() {
+  const sel = document.getElementById("cu_company");
+  if (!sel) return;
+
+  const companies = Array.isArray(state.companies) ? state.companies : [];
+
+  if (!companies.length) {
+    sel.innerHTML = '<option value="">No companies loaded</option>';
+    return;
+  }
+
+  const current = sel.value || state.selectedCompanyId || companies[0]?.id || "";
+
+  sel.innerHTML = [
+    '<option value="">Select company…</option>',
+    ...companies
+      .filter((c) => c.is_active !== false)
+      .map((c) => {
+        const label = c.company_name || c.short_name || c.company_code || c.id;
+        return '<option value="' + esc(c.id) + '">' + esc(label) + '</option>';
+      })
+  ].join("");
+
+  if (current && companies.some((c) => String(c.id) === String(current))) {
+    sel.value = current;
+  } else if (companies[0]?.id) {
+    sel.value = companies[0].id;
+  }
+
+  updateCreateUserCompanyControls();
+}
+
+function currentCreateUserCompanyId() {
+  const role = document.getElementById("cu_role")?.value || "";
+  if (isPlatformUserRole(role)) return null;
+
+  return (document.getElementById("cu_company")?.value || "").trim() || null;
+}
+
+function updateCreateUserCompanyControls() {
+  const role = document.getElementById("cu_role")?.value || "";
+  const companySel = document.getElementById("cu_company");
+  const vesselSel = document.getElementById("cu_vessel");
+
+  const isPlatform = isPlatformUserRole(role);
+
+  if (companySel) companySel.disabled = isPlatform;
+  if (vesselSel) vesselSel.disabled = isPlatform;
+
+  if (isPlatform) {
+    if (companySel) companySel.value = "";
+    if (vesselSel) vesselSel.value = "";
+  }
+}
+
+async function findUserIdByUsername(username) {
+  const target = String(username || "").trim().toLowerCase();
+  if (!target) return null;
+
+  const existing = (state.users || []).find((u) => String(u.username || "").toLowerCase() === target);
+  if (existing?.id) return existing.id;
+
+  const rpcUsers = await csvbRpc("csvb_admin_list_users_by_company", { p_company_id: null });
+  const found = (rpcUsers || []).find((u) => String(u.username || "").toLowerCase() === target);
+
+  return found?.id || null;
+}
+
+function extractCreatedUserId(resp) {
+  if (!resp || typeof resp !== "object") return null;
+
+  const candidates = [
+    resp.user_id,
+    resp.id,
+    resp.profile_id,
+    resp?.user?.id,
+    resp?.profile?.id,
+    resp?.data?.user?.id,
+    resp?.data?.profile?.id,
+  ];
+
+  const found = candidates.find((x) => x && isUUID(x));
+  return found || null;
+}
+
 // public/su-admin.js
 const sb = window.AUTH.ensureSupabase();
 
@@ -356,23 +449,43 @@ function initTabs() {
 function renderRoleDropdown() {
   const sel = document.getElementById("cu_role");
   if (!sel) return;
-  sel.innerHTML = state.roles.map((r) => `<option value="${esc(r)}">${esc(r)}</option>`).join("");
+
+  const current = sel.value;
+
+  sel.innerHTML = state.roles.map((r) => '<option value="' + esc(r) + '">' + esc(r) + '</option>').join("");
+
+  if (current && state.roles.includes(current)) {
+    sel.value = current;
+  }
+
+  updateCreateUserCompanyControls();
 }
 
 function renderVesselDropdown() {
   const sel = document.getElementById("cu_vessel");
   if (!sel) return;
 
+  const current = sel.value;
+  const companyId = currentCreateUserCompanyId();
+
   const opts = [];
   opts.push('<option value="">(No vessel)</option>');
 
   for (const v of state.vessels) {
+    if (companyId && String(v.company_id || "") !== String(companyId)) continue;
+
     const vesselName = v.name || v.vessel_name || v.title || v.id;
     const company = v.company_name ? " — " + v.company_name : "";
     opts.push('<option value="' + esc(v.id) + '">' + esc(vesselName + company) + '</option>');
   }
 
   sel.innerHTML = opts.join("");
+
+  if (current && Array.from(sel.options).some((o) => String(o.value) === String(current))) {
+    sel.value = current;
+  }
+
+  updateCreateUserCompanyControls();
 }
 
 /* ======================== Render: users ======================== */
@@ -395,47 +508,70 @@ function renderUsers() {
 
   const filtered = users.filter((u) => {
     if (!q) return true;
-    const hay = [u.username, u.role, u.position, vesselNameById(u.vessel_id), u.vessel_name]
+
+    const hay = [
+      u.company_name,
+      u.username,
+      u.role,
+      u.role_name,
+      u.position,
+      u.user_position,
+      vesselNameById(u.vessel_id),
+      u.vessel_name
+    ]
       .filter(Boolean)
       .join(" ")
       .toLowerCase();
+
     return hay.includes(q);
   });
 
   if (!filtered.length) {
-    tbody.innerHTML = `<tr><td colspan="7" class="muted small">No users found.</td></tr>`;
+    tbody.innerHTML = '<tr><td colspan="8" class="muted small">No users found.</td></tr>';
     return;
   }
 
   const rows = [];
+
   for (const u of filtered) {
     const disabled = !!u.is_disabled;
     const active = u.is_active === false ? false : true;
-    const statusPill =
-      disabled || !active ? `<span class="pill bad">Disabled</span>` : `<span class="pill ok">Active</span>`;
 
-    const forceReset = u.force_password_reset ? `<span class="pill bad">Yes</span>` : `<span class="pill ok">No</span>`;
+    const statusPill =
+      disabled || !active
+        ? '<span class="pill bad">Disabled</span>'
+        : '<span class="pill ok">Active</span>';
+
+    const forceReset = u.force_password_reset
+      ? '<span class="pill bad">Yes</span>'
+      : '<span class="pill ok">No</span>';
+
     const uid = u.id;
+    const roleName = u.role || u.role_name || "";
+    const positionName = u.position || u.user_position || "";
 
     const actionBtns = [];
+
     if (disabled || !active) {
       actionBtns.push(
-        `<button class="btnSmall btn" data-act="enable_user" data-id="${esc(uid)}" type="button">Enable</button>`
+        '<button class="btnSmall btn" data-act="enable_user" data-id="' + esc(uid) + '" type="button">Enable</button>'
       );
     } else {
       actionBtns.push(
-        `<button class="btnSmall btnDanger" data-act="disable_user" data-id="${esc(uid)}" type="button">Disable</button>`
+        '<button class="btnSmall btnDanger" data-act="disable_user" data-id="' + esc(uid) + '" type="button">Disable</button>'
       );
     }
+
     actionBtns.push(
-      `<button class="btnSmall btn2" data-act="reset_password" data-id="${esc(uid)}" type="button">Reset password</button>`
+      '<button class="btnSmall btn2" data-act="reset_password" data-id="' + esc(uid) + '" type="button">Reset password</button>'
     );
 
     rows.push(`
       <tr>
+        <td>${esc(u.company_name || "")}</td>
         <td class="mono">${esc(u.username || "")}</td>
-        <td>${esc(u.role || "")}</td>
-        <td>${esc(u.position || "")}</td>
+        <td>${esc(roleName)}</td>
+        <td>${esc(positionName)}</td>
         <td>${esc(u.vessel_name || vesselNameById(u.vessel_id) || "")}</td>
         <td>${statusPill}</td>
         <td>${forceReset}</td>
@@ -639,9 +775,25 @@ function normalizeListResponse(resp) {
 
 async function refreshUsers() {
   setStatus("Loading users…");
-  const resp = await callSuAdmin({ action: "list_users" });
-  state.users = normalizeListResponse(resp);
+
+  if (typeof ensureCompaniesLoaded === "function") {
+    await ensureCompaniesLoaded();
+  }
+
+  const rows = await csvbRpc("csvb_admin_list_users_by_company", {
+    p_company_id: null
+  });
+
+  state.users = (rows || []).map((u) => ({
+    ...u,
+    role: u.role || u.role_name,
+    position: u.position || u.user_position
+  }));
+
   renderUsers();
+  renderUserCompanyDropdown();
+  renderVesselDropdown();
+
   setStatus("Ready");
 }
 
@@ -658,6 +810,8 @@ async function refreshVessels() {
     p_company_id: null
   });
 
+  renderUserCompanyDropdown();
+
   renderVessels();
   renderVesselDropdown();
 
@@ -668,8 +822,11 @@ async function refreshVessels() {
 function initCreateUser() {
   const btn = document.getElementById("cu_createBtn");
   const clearBtn = document.getElementById("cu_clearBtn");
+  const companySel = document.getElementById("cu_company");
+  const roleSel = document.getElementById("cu_role");
 
   const posPick = document.getElementById("cu_position_pick");
+
   if (posPick) {
     posPick.addEventListener("change", () => {
       const v = posPick.value || "";
@@ -678,18 +835,38 @@ function initCreateUser() {
     });
   }
 
+  if (companySel) {
+    companySel.addEventListener("change", () => {
+      renderVesselDropdown();
+    });
+  }
+
+  if (roleSel) {
+    roleSel.addEventListener("change", () => {
+      updateCreateUserCompanyControls();
+      renderVesselDropdown();
+    });
+  }
+
   if (clearBtn) {
     clearBtn.addEventListener("click", () => {
       clearWarn();
       clearOk();
+
       document.getElementById("cu_username").value = "";
       document.getElementById("cu_password").value = "";
       document.getElementById("cu_position").value = "";
       document.getElementById("cu_position_pick").value = "";
       document.getElementById("cu_vessel").value = "";
       document.getElementById("cu_force_reset").checked = false;
+
+      renderUserCompanyDropdown();
+      renderVesselDropdown();
     });
   }
+
+  renderUserCompanyDropdown();
+  renderVesselDropdown();
 
   if (!btn) return;
 
@@ -698,10 +875,18 @@ function initCreateUser() {
     clearOk();
 
     try {
+      if (typeof ensureCompaniesLoaded === "function") {
+        await ensureCompaniesLoaded();
+      }
+
+      renderUserCompanyDropdown();
+      renderVesselDropdown();
+
       const username = (document.getElementById("cu_username").value || "").trim();
       const password = (document.getElementById("cu_password").value || "").trim();
       const role = document.getElementById("cu_role").value;
       const position = (document.getElementById("cu_position").value || "").trim();
+      const company_id = currentCreateUserCompanyId();
       const vessel_id = (document.getElementById("cu_vessel").value || "").trim();
       const force_password_reset = !!document.getElementById("cu_force_reset").checked;
 
@@ -709,7 +894,16 @@ function initCreateUser() {
       if (!password) throw new Error("Password is required.");
       if (!role) throw new Error("Role is required.");
 
+      if (!isPlatformUserRole(role) && !company_id) {
+        throw new Error("Company is required for non-platform users.");
+      }
+
+      if (isPlatformUserRole(role) && vessel_id) {
+        throw new Error("Platform users cannot be assigned to vessels.");
+      }
+
       setStatus("Creating user…");
+
       const resp = await callSuAdmin({
         action: "create_user",
         username,
@@ -720,9 +914,58 @@ function initCreateUser() {
         force_password_reset,
       });
 
-      showOk(`User created successfully.\n\nResponse:\n${JSON.stringify(resp, null, 2)}`);
+      let userId = extractCreatedUserId(resp);
 
       await refreshUsers();
+
+      if (!userId) {
+        userId = await findUserIdByUsername(username);
+      }
+
+      if (!userId) {
+        throw new Error(
+          "User was created, but the new profile id could not be found for company assignment. Refresh the page and verify the user."
+        );
+      }
+
+      if (!isPlatformUserRole(role)) {
+        if (vessel_id) {
+          await csvbRpc("csvb_admin_set_profile_vessel", {
+            p_user_id: userId,
+            p_vessel_id: vessel_id,
+          });
+        } else {
+          await csvbRpc("csvb_admin_set_profile_company", {
+            p_user_id: userId,
+            p_company_id: company_id,
+          });
+        }
+      }
+
+      showOk("User created and company context assigned.\n\n" + JSON.stringify(resp, null, 2));
+
+      document.getElementById("cu_username").value = "";
+      document.getElementById("cu_password").value = "";
+      document.getElementById("cu_position").value = "";
+      document.getElementById("cu_position_pick").value = "";
+      document.getElementById("cu_vessel").value = "";
+      document.getElementById("cu_force_reset").checked = false;
+
+      state.selectedCompanyId = company_id || state.selectedCompanyId;
+
+      await refreshUsers();
+
+      if (typeof refreshCompanies === "function") {
+        await refreshCompanies();
+      }
+
+      if (typeof refreshSelectedCompanyDetails === "function") {
+        await refreshSelectedCompanyDetails();
+      }
+
+      renderUserCompanyDropdown();
+      renderVesselDropdown();
+
       setStatus("Ready");
     } catch (e) {
       setStatus("Ready");

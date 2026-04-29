@@ -6,7 +6,7 @@
 // - Bump cache version + clean old caches on activate
 
 const CACHE_PREFIX = "sire-test-";
-const CACHE_VERSION = "v13-mc3b6b-vessel-delete-button";              // <-- bump this if you change caching behavior again
+const CACHE_VERSION = "v14-mc3b7-company-aware-users";              // <-- bump this if you change caching behavior again
 const CACHE_NAME = `${CACHE_PREFIX}${CACHE_VERSION}`;
 
 const CORE_ASSETS = [
