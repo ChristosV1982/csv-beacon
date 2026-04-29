@@ -1,0 +1,1 @@
+Added safe Delete button to Superuser Administration > Vessels. Uses csvb_admin_delete_vessel_if_unused. No auth/Supabase key/SQL changes.\n

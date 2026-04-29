@@ -491,7 +491,6 @@ function renderVessels() {
 
   const filtered = vessels.filter((v) => {
     if (!q) return true;
-
     const hay = [
       v.company_name,
       v.name,
@@ -499,7 +498,6 @@ function renderVessels() {
       v.hull_number,
       v.call_sign
     ].filter(Boolean).join(" ").toLowerCase();
-
     return hay.includes(q);
   });
 
@@ -512,17 +510,13 @@ function renderVessels() {
 
   for (const v of filtered) {
     const active = v.is_active === false ? false : true;
-
     const statusPill = active
       ? '<span class="pill ok">Active</span>'
       : '<span class="pill bad">Inactive</span>';
 
-    const activeBtn = active
+    const btn = active
       ? '<button class="btnSmall btnDanger" data-act="deactivate" data-id="' + esc(v.id) + '" type="button">Deactivate</button>'
       : '<button class="btnSmall btn" data-act="activate" data-id="' + esc(v.id) + '" type="button">Activate</button>';
-
-    const deleteBtn =
-      '<button class="btnSmall btnDanger" data-act="delete" data-id="' + esc(v.id) + '" type="button">Delete</button>';
 
     rows.push(`
       <tr>
@@ -532,7 +526,7 @@ function renderVessels() {
         <td>${esc(v.imo_number || "")}</td>
         <td>${esc(v.call_sign || "")}</td>
         <td>${statusPill}</td>
-        <td><div class="actions">${activeBtn}${deleteBtn}</div></td>
+        <td><div class="actions">${btn}</div></td>
       </tr>
     `);
   }
@@ -550,45 +544,6 @@ function renderVessels() {
         const v = state.vessels.find((x) => String(x.id) === String(id));
 
         if (!v) throw new Error("Vessel not found in state.");
-
-        if (act === "delete") {
-          const message =
-            "Delete vessel?\n\n" +
-            "Vessel: " + (v.name || id) + "\n" +
-            "Company: " + (v.company_name || "") + "\n\n" +
-            "This will only work if the vessel has no linked users, questionnaires, inspections, audits, or other operational records.\n\n" +
-            "If linked records exist, deletion will be blocked and you should deactivate the vessel instead.";
-
-          if (!confirm(message)) return;
-
-          const typeConfirm = prompt('Type DELETE to confirm vessel deletion:');
-
-          if (typeConfirm !== "DELETE") {
-            showWarn("Delete cancelled. Confirmation text did not match DELETE.");
-            return;
-          }
-
-          setStatus("Deleting vessel…");
-
-          const result = await csvbRpc("csvb_admin_delete_vessel_if_unused", {
-            p_vessel_id: id
-          });
-
-          showOk("Vessel deleted.\n\n" + JSON.stringify(result, null, 2));
-
-          await refreshVessels();
-
-          if (typeof refreshCompanies === "function") {
-            await refreshCompanies();
-          }
-
-          if (typeof refreshSelectedCompanyDetails === "function") {
-            await refreshSelectedCompanyDetails();
-          }
-
-          setStatus("Ready");
-          return;
-        }
 
         const nextActive = act === "activate";
 
@@ -612,10 +567,6 @@ function renderVessels() {
 
         if (typeof refreshCompanies === "function") {
           await refreshCompanies();
-        }
-
-        if (typeof refreshSelectedCompanyDetails === "function") {
-          await refreshSelectedCompanyDetails();
         }
 
         setStatus("Ready");
