@@ -570,29 +570,8 @@
     }
   }
 
-
-
-  /* ======================== MC-5E2 Questions Editor Access Helpers ======================== */
-
-  function canEditSelected() {
-    if (!selected) return false;
-    if (selected.__isNew) return true;
-    return selected.can_edit === true;
-  }
-
-  function editableNotice() {
-    return "This question is read-only for your company. You may edit only company custom questions belonging to your company.";
-  }
-
-
   function setMode(newMode) {
     mode = newMode;
-
-    if (mode === "EDIT" && selected && !canEditSelected()) {
-      mode = "VIEW";
-      showWarn(editableNotice());
-    }
-
     const empty = $("emptyState");
     const v = $("viewPanel");
     const e = $("editPanel");
@@ -608,21 +587,13 @@
     if (v) v.style.display = (mode === "VIEW") ? "block" : "none";
     if (e) e.style.display = (mode === "EDIT") ? "block" : "none";
 
-    const bEdit = $("btnEdit");
-    const bSave = $("btnSave");
-    const bDel = $("btnDeleteQuestion");
-    const bDea = $("btnDeactivateQuestion");
-
-    const editable = canEditSelected();
-
-    if (bEdit) {
-      bEdit.disabled = !editable;
-      bEdit.title = editable ? "Edit this question" : editableNotice();
+    if (mode === "EDIT") {
+      const dis = !!selected.__isNew || !selected.id;
+      const bDel = $("btnDeleteQuestion");
+      const bDea = $("btnDeactivateQuestion");
+      if (bDel) bDel.disabled = dis;
+      if (bDea) bDea.disabled = dis;
     }
-
-    if (bSave) bSave.disabled = !editable;
-    if (bDel) bDel.disabled = !editable || !!selected.__isNew || !selected.id;
-    if (bDea) bDea.disabled = !editable || !!selected.__isNew || !selected.id;
 
     syncDeactivateButtonUI();
   }
@@ -649,6 +620,7 @@
     const btn = $("btnDeactivateQuestion");
     if (!btn) return;
 
+    // default presentation
     btn.classList.add("warn");
     btn.classList.remove("primary");
     btn.title = "Toggle active/inactive";
@@ -658,15 +630,7 @@
       return;
     }
 
-    if (!canEditSelected()) {
-      btn.textContent = "Deactivate";
-      btn.disabled = true;
-      btn.title = editableNotice();
-      return;
-    }
-
     const st = safeStr(selected.status).trim().toLowerCase() || "active";
-
     if (st === "inactive") {
       btn.textContent = "Activate";
       btn.classList.remove("warn");
@@ -1232,26 +1196,19 @@
       const sourceSel = facetSelected.source;
       const versionSel = facetSelected.version;
 
-      const { data, error } = await sb.rpc("csvb_questions_master_for_me");
+      let q = sb
+        .from("questions_master")
+        .select("id, number_base, number_suffix, number_full, source_type, is_custom, status, version, tags, payload, change_reason, updated_at, created_at")
+        .order("created_at", { ascending: true });
 
+      if (statusSel && statusSel.size) q = q.in("status", Array.from(statusSel));
+      if (sourceSel && sourceSel.size) q = q.in("source_type", Array.from(sourceSel));
+      if (versionSel && versionSel.size) q = q.in("version", Array.from(versionSel));
+
+      const { data, error } = await q;
       if (error) throw error;
 
-      let rows = data || [];
-
-      if (statusSel && statusSel.size) {
-        rows = rows.filter((r) => statusSel.has(String(r.status || "")));
-      }
-
-      if (sourceSel && sourceSel.size) {
-        rows = rows.filter((r) => sourceSel.has(String(r.source_type || "")));
-      }
-
-      if (versionSel && versionSel.size) {
-        rows = rows.filter((r) => versionSel.has(String(r.version || "")));
-      }
-
-      allRows = rows;
-
+      allRows = data || [];
       setText("loadHint", `Loaded ${allRows.length}`);
       renderList();
 
@@ -1268,9 +1225,11 @@
 
   // ===== PGNO DB operations =====
   async function loadPgnoFromDb(questionId) {
-    const { data, error } = await sb.rpc("csvb_pgno_master_for_question_for_me", {
-      p_question_id: questionId
-    });
+    const { data, error } = await sb
+      .from("pgno_master")
+      .select("id, seq, pgno_code, pgno_text, remarks")
+      .eq("question_id", questionId)
+      .order("seq", { ascending: true });
 
     if (error) throw error;
 
@@ -1284,27 +1243,37 @@
   // FIX: sourceType must be used to format nb (SIRE vs zzz) in pgno_code
   async function savePgnoToDb(questionId, numberBase, items, sourceType) {
     const clean = (items || [])
-      .map((x, idx) => ({
-        seq: idx + 1,
-        pgno_code: pgnoCode(numberBase, idx + 1, sourceType || "SIRE"),
-        pgno_text: safeStr(x.text).trim(),
-        remarks: safeStr(x.remarks).trim()
-      }))
-      .filter(x => x.pgno_text.length > 0);
+      .map(x => ({ text: safeStr(x.text).trim(), remarks: safeStr(x.remarks).trim() }))
+      .filter(x => x.text.length > 0);
 
-    const { error } = await sb.rpc("csvb_replace_pgno_for_question_for_me", {
-      p_question_id: questionId,
-      p_rows: clean
-    });
+    const { error: delErr } = await sb.from("pgno_master").delete().eq("question_id", questionId);
+    if (delErr) throw delErr;
 
-    if (error) throw error;
+    if (!clean.length) return;
+
+    const st = sourceType || "SIRE";
+
+    const rows = clean.map((x, i) => ({
+      question_id: questionId,
+      seq: i + 1,
+      pgno_code: pgnoCode(numberBase, i + 1, st),
+      pgno_text: x.text,
+      remarks: x.remarks,
+      created_by: me?.user?.id || null,
+      updated_by: me?.user?.id || null,
+    }));
+
+    const { error: insErr } = await sb.from("pgno_master").insert(rows);
+    if (insErr) throw insErr;
   }
 
   // ===== Expected Evidence DB operations =====
   async function loadEeFromDb(questionId) {
-    const { data, error } = await sb.rpc("csvb_expected_evidence_for_question_for_me", {
-      p_question_id: questionId
-    });
+    const { data, error } = await sb
+      .from("expected_evidence_master")
+      .select("id, seq, evidence_text, esms_references, esms_forms, remarks")
+      .eq("question_id", questionId)
+      .order("seq", { ascending: true });
 
     if (error) throw error;
 
@@ -1319,21 +1288,32 @@
 
   async function saveEeToDb(questionId, items) {
     const clean = (items || [])
-      .map((x, idx) => ({
-        seq: idx + 1,
-        evidence_text: safeStr(x.text).trim(),
-        esms_references: safeStr(x.esms_references).trim() || null,
-        esms_forms: safeStr(x.esms_forms).trim() || null,
-        remarks: safeStr(x.remarks).trim() || null
+      .map(x => ({
+        text: safeStr(x.text).trim(),
+        esms_references: safeStr(x.esms_references).trim(),
+        esms_forms: safeStr(x.esms_forms).trim(),
+        remarks: safeStr(x.remarks).trim(),
       }))
-      .filter(x => x.evidence_text.length > 0);
+      .filter(x => x.text.length > 0);
 
-    const { error } = await sb.rpc("csvb_replace_expected_evidence_for_question_for_me", {
-      p_question_id: questionId,
-      p_rows: clean
-    });
+    const { error: delErr } = await sb.from("expected_evidence_master").delete().eq("question_id", questionId);
+    if (delErr) throw delErr;
 
-    if (error) throw error;
+    if (!clean.length) return;
+
+    const rows = clean.map((x, i) => ({
+      question_id: questionId,
+      seq: i + 1,
+      evidence_text: x.text,
+      esms_references: x.esms_references || null,
+      esms_forms: x.esms_forms || null,
+      remarks: x.remarks || null,
+      created_by: me?.user?.id || null,
+      updated_by: me?.user?.id || null,
+    }));
+
+    const { error: insErr } = await sb.from("expected_evidence_master").insert(rows);
+    if (insErr) throw insErr;
   }
 
   // ===== select =====
@@ -1430,11 +1410,6 @@
   async function toggleActiveSelected() {
     if (!selected || selected.__isNew || !selected.id) return;
 
-    if (!canEditSelected()) {
-      showWarn(editableNotice());
-      return;
-    }
-
     showWarn("");
     showOk("");
     setText("saveStatus", "");
@@ -1450,20 +1425,14 @@
     if (!ok) return;
 
     try {
-      const { error } = await sb.rpc("csvb_upsert_question_master_for_me", {
-        p_question_id: selected.id,
-        p_number_base: selected.number_base,
-        p_number_suffix: selected.number_suffix || "",
-        p_source_type: selected.source_type || "COMPANY_CUSTOM",
-        p_status: next,
-        p_version: selected.version || "1.0",
-        p_tags: selected.tags || [],
-        p_payload: selected.payload || {},
-        p_change_reason: selected.change_reason || null
-      });
+      const { error } = await sb
+        .from("questions_master")
+        .update({ status: next, updated_by: me?.user?.id || null })
+        .eq("id", selected.id);
 
       if (error) throw error;
 
+      // Auto-switch Status facet so you immediately see the question after toggle
       facetSelected.status = new Set([next]);
       saveFacetSet("status", facetSelected.status);
 
@@ -1475,6 +1444,7 @@
 
       await loadQuestions();
 
+      // Re-select the same row if it still exists in the filtered list
       const still = allRows.find(r => r.id === selected.id);
       if (still) await selectRow(still);
       else {
@@ -1489,11 +1459,6 @@
 async function deleteSelected() {
     if (!selected || selected.__isNew || !selected.id) return;
 
-    if (!canEditSelected()) {
-      showWarn(editableNotice());
-      return;
-    }
-
     showWarn("");
     showOk("");
     setText("saveStatus", "");
@@ -1503,21 +1468,45 @@ async function deleteSelected() {
       `DELETE question ${qno}?\n\n` +
       `This will permanently delete:\n` +
       `- questions_master\n` +
-      `- pgno_master children\n` +
-      `- expected_evidence_master children\n\n` +
+      `- pgno_master (children)\n` +
+      `- expected_evidence_master (children)\n\n` +
       `This cannot be undone.`
     );
     if (!ok) return;
 
     try {
-      const { data, error } = await sb.rpc("csvb_delete_question_master_for_me", {
-        p_question_id: selected.id
-      });
+      // Children can be 0 rows; we don't treat that as an error.
+      const { error: e1 } = await sb.from("pgno_master").delete().eq("question_id", selected.id);
+      if (e1) throw e1;
 
-      if (error) throw error;
+      const { error: e2 } = await sb.from("expected_evidence_master").delete().eq("question_id", selected.id);
+      if (e2) throw e2;
 
-      showOk(`Deleted ${qno}.\n\n` + JSON.stringify(data, null, 2));
+      // IMPORTANT:
+      // With Supabase RLS, a DELETE that is blocked often returns *no error* but deletes 0 rows.
+      // So we request the deleted row back and verify we actually deleted something.
+      const { data: delRows, error: e3 } = await sb
+        .from("questions_master")
+        .delete()
+        .eq("id", selected.id)
+        .select("id");
+      if (e3) throw e3;
 
+      const deletedCount = Array.isArray(delRows) ? delRows.length : 0;
+      if (deletedCount === 0) {
+        showWarn(
+          "Delete did not remove any row. This is almost always caused by Supabase RLS policies blocking DELETE.\n\n" +
+          "You can still SELECT the question, but the database refuses to DELETE it.\n\n" +
+          "Fix: add DELETE policies for these tables:\n" +
+          "- questions_master\n" +
+          "- pgno_master\n" +
+          "- expected_evidence_master"
+        );
+        setText("saveStatus", "");
+        return;
+      }
+
+      showOk(`Deleted ${qno}.`);
       selected = null;
       await loadQuestions();
       setMode("VIEW");
@@ -1529,11 +1518,6 @@ async function deleteSelected() {
   // ===== save =====
   async function saveSelected() {
     if (!selected) return;
-
-    if (!canEditSelected()) {
-      showWarn(editableNotice());
-      return;
-    }
 
     showWarn("");
     showOk("");
@@ -1555,7 +1539,6 @@ async function deleteSelected() {
       }
 
       const number_base = buildNumberBase(src, xx, yy, zz);
-
       if (!number_base) {
         setText("saveStatus", "");
         showWarn("Number is required.");
@@ -1569,7 +1552,6 @@ async function deleteSelected() {
 
       let payload = {};
       const raw = safeStr($("pRaw")?.value).trim();
-
       if (raw) {
         try { payload = JSON.parse(raw); }
         catch { payload = selected.payload || {}; }
@@ -1595,55 +1577,77 @@ async function deleteSelected() {
         .map(x => safeStr(x.text).trim())
         .filter(Boolean);
 
-      const { data, error } = await sb.rpc("csvb_upsert_question_master_for_me", {
-        p_question_id: selected.__isNew ? null : selected.id,
-        p_number_base: number_base,
-        p_number_suffix: number_suffix,
-        p_source_type: src,
-        p_status: status,
-        p_version: version,
-        p_tags: tags,
-        p_payload: payload,
-        p_change_reason: safeStr($("dbChangeReason")?.value).trim() || null
-      });
+      const is_custom = (src !== "SIRE");
 
-      if (error) throw error;
+      const row = {
+        source_type: src,
+        is_custom,
+        status,
+        version,
+        tags,
+        number_base,
+        number_suffix,
+        payload,
+        change_reason: safeStr($("dbChangeReason")?.value).trim() || null,
+        updated_by: me?.user?.id || null,
+      };
 
-      const savedRow = Array.isArray(data) ? data[0] : data;
+      if (selected.__isNew) {
+        row.created_by = me?.user?.id || null;
 
-      if (!savedRow?.id) {
-        throw new Error("Question saved but returned row id was not found.");
+        const { data, error } = await sb
+          .from("questions_master")
+          .insert(row)
+          .select("id, number_base, number_suffix, number_full, source_type, is_custom, status, version, tags, payload, change_reason, updated_at, created_at")
+          .single();
+
+        if (error) throw error;
+
+        try { await savePgnoToDb(data.id, number_base, selected.pgno_items || [], src); }
+        catch (e) { showWarn("Question saved, but PGNO rows could not be saved.\n\nError: " + String(e?.message || e)); }
+
+        try { await saveEeToDb(data.id, selected.ee_items || []); }
+        catch (e) {
+          showWarn(
+            (safeStr($("warnBox")?.textContent) ? $("warnBox").textContent + "\n\n---\n\n" : "") +
+            "Question saved, but Expected Evidence rows could not be saved.\n\nError: " + String(e?.message || e)
+          );
+        }
+
+        showOk("Saved new question.");
+        setText("saveStatus", "");
+        await loadQuestions();
+
+        const newRow = allRows.find(x => x.id === data.id);
+        if (newRow) await selectRow(newRow);
+
+      } else {
+        const { error } = await sb
+          .from("questions_master")
+          .update(row)
+          .eq("id", selected.id);
+
+        if (error) throw error;
+
+        try { await savePgnoToDb(selected.id, number_base, selected.pgno_items || [], src); }
+        catch (e) { showWarn("Question saved, but PGNO rows could not be saved.\n\nError: " + String(e?.message || e)); }
+
+        try { await saveEeToDb(selected.id, selected.ee_items || []); }
+        catch (e) {
+          showWarn(
+            (safeStr($("warnBox")?.textContent) ? $("warnBox").textContent + "\n\n---\n\n" : "") +
+            "Question saved, but Expected Evidence rows could not be saved.\n\nError: " + String(e?.message || e)
+          );
+        }
+
+        showOk("Saved changes.");
+        setText("saveStatus", "");
+        await loadQuestions();
+
+        const updated = allRows.find(x => x.id === selected.id);
+        if (updated) await selectRow(updated);
       }
 
-      try {
-        await savePgnoToDb(savedRow.id, number_base, selected.pgno_items || [], src);
-      } catch (e) {
-        showWarn("Question saved, but PGNO rows could not be saved.\n\nError: " + String(e?.message || e));
-      }
-
-      try {
-        await saveEeToDb(savedRow.id, selected.ee_items || []);
-      } catch (e) {
-        showWarn(
-          (safeStr($("warnBox")?.textContent) ? $("warnBox").textContent + "\n\n---\n\n" : "") +
-          "Question saved, but Expected Evidence rows could not be saved.\n\nError: " + String(e?.message || e)
-        );
-      }
-
-      showOk(selected.__isNew ? "Saved new question." : "Saved changes.");
-      setText("saveStatus", "");
-
-      const savedId = savedRow.id;
-
-      await loadQuestions();
-
-      const updated = allRows.find(x => x.id === savedId);
-
-      if (updated) await selectRow(updated);
-      else {
-        selected = null;
-        setMode("VIEW");
-      }
     } catch (e) {
       setText("saveStatus", "");
       showWarn("Save failed:\n\n" + (e?.message || String(e)));
@@ -1674,14 +1678,8 @@ async function deleteSelected() {
     }
 
     onClick("btnEdit", () => {
-      if (!canEditSelected()) {
-        showWarn(editableNotice());
-        return;
-      }
-
       const ok = confirm("Enter edit mode for this question?");
       if (!ok) return;
-
       setMode("EDIT");
     });
 
