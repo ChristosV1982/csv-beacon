@@ -1,0 +1,1 @@
+MC-4C applied: direct page module guard added. No auth/Supabase key/RLS changes.

@@ -3,12 +3,11 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Reports & Statistics</title>
+  <title>Inspector View (Read Only)</title>
   <link rel="stylesheet" href="./csv-beacon-theme.css?v=20260428_3" />
   <link rel="stylesheet" href="style.css?v=20260428_3" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="./auth.js"></script>
-  <script src="./csvb-module-guard.js?v=20260429_1"></script>
   <style>
     body { margin:0; font-family:"Segoe UI", Arial, sans-serif; background:#f5f7fb; }
     .topbar { background:#1a4170; color:#fff; padding:12px 16px; display:flex; justify-content:space-between; align-items:center; }
@@ -20,10 +19,11 @@
 </head>
 <body>
   <div class="topbar">
-    <div><b>Reports & Statistics</b></div>
+    <div><b>Inspector / Third Party (Read Only)</b></div>
     <div style="display:flex; gap:10px; align-items:center;">
       <div id="userBadge" style="font-weight:800; opacity:0.95;"></div>
       <button class="btn2" onclick="location.href='./q-dashboard.html'">Dashboard</button>
+      <button class="btn2" onclick="location.href='./library.html'">Read Only Library</button>
       <button class="btn" id="logoutBtn">Logout</button>
     </div>
   </div>
@@ -31,14 +31,14 @@
   <div class="wrap">
     <div class="card">
       <h3 style="margin:0 0 8px 0;">Protected Page</h3>
-      <div>Company reporting is restricted to Company roles and Super Admin.</div>
+      <div>Inspector role is read-only (we will enforce read-only on data later with RLS).</div>
     </div>
   </div>
 
   <script>
     (async () => {
       const R = AUTH.ROLES;
-      const me = await AUTH.requireAuth([R.SUPER_ADMIN, R.COMPANY_ADMIN, R.COMPANY_SUPERINTENDENT]);
+      const me = await AUTH.requireAuth([R.SUPER_ADMIN, R.COMPANY_ADMIN, R.COMPANY_SUPERINTENDENT, R.INSPECTOR]);
       if (!me) return;
 
       AUTH.fillUserBadge(me, "userBadge");

@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>C.S.V. BEACON – Login</title>
+
+  <link rel="stylesheet" href="./csv-beacon-theme.css?v=20260428_3" />
+  <link rel="stylesheet" href="style.css?v=20260428_3" />
+
+  <style>
+    body {
+      min-height: 100vh;
+      margin: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 28px 16px;
+      background: radial-gradient(1200px 700px at 20% 10%, var(--brand-navy) 0%, var(--brand-navy-dark) 55%, #020B1A 100%);
+      font-family: "Segoe UI", Arial, sans-serif;
+    }
+    .login-shell {
+      width: 100%;
+      max-width: 560px;
+      background: rgba(12,33,58,0.68);
+      border: 1px solid rgba(213,222,239,0.35);
+      border-radius: 20px;
+      padding: 28px 22px 22px 22px;
+      box-shadow: 0 10px 46px rgba(0,0,0,0.45);
+      backdrop-filter: blur(3px);
+      color:#fff;
+    }
+    .title {
+      color: #ffffff;
+      margin: 0 0 10px 0;
+      font-size: 1.55rem;
+      font-weight: 900;
+      letter-spacing: 0.03em;
+      text-align: center;
+      text-shadow: 0 3px 12px rgba(0,0,0,0.35);
+    }
+    .subtitle {
+      margin: 0 0 18px 0;
+      color: rgba(255,255,255,0.90);
+      font-size: 1rem;
+      line-height: 1.45;
+      text-align: center;
+      font-weight: 800;
+    }
+    .build {
+      margin-top: 6px;
+      font-size: 0.85rem;
+      opacity: 0.85;
+      font-weight: 700;
+    }
+    .card {
+      background: #ffffff;
+      border: 1px solid #d5deef;
+      border-radius: 16px;
+      padding: 18px 18px;
+      box-shadow: 0 4px 18px rgba(18, 44, 87, 0.16);
+      color:var(--brand-navy);
+    }
+    label {
+      display: block;
+      margin: 12px 0 6px 0;
+      font-weight: 900;
+      color: #1a4170;
+      font-size: 0.95rem;
+    }
+    input {
+      width: 100%;
+      box-sizing: border-box;
+      font-size: 1rem;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid #cbd7ee;
+      outline: none;
+      font-family: "Segoe UI", Arial, sans-serif;
+      background:#fff;
+      color:var(--brand-navy);
+    }
+    input:focus {
+      border-color: var(--brand-teal);
+      box-shadow: 0 0 0 3px rgba(46, 104, 199, 0.15);
+    }
+    .actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+      margin-top: 16px;
+    }
+    .btn-primary {
+      border: none;
+      border-radius: 10px;
+      background: var(--brand-navy);
+      color: #ffffff;
+      font-weight: 900;
+      font-size: 1rem;
+      padding: 10px 16px;
+      cursor: pointer;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+    }
+    .btn-primary:hover { filter: brightness(0.96); }
+    .btn-muted {
+      border-radius: 10px;
+      background: #eaf1fb;
+      border: 1px solid #d5deef;
+      color: #1a4170;
+      font-weight: 900;
+      font-size: 1rem;
+      padding: 9px 16px;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-block;
+    }
+    .btn-outline {
+      border-radius: 10px;
+      background: transparent;
+      border: 1px solid var(--brand-navy);
+      color: var(--brand-navy);
+      font-weight: 900;
+      font-size: 1rem;
+      padding: 9px 16px;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-block;
+    }
+    .btn-outline:hover { background: rgba(41, 94, 176, 0.08); }
+    .error {
+      display: none;
+      margin-top: 12px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid #f1c7c7;
+      background: #fff2f2;
+      color: #7a1f1f;
+      font-weight: 900;
+      font-size: 0.95rem;
+      line-height: 1.35;
+      white-space: pre-wrap;
+    }
+    .hint {
+      margin-top: 12px;
+      color: #35507b;
+      font-size: 0.92rem;
+      line-height: 1.35;
+      font-weight: 800;
+    }
+    .mono {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+      font-size: 0.92rem;
+      color:#35507b;
+    }
+  </style>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+
+<body>
+  <div class="login-shell">
+    <div style="text-align:center;margin-bottom:12px;">
+      <img src="./assets/csv-beacon-logo-full.png" alt="C.S.V. BEACON logo" class="csvb-brand-logo-full" style="max-width:320px;margin:0 auto;" />
+    </div>
+    <div class="title">C.S.V. BEACON Login</div>
+    <div class="subtitle">
+      Marine Assurance & Compliance Platform<br/>Users login with <b>Username + Password</b>.<br/>
+      Internally we use: <span class="mono">username@csvtest.local</span>
+      <div class="build" id="buildTag">BUILD: LOGIN-2026-01-14B</div>
+    </div>
+
+    <div class="card">
+      <label for="username">Username</label>
+      <input id="username" type="text" autocomplete="username" placeholder="e.g. superuser" />
+
+      <label for="password">Password</label>
+      <input id="password" type="password" autocomplete="current-password" />
+
+      <div class="actions">
+        <button class="btn-primary" id="loginBtn" type="button">Login</button>
+        <button class="btn-muted" id="logoutBtn" type="button">Logout</button>
+      </div>
+
+      <div class="error" id="errBox"></div>
+
+      <div class="hint">
+        <b>Important:</b> the user must exist in Supabase Auth as email
+        <span class="mono">username@csvtest.local</span> and must have a matching row in
+        <span class="mono">public.profiles</span>.
+      </div>
+
+      <div class="actions" style="margin-top:14px;">
+        <a class="btn-outline" href="./library.html">Read Only</a>
+        <a class="btn-outline" href="./index.html">Mode Selection</a>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      "use strict";
+
+      // ---- FIXED, LOCAL CONFIG (no dependency on AUTH.*) ----
+      const BUILD = "LOGIN-2026-01-14B";
+      const SUPABASE_URL = "https://bdidrcyufazskpuwmfca.supabase.co";
+      const SUPABASE_ANON_KEY =
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJkaWRyY3l1ZmF6c2twdXdtZmNhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc5NDI4ODMsImV4cCI6MjA4MzUxODg4M30.Uqj4WCzoNS9wnlzI-xew6iTFzTUi77dcGeBjUgFjZbQ";
+      const USERNAME_DOMAIN = "csvtest.local";
+
+      const errEl = document.getElementById("errBox");
+      function setError(msg) { errEl.textContent = msg; errEl.style.display = "block"; }
+      function clearError() { errEl.textContent = ""; errEl.style.display = "none"; }
+
+      if (!window.supabase?.createClient) {
+        setError("Supabase JS not loaded. Check the @supabase/supabase-js script tag.");
+        return;
+      }
+
+      const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+        auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
+      });
+
+      function usernameToEmail(usernameOrEmail) {
+        const v = String(usernameOrEmail || "").trim();
+        if (!v) return "";
+        if (v.includes("@")) return v;
+        return `${v}@${USERNAME_DOMAIN}`;
+      }
+
+      function qs(name) {
+        try { return new URLSearchParams(window.location.search || "").get(name); }
+        catch (_) { return null; }
+      }
+
+      function safePath(p) {
+        const v = String(p || "").trim();
+        if (!v) return "";
+        if (v.startsWith("http://") || v.startsWith("https://") || v.startsWith("//")) return "";
+        if (v.includes("..")) return "";
+        if (!v.endsWith(".html")) return "";
+        return v;
+      }
+
+      async function fetchMyProfile(userId) {
+        const { data, error } = await supabaseClient
+          .from("profiles")
+          .select("id, username, role, vessel_id, is_active, position")
+          .eq("id", userId)
+          .single();
+        if (error) throw error;
+        return data;
+      }
+
+      function routeByRole(role) {
+        // role values must match your DB: public.profiles.role
+        if (role === "vessel") return "./q-vessel.html";
+        if (role === "inspector") return "./q-inspector.html";
+        // company_admin / company_superintendent / super_admin -> dashboard
+        return "./q-dashboard.html";
+      }
+
+      async function doLogin() {
+        clearError();
+
+        const username = document.getElementById("username").value.trim();
+        const password = document.getElementById("password").value;
+
+        if (!username || !password) {
+          setError("Please enter username and password.");
+          return;
+        }
+
+        const email = usernameToEmail(username);
+        console.log(`[${BUILD}] attempting login with email:`, email);
+
+        const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+        if (error) {
+          setError("Login failed: " + error.message);
+          return;
+        }
+
+        const user = data.user;
+        if (!user) {
+          setError("Login failed: no user returned.");
+          return;
+        }
+
+        let profile;
+        try {
+          profile = await fetchMyProfile(user.id);
+        } catch (e) {
+          setError(
+            "Login OK but profile missing or blocked by RLS.\n" +
+            "Ensure a row exists in public.profiles for this user, and RLS allows select."
+          );
+          return;
+        }
+
+        if (profile && profile.is_active === false) {
+          setError("Your account is inactive. Please contact the administrator.");
+          await supabaseClient.auth.signOut();
+          return;
+        }
+
+        const returnTo = safePath(qs("returnTo"));
+        if (returnTo) {
+          window.location.href = returnTo;
+          return;
+        }
+
+        window.location.href = routeByRole(profile.role);
+      }
+
+      async function doLogout() {
+        clearError();
+        await supabaseClient.auth.signOut();
+        localStorage.removeItem("q_session_v1");
+        setError("Logged out.");
+      }
+
+      document.getElementById("loginBtn").addEventListener("click", doLogin);
+      document.getElementById("logoutBtn").addEventListener("click", doLogout);
+      document.getElementById("password").addEventListener("keydown", (e) => { if (e.key === "Enter") doLogin(); });
+      document.getElementById("username").addEventListener("keydown", (e) => { if (e.key === "Enter") doLogin(); });
+    })();
+  </script>
+</body>
+</html>
