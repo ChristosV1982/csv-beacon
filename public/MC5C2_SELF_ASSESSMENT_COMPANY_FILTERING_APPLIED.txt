@@ -1,0 +1,1 @@
+MC-5C2 applied: Self-Assessment frontend now uses company/vessel-scoped RPCs. No auth/Supabase key/RLS changes.\n

@@ -147,53 +147,35 @@ function addCreatedItemToLog(item) {
 }
 
 async function loadCampaigns(supabase) {
-  const { data, error } = await supabase.rpc("csvb_self_assess_campaigns_for_me");
+  const { data, error } = await supabase
+    .from("self_assess_campaigns")
+    .select("id, name, due_date, open_from, created_at")
+    .order("created_at", { ascending: false });
 
   if (error) throw error;
-
-  return (data || []).map((c) => ({
-    id: c.id,
-    company_id: c.company_id,
-    company_name: c.company_name || "",
-    name: c.name,
-    due_date: c.due_date,
-    open_from: c.open_from,
-    created_at: c.created_at
-  }));
+  return data || [];
 }
 
 async function loadTemplates(supabase) {
-  const { data, error } = await supabase.rpc("csvb_questionnaire_templates_for_me");
+  const { data, error } = await supabase
+    .from("questionnaire_templates")
+    .select("id, name, description, is_active, updated_at")
+    .eq("is_active", true)
+    .order("updated_at", { ascending: false });
 
   if (error) throw error;
-
-  return (data || [])
-    .filter((t) => t.is_active !== false)
-    .map((t) => ({
-      id: t.id,
-      company_id: t.company_id,
-      company_name: t.company_name || "",
-      name: t.name,
-      description: t.description,
-      is_active: t.is_active,
-      updated_at: t.updated_at
-    }));
+  return data || [];
 }
 
 async function loadVessels(supabase) {
-  const { data, error } = await supabase.rpc("csvb_accessible_vessels_for_me");
+  const { data, error } = await supabase
+    .from("vessels")
+    .select("id, name, is_active")
+    .eq("is_active", true)
+    .order("name", { ascending: true });
 
   if (error) throw error;
-
-  return (data || [])
-    .filter((v) => v.is_active !== false)
-    .map((v) => ({
-      id: v.id,
-      company_id: v.company_id,
-      company_name: v.company_name || "",
-      name: v.name,
-      is_active: v.is_active
-    }));
+  return data || [];
 }
 
 function renderCampaignSelect(campaigns) {
@@ -429,7 +411,7 @@ async function createAssignments(supabase, me, state) {
 
 async function init() {
   // Admin-only
-  const me = await AUTH.requireAuth([AUTH.ROLES.SUPER_ADMIN, AUTH.ROLES.COMPANY_ADMIN, AUTH.ROLES.COMPANY_SUPERINTENDENT].filter(Boolean));
+  const me = await AUTH.requireAuth([AUTH.ROLES.SUPER_ADMIN, AUTH.ROLES.COMPANY_ADMIN]);
   if (!me) return;
 
   AUTH.fillUserBadge(me, "userBadge");

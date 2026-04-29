@@ -28,54 +28,38 @@ function pill(status) {
 }
 
 async function loadVessels(supabase) {
-  const { data, error } = await supabase.rpc("csvb_accessible_vessels_for_me");
-
+  const { data, error } = await supabase
+    .from("vessels")
+    .select("id,name,is_active")
+    .eq("is_active", true)
+    .order("name", { ascending: true });
   if (error) throw error;
-
-  return (data || [])
-    .filter((v) => v.is_active !== false)
-    .map((v) => ({
-      id: v.id,
-      company_id: v.company_id,
-      company_name: v.company_name || "",
-      name: v.name,
-      is_active: v.is_active
-    }));
+  return data || [];
 }
 
 async function loadQuestionnairesForVessel(supabase, vesselId, status, viewerRole, viewerPosition) {
-  const { data, error } = await supabase.rpc("csvb_questionnaires_for_me");
+  let q = supabase
+    .from("questionnaires")
+    .select("id, title, status, updated_at, created_at, mode, assigned_position")
+    .eq("vessel_id", vesselId)
+    .order("updated_at", { ascending: false });
 
-  if (error) throw error;
+  if (status) q = q.eq("status", status);
 
-  let rows = (data || []).filter((r) => String(r.vessel_id || "") === String(vesselId || ""));
-
-  if (status) {
-    rows = rows.filter((r) => String(r.status || "") === String(status));
-  }
-
+  // If the viewer is a vessel user, enforce assignment filtering:
+  // - master: sees all
+  // - others: sees assigned_position IS NULL (all roles) OR assigned_position == their position
   const isVesselViewer = (viewerRole === AUTH.ROLES.VESSEL);
-
   if (isVesselViewer) {
     const pos = String(viewerPosition || "").toLowerCase();
-
     if (pos && pos !== "master") {
-      rows = rows.filter((r) => {
-        const assigned = String(r.assigned_position || "").toLowerCase();
-        return !assigned || assigned === pos;
-      });
+      q = q.or(`assigned_position.is.null,assigned_position.eq.${pos}`);
     }
   }
 
-  return rows.map((r) => ({
-    id: r.id,
-    title: r.title,
-    status: r.status,
-    updated_at: r.updated_at,
-    created_at: r.created_at,
-    mode: r.mode,
-    assigned_position: r.assigned_position
-  }));
+  const { data, error } = await q;
+  if (error) throw error;
+  return data || [];
 }
 
 function render(rows) {
@@ -121,7 +105,7 @@ async function refresh() {
   const R = AUTH.ROLES;
 
   // Allow vessel + super_admin + company_admin to enter this page
-  const me = await AUTH.requireAuth([R.VESSEL, R.SUPER_ADMIN, R.COMPANY_ADMIN, R.COMPANY_SUPERINTENDENT].filter(Boolean), {
+  const me = await AUTH.requireAuth([R.VESSEL, R.SUPER_ADMIN, R.COMPANY_ADMIN], {
     redirectTo: "./login.html",
     unauthorizedRedirect: "./q-dashboard.html"
   });
@@ -138,7 +122,7 @@ async function refresh() {
   // - Super/Admin: can pick a vessel from dropdown (and can also default to their profile.vessel_id if set)
   let vesselId = me.profile?.vessel_id || null;
 
-  const isAdminViewer = (role === R.SUPER_ADMIN || role === R.COMPANY_ADMIN || role === R.COMPANY_SUPERINTENDENT);
+  const isAdminViewer = (role === R.SUPER_ADMIN || role === R.COMPANY_ADMIN);
 
   const pickerWrap = el("adminVesselPicker");
   const picker = el("vesselPicker");

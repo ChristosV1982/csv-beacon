@@ -119,22 +119,20 @@ async function getSessionOrWarn() {
 async function getMyProfile(userId) {
   const { data, error } = await supabaseClient
     .from("profiles")
-    .select("username, role, vessel_id, position, company_id")
+    .select("username, role, vessel_id")
     .eq("id", userId)
     .single();
 
   if (error) throw error;
 
   let vesselName = "";
-
   if (data?.vessel_id) {
     const { data: v, error: vErr } = await supabaseClient
-      .rpc("csvb_accessible_vessels_for_me");
-
-    if (!vErr) {
-      const row = (v || []).find((x) => String(x.id) === String(data.vessel_id));
-      vesselName = row?.name || "";
-    }
+      .from("vessels")
+      .select("name")
+      .eq("id", data.vessel_id)
+      .maybeSingle();
+    if (!vErr) vesselName = v?.name || "";
   }
 
   return { ...data, vessels: { name: vesselName } };
@@ -144,71 +142,59 @@ async function getMyProfile(userId) {
 // Data loading
 // ----------------------
 async function loadVessels() {
-  const { data, error } = await supabaseClient.rpc("csvb_accessible_vessels_for_me");
-
+  const { data, error } = await supabaseClient
+    .from("vessels")
+    .select("id, name, is_active")
+    .eq("is_active", true)
+    .order("name", { ascending: true });
   if (error) throw error;
-
-  return (data || [])
-    .filter((v) => v.is_active !== false)
-    .map((v) => ({
-      id: v.id,
-      company_id: v.company_id,
-      company_name: v.company_name || "",
-      name: v.name,
-      is_active: v.is_active
-    }));
+  return data || [];
 }
 
 async function loadQuestionnaires() {
-  const { data, error } = await supabaseClient.rpc("csvb_questionnaires_for_me");
-
+  // IMPORTANT: Do NOT select "mode" here to avoid Postgres calling mode() aggregate
+  const { data, error } = await supabaseClient
+    .from("questionnaires")
+    .select("id, title, status, created_at, updated_at, vessel_id, assigned_position")
+    .order("updated_at", { ascending: false });
   if (error) throw error;
 
-  return (data || []).map((r) => ({
-    id: r.id,
-    company_id: r.company_id,
-    company_name: r.company_name || "",
-    title: r.title,
-    status: r.status,
-    created_at: r.created_at,
-    updated_at: r.updated_at,
-    vessel_id: r.vessel_id,
-    vessel_name: r.vessel_name || "",
-    assigned_position: r.assigned_position,
-    mode: r.mode,
-    created_by: r.created_by
-  }));
+  const rows = data || [];
+  const vesselIds = [...new Set(rows.map((r) => r.vessel_id).filter(Boolean))];
+
+  if (!vesselIds.length) return rows.map((r) => ({ ...r, vessel_name: "" }));
+
+  const { data: vessels, error: vErr } = await supabaseClient
+    .from("vessels")
+    .select("id, name")
+    .in("id", vesselIds);
+
+  if (vErr) return rows.map((r) => ({ ...r, vessel_name: "" }));
+
+  const map = new Map((vessels || []).map((v) => [v.id, v.name]));
+  return rows.map((r) => ({ ...r, vessel_name: map.get(r.vessel_id) || "" }));
 }
 
 // Templates
 async function loadTemplates() {
-  const { data, error } = await supabaseClient.rpc("csvb_questionnaire_templates_for_me");
-
+  const { data, error } = await supabaseClient
+    .from("questionnaire_templates")
+    .select("id, name, description, is_active, created_at, updated_at")
+    .order("updated_at", { ascending: false });
   if (error) throw error;
-
-  return (data || []).map((t) => ({
-    id: t.id,
-    company_id: t.company_id,
-    company_name: t.company_name || "",
-    name: t.name,
-    description: t.description,
-    is_active: t.is_active,
-    created_at: t.created_at,
-    updated_at: t.updated_at
-  }));
+  return data || [];
 }
 
 async function loadTemplateCounts() {
-  const { data, error } = await supabaseClient.rpc("csvb_template_question_counts_for_me");
-
+  const { data, error } = await supabaseClient
+    .from("questionnaire_template_questions")
+    .select("template_id, question_no");
   if (error) throw error;
 
   const map = new Map();
-
   for (const row of data || []) {
-    map.set(row.template_id, Number(row.question_count || 0));
+    map.set(row.template_id, (map.get(row.template_id) || 0) + 1);
   }
-
   return map;
 }
 

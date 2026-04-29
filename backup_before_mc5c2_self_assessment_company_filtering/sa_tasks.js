@@ -52,51 +52,38 @@ function statusPill(status) {
 }
 
 async function loadCampaigns(supabase) {
-  const { data, error } = await supabase.rpc("csvb_self_assess_campaigns_for_me");
-
+  const { data, error } = await supabase
+    .from("self_assess_campaigns")
+    .select("id, name, created_at")
+    .order("created_at", { ascending: false });
   if (error) throw error;
-
-  return (data || []).map((c) => ({
-    id: c.id,
-    name: c.name,
-    due_date: c.due_date,
-    open_from: c.open_from,
-    created_at: c.created_at
-  }));
+  return data || [];
 }
 
 async function loadMyTasks(supabase, campaignIdOrNull) {
-  const { data, error } = await supabase.rpc("csvb_self_assess_instances_for_me", {
-    p_campaign_id: campaignIdOrNull || null
-  });
+  let q = supabase
+    .from("self_assess_instances")
+    .select(`
+      questionnaire_id,
+      campaign_id,
+      due_date,
+      questionnaires (
+        id, title, status, updated_at, created_at, vessel_id
+      ),
+      self_assess_campaigns (
+        id, name
+      )
+    `);
 
+  if (campaignIdOrNull) q = q.eq("campaign_id", campaignIdOrNull);
+
+  // NOTE: order by nested is not always supported consistently; order by due_date then load timestamps from questionnaires
+  q = q.order("due_date", { ascending: true, nullsFirst: false });
+
+  const { data, error } = await q;
   if (error) throw error;
 
-  return (data || []).map((r) => ({
-    questionnaire_id: r.questionnaire_id,
-    campaign_id: r.campaign_id,
-    assignee_type: r.assignee_type,
-    assignee_role: r.assignee_role,
-    due_date: r.due_date,
-    created_by: r.created_by,
-    created_at: r.created_at,
-    updated_at: r.updated_at,
-    questionnaires: {
-      id: r.questionnaire_id,
-      title: r.questionnaire_title,
-      status: r.questionnaire_status,
-      updated_at: r.questionnaire_updated_at,
-      created_at: r.questionnaire_created_at,
-      vessel_id: r.questionnaire_vessel_id
-    },
-    self_assess_campaigns: {
-      id: r.campaign_id,
-      name: r.campaign_name,
-      open_from: r.campaign_open_from,
-      due_date: r.campaign_due_date
-    },
-    _vessel_name: r.questionnaire_vessel_name || ""
-  }));
+  return data || [];
 }
 
 async function loadVesselNames(supabase, vesselIds) {
@@ -142,7 +129,7 @@ function renderRows(rows, vesselNameMap) {
 
   if (!rows.length) {
     const tr = document.createElement("tr");
-    tr.innerHTML = '<td colspan="7" class="muted">No assigned self-assessments found.</td>';
+    tr.innerHTML = `<td colspan="7" class="muted">No assigned self-assessments found.</td>`;
     body.appendChild(tr);
     return;
   }
@@ -150,13 +137,12 @@ function renderRows(rows, vesselNameMap) {
   for (const r of rows) {
     const q = r.questionnaires || {};
     const campName = r.self_assess_campaigns?.name || "(no campaign)";
-    const vesselName = r._vessel_name || vesselNameMap.get(q.vessel_id) || "-";
+    const vesselName = vesselNameMap.get(q.vessel_id) || "-";
     const title = q.title || r.questionnaire_id;
 
     const updated = q.updated_at || q.created_at || null;
 
     const tr = document.createElement("tr");
-
     tr.innerHTML = `
       <td><div style="font-weight:900;color:#1a4170;">${campName}</div></td>
       <td style="font-weight:900;color:#1a4170;">${vesselName}</td>
@@ -172,7 +158,6 @@ function renderRows(rows, vesselNameMap) {
         <button class="btn2" data-submit="${r.questionnaire_id}" ${String(q.status||"").toLowerCase()==="submitted" ? "disabled" : ""}>Mark Submitted</button>
       </td>
     `;
-
     body.appendChild(tr);
   }
 }

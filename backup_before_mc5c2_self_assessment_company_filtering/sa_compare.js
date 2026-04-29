@@ -20,33 +20,24 @@ function ensureSupabase() {
 }
 
 async function loadVessels(supabase) {
-  const { data, error } = await supabase.rpc("csvb_accessible_vessels_for_me");
+  const { data, error } = await supabase
+    .from("vessels")
+    .select("id, name, is_active")
+    .eq("is_active", true)
+    .order("name", { ascending: true });
 
   if (error) throw error;
-
-  return (data || [])
-    .filter((v) => v.is_active !== false)
-    .map((v) => ({
-      id: v.id,
-      company_id: v.company_id,
-      company_name: v.company_name || "",
-      name: v.name,
-      is_active: v.is_active
-    }));
+  return data || [];
 }
 
 async function loadCampaigns(supabase) {
-  const { data, error } = await supabase.rpc("csvb_self_assess_campaigns_for_me");
+  const { data, error } = await supabase
+    .from("self_assess_campaigns")
+    .select("id, name, created_at")
+    .order("created_at", { ascending: false });
 
   if (error) throw error;
-
-  return (data || []).map((c) => ({
-    id: c.id,
-    company_id: c.company_id,
-    company_name: c.company_name || "",
-    name: c.name,
-    created_at: c.created_at
-  }));
+  return data || [];
 }
 
 function renderVessels(vessels) {
@@ -171,7 +162,7 @@ async function loadGaps(supabase, gapType) {
 async function init() {
   // IMPORTANT: Post-inspection is admin-restricted in your DB (is_post_inspection_admin),
   // so this page is admin-only to avoid misleading comparisons.
-  const me = await AUTH.requireAuth([AUTH.ROLES.SUPER_ADMIN, AUTH.ROLES.COMPANY_ADMIN, AUTH.ROLES.COMPANY_SUPERINTENDENT].filter(Boolean));
+  const me = await AUTH.requireAuth([AUTH.ROLES.SUPER_ADMIN, AUTH.ROLES.COMPANY_ADMIN]);
   if (!me) return;
 
   AUTH.fillUserBadge(me, "userBadge");
