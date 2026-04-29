@@ -277,6 +277,45 @@ const state = {
   },
 };
 
+
+/* ======================== MC-3B5B Repair: Vessel Company Dropdown ======================== */
+
+function renderVesselCompanyDropdown() {
+  const sel = document.getElementById("v_company");
+  if (!sel) return;
+
+  const companies = Array.isArray(state.companies) ? state.companies : [];
+
+  if (!companies.length) {
+    sel.innerHTML = '<option value="">No companies loaded</option>';
+    return;
+  }
+
+  const current = sel.value || state.selectedCompanyId || companies[0]?.id || "";
+
+  sel.innerHTML = [
+    '<option value="">Select company…</option>',
+    ...companies
+      .filter((c) => c.is_active !== false)
+      .map((c) => {
+        const label = c.company_name || c.short_name || c.company_code || c.id;
+        return '<option value="' + esc(c.id) + '">' + esc(label) + '</option>';
+      })
+  ].join("");
+
+  if (current && companies.some((c) => String(c.id) === String(current))) {
+    sel.value = current;
+  } else if (companies[0]?.id) {
+    sel.value = companies[0].id;
+  }
+}
+
+/* Compatibility alias in case a previous patch inserted a misspelled call */
+function renderVeselCompanyDropdown() {
+  return renderVesselCompanyDropdown();
+}
+
+
 /* ======================== Tabs ======================== */
 function initTabs() {
   const tabs = document.querySelectorAll(".tab");
