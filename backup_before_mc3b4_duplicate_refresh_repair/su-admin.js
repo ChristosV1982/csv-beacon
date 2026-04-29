@@ -1127,46 +1127,23 @@ async function saveCompany() {
 
 async function refreshSelectedCompanyDetails() {
   const c = selectedCompany();
-  if (!c?.id) {
-    if (typeof renderCompanyAssignmentControls === "function") {
-      renderCompanyAssignmentControls();
-    }
-    return;
-  }
+  if (!c?.id) return;
 
   setStatus("Loading company details…");
 
-  const hasAssignmentControls = typeof renderCompanyAssignmentControls === "function";
-
-  const calls = [
+  const [modules, vessels, users] = await Promise.all([
     csvbRpc("csvb_admin_list_company_modules", { p_company_id: c.id }),
     csvbRpc("csvb_admin_list_vessels_by_company", { p_company_id: c.id }),
     csvbRpc("csvb_admin_list_users_by_company", { p_company_id: c.id }),
-  ];
+  ]);
 
-  if (hasAssignmentControls) {
-    calls.push(csvbRpc("csvb_admin_list_vessels_by_company", { p_company_id: null }));
-    calls.push(csvbRpc("csvb_admin_list_users_by_company", { p_company_id: null }));
-  }
-
-  const results = await Promise.all(calls);
-
-  state.companyModules = results[0] || [];
-  state.companyVessels = results[1] || [];
-  state.companyUsers = results[2] || [];
-
-  if (hasAssignmentControls) {
-    state.companyAllVessels = results[3] || [];
-    state.companyAllUsers = results[4] || [];
-  }
+  state.companyModules = modules || [];
+  state.companyVessels = vessels || [];
+  state.companyUsers = users || [];
 
   renderCompanyModules();
   renderCompanyVessels();
   renderCompanyUsers();
-
-  if (hasAssignmentControls) {
-    renderCompanyAssignmentControls();
-  }
 
   setStatus("Ready");
 }
@@ -1382,11 +1359,33 @@ function renderCompanyAssignmentControls() {
   ].join("");
 }
 
+async function refreshSelectedCompanyDetails() {
+  const c = selectedCompany();
+  if (!c?.id) return;
 
+  setStatus("Loading company details…");
 
-/* Duplicate refreshSelectedCompanyDetails removed by MC-3B4 repair. */
+  const [modules, vessels, users, allVessels, allUsers] = await Promise.all([
+    csvbRpc("csvb_admin_list_company_modules", { p_company_id: c.id }),
+    csvbRpc("csvb_admin_list_vessels_by_company", { p_company_id: c.id }),
+    csvbRpc("csvb_admin_list_users_by_company", { p_company_id: c.id }),
+    csvbRpc("csvb_admin_list_vessels_by_company", { p_company_id: null }),
+    csvbRpc("csvb_admin_list_users_by_company", { p_company_id: null }),
+  ]);
 
+  state.companyModules = modules || [];
+  state.companyVessels = vessels || [];
+  state.companyUsers = users || [];
+  state.companyAllVessels = allVessels || [];
+  state.companyAllUsers = allUsers || [];
 
+  renderCompanyModules();
+  renderCompanyVessels();
+  renderCompanyUsers();
+  renderCompanyAssignmentControls();
+
+  setStatus("Ready");
+}
 
 async function assignSelectedVesselToCompany() {
   clearWarn();
