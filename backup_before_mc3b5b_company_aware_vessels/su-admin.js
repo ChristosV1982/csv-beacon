@@ -325,22 +325,14 @@ function renderVesselDropdown() {
   if (!sel) return;
 
   const opts = [];
-  opts.push('<option value="">(No vessel)</option>');
-
+  opts.push(`<option value="">(No vessel)</option>`);
   for (const v of state.vessels) {
-    const vesselName = v.name || v.vessel_name || v.title || v.id;
-    const company = v.company_name ? " — " + v.company_name : "";
-    opts.push('<option value="' + esc(v.id) + '">' + esc(vesselName + company) + '</option>');
+    opts.push(`<option value="${esc(v.id)}">${esc(v.name || v.vessel_name || v.title || v.id)}</option>`);
   }
-
   sel.innerHTML = opts.join("");
 }
 
 /* ======================== Render: users ======================== */
-function publicDefaultCompanyId() {
-  return state.selectedCompanyId || state.companies?.[0]?.id || null;
-}
-
 function vesselNameById(id) {
   if (!id) return "";
   const v = state.vessels.find((x) => String(x.id) === String(id));
@@ -452,36 +444,26 @@ function renderVessels() {
 
   const filtered = vessels.filter((v) => {
     if (!q) return true;
-    const hay = [
-      v.company_name,
-      v.name,
-      v.imo_number,
-      v.hull_number,
-      v.call_sign
-    ].filter(Boolean).join(" ").toLowerCase();
+    const hay = [v.name, v.imo_number, v.hull_number, v.call_sign].filter(Boolean).join(" ").toLowerCase();
     return hay.includes(q);
   });
 
   if (!filtered.length) {
-    tbody.innerHTML = '<tr><td colspan="7" class="muted small">No vessels found.</td></tr>';
+    tbody.innerHTML = `<tr><td colspan="6" class="muted small">No vessels found.</td></tr>`;
     return;
   }
 
   const rows = [];
-
   for (const v of filtered) {
     const active = v.is_active === false ? false : true;
-    const statusPill = active
-      ? '<span class="pill ok">Active</span>'
-      : '<span class="pill bad">Inactive</span>';
+    const statusPill = active ? `<span class="pill ok">Active</span>` : `<span class="pill bad">Inactive</span>`;
 
     const btn = active
-      ? '<button class="btnSmall btnDanger" data-act="deactivate" data-id="' + esc(v.id) + '" type="button">Deactivate</button>'
-      : '<button class="btnSmall btn" data-act="activate" data-id="' + esc(v.id) + '" type="button">Activate</button>';
+      ? `<button class="btnSmall btnDanger" data-act="deactivate" data-id="${esc(v.id)}" type="button">Deactivate</button>`
+      : `<button class="btnSmall btn" data-act="activate" data-id="${esc(v.id)}" type="button">Activate</button>`;
 
     rows.push(`
       <tr>
-        <td>${esc(v.company_name || "")}</td>
         <td>${esc(v.name || "")}</td>
         <td>${esc(v.hull_number || "")}</td>
         <td>${esc(v.imo_number || "")}</td>
@@ -498,41 +480,29 @@ function renderVessels() {
     btn.addEventListener("click", async () => {
       clearWarn();
       clearOk();
-
       try {
         const id = btn.getAttribute("data-id");
         const act = btn.getAttribute("data-act");
         const v = state.vessels.find((x) => String(x.id) === String(id));
-
         if (!v) throw new Error("Vessel not found in state.");
 
         const nextActive = act === "activate";
 
-        setStatus(nextActive ? "Activating vessel…" : "Deactivating vessel…");
-
-        await csvbRpc("csvb_admin_upsert_vessel", {
-          p_vessel_id: v.id,
-          p_company_id: v.company_id || publicDefaultCompanyId(),
-          p_name: v.name || "",
-          p_hull_number: v.hull_number || null,
-          p_imo_number: v.imo_number ? String(v.imo_number) : null,
-          p_call_sign: v.call_sign || null,
-          p_is_active: nextActive,
-          p_move_related: false
+        // IMPORTANT: your Edge Function expects top-level fields, not nested "vessel:{...}".
+        await callSuAdmin({
+          action: "upsert_vessel",
+          vessel_id: v.id,
+          name: v.name,
+          is_active: nextActive,
+          hull_number: v.hull_number ?? null,
+          call_sign: v.call_sign ?? null,
+          imo_number: v.imo_number ?? null,
         });
 
         showOk(nextActive ? "Vessel activated." : "Vessel deactivated.");
-
         await refreshVessels();
         renderVesselDropdown();
-
-        if (typeof refreshCompanies === "function") {
-          await refreshCompanies();
-        }
-
-        setStatus("Ready");
       } catch (e) {
-        setStatus("Ready");
         showWarn(String(e?.message || e));
       }
     });
@@ -559,20 +529,9 @@ async function refreshUsers() {
 
 async function refreshVessels() {
   setStatus("Loading vessels…");
-
-  if (typeof ensureCompaniesLoaded === "function") {
-    await ensureCompaniesLoaded();
-  }
-
-  renderVesselCompanyDropdown();
-
-  state.vessels = await csvbRpc("csvb_admin_list_vessels_by_company", {
-    p_company_id: null
-  });
-
+  const resp = await callSuAdmin({ action: "list_vessels" });
+  state.vessels = normalizeListResponse(resp);
   renderVessels();
-  renderVesselDropdown();
-
   setStatus("Ready");
 }
 
@@ -652,13 +611,10 @@ function initAddVessel() {
     clearBtn.addEventListener("click", () => {
       clearWarn();
       clearOk();
-
       document.getElementById("v_name").value = "";
       document.getElementById("v_hull").value = "";
       document.getElementById("v_imo").value = "";
       document.getElementById("v_call").value = "";
-
-      renderVesselCompanyDropdown();
     });
   }
 
@@ -669,58 +625,33 @@ function initAddVessel() {
     clearOk();
 
     try {
-      if (typeof ensureCompaniesLoaded === "function") {
-        await ensureCompaniesLoaded();
-      }
-
-      renderVesselCompanyDropdown();
-
-      const company_id = (document.getElementById("v_company")?.value || "").trim();
       const name = (document.getElementById("v_name").value || "").trim();
       const hull_number = (document.getElementById("v_hull").value || "").trim();
       const imo_number_raw = (document.getElementById("v_imo").value || "").trim();
       const call_sign = (document.getElementById("v_call").value || "").trim();
 
-      if (!company_id) throw new Error("Company is required.");
       if (!name) throw new Error("Vessel name is required.");
 
-      if (imo_number_raw && !/^\\d+$/.test(imo_number_raw)) {
-        throw new Error("IMO number must contain digits only, or remain blank.");
+      // Your Edge Function expects imo_number as number|null
+      const imo_number = imo_number_raw ? Number(imo_number_raw) : null;
+      if (imo_number_raw && (!Number.isFinite(imo_number) || imo_number <= 0)) {
+        throw new Error("IMO number must be a valid positive number (or blank).");
       }
 
       setStatus("Adding vessel…");
-
-      const resp = await csvbRpc("csvb_admin_upsert_vessel", {
-        p_vessel_id: null,
-        p_company_id: company_id,
-        p_name: name,
-        p_hull_number: hull_number || null,
-        p_imo_number: imo_number_raw || null,
-        p_call_sign: call_sign || null,
-        p_is_active: true,
-        p_move_related: true
+      const resp = await callSuAdmin({
+        action: "upsert_vessel",
+        name,
+        is_active: true,
+        hull_number: hull_number || null,
+        call_sign: call_sign || null,
+        imo_number,
       });
 
-      showOk("Vessel saved.\n\n" + JSON.stringify(resp, null, 2));
-
-      document.getElementById("v_name").value = "";
-      document.getElementById("v_hull").value = "";
-      document.getElementById("v_imo").value = "";
-      document.getElementById("v_call").value = "";
-
-      state.selectedCompanyId = company_id;
+      showOk(`Vessel saved.\n\nResponse:\n${JSON.stringify(resp, null, 2)}`);
 
       await refreshVessels();
-
-      if (typeof refreshCompanies === "function") {
-        await refreshCompanies();
-        const c = companyById(company_id);
-        if (c) fillCompanyForm(c);
-        if (typeof refreshSelectedCompanyDetails === "function") {
-          await refreshSelectedCompanyDetails();
-        }
-      }
-
+      renderVesselDropdown();
       setStatus("Ready");
     } catch (e) {
       setStatus("Ready");
@@ -1140,8 +1071,6 @@ async function refreshCompanies() {
   setStatus("Loading companies…");
   state.companies = await csvbRpc("csvb_admin_list_companies", {});
   state.companiesLoaded = true;
-
-  renderVesselCompanyDropdown();
 
   renderCompanies();
 
