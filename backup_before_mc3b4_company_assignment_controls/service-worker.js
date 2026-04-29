@@ -6,7 +6,7 @@
 // - Bump cache version + clean old caches on activate
 
 const CACHE_PREFIX = "sire-test-";
-const CACHE_VERSION = "v8-mc3b4-company-assignment-controls";              // <-- bump this if you change caching behavior again
+const CACHE_VERSION = "v7-mc3b2-companies-tab";              // <-- bump this if you change caching behavior again
 const CACHE_NAME = `${CACHE_PREFIX}${CACHE_VERSION}`;
 
 const CORE_ASSETS = [

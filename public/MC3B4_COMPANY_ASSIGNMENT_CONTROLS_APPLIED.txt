@@ -1,0 +1,8 @@
+MC-3B4 applied:
+- Added company assignment controls to Superuser Administration > Companies.
+- Can assign existing vessel to selected company.
+- Can assign existing user to selected company.
+- Can assign existing user to selected vessel.
+- No auth.js changes.
+- No Supabase key changes.
+- No SQL changes.

@@ -122,45 +122,6 @@
       outline-offset:-2px;
       background:#F0FBFC !important;
     }
-  
-    /* MC-3B4 company assignment controls */
-    .assignmentGrid{
-      display:grid;
-      grid-template-columns:1fr 1fr;
-      gap:12px;
-      align-items:start;
-    }
-    @media(max-width:900px){
-      .assignmentGrid{grid-template-columns:1fr;}
-    }
-    .assignmentBox{
-      background:#F4F8FC;
-      border:1px solid #D6E4F5;
-      border-radius:12px;
-      padding:12px;
-    }
-    .assignmentBoxTitle{
-      font-weight:950;
-      color:#062A5E;
-      margin-bottom:6px;
-    }
-    .assignmentHelp{
-      color:#5E6F86;
-      font-size:.88rem;
-      font-weight:750;
-      line-height:1.35;
-      margin-bottom:10px;
-    }
-    .assignmentLine{
-      display:flex;
-      gap:8px;
-      align-items:center;
-      flex-wrap:wrap;
-      margin-top:8px;
-    }
-    .assignmentLine input[type="checkbox"]{
-      width:auto;
-    }
   </style>
 </head>
 
@@ -385,74 +346,6 @@
             </div>
           </div>
 
-
-          <div style="height:12px;"></div>
-
-          <div class="card" id="co_assignmentCard" style="box-shadow:none;">
-            <div style="font-weight:950;">Company assignment controls</div>
-            <div class="muted small" style="margin-top:6px;">
-              Assign existing vessels/users to the selected company. This is the multi-company foundation control area.
-            </div>
-
-            <div style="height:12px;"></div>
-
-            <div class="assignmentGrid">
-              <div class="assignmentBox">
-                <div class="assignmentBoxTitle">Assign vessel to this company</div>
-                <div class="assignmentHelp">
-                  Moves the selected vessel under the selected company. If “move related data” is checked, linked operational records are moved with the vessel.
-                </div>
-
-                <label>Vessel</label>
-                <select id="co_assign_vessel_select">
-                  <option value="">Select company first…</option>
-                </select>
-
-                <div class="assignmentLine">
-                  <label style="display:flex;align-items:center;gap:8px;margin:0;">
-                    <input type="checkbox" id="co_move_related" checked />
-                    Move related vessel data
-                  </label>
-                </div>
-
-                <div style="height:10px;"></div>
-                <button class="btn btnSmall" type="button" id="co_assign_vessel_btn">
-                  Assign vessel to selected company
-                </button>
-              </div>
-
-              <div class="assignmentBox">
-                <div class="assignmentBoxTitle">Assign user to this company / vessel</div>
-                <div class="assignmentHelp">
-                  Assigns the user to the selected company. Vessel assignment automatically uses the vessel’s company.
-                </div>
-
-                <label>User</label>
-                <select id="co_assign_user_select">
-                  <option value="">Select company first…</option>
-                </select>
-
-                <div style="height:10px;"></div>
-
-                <button class="btn2 btnSmall" type="button" id="co_assign_user_company_btn">
-                  Assign user to selected company
-                </button>
-
-                <div style="height:12px;"></div>
-
-                <label>Vessel under selected company</label>
-                <select id="co_assign_user_vessel_select">
-                  <option value="">Select company first…</option>
-                </select>
-
-                <div style="height:10px;"></div>
-
-                <button class="btn btnSmall" type="button" id="co_assign_user_vessel_btn">
-                  Assign user to selected vessel
-                </button>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
     </div>
