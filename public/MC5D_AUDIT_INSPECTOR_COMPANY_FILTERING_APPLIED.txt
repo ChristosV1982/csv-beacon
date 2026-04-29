@@ -1,0 +1,1 @@
+MC-5D applied: Audit Observations and Inspector Intelligence now use company/vessel-scoped RPCs. No auth/Supabase key/RLS changes.\n

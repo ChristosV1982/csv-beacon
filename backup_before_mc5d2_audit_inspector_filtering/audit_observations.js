@@ -110,74 +110,72 @@ function currentAuditorLabel(audit) {
 }
 
 async function loadVessels() {
-  const { data, error } = await state.supabase.rpc("csvb_accessible_vessels_for_me");
+  const { data, error } = await state.supabase
+    .from("vessels")
+    .select("id, name, is_active")
+    .eq("is_active", true)
+    .order("name", { ascending: true });
 
   if (error) throw error;
-
-  return (data || [])
-    .filter((v) => v.is_active !== false)
-    .map((v) => ({
-      id: v.id,
-      company_id: v.company_id,
-      company_name: v.company_name || "",
-      name: v.name,
-      is_active: v.is_active
-    }));
+  return data || [];
 }
 
 async function loadAuditTypes() {
-  const { data, error } = await state.supabase.rpc("csvb_audit_types_for_me");
+  const { data, error } = await state.supabase
+    .from("audit_types")
+    .select("*")
+    .eq("is_active", true)
+    .order("sort_order", { ascending: true })
+    .order("audit_type_name", { ascending: true });
 
   if (error) throw error;
-
-  return (data || []).filter((t) => t.is_active !== false);
+  return data || [];
 }
 
 async function loadProfiles() {
-  const { data, error } = await state.supabase.rpc("csvb_profiles_for_my_company");
+  const { data, error } = await state.supabase
+    .from("profiles")
+    .select("id, username, role, position, is_active")
+    .in("role", ["super_admin", "company_admin", "company_superintendent", "vessel"])
+    .order("username", { ascending: true });
 
   if (error) throw error;
-
-  return (data || [])
-    .filter((p) => p.is_active !== false && p.is_disabled !== true)
-    .map((p) => ({
-      id: p.id,
-      company_id: p.company_id,
-      company_name: p.company_name || "",
-      username: p.username,
-      role: p.role,
-      vessel_id: p.vessel_id,
-      vessel_name: p.vessel_name || "",
-      is_active: p.is_active,
-      is_disabled: p.is_disabled
-    }));
+  return data || [];
 }
 
 async function loadInspectors() {
-  const { data, error } = await state.supabase.rpc("csvb_inspectors_for_me");
+  const { data, error } = await state.supabase
+    .from("inspectors")
+    .select("*")
+    .eq("is_active", true)
+    .order("inspector_name", { ascending: true });
 
   if (error) throw error;
-
-  return (data || []).filter((i) => i.is_active !== false);
+  return data || [];
 }
 
 async function loadAudits() {
-  const { data, error } = await state.supabase.rpc("csvb_audit_reports_for_me");
+  const { data, error } = await state.supabase
+    .from("audit_reports")
+    .select("*")
+    .order("audit_date", { ascending: false })
+    .order("created_at", { ascending: false });
 
   if (error) throw error;
-
   return data || [];
 }
 
 async function loadObservationsForAudit(auditId) {
   if (!auditId) return [];
 
-  const { data, error } = await state.supabase.rpc("csvb_audit_observation_items_for_me", {
-    p_report_id: auditId
-  });
+  const { data, error } = await state.supabase
+    .from("audit_observation_items")
+    .select("*")
+    .eq("report_id", auditId)
+    .order("sort_index", { ascending: true })
+    .order("created_at", { ascending: true });
 
   if (error) throw error;
-
   return data || [];
 }
 

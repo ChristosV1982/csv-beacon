@@ -173,85 +173,65 @@ function normalizeThirdRow(r) {
 }
 
 async function loadVessels() {
-  const { data, error } = await state.supabase.rpc("csvb_accessible_vessels_for_me");
+  const { data, error } = await state.supabase
+    .from("vessels")
+    .select("id, name, is_active")
+    .order("name", { ascending: true });
 
   if (error) throw error;
-
-  return (data || [])
-    .filter((v) => v.is_active !== false)
-    .map((v) => ({
-      id: v.id,
-      company_id: v.company_id,
-      company_name: v.company_name || "",
-      name: v.name,
-      is_active: v.is_active
-    }));
+  return data || [];
 }
 
 async function loadReports() {
-  const { data, error } = await state.supabase.rpc("csvb_post_inspection_reports_for_me");
+  const { data, error } = await state.supabase
+    .from("post_inspection_reports")
+    .select("id, vessel_id, inspection_date, report_ref, title, inspector_name, inspector_company, ocimf_inspecting_company");
 
   if (error) throw error;
-
-  return (data || []).map((r) => ({
-    id: r.id,
-    company_id: r.company_id,
-    company_name: r.company_name || "",
-    vessel_id: r.vessel_id,
-    inspection_date: r.inspection_date,
-    report_ref: r.report_ref,
-    title: r.title,
-    inspector_name: r.inspector_name,
-    inspector_company: r.inspector_company,
-    ocimf_inspecting_company: r.ocimf_inspecting_company
-  }));
+  return data || [];
 }
 
 async function loadOwnObservationRows() {
-  const { data, error } = await state.supabase.rpc("post_insp_export_observations", {
-    p_vessel_id: null,
-    p_from: null,
-    p_to: null,
-    p_observation_type: null,
-  });
+  const { data, error } = await state.supabase
+    .rpc("post_insp_export_observations", {
+      p_vessel_id: null,
+      p_from: null,
+      p_to: null,
+      p_observation_type: null,
+    });
 
   if (error) throw error;
-
-  const allowedVesselNames = new Set(
-    (state.vessels || [])
-      .map((v) => String(v.name || "").trim())
-      .filter(Boolean)
-  );
-
-  if (!allowedVesselNames.size) return [];
-
-  return (data || []).filter((r) => {
-    const vesselName = String(r.vessel_name || "").trim();
-    return allowedVesselNames.has(vesselName);
-  });
+  return data || [];
 }
 
 async function loadInspectors() {
-  const { data, error } = await state.supabase.rpc("csvb_inspectors_for_me");
+  const { data, error } = await state.supabase
+    .from("inspectors")
+    .select("*")
+    .order("inspector_name", { ascending: true });
 
   if (error) throw error;
-
   return data || [];
 }
 
 async function loadAliases() {
-  const { data, error } = await state.supabase.rpc("csvb_inspector_aliases_for_me");
+  const { data, error } = await state.supabase
+    .from("inspector_aliases")
+    .select("*")
+    .order("alias_name", { ascending: true });
 
   if (error) throw error;
-
   return data || [];
 }
 
 async function loadThirdPartyRows() {
-  const { data, error } = await state.supabase.rpc("csvb_third_party_inspector_observations_for_me");
+  const { data, error } = await state.supabase
+    .from("third_party_inspector_observations")
+    .select("*")
+    .order("inspection_date", { ascending: false, nullsFirst: false })
+    .order("created_at", { ascending: false });
 
   if (error) throw error;
-
   return data || [];
 }
 
