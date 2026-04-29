@@ -173,91 +173,7 @@
       w.style.display=msg?"block":"none";
     }
 
-    function clearWarn(){
-      showWarn("");
-    }
-
-    const DASHBOARD_MODULE_BY_CARD = {
-      library: "read_only_library",
-      compare: "post_inspection_stats",
-      vessel: "self_assessment",
-      tasks: "self_assessment",
-      company: "self_assessment",
-      assignments: "self_assessment",
-      post: "post_inspection",
-      poststats: "post_inspection_stats",
-      inspector_intelligence: "inspector_intelligence",
-      audit_observations: "audit_observations",
-      reports: "fleet_reports",
-      inspector: "sire_2_vetting",
-      qeditor: "questions_editor",
-      suadmin: "platform_administration"
-    };
-
-    async function loadEnabledModules(bundle){
-      const role = bundle?.profile?.role || "";
-      const R = AUTH.ROLES || {};
-      const isPlatform =
-        role === R.SUPER_ADMIN ||
-        role === "platform_owner" ||
-        bundle?.isPlatformAdmin === true;
-
-      if (isPlatform) {
-        return {
-          isPlatform: true,
-          enabled: new Set(Object.values(DASHBOARD_MODULE_BY_CARD).filter(Boolean)),
-          raw: []
-        };
-      }
-
-      const sb = AUTH.ensureSupabase();
-
-      const { data, error } = await sb.rpc("csvb_my_company_modules");
-
-      if (error) {
-        throw new Error("Could not load company module access: " + error.message);
-      }
-
-      const enabled = new Set(
-        (data || [])
-          .filter((m) => m.is_enabled === true)
-          .map((m) => m.module_key)
-      );
-
-      return {
-        isPlatform: false,
-        enabled,
-        raw: data || []
-      };
-    }
-
-    function hideAllCards(){
-      document.querySelectorAll("[data-card]").forEach((el) => {
-        el.style.display = "none";
-      });
-    }
-
-    function cardAllowedByModule(cardKey, moduleAccess){
-      if (moduleAccess?.isPlatform) return true;
-
-      const moduleKey = DASHBOARD_MODULE_BY_CARD[cardKey];
-
-      if (!moduleKey) return true;
-
-      return moduleAccess?.enabled?.has(moduleKey) === true;
-    }
-
-    function setVisible(cardKey, roleAllowed, moduleAccess){
-      const el = document.querySelector(`[data-card="${cardKey}"]`);
-      if (!el) return;
-
-      const allowed = !!roleAllowed && cardAllowedByModule(cardKey, moduleAccess);
-      el.style.display = allowed ? "block" : "none";
-    }
-
     (async () => {
-      clearWarn();
-
       const bundle = await AUTH.setupAuthButtons({
         badgeId: "userBadge",
         loginBtnId: "loginBtn",
@@ -265,42 +181,54 @@
         switchBtnId: "switchUserBtn"
       });
 
-      /* Logged out: keep only public/open study cards */
+      // Logged out: hide everything except Library/Compare
       if (!bundle?.session?.user) {
         showWarn("You are logged out. Please Login.");
-
         document.querySelectorAll("[data-card]").forEach(c => {
           const k = c.getAttribute("data-card");
           const keep = (k === "library" || k === "compare");
           c.style.display = keep ? "block" : "none";
         });
-
         return;
       }
 
-      const moduleAccess = await loadEnabledModules(bundle);
-
-      window.CSVB_DASHBOARD_MODULE_ACCESS = moduleAccess;
-
+      // Logged in: role-based visibility
       const role = bundle.profile?.role;
       const R = AUTH.ROLES;
 
-      const isSuper = role === R.SUPER_ADMIN || role === "platform_owner";
+      const isSuper = role === R.SUPER_ADMIN;
       const isCompanyAdmin = role === R.COMPANY_ADMIN;
       const isCompanySup = role === R.COMPANY_SUPERINTENDENT;
       const isVessel = role === R.VESSEL;
       const isInspector = role === R.INSPECTOR;
 
-      hideAllCards();
+      function setVisible(cardKey, visible){
+        const el = document.querySelector(`[data-card="${cardKey}"]`);
+        if (el) el.style.display = visible ? "block" : "none";
+      }
 
-      /* Always role-available when logged in, still filtered by company modules */
-      setVisible("library", true, moduleAccess);
-      setVisible("compare", true, moduleAccess);
-      setVisible("tasks", true, moduleAccess);
-      setVisible("vessel", true, moduleAccess);
+      // Defaults (start hidden)
+      [
+        "company",
+        "assignments",
+        "post",
+        "poststats",
+        "inspector_intelligence",
+        "audit_observations",
+        "reports",
+        "inspector",
+        "qeditor",
+        "suadmin"
+      ].forEach(k => setVisible(k,false));
 
-      /* Questions Editor visibility */
-      setVisible("qeditor", (isSuper || isCompanyAdmin || isCompanySup), moduleAccess);
+      // Always visible when logged-in:
+      setVisible("library", true);
+      setVisible("compare", true);
+      setVisible("tasks", true);
+      setVisible("vessel", true);
+
+      // Questions Editor visibility (matches your seeded permissions)
+      setVisible("qeditor", (isSuper || isCompanyAdmin || isCompanySup));
 
       if (isSuper) {
         [
@@ -314,22 +242,21 @@
           "inspector",
           "qeditor",
           "suadmin"
-        ].forEach(k => setVisible(k, true, moduleAccess));
-
+        ].forEach(k => setVisible(k,true));
         return;
       }
 
       if (isVessel) {
-        setVisible("company", false, moduleAccess);
-        setVisible("assignments", false, moduleAccess);
-        setVisible("post", false, moduleAccess);
-        setVisible("poststats", false, moduleAccess);
-        setVisible("inspector_intelligence", false, moduleAccess);
-        setVisible("audit_observations", false, moduleAccess);
-        setVisible("reports", false, moduleAccess);
-        setVisible("inspector", false, moduleAccess);
-        setVisible("qeditor", false, moduleAccess);
-        setVisible("suadmin", false, moduleAccess);
+        setVisible("company", false);
+        setVisible("assignments", false);
+        setVisible("post", false);
+        setVisible("poststats", false);
+        setVisible("inspector_intelligence", false);
+        setVisible("audit_observations", false);
+        setVisible("reports", false);
+        setVisible("inspector", false);
+        setVisible("qeditor", false);
+        setVisible("suadmin", false);
         return;
       }
 
@@ -344,34 +271,31 @@
           "reports",
           "inspector",
           "qeditor"
-        ].forEach(k => setVisible(k, true, moduleAccess));
-
-        setVisible("suadmin", false, moduleAccess);
+        ].forEach(k => setVisible(k,true));
+        setVisible("suadmin", false);
         return;
       }
 
       if (isCompanySup) {
-        setVisible("company", false, moduleAccess);
-        setVisible("assignments", false, moduleAccess);
-        setVisible("post", true, moduleAccess);
-        setVisible("poststats", true, moduleAccess);
-        setVisible("inspector_intelligence", true, moduleAccess);
-        setVisible("audit_observations", true, moduleAccess);
-        setVisible("reports", true, moduleAccess);
-        setVisible("inspector", true, moduleAccess);
-        setVisible("qeditor", true, moduleAccess);
-        setVisible("suadmin", false, moduleAccess);
+        setVisible("company", false);
+        setVisible("assignments", false);
+        setVisible("post", true);
+        setVisible("poststats", true);
+        setVisible("inspector_intelligence", true);
+        setVisible("audit_observations", true);
+        setVisible("reports", true);
+        setVisible("inspector", true);
+        setVisible("qeditor", true);
         return;
       }
 
       if (isInspector) {
-        setVisible("tasks", false, moduleAccess);
-        setVisible("vessel", false, moduleAccess);
-        setVisible("inspector", true, moduleAccess);
-        setVisible("inspector_intelligence", false, moduleAccess);
-        setVisible("audit_observations", false, moduleAccess);
-        setVisible("qeditor", false, moduleAccess);
-        setVisible("suadmin", false, moduleAccess);
+        setVisible("tasks", false);
+        setVisible("vessel", false);
+        setVisible("inspector", true);
+        setVisible("inspector_intelligence", false);
+        setVisible("audit_observations", false);
+        setVisible("qeditor", false);
         return;
       }
     })().catch(e => showWarn(String(e?.message || e)));

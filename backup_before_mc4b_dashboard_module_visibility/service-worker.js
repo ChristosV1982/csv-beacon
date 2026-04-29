@@ -6,7 +6,7 @@
 // - Bump cache version + clean old caches on activate
 
 const CACHE_PREFIX = "sire-test-";
-const CACHE_VERSION = "v17-mc4-dashboard-module-visibility";              // <-- bump this if you change caching behavior again
+const CACHE_VERSION = "v16-mc3b8-user-list-filters";              // <-- bump this if you change caching behavior again
 const CACHE_NAME = `${CACHE_PREFIX}${CACHE_VERSION}`;
 
 const CORE_ASSETS = [

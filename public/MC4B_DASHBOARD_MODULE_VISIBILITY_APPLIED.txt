@@ -1,0 +1,1 @@
+Dashboard now filters cards by company_modules through csvb_my_company_modules RPC. No auth/Supabase key/RLS changes.\n
