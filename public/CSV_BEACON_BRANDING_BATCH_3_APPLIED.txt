@@ -1,0 +1,1 @@
+C.S.V. BEACON Branding Batch 3 was applied directly by Node script. No database/Supabase/business logic changes.
