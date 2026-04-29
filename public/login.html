@@ -3,9 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SIRE 2.0 – Login (Username + Password)</title>
+  <title>C.S.V. BEACON – Login</title>
 
-  <link rel="stylesheet" href="./tekmerion-theme.css?v=20260212_1" />
+  <link rel="stylesheet" href="./csv-beacon-theme.css?v=20260428_1" />
   <link rel="stylesheet" href="style.css" />
 
   <style>
@@ -16,7 +16,7 @@
       align-items: center;
       justify-content: center;
       padding: 28px 16px;
-      background: radial-gradient(1200px 700px at 20% 10%, #1a4170 0%, #0b1c33 55%, #071426 100%);
+      background: radial-gradient(1200px 700px at 20% 10%, var(--brand-navy) 0%, var(--brand-navy-dark) 55%, #020B1A 100%);
       font-family: "Segoe UI", Arial, sans-serif;
     }
     .login-shell {
@@ -59,7 +59,7 @@
       border-radius: 16px;
       padding: 18px 18px;
       box-shadow: 0 4px 18px rgba(18, 44, 87, 0.16);
-      color:#1a4170;
+      color:var(--brand-navy);
     }
     label {
       display: block;
@@ -78,10 +78,10 @@
       outline: none;
       font-family: "Segoe UI", Arial, sans-serif;
       background:#fff;
-      color:#1a4170;
+      color:var(--brand-navy);
     }
     input:focus {
-      border-color: #2e68c7;
+      border-color: var(--brand-teal);
       box-shadow: 0 0 0 3px rgba(46, 104, 199, 0.15);
     }
     .actions {
@@ -94,7 +94,7 @@
     .btn-primary {
       border: none;
       border-radius: 10px;
-      background: #295eb0;
+      background: var(--brand-navy);
       color: #ffffff;
       font-weight: 900;
       font-size: 1rem;
@@ -118,8 +118,8 @@
     .btn-outline {
       border-radius: 10px;
       background: transparent;
-      border: 1px solid #295eb0;
-      color: #295eb0;
+      border: 1px solid var(--brand-navy);
+      color: var(--brand-navy);
       font-weight: 900;
       font-size: 1rem;
       padding: 9px 16px;
@@ -160,9 +160,12 @@
 
 <body>
   <div class="login-shell">
-    <div class="title">Questionnaire Mode Login</div>
+    <div style="text-align:center;margin-bottom:12px;">
+      <img src="./assets/csv-beacon-logo.png" alt="C.S.V. BEACON logo" style="width:145px;max-width:60%;height:auto;" />
+    </div>
+    <div class="title">C.S.V. BEACON Login</div>
     <div class="subtitle">
-      Users login with <b>Username + Password</b>.<br/>
+      Marine Assurance & Compliance Platform<br/>Users login with <b>Username + Password</b>.<br/>
       Internally we use: <span class="mono">username@csvtest.local</span>
       <div class="build" id="buildTag">BUILD: LOGIN-2026-01-14B</div>
     </div>

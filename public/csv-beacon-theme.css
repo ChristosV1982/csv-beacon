@@ -1,0 +1,225 @@
+/* C.S.V. BEACON — Global Theme Tokens (Light + Dark)
+   Dark mode is enabled via: html[data-theme="dark"]
+
+   Locked brand:
+   C.S.V. BEACON
+   Marine Assurance & Compliance Platform
+*/
+
+:root{
+  /* ---------- C.S.V. BEACON Brand Palette ---------- */
+  --brand-navy: #062A5E;          /* Beacon Navy */
+  --brand-navy-dark: #031B3F;     /* Deep Marine Navy */
+  --brand-teal: #0097A7;          /* Signal Teal */
+  --brand-teal-soft: #DDF7FA;     /* Light Signal Teal */
+  --brand-gold: #F4A000;          /* Beacon Gold */
+
+  --bg-main: #F4F8FC;             /* Ice Marine Background */
+  --bg-card: #FFFFFF;
+  --border-soft: #D6E4F5;         /* Soft Marine Border */
+
+  --text-main: #17324D;           /* Marine Text */
+  --text-muted: #5E6F86;          /* Muted Steel */
+
+  --status-positive: #168A4A;
+  --status-progress: #0097A7;
+  --status-warning: #F4A000;
+  --status-negative: #C62828;
+  --status-neutral: #607D9A;
+  --status-disabled: #9AA8B8;
+
+  /* ---------- Compatibility aliases used by existing pages ---------- */
+  --navy-900: var(--brand-navy-dark);
+  --navy-800: var(--brand-navy);
+  --ocean-600: var(--brand-teal);
+  --ocean-500: #13AFC0;
+  --tanker-red: var(--status-negative);
+
+  /* Fonts */
+  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, Arial, "Noto Sans", sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+
+  /* Light theme */
+  --bg: var(--bg-main);
+  --surface: var(--bg-card);
+  --surface-2: #EAF3FB;
+  --border: var(--border-soft);
+
+  --text: var(--text-main);
+  --muted: var(--text-muted);
+
+  --link: var(--brand-teal);
+
+  /* Buttons */
+  --btn-primary-bg: var(--brand-navy);
+  --btn-primary-text: #FFFFFF;
+  --btn-primary-bg-hover: var(--brand-navy-dark);
+
+  --btn-secondary-bg: #EAF6FA;
+  --btn-secondary-text: var(--brand-navy);
+  --btn-secondary-border: #B8DCE8;
+  --btn-secondary-bg-hover: var(--brand-teal-soft);
+
+  /* Status aliases */
+  --success: var(--status-positive);
+  --warning: var(--status-warning);
+  --danger: var(--status-negative);
+  --info: var(--status-progress);
+
+  --focus: rgba(0,151,167,0.35);
+}
+
+html[data-theme="dark"]{
+  --bg: #06162E;
+  --surface: #0B2447;
+  --surface-2: #071D3A;
+  --border: #20466F;
+
+  --text: #EAF3FB;
+  --muted: #B8C9D9;
+
+  --link: #4DC8D3;
+
+  --btn-primary-bg: #0097A7;
+  --btn-primary-text: #FFFFFF;
+  --btn-primary-bg-hover: #13AFC0;
+
+  --btn-secondary-bg: #0B2447;
+  --btn-secondary-text: #EAF3FB;
+  --btn-secondary-border: #20466F;
+  --btn-secondary-bg-hover: #12345E;
+
+  --success: #37B46B;
+  --warning: #FFC24B;
+  --danger: #FF6B6B;
+  --info: #4DC8D3;
+
+  --focus: rgba(77,200,211,0.42);
+}
+
+html, body{
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+}
+
+a{
+  color: var(--link);
+}
+
+:focus-visible{
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* Shared application shell helpers */
+.csvb-brand{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  min-width:0;
+}
+
+.csvb-brand-logo{
+  width:52px;
+  height:52px;
+  object-fit:contain;
+  flex:0 0 auto;
+}
+
+.csvb-brand-text{
+  min-width:0;
+}
+
+.csvb-brand-title{
+  margin:0;
+  font-size:1.15rem;
+  line-height:1.1;
+  font-weight:950;
+  letter-spacing:.08em;
+  color:#FFFFFF;
+}
+
+.csvb-brand-subtitle{
+  margin-top:3px;
+  font-size:.78rem;
+  line-height:1.15;
+  font-weight:750;
+  color:#BFEFF4;
+  letter-spacing:.01em;
+}
+
+.csvb-page-title{
+  color:var(--brand-navy);
+  font-weight:950;
+}
+
+.csvb-page-subtitle{
+  color:var(--text-muted);
+  font-weight:700;
+}
+
+/* Generic controls */
+.btn,
+.btn-primary,
+button.btn-primary{
+  background: var(--btn-primary-bg);
+  color: var(--btn-primary-text);
+  border-color: var(--btn-primary-bg);
+}
+
+.btn:hover,
+.btn-primary:hover,
+button.btn-primary:hover{
+  background: var(--btn-primary-bg-hover);
+}
+
+.btn2,
+.btn-muted,
+button.btn-muted{
+  background: var(--btn-secondary-bg);
+  color: var(--btn-secondary-text);
+  border: 1px solid var(--btn-secondary-border);
+}
+
+.btn2:hover,
+.btn-muted:hover,
+button.btn-muted:hover{
+  background: var(--btn-secondary-bg-hover);
+}
+
+/* Theme dropdown */
+.themeCtl{
+  display:flex;
+  align-items:center;
+  gap:10px;
+}
+
+.themeCtl-label{
+  font-size:12px;
+  font-weight:700;
+  color: var(--muted);
+  user-select:none;
+}
+
+.themeCtl-select{
+  padding: 8px 12px;
+  border-radius: 12px;
+  min-width: 140px;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-color: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  background-image:
+    linear-gradient(45deg, transparent 50%, currentColor 50%),
+    linear-gradient(135deg, currentColor 50%, transparent 50%),
+    linear-gradient(to right, transparent, transparent);
+  background-position:
+    calc(100% - 18px) 50%,
+    calc(100% - 12px) 50%,
+    0 0;
+  background-size: 6px 6px, 6px 6px, 100% 100%;
+  background-repeat: no-repeat;
+}

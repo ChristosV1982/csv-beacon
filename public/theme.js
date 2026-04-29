@@ -1,5 +1,12 @@
 (function () {
-  const STORAGE_KEY = "tekmerion.theme"; // system | light | dark
+  const STORAGE_KEY = "csv-beacon.theme"; // system | light | dark
+  const LEGACY_STORAGE_KEY = "tekmerion.theme";
+
+  // Migrate old branding key once, without breaking existing user preference.
+  const legacyValue = localStorage.getItem(LEGACY_STORAGE_KEY);
+  if (!localStorage.getItem(STORAGE_KEY) && legacyValue) {
+    localStorage.setItem(STORAGE_KEY, legacyValue);
+  }
 
   function applyTheme(mode) {
     const root = document.documentElement;
