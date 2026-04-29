@@ -1,3 +1,22 @@
+#!/usr/bin/env bash
+set -e
+
+if [ ! -d "public" ]; then
+  echo "ERROR: public folder not found. Run this from the Replit project root."
+  exit 1
+fi
+
+mkdir -p backup_before_mc2_auth_company_context
+
+if [ -f "public/auth.js" ]; then
+  cp public/auth.js backup_before_mc2_auth_company_context/auth.js
+fi
+
+if [ -f "public/service-worker.js" ]; then
+  cp public/service-worker.js backup_before_mc2_auth_company_context/service-worker.js
+fi
+
+cat > public/auth.js <<'AUTHJS'
 // public/auth.js
 (() => {
   "use strict";
@@ -350,3 +369,30 @@
     setupAuthButtons,
   };
 })();
+AUTHJS
+
+# Bump service worker cache version so updated auth.js is not stuck in cache.
+if [ -f "public/service-worker.js" ]; then
+  node <<'NODE'
+const fs = require("fs");
+const p = "public/service-worker.js";
+let s = fs.readFileSync(p, "utf8");
+
+if (/const CACHE_VERSION = "[^"]+";/.test(s)) {
+  s = s.replace(/const CACHE_VERSION = "[^"]+";/, 'const CACHE_VERSION = "v5";');
+}
+
+fs.writeFileSync(p, s);
+NODE
+fi
+
+cat > public/MC2_AUTH_COMPANY_CONTEXT_APPLIED.txt <<'TXT'
+MC-2 applied:
+- public/auth.js now loads profile.company_id and company context.
+- window.CSVB_CONTEXT is populated after session/profile load.
+- service worker cache version bumped to v5 if service-worker.js exists.
+- No SQL, RLS, Supabase policy, or module logic restriction changes.
+TXT
+
+echo "DONE: MC-2 auth company context applied."
+echo "Next: Stop/Run the Replit app, then press Ctrl + Shift + R."

@@ -2,12 +2,12 @@
 (() => {
   "use strict";
 
-  // Bump when you change auth behavior (helps confirm cache is cleared)
-  const AUTH_BUILD = "AUTH-2026-04-29-MC2-COMPANY-CONTEXT";
+  // Bump when you change auth behavior (helps you confirm cache is cleared)
+  const AUTH_BUILD = "AUTH-2026-01-21A";
 
   const SUPABASE_URL = "https://bdidrcyufazskpuwmfca.supabase.co";
   const SUPABASE_ANON_KEY =
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJIUzI1NiIsInJlZiI6ImJkaWRyY3l1ZmF6c2twdXdtZmNhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc5NDI4ODMsImV4cCI6MjA4MzUxODg4M30.Uqj4WCzoNS9wnlzI-xew6iTFzTUi77dcGeBjUgFjZbQ";
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJkaWRyY3l1ZmF6c2twdXdtZmNhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc5NDI4ODMsImV4cCI6MjA4MzUxODg4M30.Uqj4WCzoNS9wnlzI-xew6iTFzTUi77dcGeBjUgFjZbQ";
 
   const USERNAME_DOMAIN = "csvtest.local";
 
@@ -27,34 +27,8 @@
     [ROLES.INSPECTOR]: "Inspector / Third Party",
   };
 
-  const PROFILE_SELECT = [
-    "id",
-    "username",
-    "role",
-    "company_id",
-    "vessel_id",
-    "position",
-    "is_active",
-    "is_disabled",
-    "disabled_at",
-    "disabled_reason",
-    "force_password_reset",
-  ].join(", ");
-
-  const COMPANY_SELECT = [
-    "id",
-    "company_name",
-    "short_name",
-    "company_code",
-    "is_active",
-  ].join(", ");
-
   function roleToUi(role) {
     return UI_ROLE_MAP[role] || role || "";
-  }
-
-  function isPlatformAdminRole(role) {
-    return role === ROLES.SUPER_ADMIN || role === "platform_owner";
   }
 
   function qs(name) {
@@ -97,6 +71,7 @@
   }
 
   function ensureSupabase() {
+    // Prefer a single canonical instance
     if (window.__SUPABASE_CLIENT) return window.__SUPABASE_CLIENT;
 
     if (!window.supabase?.createClient) {
@@ -105,13 +80,10 @@
     }
 
     const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      auth: {
-        persistSession: true,
-        autoRefreshToken: true,
-        detectSessionInUrl: true,
-      },
+      auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
     });
 
+    // IMPORTANT: publish BOTH names because some modules use __supabaseClient
     window.__SUPABASE_CLIENT = client;
     window.__supabaseClient = client;
 
@@ -126,11 +98,6 @@
     return null;
   }
 
-  function companyLabel(company) {
-    if (!company) return "";
-    return company.short_name || company.company_name || company.company_code || "";
-  }
-
   async function getSession() {
     const sb = ensureSupabase();
     const { data, error } = await sb.auth.getSession();
@@ -138,63 +105,22 @@
     return data?.session || null;
   }
 
-  async function fetchCompany(companyId) {
-    if (!companyId) return null;
-
-    const sb = ensureSupabase();
-
-    const { data, error } = await sb
-      .from("companies")
-      .select(COMPANY_SELECT)
-      .eq("id", companyId)
-      .maybeSingle();
-
-    if (error) throw error;
-
-    return data || null;
-  }
-
   async function getSessionUserProfile() {
     const sb = ensureSupabase();
     const session = await getSession();
-
-    if (!session?.user) {
-      const out = { session: null, user: null, profile: null, company: null };
-      window.CSVB_CONTEXT = out;
-      return out;
-    }
+    if (!session?.user) return { session: null, user: null, profile: null };
 
     const user = session.user;
 
     const { data: profile, error } = await sb
       .from("profiles")
-      .select(PROFILE_SELECT)
+      .select("id, username, role, vessel_id, position, is_active")
       .eq("id", user.id)
       .single();
 
     if (error) throw error;
 
-    const company = await fetchCompany(profile?.company_id);
-
-    const enrichedProfile = {
-      ...(profile || {}),
-      company,
-    };
-
-    const out = {
-      session,
-      user,
-      profile: enrichedProfile,
-      company,
-      company_id: enrichedProfile.company_id || null,
-      isPlatformAdmin: isPlatformAdminRole(enrichedProfile.role),
-      uiRole: roleToUi(enrichedProfile.role),
-      vesselPosition: deriveVesselPosition(enrichedProfile.username),
-    };
-
-    window.CSVB_CONTEXT = out;
-
-    return out;
+    return { session, user, profile };
   }
 
   async function requireAuth(allowedRoles = null, opts = {}) {
@@ -202,12 +128,11 @@
     const unauthorizedRedirect = opts.unauthorizedRedirect || "./q-dashboard.html";
 
     let bundle;
-
     try {
       bundle = await getSessionUserProfile();
     } catch (e) {
       showPageMessage(
-        "Profile missing, company context missing, or blocked by RLS.\n" +
+        "Profile missing or blocked by RLS.\n" +
           "Ensure a row exists in public.profiles for this user, and RLS allows select.\n\n" +
           "Error: " +
           String(e?.message || e)
@@ -215,7 +140,7 @@
       throw e;
     }
 
-    const { session, profile } = bundle;
+    const { session, user, profile } = bundle;
 
     if (!session?.user) {
       window.location.href = redirectTo;
@@ -240,8 +165,13 @@
       }
     }
 
-    window.CSVB_CONTEXT = bundle;
-    return bundle;
+    return {
+      session,
+      user,
+      profile,
+      uiRole: roleToUi(profile?.role),
+      vesselPosition: deriveVesselPosition(profile?.username),
+    };
   }
 
   function fillUserBadge(meOrBundle, badgeId = "userBadge") {
@@ -249,22 +179,12 @@
     if (!el) return;
 
     const profile = meOrBundle?.profile || null;
-    const company = meOrBundle?.company || profile?.company || null;
-
     const username = profile?.username || meOrBundle?.user?.email || "";
     const uiRole = meOrBundle?.uiRole || roleToUi(profile?.role);
-    const companyName = companyLabel(company);
 
     const parts = [];
-
     if (username) parts.push(username);
     if (uiRole) parts.push(uiRole);
-
-    if (companyName) {
-      parts.push(companyName);
-    } else if (isPlatformAdminRole(profile?.role)) {
-      parts.push("Platform");
-    }
 
     el.textContent = parts.join(" • ");
   }
@@ -276,6 +196,12 @@
     window.location.href = redirectTo;
   }
 
+  /**
+   * Dashboard helper:
+   * - wires login/logout/switch buttons
+   * - fills badge
+   * - returns the same bundle as requireAuth() (without role restriction)
+   */
   async function setupAuthButtons(cfg = {}) {
     const badgeId = cfg.badgeId || "userBadge";
     const loginBtnId = cfg.loginBtnId || "loginBtn";
@@ -287,17 +213,12 @@
     const logoutBtn = document.getElementById(logoutBtnId);
     const switchBtn = document.getElementById(switchBtnId);
 
-    let bundle;
+    const me = await requireAuth([], { redirectTo: loginPath });
 
-    try {
-      bundle = await getSessionUserProfile();
-    } catch (e) {
-      showPageMessage(
-        "Profile/company loading error.\n\n" +
-          String(e?.message || e)
-      );
-      throw e;
-    }
+    // requireAuth redirects when not logged in; however some pages want "logged-out mode".
+    // So if not logged in, do NOT redirect; instead show login button.
+    // We detect "logged out" by checking session from getSessionUserProfile directly.
+    const bundle = await getSessionUserProfile();
 
     const loggedIn = !!bundle?.session?.user;
 
@@ -315,12 +236,23 @@
     }
 
     if (switchBtn) {
+      // Switch user = sign out and go login
       switchBtn.style.display = "inline-block";
       switchBtn.onclick = () => logoutAndGoLogin(loginPath);
     }
 
-    fillUserBadge(bundle, badgeId);
-    return bundle;
+    const out = loggedIn
+      ? {
+          session: bundle.session,
+          user: bundle.user,
+          profile: bundle.profile,
+          uiRole: roleToUi(bundle.profile?.role),
+          vesselPosition: deriveVesselPosition(bundle.profile?.username),
+        }
+      : { session: null, user: null, profile: null };
+
+    fillUserBadge(out, badgeId);
+    return out;
   }
 
   window.AUTH = {
@@ -329,21 +261,13 @@
     SUPABASE_ANON_KEY,
     USERNAME_DOMAIN,
     ROLES,
-
     roleToUi,
-    isPlatformAdminRole,
-    companyLabel,
-
     qs,
     safePath,
     usernameToEmail,
     ensureSupabase,
-
-    getSession,
-    getSessionUserProfile,
-    fetchCompany,
     requireAuth,
-
+    getSessionUserProfile,
     deriveVesselPosition,
     fillUserBadge,
     logoutAndGoLogin,
