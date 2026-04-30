@@ -1627,18 +1627,28 @@ function bindDropdown(dropId, btnId) {
   const btn = safeEl(btnId);
   if (!drop || !btn) return;
 
+  const panel = drop.querySelector(".filterPanel");
+
+  // Always start closed
+  drop.classList.remove("open");
+
   btn.addEventListener("click", (e) => {
     e.preventDefault();
     e.stopPropagation();
 
-    document.querySelectorAll(".filterDrop.open").forEach((x) => {
-      if (x !== drop) x.classList.remove("open");
-    });
+    const isOpen = drop.classList.contains("open");
+    closeAllDropdowns();
 
-    drop.classList.toggle("open");
+    if (!isOpen) {
+      drop.classList.add("open");
+    }
   });
 
-  drop.addEventListener("click", (e) => e.stopPropagation());
+  if (panel) {
+    panel.addEventListener("click", (e) => {
+      e.stopPropagation();
+    });
+  }
 }
 
 function closeAllDropdowns() {
@@ -1732,6 +1742,7 @@ async function init() {
   bindDropdown("typeDrop", "typeDropBtn");
   bindDropdown("recYearDrop", "recYearDropBtn");
   bindDropdown("recMonthDrop", "recMonthDropBtn");
+  closeAllDropdowns();
 
   document.addEventListener("click", closeAllDropdowns);
   document.addEventListener("keydown", (e) => {
