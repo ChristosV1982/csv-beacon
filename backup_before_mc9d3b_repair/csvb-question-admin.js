@@ -4,7 +4,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "MC9D3B-REPAIR-2026-04-30";
+  const BUILD = "MC9B2-2026-04-30";
 
   const state = {
     sb: null,
@@ -238,16 +238,6 @@
             <option value="disabled">disabled</option>
           </select>
 
-          <label>Override Approval Mode</label>
-          <select id="qaSetApprovalMode" class="qa-select">
-            <option value="platform_review_required">platform_review_required</option>
-            <option value="auto_publish">auto_publish</option>
-            <option value="company_admin_review">company_admin_review</option>
-          </select>
-          <div class="qa-muted">
-            For SIRE/platform question sets, normally keep platform_review_required.
-          </div>
-
           <label>Notes</label>
           <textarea id="qaSetNotes" class="qa-textarea" placeholder="Optional notes"></textarea>
 
@@ -318,16 +308,6 @@
             <option value="archived">archived</option>
             <option value="disabled">disabled</option>
           </select>
-
-          <label>Override Approval Mode</label>
-          <select id="qaQuestionApprovalMode" class="qa-select">
-            <option value="platform_review_required">platform_review_required</option>
-            <option value="auto_publish">auto_publish</option>
-            <option value="company_admin_review">company_admin_review</option>
-          </select>
-          <div class="qa-muted">
-            For company-owned custom questions, auto_publish is normally acceptable. For SIRE/platform questions, platform_review_required is safer.
-          </div>
 
           <div id="qaQuestionResultsBox" class="qa-muted">Search questions to assign individually.</div>
         </div>
@@ -510,7 +490,6 @@
             <th>View</th>
             <th>Review</th>
             <th>Edit Override</th>
-            <th>Approval Mode</th>
             <th>Action</th>
           </tr>
         </thead>
@@ -528,7 +507,6 @@
                 <td>${a.can_view ? "Yes" : "No"}</td>
                 <td>${a.can_review ? "Yes" : "No"}</td>
                 <td>${a.can_edit_override ? "Yes" : "No"}</td>
-                <td><span class="qa-pill">${esc(a.override_approval_mode || "platform_review_required")}</span></td>
                 <td><button class="qa-btn danger" data-delete-assignment="${esc(a.id)}" type="button">Delete</button></td>
               </tr>
             `;
@@ -703,8 +681,7 @@
       p_can_edit_override: !!$("qaSetCanEditOverride")?.checked,
       p_valid_from: null,
       p_valid_to: null,
-      p_notes: $("qaSetNotes")?.value || null,
-      p_override_approval_mode: $("qaSetApprovalMode")?.value || "platform_review_required"
+      p_notes: $("qaSetNotes")?.value || null
     });
 
     setMsg("ok", "Question set assignment saved.");
@@ -742,8 +719,7 @@
       p_can_edit_override: !!$("qaQuestionCanEditOverride")?.checked,
       p_valid_from: null,
       p_valid_to: null,
-      p_notes: "Individual question assignment from MC-9B2 UI.",
-      p_override_approval_mode: $("qaQuestionApprovalMode")?.value || "platform_review_required"
+      p_notes: "Individual question assignment from MC-9B2 UI."
     });
 
     setMsg("ok", "Individual question assignment saved.");
