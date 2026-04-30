@@ -1,0 +1,1 @@
+MC-10D2R applied: Company Builder full-width stacked layout and table wrapping repair for 100% browser zoom. Visual-only.\n
