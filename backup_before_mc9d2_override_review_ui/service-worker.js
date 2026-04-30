@@ -6,7 +6,7 @@
 // - Bump cache version + clean old caches on activate
 
 const CACHE_PREFIX = "sire-test-";
-const CACHE_VERSION = "v27-mc9d2-question-overrides-admin";              // <-- bump this if you change caching behavior again
+const CACHE_VERSION = "v26-mc9c3c-effective-template-flow";              // <-- bump this if you change caching behavior again
 const CACHE_NAME = `${CACHE_PREFIX}${CACHE_VERSION}`;
 
 const CORE_ASSETS = [
@@ -17,7 +17,6 @@ const CORE_ASSETS = [
   "./auth.js",
   "./csvb-module-guard.js",
   "./csvb-question-admin.js",
-  "./csvb-question-overrides-admin.js",
   "./assets/csv-beacon-icon.png",
   "./assets/csv-beacon-logo-full.png",
   "./icon-192.png",
