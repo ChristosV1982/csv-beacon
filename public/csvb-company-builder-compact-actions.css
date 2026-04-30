@@ -1,0 +1,82 @@
+/* public/csvb-company-builder-compact-actions.css
+   MC-10D3
+   Compact action groups for q-company.html
+*/
+
+html[data-csvb-page="q-company.html"] .csvb-inline-actions,
+html[data-csvb-page="q-company.html"] .csvb-toolbar-actions,
+html[data-csvb-page="q-company.html"] .csvb-template-actions{
+  display:flex !important;
+  flex-wrap:wrap !important;
+  align-items:center !important;
+  gap:8px !important;
+}
+
+html[data-csvb-page="q-company.html"] .csvb-inline-actions > *,
+html[data-csvb-page="q-company.html"] .csvb-toolbar-actions > *,
+html[data-csvb-page="q-company.html"] .csvb-template-actions > *{
+  margin:0 !important;
+}
+
+html[data-csvb-page="q-company.html"] .csvb-toolbar-actions{
+  margin-top:8px !important;
+  margin-bottom:6px !important;
+}
+
+html[data-csvb-page="q-company.html"] .csvb-inline-actions{
+  justify-content:flex-start !important;
+}
+
+html[data-csvb-page="q-company.html"] td .csvb-inline-actions{
+  min-width:260px !important;
+}
+
+html[data-csvb-page="q-company.html"] button,
+html[data-csvb-page="q-company.html"] .btn,
+html[data-csvb-page="q-company.html"] a.btn,
+html[data-csvb-page="q-company.html"] a.button{
+  padding:7px 12px !important;
+  min-height:auto !important;
+  line-height:1.2 !important;
+}
+
+html[data-csvb-page="q-company.html"] .csvb-inline-actions button,
+html[data-csvb-page="q-company.html"] .csvb-inline-actions .btn,
+html[data-csvb-page="q-company.html"] .csvb-template-actions button,
+html[data-csvb-page="q-company.html"] .csvb-template-actions .btn{
+  white-space:nowrap !important;
+}
+
+html[data-csvb-page="q-company.html"] .csvb-toolbar-actions button,
+html[data-csvb-page="q-company.html"] .csvb-toolbar-actions .btn{
+  white-space:nowrap !important;
+}
+
+html[data-csvb-page="q-company.html"] table td:last-child,
+html[data-csvb-page="q-company.html"] table th:last-child{
+  white-space:normal !important;
+}
+
+html[data-csvb-page="q-company.html"] .csvb-help-note{
+  margin-top:4px !important;
+  font-size:.86rem !important;
+  opacity:.9 !important;
+}
+
+@media (max-width: 900px){
+  html[data-csvb-page="q-company.html"] td .csvb-inline-actions{
+    min-width:unset !important;
+  }
+
+  html[data-csvb-page="q-company.html"] .csvb-inline-actions,
+  html[data-csvb-page="q-company.html"] .csvb-toolbar-actions,
+  html[data-csvb-page="q-company.html"] .csvb-template-actions{
+    gap:6px !important;
+  }
+
+  html[data-csvb-page="q-company.html"] .csvb-inline-actions button,
+  html[data-csvb-page="q-company.html"] .csvb-template-actions button,
+  html[data-csvb-page="q-company.html"] .csvb-toolbar-actions button{
+    white-space:normal !important;
+  }
+}
