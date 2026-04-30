@@ -1,0 +1,1 @@
+MC-10A applied: global UI polish, lighter typography, wider layout, compact buttons, dashboard/icons. Visual-only.\n
