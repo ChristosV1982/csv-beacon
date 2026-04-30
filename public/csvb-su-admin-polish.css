@@ -1,0 +1,78 @@
+/* C.S.V. BEACON — MC-10D1 Superuser Administration Polish */
+
+html[data-csvb-page="su-admin.html"] .csvb-su-helper-strip{
+  max-width:100%;
+  margin:8px auto 10px;
+  padding:9px 12px;
+  border:1px solid #D6E4F5;
+  border-radius:12px;
+  background:#fff;
+  color:#163457;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  flex-wrap:wrap;
+  box-shadow:0 8px 20px rgba(3,27,63,.05);
+}
+
+html[data-csvb-page="su-admin.html"] .csvb-su-helper-title{
+  color:#062A5E;
+  font-weight:700;
+  display:flex;
+  align-items:center;
+  gap:7px;
+}
+
+html[data-csvb-page="su-admin.html"] .csvb-su-helper-note{
+  color:#5E6F86;
+  font-size:.9rem;
+}
+
+html[data-csvb-page="su-admin.html"] .csvb-su-tabbar-polished{
+  position:sticky;
+  top:0;
+  z-index:50;
+  background:rgba(244,248,252,.94);
+  backdrop-filter:blur(6px);
+  padding:6px 0;
+  border-bottom:1px solid #D6E4F5;
+}
+
+html[data-csvb-page="su-admin.html"] button.csvb-su-tab-iconed{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+}
+
+html[data-csvb-page="su-admin.html"] .csvb-su-tab-icon{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  width:20px;
+  height:20px;
+  border-radius:7px;
+  background:#E9F7FB;
+  color:#062A5E;
+  border:1px solid #AEE3F1;
+  font-size:.85rem;
+}
+
+html[data-csvb-page="su-admin.html"] .csvb-admin-danger-note{
+  margin:6px 0;
+  color:#8A5A00;
+  background:#FFF6E0;
+  border:1px solid #F6D58F;
+  border-radius:10px;
+  padding:7px 9px;
+  font-size:.88rem;
+}
+
+html[data-csvb-page="su-admin.html"] table{
+  font-size:.9rem !important;
+}
+
+html[data-csvb-page="su-admin.html"] .qa-panel,
+html[data-csvb-page="su-admin.html"] .qo-panel{
+  margin-top:10px !important;
+}
