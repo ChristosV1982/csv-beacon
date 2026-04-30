@@ -1,0 +1,1 @@
+MC-10D5 applied: Post-Inspection Stats/KPIs visual polish, helper strip, compact controls, icons, tooltips.\n
