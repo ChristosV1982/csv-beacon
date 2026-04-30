@@ -6,7 +6,7 @@
 // - Bump cache version + clean old caches on activate
 
 const CACHE_PREFIX = "sire-test-";
-const CACHE_VERSION = "v42-rollback-mc10d5r-post-stats-repair";              // <-- bump this if you change caching behavior again
+const CACHE_VERSION = "v41-mc10d5r-post-stats-repair";              // <-- bump this if you change caching behavior again
 const CACHE_NAME = `${CACHE_PREFIX}${CACHE_VERSION}`;
 
 const CORE_ASSETS = [
