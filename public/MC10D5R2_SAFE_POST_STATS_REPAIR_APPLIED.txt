@@ -1,0 +1,1 @@
+MC-10D5R2 applied: safe post-inspection stats vessel dropdown close and PGNO vertical list rendering.

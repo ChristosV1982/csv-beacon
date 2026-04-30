@@ -1000,66 +1000,7 @@ function renderMonthlyTrend(rows, reportRows) {
   bindDrillButtons(tbody);
 }
 
-function renderBarChartOriginal(containerId, rows, options = {}
-
-function renderPgnoListChartSafe(containerId, rows, options = {}) {
-  const box = document.getElementById(containerId);
-  if (!box) return;
-
-  const list = Array.isArray(rows) ? rows : [];
-  const labelFn = options.labelFn || ((r) => r.key || "");
-  const obsFn = options.obsFn || ((r) => Number(r.observations || r.observation_count || 0));
-  const inspFn = options.inspFn || ((r) => Number(r.inspections || r.report_count || r.reports || 0));
-  const limit = Number(options.limit || 50);
-
-  const visible = list
-    .filter((r) => Number(obsFn(r) || 0) > 0)
-    .slice(0, limit);
-
-  if (!visible.length) {
-    box.innerHTML = '<div class="csvb-pgno-list-empty">' + esc(options.emptyText || "No PGNO data for current filters.") + '</div>';
-    return;
-  }
-
-  box.innerHTML = '<div class="csvb-pgno-list-chart">' + visible.map((r) => {
-    const label = String(labelFn(r) || r.key || "").trim();
-    const obs = Number(obsFn(r) || 0);
-    const insp = Number(inspFn(r) || 0);
-    const avg = insp > 0 ? (obs / insp).toFixed(2) : "0.00";
-
-    const title = options.titleFn ? String(options.titleFn(r) || label) : label;
-    const drillRows = Array.isArray(r.rows) ? r.rows : [];
-    const drillId = typeof registerDrill === "function"
-      ? registerDrill(title, drillRows, null, "PGNO analytics drilldown.")
-      : "";
-
-    return [
-      '<div class="csvb-pgno-list-row">',
-        '<div class="csvb-pgno-list-title" title="' + esc(label) + '">' + esc(label) + '</div>',
-        '<div class="csvb-pgno-list-metrics">' + esc(obs) + ' / ' + esc(insp) + ' / ' + esc(avg) + '</div>',
-        '<div class="csvb-pgno-list-actions">',
-          drillId ? '<button class="btn btn-muted btn-small" data-csvb-pgno-drill="' + esc(drillId) + '">View</button>' : '',
-        '</div>',
-      '</div>'
-    ].join("");
-  }).join("") + '</div>';
-
-  box.querySelectorAll("[data-csvb-pgno-drill]").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const id = btn.getAttribute("data-csvb-pgno-drill");
-      if (id && typeof openRegisteredDrill === "function") openRegisteredDrill(id);
-    });
-  });
-}
-
 function renderBarChart(containerId, rows, options = {}) {
-  if (containerId === "chartPgno" || containerId === "chartPgnoQuestion" || containerId === "chartPgnoMissing") {
-    return renderPgnoListChartSafe(containerId, rows, options);
-  }
-
-  return renderBarChartOriginal(containerId, rows, options);
-}
-) {
   const box = safeEl(containerId);
   if (!box) return;
 
