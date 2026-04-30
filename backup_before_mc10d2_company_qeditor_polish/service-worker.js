@@ -6,7 +6,7 @@
 // - Bump cache version + clean old caches on activate
 
 const CACHE_PREFIX = "sire-test-";
-const CACHE_VERSION = "v36-mc10d2-company-qeditor-polish";              // <-- bump this if you change caching behavior again
+const CACHE_VERSION = "v35-mc10d1-dashboard-suadmin-polish";              // <-- bump this if you change caching behavior again
 const CACHE_NAME = `${CACHE_PREFIX}${CACHE_VERSION}`;
 
 const CORE_ASSETS = [
