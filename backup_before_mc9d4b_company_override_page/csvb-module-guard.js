@@ -40,7 +40,6 @@
     "q-inspector.html": "sire_2_vetting",
 
     "q-questions-editor.html": "questions_editor",
-    "q-company-overrides.html": "questions_editor",
 
     "su-admin.html": "platform_administration"
   };
