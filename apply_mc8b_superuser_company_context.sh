@@ -1,29 +1,58 @@
-<!-- public/q-dashboard.html -->
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>C.S.V. BEACON – Dashboard</title>
+#!/usr/bin/env bash
+set -e
 
-  <link rel="stylesheet" href="./csv-beacon-theme.css?v=20260428_3" />
-  <link rel="stylesheet" href="./style.css?v=20260428_3" />
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="./auth.js"></script>
+if [ ! -d "public" ]; then
+  echo "ERROR: public folder not found. Run this from the Replit project root."
+  exit 1
+fi
 
-  <style>
-    body{margin:0;font-family:var(--font-sans);background:var(--bg-main);color:var(--text-main);}
-    .topbar{background:linear-gradient(90deg,var(--brand-navy-dark),var(--brand-navy));color:#fff;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;box-shadow:0 8px 24px rgba(3,27,63,.16);}
-    .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
-    .wrap{padding:18px;max-width:1200px;margin:0 auto;}
-    .btn{background:var(--brand-navy);color:#fff;border:1px solid var(--brand-navy);border-radius:10px;padding:10px 14px;font-weight:900;cursor:pointer;}
-    .btn2{background:var(--btn-secondary-bg);color:var(--brand-navy);border:1px solid var(--btn-secondary-border);border-radius:10px;padding:10px 14px;font-weight:900;cursor:pointer;}
-    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin-top:14px;}
-    .card{background:var(--bg-card);border:1px solid var(--border-soft);border-radius:14px;padding:14px;box-shadow:0 10px 30px rgba(3,27,63,0.06);}
-    .title{font-weight:950;color:var(--brand-navy);font-size:1.05rem;}
-    .muted{color:var(--text-muted);font-weight:650;margin-top:6px;line-height:1.35;}
-    .warn{display:none;margin-top:12px;color:#8b1d1d;background:#ffeaea;border:1px solid #ffc7c7;padding:10px 12px;border-radius:12px;font-weight:800;white-space:pre-wrap;}
-  
+mkdir -p backup_before_mc8b_superuser_company_context
+
+for f in \
+  public/q-dashboard.html \
+  public/csvb-module-guard.js \
+  public/service-worker.js
+do
+  if [ -f "$f" ]; then
+    cp "$f" backup_before_mc8b_superuser_company_context/$(basename "$f")
+  fi
+done
+
+node <<'NODE'
+const fs = require("fs");
+
+/* ============================================================
+   Patch q-dashboard.html
+============================================================ */
+
+const dashboard = "public/q-dashboard.html";
+
+if (!fs.existsSync(dashboard)) {
+  throw new Error("public/q-dashboard.html not found.");
+}
+
+let html = fs.readFileSync(dashboard, "utf8");
+
+/* Add selector UI after userBadge */
+if (!html.includes('id="csvbCompanyViewWrap"')) {
+  html = html.replace(
+    '<div id="userBadge" style="font-weight:800;opacity:.95;"></div>',
+    `<div id="userBadge" style="font-weight:800;opacity:.95;"></div>
+      <div id="csvbCompanyViewWrap" class="csvb-company-view-wrap" style="display:none;">
+        <span class="csvb-company-view-label">View as</span>
+        <select id="csvbCompanyViewSelect" class="csvb-company-view-select">
+          <option value="">Platform</option>
+        </select>
+        <button class="btn2 csvb-company-view-clear" id="csvbCompanyViewClearBtn" type="button">Platform view</button>
+      </div>`
+  );
+}
+
+/* Add styling */
+if (!html.includes(".csvb-company-view-wrap")) {
+  html = html.replace(
+    "</style>",
+    `
     .csvb-company-view-wrap{
       display:flex;
       align-items:center;
@@ -60,157 +89,19 @@
       color:#8A5A00;
       font-weight:900;
     }
-  </style>
-</head>
+  </style>`
+  );
+}
 
-<body>
-  <div class="topbar">
-    <div class="csvb-brand">
-      <img class="csvb-brand-logo" src="./assets/csv-beacon-icon.png" alt="C.S.V. BEACON logo" />
-      <div class="csvb-brand-text">
-        <div class="csvb-brand-title">C.S.V. BEACON</div>
-        <div class="csvb-brand-subtitle">Marine Assurance & Compliance Platform</div>
-      </div>
-    </div>
-    <div class="row">
-      <div id="userBadge" style="font-weight:800;opacity:.95;"></div>
-      <div id="csvbCompanyViewWrap" class="csvb-company-view-wrap" style="display:none;">
-        <span class="csvb-company-view-label">View as</span>
-        <select id="csvbCompanyViewSelect" class="csvb-company-view-select">
-          <option value="">Platform</option>
-        </select>
-        <button class="btn2 csvb-company-view-clear" id="csvbCompanyViewClearBtn" type="button">Platform view</button>
-      </div>
-      <button class="btn2" id="loginBtn" type="button" style="display:none;">Login</button>
-      <button class="btn2" id="switchUserBtn" type="button">Switch User</button>
-      <button class="btn" id="logoutBtn" type="button" style="display:none;">Logout</button>
-    </div>
-  </div>
+/* Replace final dashboard script */
+const start = html.lastIndexOf("<script>");
+const end = html.lastIndexOf("</script>");
 
-  <div class="wrap">
-    <div id="warnBox" class="warn"></div>
+if (start < 0 || end < 0 || end < start) {
+  throw new Error("Could not find final script block in q-dashboard.html.");
+}
 
-    <div class="grid">
-      <!-- Always available -->
-      <div class="card" data-card="library">
-        <div class="title">Read-Only Library</div>
-        <div class="muted">Open the locked SIRE 2.0 question library (no edits).</div>
-        <div style="margin-top:12px;">
-          <button class="btn2" type="button" onclick="location.href='./library.html?mode=study'">Open</button>
-        </div>
-      </div>
-
-      <div class="card" data-card="compare">
-        <div class="title">Pre/Post Compare</div>
-        <div class="muted">Compare Self-Assessment vs Post-Inspection statistics.</div>
-        <div style="margin-top:12px;">
-          <button class="btn2" type="button" onclick="location.href='./sa_compare.html'">Open</button>
-        </div>
-      </div>
-
-      <!-- Vessel -->
-      <div class="card" data-card="vessel">
-        <div class="title">Vessel View – My Questionnaires</div>
-        <div class="muted">Vessel users see only assigned questionnaires. Master sees all for the vessel.</div>
-        <div style="margin-top:12px;">
-          <button class="btn2" type="button" onclick="location.href='./q-vessel.html'">Open</button>
-        </div>
-      </div>
-
-      <div class="card" data-card="tasks">
-        <div class="title">My Self-Assessment Tasks</div>
-        <div class="muted">See tasks assigned to you (via RLS) and open questionnaires.</div>
-        <div style="margin-top:12px;">
-          <button class="btn2" type="button" onclick="location.href='./sa_tasks.html'">Open</button>
-        </div>
-      </div>
-
-      <!-- Company / Office -->
-      <div class="card" data-card="company">
-        <div class="title">Company Builder</div>
-        <div class="muted">Create questionnaires from filters/templates and assign roles.</div>
-        <div style="margin-top:12px;">
-          <button class="btn2" type="button" onclick="location.href='./q-company.html'">Open</button>
-        </div>
-      </div>
-
-      <div class="card" data-card="assignments">
-        <div class="title">Self-Assessment Assignments</div>
-        <div class="muted">Create campaigns and assign questionnaires to vessel/company roles.</div>
-        <div style="margin-top:12px;">
-          <button class="btn2" type="button" onclick="location.href='./sa_assignments.html'">Open</button>
-        </div>
-      </div>
-
-      <div class="card" data-card="post">
-        <div class="title">Post-Inspection Entry</div>
-        <div class="muted">Mark which questions received observations and record PGNO tick(s).</div>
-        <div style="margin-top:12px;">
-          <button class="btn2" type="button" onclick="location.href='./post_inspection.html'">Open</button>
-        </div>
-      </div>
-
-      <div class="card" data-card="poststats">
-        <div class="title">Post-Inspection Stats</div>
-        <div class="muted">Statistics for the post-inspection module.</div>
-        <div style="margin-top:12px;">
-          <button class="btn2" type="button" onclick="location.href='./post_inspection_stats.html'">Open</button>
-        </div>
-      </div>
-
-      <div class="card" data-card="inspector_intelligence">
-        <div class="title">Inspector Intelligence</div>
-        <div class="muted">Inspector records from own fleet inspections and third-party intelligence. Third-party records do not count toward fleet statistics.</div>
-        <div style="margin-top:12px;">
-          <button class="btn2" type="button" onclick="location.href='./inspector_intelligence.html'">Open</button>
-        </div>
-      </div>
-
-      <div class="card" data-card="audit_observations">
-        <div class="title">Audit Observations</div>
-        <div class="muted">Internal and external audit findings using SIRE 2.0 classification fields.</div>
-        <div style="margin-top:12px;">
-          <button class="btn2" type="button" onclick="location.href='./audit_observations.html'">Open</button>
-        </div>
-      </div>
-
-      <div class="card" data-card="reports">
-        <div class="title">Reports</div>
-        <div class="muted">Reporting & exports for office users.</div>
-        <div style="margin-top:12px;">
-          <button class="btn2" type="button" onclick="location.href='./q-report.html'">Open</button>
-        </div>
-      </div>
-
-      <div class="card" data-card="inspector">
-        <div class="title">Inspector / Third-Party</div>
-        <div class="muted">Inspector portal (as permitted by role/RLS).</div>
-        <div style="margin-top:12px;">
-          <button class="btn2" type="button" onclick="location.href='./q-inspector.html'">Open</button>
-        </div>
-      </div>
-
-      <!-- Questions Editor (role-based) -->
-      <div class="card" data-card="qeditor">
-        <div class="title">Questions Editor</div>
-        <div class="muted">Edit or review the question library (as permitted by your role).</div>
-        <div style="margin-top:12px;">
-          <button class="btn2" type="button" onclick="location.href='./q-questions-editor.html'">Open</button>
-        </div>
-      </div>
-
-      <!-- Super Admin only -->
-      <div class="card" data-card="suadmin">
-        <div class="title">Superuser Administration</div>
-        <div class="muted">Manage roles/rights/module access (scaffold page).</div>
-        <div style="margin-top:12px;">
-          <button class="btn2" type="button" onclick="location.href='./su-admin.html'">Open</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <script>
+const script = `<script>
     const CSVB_COMPANY_VIEW_ID_KEY = "csvb_superuser_company_view_id";
     const CSVB_COMPANY_VIEW_NAME_KEY = "csvb_superuser_company_view_name";
 
@@ -389,7 +280,7 @@
     }
 
     function setVisible(cardKey, roleAllowed, moduleAccess){
-      const el = document.querySelector(`[data-card="${cardKey}"]`);
+      const el = document.querySelector(\`[data-card="\${cardKey}"]\`);
       if (!el) return;
       const allowed = !!roleAllowed && cardAllowedByModule(cardKey, moduleAccess);
       el.style.display = allowed ? "block" : "none";
@@ -511,6 +402,238 @@
         return;
       }
     })().catch(e => showWarn(String(e?.message || e)));
-  </script>
-</body>
-</html>
+  </script>`;
+
+html = html.slice(0, start) + script + html.slice(end + "</script>".length);
+
+fs.writeFileSync(dashboard, html, "utf8");
+
+/* ============================================================
+   Patch csvb-module-guard.js
+============================================================ */
+
+const guard = "public/csvb-module-guard.js";
+
+if (fs.existsSync(guard)) {
+  let g = fs.readFileSync(guard, "utf8");
+
+  const patched = `// public/csvb-module-guard.js
+// C.S.V. BEACON — Direct Page Module Access Guard
+// MC-8B: respects superuser simulated company context.
+
+(() => {
+  "use strict";
+
+  const BUILD = "MC8B-2026-04-30";
+
+  const CSVB_COMPANY_VIEW_ID_KEY = "csvb_superuser_company_view_id";
+  const CSVB_COMPANY_VIEW_NAME_KEY = "csvb_superuser_company_view_name";
+
+  const PAGE_MODULE_MAP = {
+    "library.html": "read_only_library",
+
+    "q-dashboard.html": null,
+    "index.html": null,
+    "login.html": null,
+
+    "q-vessel.html": "self_assessment",
+    "q-answer.html": "self_assessment",
+    "sa_tasks.html": "self_assessment",
+    "sa_assignments.html": "self_assessment",
+    "q-company.html": "self_assessment",
+
+    "sa_compare.html": "post_inspection_stats",
+
+    "post_inspection.html": "post_inspection",
+    "post_inspection_detail.html": "post_inspection",
+    "post_inspection_observation_detail.html": "post_inspection",
+
+    "post_inspection_stats.html": "post_inspection_stats",
+    "post_inspection_kpis.html": "post_inspection_stats",
+
+    "inspector_intelligence.html": "inspector_intelligence",
+    "audit_observations.html": "audit_observations",
+
+    "q-report.html": "fleet_reports",
+
+    "q-inspector.html": "sire_2_vetting",
+
+    "q-questions-editor.html": "questions_editor",
+
+    "su-admin.html": "platform_administration"
+  };
+
+  function currentPageName() {
+    const p = String(window.location.pathname || "");
+    return p.split("/").pop() || "index.html";
+  }
+
+  function getSimulatedCompanyId(){
+    return localStorage.getItem(CSVB_COMPANY_VIEW_ID_KEY) || "";
+  }
+
+  function getSimulatedCompanyName(){
+    return localStorage.getItem(CSVB_COMPANY_VIEW_NAME_KEY) || "";
+  }
+
+  function showAccessDenied(message) {
+    let box = document.getElementById("warnBox") || document.getElementById("errBox") || document.getElementById("loginError");
+
+    if (!box) {
+      box = document.createElement("div");
+      box.id = "csvbModuleGuardWarn";
+      box.style.margin = "16px";
+      box.style.padding = "12px 14px";
+      box.style.borderRadius = "12px";
+      box.style.border = "1px solid #F5C2C2";
+      box.style.background = "#FFF4F4";
+      box.style.color = "#8B1D1D";
+      box.style.fontWeight = "850";
+      document.body.prepend(box);
+    }
+
+    box.textContent = message;
+    box.style.display = "block";
+  }
+
+  function isPlatformRole(role) {
+    return role === "super_admin" || role === "platform_owner";
+  }
+
+  async function simulatedCompanyAllowsModule(sb, companyId, moduleKey) {
+    const { data, error } = await sb.rpc("csvb_admin_list_company_modules", {
+      p_company_id: companyId
+    });
+
+    if (error) {
+      throw new Error("Could not verify simulated company module access: " + error.message);
+    }
+
+    return (data || []).some((m) => m.module_key === moduleKey && m.is_enabled === true);
+  }
+
+  async function guardPage() {
+    const page = currentPageName();
+    const moduleKey = PAGE_MODULE_MAP[page];
+
+    window.CSVB_MODULE_GUARD_BUILD = BUILD;
+
+    if (!moduleKey) return;
+
+    if (!window.AUTH?.ensureSupabase || !window.AUTH?.getSessionUserProfile) {
+      console.warn("C.S.V. BEACON module guard: AUTH is not available.");
+      return;
+    }
+
+    const bundle = await window.AUTH.getSessionUserProfile();
+
+    if (!bundle?.session?.user) return;
+
+    const role = bundle?.profile?.role;
+    const sb = window.AUTH.ensureSupabase();
+
+    if (isPlatformRole(role)) {
+      const simulatedCompanyId = getSimulatedCompanyId();
+
+      if (!simulatedCompanyId) return;
+
+      const allowedBySimulation = await simulatedCompanyAllowsModule(sb, simulatedCompanyId, moduleKey);
+
+      window.CSVB_MODULE_GUARD = {
+        page,
+        moduleKey,
+        allowed: allowedBySimulation,
+        simulatedCompanyId,
+        simulatedCompanyName: getSimulatedCompanyName(),
+        platformSimulation: true
+      };
+
+      if (allowedBySimulation) return;
+
+      showAccessDenied(
+        "Access denied by simulated company context. Module is not enabled for " +
+        (getSimulatedCompanyName() || "the selected company") +
+        ": " + moduleKey + ". Redirecting to Dashboard…"
+      );
+
+      setTimeout(() => {
+        window.location.href = "./q-dashboard.html";
+      }, 1000);
+
+      return;
+    }
+
+    const { data, error } = await sb.rpc("csvb_my_company_modules");
+
+    if (error) {
+      throw new Error("Could not verify module access: " + error.message);
+    }
+
+    const allowed = (data || []).some((m) => {
+      return m.module_key === moduleKey && m.is_enabled === true;
+    });
+
+    window.CSVB_MODULE_GUARD = {
+      page,
+      moduleKey,
+      allowed,
+      modules: data || []
+    };
+
+    if (allowed) return;
+
+    showAccessDenied(
+      "Access denied. This module is not enabled for your company: " + moduleKey + ". Redirecting to Dashboard…"
+    );
+
+    setTimeout(() => {
+      window.location.href = "./q-dashboard.html";
+    }, 1000);
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", () => {
+      guardPage().catch((e) => {
+        console.error("C.S.V. BEACON module guard error:", e);
+        showAccessDenied(String(e?.message || e));
+      });
+    });
+  } else {
+    guardPage().catch((e) => {
+      console.error("C.S.V. BEACON module guard error:", e);
+      showAccessDenied(String(e?.message || e));
+    });
+  }
+})();
+`;
+
+  fs.writeFileSync(guard, patched, "utf8");
+}
+
+/* ============================================================
+   Service worker bump
+============================================================ */
+
+const sw = "public/service-worker.js";
+if (fs.existsSync(sw)) {
+  let s = fs.readFileSync(sw, "utf8");
+  if (/const CACHE_VERSION = "[^"]+";/.test(s)) {
+    s = s.replace(
+      /const CACHE_VERSION = "[^"]+";/,
+      'const CACHE_VERSION = "v23-mc8b-superuser-company-context";'
+    );
+  }
+  fs.writeFileSync(sw, s, "utf8");
+}
+
+fs.writeFileSync(
+  "public/MC8B_SUPERUSER_COMPANY_CONTEXT_APPLIED.txt",
+  "MC-8B applied: Dashboard superuser company context selector and module guard simulation. No SQL/auth/RLS changes.\\n",
+  "utf8"
+);
+
+console.log("DONE: MC-8B superuser company context applied.");
+NODE
+
+echo "DONE: MC-8B completed."
+echo "Next: open Dashboard and hard refresh with Ctrl + Shift + R."

@@ -23,43 +23,6 @@
     .title{font-weight:950;color:var(--brand-navy);font-size:1.05rem;}
     .muted{color:var(--text-muted);font-weight:650;margin-top:6px;line-height:1.35;}
     .warn{display:none;margin-top:12px;color:#8b1d1d;background:#ffeaea;border:1px solid #ffc7c7;padding:10px 12px;border-radius:12px;font-weight:800;white-space:pre-wrap;}
-  
-    .csvb-company-view-wrap{
-      display:flex;
-      align-items:center;
-      gap:8px;
-      padding:6px 8px;
-      border:1px solid rgba(255,255,255,.28);
-      border-radius:12px;
-      background:rgba(255,255,255,.10);
-    }
-    .csvb-company-view-label{
-      color:#BFEFF4;
-      font-weight:900;
-      font-size:.85rem;
-    }
-    .csvb-company-view-select{
-      min-width:210px;
-      max-width:280px;
-      border-radius:10px;
-      border:1px solid rgba(255,255,255,.35);
-      padding:8px 10px;
-      font-weight:850;
-      color:#062A5E;
-      background:#fff;
-    }
-    .csvb-company-view-clear{
-      padding:8px 10px;
-    }
-    .csvb-sim-banner{
-      margin:0 0 12px 0;
-      padding:10px 12px;
-      border-radius:12px;
-      border:1px solid #F6D58F;
-      background:#FFF6E0;
-      color:#8A5A00;
-      font-weight:900;
-    }
   </style>
 </head>
 
@@ -74,13 +37,6 @@
     </div>
     <div class="row">
       <div id="userBadge" style="font-weight:800;opacity:.95;"></div>
-      <div id="csvbCompanyViewWrap" class="csvb-company-view-wrap" style="display:none;">
-        <span class="csvb-company-view-label">View as</span>
-        <select id="csvbCompanyViewSelect" class="csvb-company-view-select">
-          <option value="">Platform</option>
-        </select>
-        <button class="btn2 csvb-company-view-clear" id="csvbCompanyViewClearBtn" type="button">Platform view</button>
-      </div>
       <button class="btn2" id="loginBtn" type="button" style="display:none;">Login</button>
       <button class="btn2" id="switchUserBtn" type="button">Switch User</button>
       <button class="btn" id="logoutBtn" type="button" style="display:none;">Logout</button>
@@ -211,9 +167,6 @@
   </div>
 
   <script>
-    const CSVB_COMPANY_VIEW_ID_KEY = "csvb_superuser_company_view_id";
-    const CSVB_COMPANY_VIEW_NAME_KEY = "csvb_superuser_company_view_name";
-
     function showWarn(msg){
       const w=document.getElementById("warnBox");
       w.textContent=msg||"";
@@ -222,28 +175,6 @@
 
     function clearWarn(){
       showWarn("");
-    }
-
-    function isPlatformRole(role){
-      return role === "super_admin" || role === "platform_owner";
-    }
-
-    function getSimulatedCompanyId(){
-      return localStorage.getItem(CSVB_COMPANY_VIEW_ID_KEY) || "";
-    }
-
-    function getSimulatedCompanyName(){
-      return localStorage.getItem(CSVB_COMPANY_VIEW_NAME_KEY) || "";
-    }
-
-    function setSimulatedCompany(id, name){
-      if (id) {
-        localStorage.setItem(CSVB_COMPANY_VIEW_ID_KEY, id);
-        localStorage.setItem(CSVB_COMPANY_VIEW_NAME_KEY, name || "");
-      } else {
-        localStorage.removeItem(CSVB_COMPANY_VIEW_ID_KEY);
-        localStorage.removeItem(CSVB_COMPANY_VIEW_NAME_KEY);
-      }
     }
 
     const DASHBOARD_MODULE_BY_CARD = {
@@ -263,103 +194,23 @@
       suadmin: "platform_administration"
     };
 
-    async function setupSuperuserCompanyContext(bundle){
-      const wrap = document.getElementById("csvbCompanyViewWrap");
-      const sel = document.getElementById("csvbCompanyViewSelect");
-      const clearBtn = document.getElementById("csvbCompanyViewClearBtn");
-
-      if (!wrap || !sel || !clearBtn) return;
-
-      const role = bundle?.profile?.role || "";
-      if (!isPlatformRole(role)) {
-        wrap.style.display = "none";
-        return;
-      }
-
-      wrap.style.display = "flex";
-
-      const sb = AUTH.ensureSupabase();
-
-      const { data, error } = await sb.rpc("csvb_admin_list_companies");
-      if (error) {
-        showWarn("Could not load companies for superuser company context: " + error.message);
-        return;
-      }
-
-      const current = getSimulatedCompanyId();
-
-      sel.innerHTML = [
-        '<option value="">Platform / all companies</option>',
-        ...(data || []).map((c) => {
-          const label = c.company_name || c.short_name || c.company_code || c.id;
-          return '<option value="' + String(c.id).replaceAll('"','&quot;') + '">' +
-            String(label).replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;") +
-            '</option>';
-        })
-      ].join("");
-
-      sel.value = current || "";
-
-      sel.addEventListener("change", () => {
-        const id = sel.value || "";
-        const name = sel.options[sel.selectedIndex]?.textContent || "";
-        setSimulatedCompany(id, name);
-        location.reload();
-      });
-
-      clearBtn.addEventListener("click", () => {
-        setSimulatedCompany("", "");
-        location.reload();
-      });
-
-      if (current) {
-        const banner = document.createElement("div");
-        banner.className = "csvb-sim-banner";
-        banner.textContent =
-          "Superuser simulation active: viewing dashboard/module visibility as " +
-          (getSimulatedCompanyName() || "selected company") +
-          ". RLS remains platform-level for the actual superuser account.";
-        const warn = document.getElementById("warnBox");
-        if (warn && warn.parentElement && !document.querySelector(".csvb-sim-banner")) {
-          warn.parentElement.insertBefore(banner, warn.nextSibling);
-        }
-      }
-    }
-
     async function loadEnabledModules(bundle){
       const role = bundle?.profile?.role || "";
-      const isPlatform = isPlatformRole(role);
-      const sb = AUTH.ensureSupabase();
+      const R = AUTH.ROLES || {};
+      const isPlatform =
+        role === R.SUPER_ADMIN ||
+        role === "platform_owner" ||
+        bundle?.isPlatformAdmin === true;
 
       if (isPlatform) {
-        const simulatedCompanyId = getSimulatedCompanyId();
-
-        if (simulatedCompanyId) {
-          const { data, error } = await sb.rpc("csvb_admin_list_company_modules", {
-            p_company_id: simulatedCompanyId
-          });
-
-          if (error) {
-            throw new Error("Could not load simulated company module access: " + error.message);
-          }
-
-          return {
-            isPlatform: false,
-            isSimulatedCompany: true,
-            simulatedCompanyId,
-            simulatedCompanyName: getSimulatedCompanyName(),
-            enabled: new Set((data || []).filter((m) => m.is_enabled === true).map((m) => m.module_key)),
-            raw: data || []
-          };
-        }
-
         return {
           isPlatform: true,
-          isSimulatedCompany: false,
           enabled: new Set(Object.values(DASHBOARD_MODULE_BY_CARD).filter(Boolean)),
           raw: []
         };
       }
+
+      const sb = AUTH.ensureSupabase();
 
       const { data, error } = await sb.rpc("csvb_my_company_modules");
 
@@ -367,10 +218,15 @@
         throw new Error("Could not load company module access: " + error.message);
       }
 
+      const enabled = new Set(
+        (data || [])
+          .filter((m) => m.is_enabled === true)
+          .map((m) => m.module_key)
+      );
+
       return {
         isPlatform: false,
-        isSimulatedCompany: false,
-        enabled: new Set((data || []).filter((m) => m.is_enabled === true).map((m) => m.module_key)),
+        enabled,
         raw: data || []
       };
     }
@@ -383,14 +239,18 @@
 
     function cardAllowedByModule(cardKey, moduleAccess){
       if (moduleAccess?.isPlatform) return true;
+
       const moduleKey = DASHBOARD_MODULE_BY_CARD[cardKey];
+
       if (!moduleKey) return true;
+
       return moduleAccess?.enabled?.has(moduleKey) === true;
     }
 
     function setVisible(cardKey, roleAllowed, moduleAccess){
       const el = document.querySelector(`[data-card="${cardKey}"]`);
       if (!el) return;
+
       const allowed = !!roleAllowed && cardAllowedByModule(cardKey, moduleAccess);
       el.style.display = allowed ? "block" : "none";
     }
@@ -405,8 +265,7 @@
         switchBtnId: "switchUserBtn"
       });
 
-      await setupSuperuserCompanyContext(bundle);
-
+      /* Logged out: keep only public/open study cards */
       if (!bundle?.session?.user) {
         showWarn("You are logged out. Please Login.");
 
@@ -420,6 +279,7 @@
       }
 
       const moduleAccess = await loadEnabledModules(bundle);
+
       window.CSVB_DASHBOARD_MODULE_ACCESS = moduleAccess;
 
       const role = bundle.profile?.role;
@@ -433,11 +293,13 @@
 
       hideAllCards();
 
+      /* Always role-available when logged in, still filtered by company modules */
       setVisible("library", true, moduleAccess);
       setVisible("compare", true, moduleAccess);
       setVisible("tasks", true, moduleAccess);
       setVisible("vessel", true, moduleAccess);
 
+      /* Questions Editor visibility */
       setVisible("qeditor", (isSuper || isCompanyAdmin || isCompanySup), moduleAccess);
 
       if (isSuper) {
@@ -453,6 +315,7 @@
           "qeditor",
           "suadmin"
         ].forEach(k => setVisible(k, true, moduleAccess));
+
         return;
       }
 
@@ -482,6 +345,7 @@
           "inspector",
           "qeditor"
         ].forEach(k => setVisible(k, true, moduleAccess));
+
         setVisible("suadmin", false, moduleAccess);
         return;
       }

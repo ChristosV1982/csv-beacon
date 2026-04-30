@@ -1,14 +1,10 @@
 // public/csvb-module-guard.js
-// C.S.V. BEACON — Direct Page Module Access Guard
-// MC-8B: respects superuser simulated company context.
+// C.S.V. BEACON — MC-4C Direct Page Module Access Guard
 
 (() => {
   "use strict";
 
-  const BUILD = "MC8B-2026-04-30";
-
-  const CSVB_COMPANY_VIEW_ID_KEY = "csvb_superuser_company_view_id";
-  const CSVB_COMPANY_VIEW_NAME_KEY = "csvb_superuser_company_view_name";
+  const BUILD = "MC4C-2026-04-29";
 
   const PAGE_MODULE_MAP = {
     "library.html": "read_only_library",
@@ -49,14 +45,6 @@
     return p.split("/").pop() || "index.html";
   }
 
-  function getSimulatedCompanyId(){
-    return localStorage.getItem(CSVB_COMPANY_VIEW_ID_KEY) || "";
-  }
-
-  function getSimulatedCompanyName(){
-    return localStorage.getItem(CSVB_COMPANY_VIEW_NAME_KEY) || "";
-  }
-
   function showAccessDenied(message) {
     let box = document.getElementById("warnBox") || document.getElementById("errBox") || document.getElementById("loginError");
 
@@ -81,24 +69,13 @@
     return role === "super_admin" || role === "platform_owner";
   }
 
-  async function simulatedCompanyAllowsModule(sb, companyId, moduleKey) {
-    const { data, error } = await sb.rpc("csvb_admin_list_company_modules", {
-      p_company_id: companyId
-    });
-
-    if (error) {
-      throw new Error("Could not verify simulated company module access: " + error.message);
-    }
-
-    return (data || []).some((m) => m.module_key === moduleKey && m.is_enabled === true);
-  }
-
   async function guardPage() {
     const page = currentPageName();
     const moduleKey = PAGE_MODULE_MAP[page];
 
     window.CSVB_MODULE_GUARD_BUILD = BUILD;
 
+    // Unguarded pages
     if (!moduleKey) return;
 
     if (!window.AUTH?.ensureSupabase || !window.AUTH?.getSessionUserProfile) {
@@ -108,41 +85,15 @@
 
     const bundle = await window.AUTH.getSessionUserProfile();
 
+    // If logged out, let the page's existing auth logic handle login/redirect.
     if (!bundle?.session?.user) return;
 
     const role = bundle?.profile?.role;
+
+    // Platform users can access everything.
+    if (isPlatformRole(role)) return;
+
     const sb = window.AUTH.ensureSupabase();
-
-    if (isPlatformRole(role)) {
-      const simulatedCompanyId = getSimulatedCompanyId();
-
-      if (!simulatedCompanyId) return;
-
-      const allowedBySimulation = await simulatedCompanyAllowsModule(sb, simulatedCompanyId, moduleKey);
-
-      window.CSVB_MODULE_GUARD = {
-        page,
-        moduleKey,
-        allowed: allowedBySimulation,
-        simulatedCompanyId,
-        simulatedCompanyName: getSimulatedCompanyName(),
-        platformSimulation: true
-      };
-
-      if (allowedBySimulation) return;
-
-      showAccessDenied(
-        "Access denied by simulated company context. Module is not enabled for " +
-        (getSimulatedCompanyName() || "the selected company") +
-        ": " + moduleKey + ". Redirecting to Dashboard…"
-      );
-
-      setTimeout(() => {
-        window.location.href = "./q-dashboard.html";
-      }, 1000);
-
-      return;
-    }
 
     const { data, error } = await sb.rpc("csvb_my_company_modules");
 
