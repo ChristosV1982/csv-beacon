@@ -1,0 +1,1 @@
+MC-10D5-S1 applied: safe CSS-only density polish for post-inspection stats and KPI pages.
