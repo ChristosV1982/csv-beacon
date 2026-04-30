@@ -1319,46 +1319,76 @@ function extractPgnoAnalyticsRows(rows) {
   return out;
 }
 
+
 function renderPgnoAnalytics(rows, reportRows) {
   const pgRows = extractPgnoAnalyticsRows(rows);
+
   const byPgno = groupObjectiveRows(pgRows, (r) => r.pgno_label).slice(0, 50);
-  const byPgnoQuestion = groupObjectiveRows(pgRows, (r) => r.question_no).slice(0, 50);
 
-  renderBarChart("chartPgno", byPgno.map((x) => ({ ...x, rows: pgRows.filter((r) => r.pgno_label === x.key) })), {
-    labelFn: (r) => r.key,
-    obsFn: (r) => r.observation_count,
-    inspFn: (r) => r.report_count,
-    rowsFn: (r) => r.rows,
-    limit: 10,
-    emptyText: "No assigned PGNOs for current filters.",
-    titleFn: (r) => `PGNO: ${r.key}`,
+  const questionTextByNo = new Map();
+  (rows || []).forEach((r) => {
+    const qno = String(r.question_no || "").trim();
+    if (!qno || questionTextByNo.has(qno)) return;
+
+    const txt = String(
+      r.short_text ||
+      r.question_short_text ||
+      r.question_text ||
+      r.question ||
+      r.library_short_text ||
+      ""
+    ).trim();
+
+    if (txt) questionTextByNo.set(qno, txt);
   });
 
-  renderBarChart("chartPgnoQuestion", byPgnoQuestion.map((x) => ({ ...x, rows: pgRows.filter((r) => r.question_no === x.key) })), {
-    labelFn: (r) => r.key,
-    obsFn: (r) => r.observation_count,
-    inspFn: (r) => r.report_count,
-    rowsFn: (r) => r.rows,
-    limit: 10,
-    emptyText: "No PGNO/question data for current filters.",
-    titleFn: (r) => `PGNO Question: ${r.key}`,
-  });
+  const byPgnoQuestion = groupObjectiveRows(pgRows, (r) => r.question_no)
+    .map((x) => {
+      const qno = String(x.key || "").trim();
+      const qtxt = String(questionTextByNo.get(qno) || "").trim();
+      return {
+        ...x,
+        display_label: qtxt ? `${qno} — ${qtxt}` : qno,
+        rows: pgRows.filter((r) => String(r.question_no || "").trim() === qno),
+      };
+    })
+    .slice(0, 50);
 
-  const missingRows = (rows || []).filter((r) => {
-    const arr = Array.isArray(r.pgno_selected) ? r.pgno_selected : [];
-    const type = normalizeType(r.observation_type);
-    return (type === "negative" || type === "largely") && arr.length === 0;
-  });
+  renderBarChart(
+    "chartPgno",
+    byPgno.map((x) => ({
+      ...x,
+      rows: pgRows.filter((r) => r.pgno_label === x.key),
+    })),
+    {
+      labelFn: (r) => r.key,
+      obsFn: (r) => r.observations,
+      inspFn: (r) => r.inspections,
+      limit: 50,
+      emptyText: "No assigned PGNOs for current filters.",
+      titleFn: (r) => `PGNO: ${r.key}`,
+    }
+  );
 
-  renderBarChart("chartPgnoMissing", buildPeriodRows(missingRows, reportRows, monthKey), {
-    labelFn: (r) => r.key,
-    obsFn: (r) => r.observations,
-    inspFn: (r) => r.inspections,
-    rowsFn: (r) => r.rows,
-    limit: 18,
-    emptyText: "No missing PGNOs for current filters.",
-    titleFn: (r) => `Missing PGNO: ${r.key}`,
-  });
+  renderBarChart(
+    "chartPgnoQuestion",
+    byPgnoQuestion,
+    {
+      labelFn: (r) => r.display_label || r.key,
+      obsFn: (r) => r.observations,
+      inspFn: (r) => r.inspections,
+      limit: 50,
+      emptyText: "No PGNO / question data for current filters.",
+      titleFn: (r) => `PGNO Question: ${r.display_label || r.key}`,
+    }
+  );
+
+  // Remove Missing PGNO Trend completely
+  const missingChart = safeEl("chartPgnoMissing");
+  if (missingChart) {
+    const chartBox = missingChart.closest(".chartBox");
+    if (chartBox) chartBox.remove();
+  }
 
   const tbody = safeTbody("pgnoTableTbody");
   if (!tbody) return;
@@ -1370,10 +1400,10 @@ function renderPgnoAnalytics(rows, reportRows) {
 
     const tr = document.createElement("tr");
     tr.innerHTML = `
-      <td>${esc(r.key)}</td>
-      <td>${esc(r.observation_count)}</td>
-      <td>${esc(r.report_count)}</td>
-      <td>${esc(r.avg_per_inspection)}</td>
+      <td>${esc(r.key || "")}</td>
+      <td>${esc(r.observations || 0)}</td>
+      <td>${esc(r.inspections || 0)}</td>
+      <td>${esc(avg(r.observations || 0, r.inspections || 0))}</td>
       <td>${esc(r.last_seen || "")}</td>
       <td>${buttonHtml(drillId)}</td>
     `;
@@ -1381,7 +1411,6 @@ function renderPgnoAnalytics(rows, reportRows) {
   }
 
   if (!byPgno.length) ensureTbodyMessage(tbody, 6, "No assigned PGNO data for current filters.");
-  bindDrillButtons(tbody);
 }
 
 function renderSummaryFromRows(rows, reportRows) {
