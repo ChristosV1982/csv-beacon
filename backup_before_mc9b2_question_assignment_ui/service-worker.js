@@ -6,7 +6,7 @@
 // - Bump cache version + clean old caches on activate
 
 const CACHE_PREFIX = "sire-test-";
-const CACHE_VERSION = "v24-mc9b2-question-assignment-ui";              // <-- bump this if you change caching behavior again
+const CACHE_VERSION = "v23-mc8b-superuser-company-context";              // <-- bump this if you change caching behavior again
 const CACHE_NAME = `${CACHE_PREFIX}${CACHE_VERSION}`;
 
 const CORE_ASSETS = [
@@ -16,7 +16,6 @@ const CORE_ASSETS = [
   "./csv-beacon-theme.css",
   "./auth.js",
   "./csvb-module-guard.js",
-  "./csvb-question-admin.js",
   "./assets/csv-beacon-icon.png",
   "./assets/csv-beacon-logo-full.png",
   "./icon-192.png",
