@@ -1,0 +1,1 @@
+MC-10C applied: 100% browser zoom fit and responsive density pass. Visual-only.\n
