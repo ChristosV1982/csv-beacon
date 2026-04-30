@@ -220,219 +220,6 @@ let LIB_BY_NO = new Map();
 let FILTERED = [];
 let SELECTED_SET = new Set(); // question_no strings
 
-
-/* ======================== MC-9C2B Effective Company Question Library Helpers ======================== */
-
-const MC9C2B_BUILD = "MC9C2B-2026-04-30";
-
-function mc9SafeArray(v) {
-  return Array.isArray(v) ? v : [];
-}
-
-function mc9Text(v) {
-  return v === null || v === undefined ? "" : String(v);
-}
-
-function mc9QuestionNumber(row) {
-  const full = mc9Text(row?.number_full).trim();
-  if (full) return full;
-
-  const base = mc9Text(row?.number_base).trim();
-  const suffix = mc9Text(row?.number_suffix).trim();
-
-  if (!base) return "";
-  return suffix ? base + "-" + suffix : base;
-}
-
-function mc9NormalizePgnoRows(rows) {
-  return mc9SafeArray(rows)
-    .map((r, idx) => ({
-      seq: Number(r?.seq || idx + 1),
-      pgno_code: mc9Text(r?.pgno_code || ""),
-      pgno_text: mc9Text(r?.pgno_text || r?.text || ""),
-      text: mc9Text(r?.pgno_text || r?.text || ""),
-      remarks: mc9Text(r?.remarks || "")
-    }))
-    .filter((r) => r.text.trim());
-}
-
-function mc9NormalizeEvidenceRows(rows) {
-  return mc9SafeArray(rows)
-    .map((r, idx) => ({
-      seq: Number(r?.seq || idx + 1),
-      evidence_text: mc9Text(r?.evidence_text || r?.text || ""),
-      text: mc9Text(r?.evidence_text || r?.text || ""),
-      esms_references: mc9Text(r?.esms_references || ""),
-      esms_forms: mc9Text(r?.esms_forms || ""),
-      remarks: mc9Text(r?.remarks || "")
-    }))
-    .filter((r) => r.text.trim());
-}
-
-function mc9EffectiveRowToQuestion(row) {
-  const payload = row?.effective_payload && typeof row.effective_payload === "object"
-    ? JSON.parse(JSON.stringify(row.effective_payload))
-    : {};
-
-  const qno = mc9QuestionNumber(row);
-  const numberBase = mc9Text(row?.number_base).trim();
-  const numberSuffix = mc9Text(row?.number_suffix).trim();
-  const sourceType = mc9Text(row?.source_type || "SIRE").trim() || "SIRE";
-
-  const pgnoRows = mc9NormalizePgnoRows(row?.effective_pgno);
-  const eeRows = mc9NormalizeEvidenceRows(row?.effective_expected_evidence);
-
-  const pgnoTextRows = pgnoRows.map((x) => x.text).filter(Boolean);
-  const eeTextRows = eeRows.map((x) => x.text).filter(Boolean);
-
-  const questionText =
-    mc9Text(payload.question || payload.Question || payload.short_text || payload.ShortText || payload.text || "").trim();
-
-  const shortText =
-    mc9Text(payload.short_text || payload.ShortText || payload.shortText || questionText || "").trim();
-
-  const merged = {
-    ...payload,
-
-    id: row.question_id,
-    question_id: row.question_id,
-    db_question_id: row.question_id,
-    master_question_id: row.question_id,
-
-    question_no: qno,
-    question_number: qno,
-    number_full: qno,
-    Number: qno,
-    Question_No: qno,
-    questionNo: qno,
-
-    number_base: numberBase,
-    number_suffix: numberSuffix,
-
-    source_type: sourceType,
-    is_custom: !!row.is_custom,
-    status: row.status,
-    version: row.version,
-    tags: row.tags || [],
-
-    company_id: row.company_id,
-    company_name: row.company_name || "",
-
-    override_id: row.override_id || null,
-    override_status: row.override_status || null,
-    override_version: row.override_version || null,
-
-    can_view: row.can_view,
-    can_review: row.can_review,
-    can_edit_override: row.can_edit_override,
-
-    short_text: shortText,
-    ShortText: shortText,
-    question: questionText,
-    Question: questionText,
-
-    potential_grounds_for_negative_observations: pgnoTextRows,
-    Potential_Grounds_for_Negative_Observations: pgnoTextRows,
-    PGNO: pgnoTextRows,
-    pgno_rows: pgnoRows,
-    effective_pgno: pgnoRows,
-
-    expected_evidence: eeTextRows,
-    Expected_Evidence: eeTextRows,
-    expected_evidence_rows: eeRows,
-    effective_expected_evidence: eeRows,
-
-    __effective_company_library: true,
-    __mc9c2b_build: MC9C2B_BUILD
-  };
-
-  return merged;
-}
-
-function mc9RefreshFilterValuesFromLibrary() {
-  const chapters = [...new Set(LIB.map(getChapter).filter(Boolean).map(String))].sort((a, b) => {
-    const na = Number(a);
-    const nb = Number(b);
-    if (!Number.isNaN(na) && !Number.isNaN(nb)) return na - nb;
-    return a.localeCompare(b);
-  });
-
-  const qtypes = [...new Set(LIB.map(getQType).filter(Boolean).map(String))].sort();
-
-  FILTERS.chapters.values = chapters;
-  FILTERS.qtype.values = qtypes;
-
-  renderFilterBar();
-  applyFilters();
-  renderSelectedSummary();
-}
-
-async function loadEffectiveLibraryForSelectedVessel() {
-  const vesselId = el("vesselSelect")?.value || VESSELS[0]?.id || "";
-
-  if (!vesselId) {
-    LIB = [];
-    LIB_BY_NO = new Map();
-    FILTERED = [];
-    SELECTED_SET = new Set();
-
-    const lockLine = el("libraryLockLine");
-    if (lockLine) {
-      lockLine.textContent = "Effective question library: no vessel selected.";
-    }
-
-    mc9RefreshFilterValuesFromLibrary();
-    return;
-  }
-
-  setSubLine("Loading assigned/effective question library for selected vessel...");
-
-  const { data, error } = await supabaseClient.rpc("csvb_effective_question_library_for_vessel", {
-    p_vessel_id: vesselId
-  });
-
-  if (error) {
-    throw new Error("Effective question library load failed: " + error.message);
-  }
-
-  LIB = (data || []).map(mc9EffectiveRowToQuestion);
-  LIB_BY_NO = new Map();
-
-  for (const q of LIB) {
-    const qno = getQno(q);
-    if (qno) LIB_BY_NO.set(String(qno), q);
-  }
-
-  const validQuestionNos = new Set(Array.from(LIB_BY_NO.keys()));
-  SELECTED_SET = new Set(
-    Array.from(SELECTED_SET || []).filter((qno) => validQuestionNos.has(String(qno)))
-  );
-
-  const vesselName = (VESSELS || []).find((v) => String(v.id) === String(vesselId))?.name || "selected vessel";
-  const lockLine = el("libraryLockLine");
-
-  if (lockLine) {
-    lockLine.textContent =
-      "Effective assigned question library loaded for " +
-      vesselName +
-      ": " +
-      LIB.length +
-      " question(s).";
-  }
-
-  window.CSVB_EFFECTIVE_LIBRARY = {
-    build: MC9C2B_BUILD,
-    vessel_id: vesselId,
-    question_count: LIB.length,
-    sample: LIB.slice(0, 3)
-  };
-
-  mc9RefreshFilterValuesFromLibrary();
-  setSubLine("Ready.");
-}
-
-
-
 function pick(obj, keys) {
   for (const k of keys) {
     if (obj && obj[k] != null && obj[k] !== "") return obj[k];
@@ -1187,8 +974,6 @@ async function refreshAll() {
   VESSELS = await loadVessels();
   renderVesselSelect();
 
-  await loadEffectiveLibraryForSelectedVessel();
-
   ALL_Q = await loadQuestionnaires();
   renderQuestionnairesTable();
 
@@ -1201,7 +986,7 @@ async function refreshAll() {
 async function init() {
   clearWarn();
   const lockLine = el("libraryLockLine");
-  if (lockLine) lockLine.textContent = "Question source: assigned/effective company library.";
+  if (lockLine) lockLine.textContent = `Library locked to: ${LOCKED_LIBRARY_JSON}`;
 
   document.addEventListener("click", (e) => {
     const inside = e.target.closest(".fltDD");
@@ -1261,7 +1046,7 @@ async function init() {
     })
   );
 
-  setSubLine("Loading fallback question library; effective library will replace it after vessel load...");
+  setSubLine("Loading question library...");
 
   try {
     LIB = await loadLockedLibraryJson(LOCKED_LIBRARY_JSON);
@@ -1304,19 +1089,6 @@ async function init() {
   }
 
   el("refreshBtn")?.addEventListener("click", refreshAll);
-
-  // MC-9C2B vessel change effective library reload
-  el("vesselSelect")?.addEventListener("change", async () => {
-    clearWarn();
-
-    try {
-      SELECTED_SET = new Set();
-      await loadEffectiveLibraryForSelectedVessel();
-    } catch (e) {
-      showWarn(String(e?.message || e));
-      setSubLine("Error loading effective library.");
-    }
-  });
   el("searchInput")?.addEventListener("input", renderQuestionnairesTable);
 
   el("createBtn")?.addEventListener("click", () => createQuestionnaireByCompile(user.id));

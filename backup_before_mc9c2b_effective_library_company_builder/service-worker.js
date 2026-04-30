@@ -6,7 +6,7 @@
 // - Bump cache version + clean old caches on activate
 
 const CACHE_PREFIX = "sire-test-";
-const CACHE_VERSION = "v25-mc9c2b-effective-library-company-builder";              // <-- bump this if you change caching behavior again
+const CACHE_VERSION = "v24-mc9b2-question-assignment-ui";              // <-- bump this if you change caching behavior again
 const CACHE_NAME = `${CACHE_PREFIX}${CACHE_VERSION}`;
 
 const CORE_ASSETS = [
