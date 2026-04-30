@@ -963,34 +963,40 @@ async function createQuestionnaireFromTemplateFlow(templateId) {
 
   const vesselId = el("vesselSelect")?.value || "";
   const title = (el("titleInput")?.value || "").trim();
-  const assigned = getAssignedPositionFromUI();
 
   if (!vesselId) {
     showWarn("Select a vessel first (Vessel).");
     return;
   }
-
   if (!title) {
     showWarn("Enter a title first (Title).");
     return;
   }
 
-  setSubLine("Creating questionnaire from template using effective company library...");
-
-  const { data, error } = await supabaseClient.rpc("csvb_create_questionnaire_from_template_effective", {
+  const { data, error } = await supabaseClient.rpc("create_questionnaire_from_template", {
     p_template_id: templateId,
     p_vessel_id: vesselId,
     p_title: title,
-    p_assigned_position: assigned || null
   });
 
   if (error) {
     showWarn("Create from template failed: " + error.message);
-    setSubLine("Ready.");
     return;
   }
 
   const qid = data;
+
+  if (qid) {
+    try {
+      await applyAssignedPositionToQuestionnaire(qid);
+    } catch (e) {
+      showWarn(
+        "Questionnaire created from template, but assignment update failed.\n\n" +
+          "Error: " +
+          String(e?.message || e)
+      );
+    }
+  }
 
   await refreshAll();
 
