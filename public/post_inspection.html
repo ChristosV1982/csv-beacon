@@ -313,9 +313,10 @@
   <link rel="stylesheet" href="./csvb-ui-polish.css?v=20260430_1" />
   <link rel="stylesheet" href="./csvb-help-tooltips.css?v=20260430_1" />
   <link rel="stylesheet" href="./csvb-100pct-fit.css?v=20260430_1" />
+  <link rel="stylesheet" href="./csvb-post-inspection-entry-polish.css?v=20260501_1" />
 </head>
 
-<body>
+<body class="post-inspection-entry-page">
   <div class="wrap">
     <div class="hero">
       <h1>Post-Inspection Entry</h1>
@@ -323,10 +324,10 @@
 
       <div class="toprow">
         <span class="pill" id="userBadge">Not signed in</span>
-        <button class="btn light" id="dashboardBtn" type="button">Dashboard</button>
-        <button class="btn light" id="modeSelectBtn" type="button">Mode Selection</button>
-        <button class="btn primary" id="newReportBtn" type="button">New Post-Inspection Report</button>
-        <button class="btn primary" id="logoutBtn" type="button">Logout</button>
+        <button class="btn light" id="dashboardBtn" type="button" title="Return to the main dashboard." data-csvb-help="Return to the main dashboard.">Dashboard</button>
+        <button class="btn light" id="modeSelectBtn" type="button" title="Return to mode selection." data-csvb-help="Return to mode selection.">Mode Selection</button>
+        <button class="btn primary" id="newReportBtn" type="button" title="Create a new stored post-inspection report record." data-csvb-help="Create a new stored post-inspection report record.">New Post-Inspection Report</button>
+        <button class="btn primary" id="logoutBtn" type="button" title="Sign out of the current session." data-csvb-help="Sign out of the current session.">Logout</button>
         <span class="pill" id="buildPill">build: —</span>
       </div>
     </div>
@@ -340,7 +341,7 @@
 
         <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
           <span class="tableCount" id="storedCount">0 inspection(s)</span>
-          <button class="btn muted" id="clearStoredFiltersBtn" type="button">Clear table filters</button>
+          <button class="btn muted" id="clearStoredFiltersBtn" type="button" title="Clear all active table filters." data-csvb-help="Clear all active table filters.">Clear table filters</button>
         </div>
       </div>
 
@@ -351,38 +352,38 @@
               <th style="width:180px;">
                 <div class="filter-head">
                   <span>Vessel</span>
-                  <button class="filter-btn" type="button" data-filter-col="vessel_name">▼</button>
+                  <button class="filter-btn" type="button" title="Open column filter." data-csvb-help="Open column filter." data-filter-col="vessel_name">▼</button>
                 </div>
               </th>
               <th style="width:140px;">
                 <div class="filter-head">
                   <span>Date</span>
-                  <button class="filter-btn" type="button" data-filter-col="inspection_date">▼</button>
+                  <button class="filter-btn" type="button" title="Open column filter." data-csvb-help="Open column filter." data-filter-col="inspection_date">▼</button>
                 </div>
               </th>
               <th style="width:190px;">Report Ref</th>
               <th style="width:260px;">
                 <div class="filter-head">
                   <span>Title</span>
-                  <button class="filter-btn" type="button" data-filter-col="title">▼</button>
+                  <button class="filter-btn" type="button" title="Open column filter." data-csvb-help="Open column filter." data-filter-col="title">▼</button>
                 </div>
               </th>
               <th style="width:260px;">
                 <div class="filter-head">
                   <span>OCIMF Inspecting Company</span>
-                  <button class="filter-btn" type="button" data-filter-col="ocimf_inspecting_company">▼</button>
+                  <button class="filter-btn" type="button" title="Open column filter." data-csvb-help="Open column filter." data-filter-col="ocimf_inspecting_company">▼</button>
                 </div>
               </th>
               <th style="width:220px;">
                 <div class="filter-head">
                   <span>Inspector Name</span>
-                  <button class="filter-btn" type="button" data-filter-col="inspector_name">▼</button>
+                  <button class="filter-btn" type="button" title="Open column filter." data-csvb-help="Open column filter." data-filter-col="inspector_name">▼</button>
                 </div>
               </th>
               <th style="width:240px;">
                 <div class="filter-head">
                   <span>Inspector’s Company</span>
-                  <button class="filter-btn" type="button" data-filter-col="inspector_company">▼</button>
+                  <button class="filter-btn" type="button" title="Open column filter." data-csvb-help="Open column filter." data-filter-col="inspector_company">▼</button>
                 </div>
               </th>
             </tr>
@@ -405,8 +406,8 @@
       <div id="storedFilterList" class="chk-list"></div>
 
       <div class="dlg-actions">
-        <button class="btn muted" id="storedFilterClearBtn" type="button">Clear this filter</button>
-        <button class="btn primary" id="storedFilterApplyBtn" type="button">Apply</button>
+        <button class="btn muted" id="storedFilterClearBtn" type="button" title="Clear the currently selected filter." data-csvb-help="Clear the currently selected filter.">Clear this filter</button>
+        <button class="btn primary" id="storedFilterApplyBtn" type="button" title="Apply the selected filter values." data-csvb-help="Apply the selected filter values.">Apply</button>
       </div>
     </div>
   </dialog>
