@@ -1,7 +1,0 @@
-MC-3B5B applied:
-- Vessels tab now has Company dropdown when adding a vessel.
-- Vessel list now includes Company column.
-- Vessel add/activate/deactivate uses csvb_admin_upsert_vessel RPC.
-- No auth.js changes.
-- No Supabase key changes.
-- No SQL changes.

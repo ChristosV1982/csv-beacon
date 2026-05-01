@@ -1,9 +1,0 @@
-MC-3B7 applied:
-- Create User form now has Company dropdown.
-- Vessel dropdown is filtered by selected company.
-- User list now shows Company column.
-- User creation still uses existing su-admin Edge Function.
-- After creation, user is assigned to selected company/vessel using existing RPCs.
-- No auth.js changes.
-- No Supabase key changes.
-- No SQL changes.

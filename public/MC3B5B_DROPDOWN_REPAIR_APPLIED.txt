@@ -1,1 +1,0 @@
-Repaired missing renderVesselCompanyDropdown helper. No DB/auth/Supabase key changes.\n

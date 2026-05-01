@@ -1,1 +1,0 @@
-MC-10D5R rollback applied: removed csvb-post-stats-repair CSS/JS from post inspection stats pages. Visual-only rollback.

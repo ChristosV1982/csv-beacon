@@ -1,1 +1,0 @@
-MC-8B applied: Dashboard superuser company context selector and module guard simulation. No SQL/auth/RLS changes.\n

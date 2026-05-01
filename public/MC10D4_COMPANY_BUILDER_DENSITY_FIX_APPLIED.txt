@@ -1,1 +1,0 @@
-MC-10D4 applied: compact search/refresh header and inline template actions for q-company.

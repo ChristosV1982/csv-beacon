@@ -1,1 +1,0 @@
-MC-9C3C applied: Company Builder template creation now uses effective company question library RPC.\n

@@ -1,1 +1,0 @@
-MC-10D1 applied: dashboard and superuser administration module-specific polish, icons, helper strips, and contextual help.\n

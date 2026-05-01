@@ -1,1 +1,0 @@
-MC-10D2 applied: Company Builder and Questions Editor module-specific polish, icons, workflow hints, and contextual help.\n

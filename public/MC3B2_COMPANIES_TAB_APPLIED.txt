@@ -1,8 +1,0 @@
-MC-3B2 applied:
-- Added Companies tab to Superuser Administration.
-- Added company list/create/edit form.
-- Added company module toggles.
-- Added read-only company vessels/users panels.
-- No auth.js changes.
-- No Supabase key changes.
-- No SQL changes.

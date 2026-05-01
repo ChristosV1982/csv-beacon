@@ -1,1 +1,0 @@
-Repaired duplicate refreshSelectedCompanyDetails function in su-admin.js. No database/auth/Supabase key changes.\n

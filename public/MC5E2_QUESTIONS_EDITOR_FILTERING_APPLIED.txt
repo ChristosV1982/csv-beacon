@@ -1,1 +1,0 @@
-MC-5E2 applied: Questions Editor now uses scoped RPCs and safe company-aware write calls. No auth/Supabase key/RLS changes.\n

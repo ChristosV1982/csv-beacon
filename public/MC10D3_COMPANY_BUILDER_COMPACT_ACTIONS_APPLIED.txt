@@ -1,1 +1,0 @@
-MC-10D3 applied: compact action groups and tooltip polish for Company Builder.
