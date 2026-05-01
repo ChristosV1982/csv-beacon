@@ -1,0 +1,135 @@
+/* public/csvb-login-exact-fit.css
+   Login page only.
+   Exact selectors only.
+*/
+
+body.csvb-login-page {
+  min-height: 100vh !important;
+  height: 100vh !important;
+  margin: 0 !important;
+  padding: 10px 14px !important;
+  overflow: hidden !important;
+
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+/* The actual login container */
+body.csvb-login-page .login-shell {
+  width: min(720px, calc(100vw - 28px)) !important;
+  max-width: 720px !important;
+  max-height: calc(100vh - 20px) !important;
+  overflow: hidden !important;
+
+  padding: 14px 16px 14px 16px !important;
+  border-radius: 16px !important;
+  box-sizing: border-box !important;
+}
+
+/* Logo block */
+body.csvb-login-page .login-shell > div:first-child {
+  margin-bottom: 6px !important;
+  max-height: 84px !important;
+  overflow: hidden !important;
+}
+
+/* Logo image only */
+body.csvb-login-page .csvb-brand-logo-full {
+  display: block !important;
+  width: auto !important;
+  max-width: 220px !important;
+  max-height: 78px !important;
+  object-fit: contain !important;
+  margin: 0 auto !important;
+}
+
+/* Title/subtitle block */
+body.csvb-login-page .title {
+  margin: 0 0 4px 0 !important;
+  font-size: 1.25rem !important;
+  line-height: 1.15 !important;
+  font-weight: 700 !important;
+}
+
+body.csvb-login-page .subtitle {
+  margin: 0 0 8px 0 !important;
+  font-size: 0.9rem !important;
+  line-height: 1.25 !important;
+  font-weight: 500 !important;
+}
+
+body.csvb-login-page .subtitle b {
+  font-weight: 600 !important;
+}
+
+body.csvb-login-page .build {
+  margin-top: 3px !important;
+  font-size: 0.78rem !important;
+  font-weight: 500 !important;
+}
+
+/* Login form card */
+body.csvb-login-page .card {
+  padding: 12px 12px !important;
+  border-radius: 12px !important;
+  box-sizing: border-box !important;
+}
+
+body.csvb-login-page label {
+  margin: 7px 0 4px 0 !important;
+  font-size: 0.88rem !important;
+  font-weight: 600 !important;
+}
+
+body.csvb-login-page input {
+  height: 34px !important;
+  min-height: 34px !important;
+  padding: 6px 9px !important;
+  font-size: 0.9rem !important;
+  border-radius: 8px !important;
+}
+
+body.csvb-login-page .actions {
+  gap: 8px !important;
+  margin-top: 10px !important;
+}
+
+body.csvb-login-page .btn-primary,
+body.csvb-login-page .btn-muted,
+body.csvb-login-page .btn-outline {
+  min-height: 32px !important;
+  padding: 6px 11px !important;
+  border-radius: 8px !important;
+  font-size: 0.9rem !important;
+  font-weight: 600 !important;
+  line-height: 1.15 !important;
+}
+
+body.csvb-login-page .hint {
+  margin-top: 8px !important;
+  font-size: 0.82rem !important;
+  line-height: 1.25 !important;
+  font-weight: 400 !important;
+}
+
+body.csvb-login-page .error {
+  margin-top: 8px !important;
+  padding: 8px 10px !important;
+  font-size: 0.85rem !important;
+  font-weight: 500 !important;
+}
+
+/* On short/small screens, allow scroll instead of cutting the form. */
+@media (max-height: 640px), (max-width: 700px) {
+  body.csvb-login-page {
+    height: auto !important;
+    min-height: 100vh !important;
+    overflow-y: auto !important;
+    align-items: flex-start !important;
+  }
+
+  body.csvb-login-page .login-shell {
+    max-height: none !important;
+  }
+}

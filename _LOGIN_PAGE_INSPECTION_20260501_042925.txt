@@ -1,0 +1,740 @@
+============================================================
+LOGIN PAGE INSPECTION — READ ONLY
+Generated: Fri May  1 04:29:25 AM UTC 2026
+============================================================
+
+============================================================
+GIT STATUS
+============================================================
+?? _LOGIN_PAGE_INSPECTION_20260501_042925.txt
+
+============================================================
+login.html — LINKED CSS / JS
+============================================================
+8:  <link rel="stylesheet" href="./csv-beacon-theme.css?v=20260428_3" />
+9:  <link rel="stylesheet" href="style.css?v=20260428_3" />
+158:  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+159:  <link rel="stylesheet" href="./csvb-ui-polish.css?v=20260430_1" />
+160:  <link rel="stylesheet" href="./csvb-help-tooltips.css?v=20260430_1" />
+161:  <link rel="stylesheet" href="./csvb-100pct-fit.css?v=20260430_1" />
+162:  <link rel="stylesheet" href="./csvb-login-fit.css?v=20260501_1" />
+204:  <script>
+332:  <script src="./csvb-ui-polish.js?v=20260430_1"></script>
+333:  <script src="./csvb-help-tooltips.js?v=20260430_1"></script>
+334:  <script src="./csvb-100pct-fit.js?v=20260430_1"></script>
+
+============================================================
+login.html — BODY / STRUCTURE LINES
+============================================================
+6:  <title>C.S.V. BEACON – Login</title>
+165:<body>
+166:  <div class="login-shell">
+167:    <div style="text-align:center;margin-bottom:12px;">
+168:      <img src="./assets/csv-beacon-logo-full.png" alt="C.S.V. BEACON logo" class="csvb-brand-logo-full" style="max-width:320px;margin:0 auto;" />
+169:    </div>
+170:    <div class="title">C.S.V. BEACON Login</div>
+171:    <div class="subtitle">
+172:      Marine Assurance & Compliance Platform<br/>Users login with <b>Username + Password</b>.<br/>
+174:      <div class="build" id="buildTag">BUILD: LOGIN-2026-01-14B</div>
+175:    </div>
+177:    <div class="card">
+178:      <label for="username">Username</label>
+181:      <label for="password">Password</label>
+184:      <div class="actions">
+185:        <button class="btn-primary" id="loginBtn" type="button">Login</button>
+186:        <button class="btn-muted" id="logoutBtn" type="button">Logout</button>
+187:      </div>
+189:      <div class="error" id="errBox"></div>
+191:      <div class="hint">
+195:      </div>
+197:      <div class="actions" style="margin-top:14px;">
+198:        <a class="btn-outline" href="./library.html">Read Only</a>
+199:        <a class="btn-outline" href="./index.html">Mode Selection</a>
+200:      </div>
+201:    </div>
+202:  </div>
+209:      const BUILD = "LOGIN-2026-01-14B";
+267:      async function doLogin() {
+279:        console.log(`[${BUILD}] attempting login with email:`, email);
+281:        const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+283:          setError("Login failed: " + error.message);
+289:          setError("Login failed: no user returned.");
+298:            "Login OK but profile missing or blocked by RLS.\n" +
+319:      async function doLogout() {
+326:      document.getElementById("loginBtn").addEventListener("click", doLogin);
+327:      document.getElementById("logoutBtn").addEventListener("click", doLogout);
+328:      document.getElementById("password").addEventListener("keydown", (e) => { if (e.key === "Enter") doLogin(); });
+329:      document.getElementById("username").addEventListener("keydown", (e) => { if (e.key === "Enter") doLogin(); });
+335:</body>
+
+============================================================
+login.html — FIRST 260 LINES
+============================================================
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>C.S.V. BEACON – Login</title>
+
+  <link rel="stylesheet" href="./csv-beacon-theme.css?v=20260428_3" />
+  <link rel="stylesheet" href="style.css?v=20260428_3" />
+
+  <style>
+    body {
+      min-height: 100vh;
+      margin: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 28px 16px;
+      background: radial-gradient(1200px 700px at 20% 10%, var(--brand-navy) 0%, var(--brand-navy-dark) 55%, #020B1A 100%);
+      font-family: "Segoe UI", Arial, sans-serif;
+    }
+    .login-shell {
+      width: 100%;
+      max-width: 560px;
+      background: rgba(12,33,58,0.68);
+      border: 1px solid rgba(213,222,239,0.35);
+      border-radius: 20px;
+      padding: 28px 22px 22px 22px;
+      box-shadow: 0 10px 46px rgba(0,0,0,0.45);
+      backdrop-filter: blur(3px);
+      color:#fff;
+    }
+    .title {
+      color: #ffffff;
+      margin: 0 0 10px 0;
+      font-size: 1.55rem;
+      font-weight: 900;
+      letter-spacing: 0.03em;
+      text-align: center;
+      text-shadow: 0 3px 12px rgba(0,0,0,0.35);
+    }
+    .subtitle {
+      margin: 0 0 18px 0;
+      color: rgba(255,255,255,0.90);
+      font-size: 1rem;
+      line-height: 1.45;
+      text-align: center;
+      font-weight: 800;
+    }
+    .build {
+      margin-top: 6px;
+      font-size: 0.85rem;
+      opacity: 0.85;
+      font-weight: 700;
+    }
+    .card {
+      background: #ffffff;
+      border: 1px solid #d5deef;
+      border-radius: 16px;
+      padding: 18px 18px;
+      box-shadow: 0 4px 18px rgba(18, 44, 87, 0.16);
+      color:var(--brand-navy);
+    }
+    label {
+      display: block;
+      margin: 12px 0 6px 0;
+      font-weight: 900;
+      color: #1a4170;
+      font-size: 0.95rem;
+    }
+    input {
+      width: 100%;
+      box-sizing: border-box;
+      font-size: 1rem;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid #cbd7ee;
+      outline: none;
+      font-family: "Segoe UI", Arial, sans-serif;
+      background:#fff;
+      color:var(--brand-navy);
+    }
+    input:focus {
+      border-color: var(--brand-teal);
+      box-shadow: 0 0 0 3px rgba(46, 104, 199, 0.15);
+    }
+    .actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+      margin-top: 16px;
+    }
+    .btn-primary {
+      border: none;
+      border-radius: 10px;
+      background: var(--brand-navy);
+      color: #ffffff;
+      font-weight: 900;
+      font-size: 1rem;
+      padding: 10px 16px;
+      cursor: pointer;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+    }
+    .btn-primary:hover { filter: brightness(0.96); }
+    .btn-muted {
+      border-radius: 10px;
+      background: #eaf1fb;
+      border: 1px solid #d5deef;
+      color: #1a4170;
+      font-weight: 900;
+      font-size: 1rem;
+      padding: 9px 16px;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-block;
+    }
+    .btn-outline {
+      border-radius: 10px;
+      background: transparent;
+      border: 1px solid var(--brand-navy);
+      color: var(--brand-navy);
+      font-weight: 900;
+      font-size: 1rem;
+      padding: 9px 16px;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-block;
+    }
+    .btn-outline:hover { background: rgba(41, 94, 176, 0.08); }
+    .error {
+      display: none;
+      margin-top: 12px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid #f1c7c7;
+      background: #fff2f2;
+      color: #7a1f1f;
+      font-weight: 900;
+      font-size: 0.95rem;
+      line-height: 1.35;
+      white-space: pre-wrap;
+    }
+    .hint {
+      margin-top: 12px;
+      color: #35507b;
+      font-size: 0.92rem;
+      line-height: 1.35;
+      font-weight: 800;
+    }
+    .mono {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+      font-size: 0.92rem;
+      color:#35507b;
+    }
+  </style>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <link rel="stylesheet" href="./csvb-ui-polish.css?v=20260430_1" />
+  <link rel="stylesheet" href="./csvb-help-tooltips.css?v=20260430_1" />
+  <link rel="stylesheet" href="./csvb-100pct-fit.css?v=20260430_1" />
+  <link rel="stylesheet" href="./csvb-login-fit.css?v=20260501_1" />
+</head>
+
+<body>
+  <div class="login-shell">
+    <div style="text-align:center;margin-bottom:12px;">
+      <img src="./assets/csv-beacon-logo-full.png" alt="C.S.V. BEACON logo" class="csvb-brand-logo-full" style="max-width:320px;margin:0 auto;" />
+    </div>
+    <div class="title">C.S.V. BEACON Login</div>
+    <div class="subtitle">
+      Marine Assurance & Compliance Platform<br/>Users login with <b>Username + Password</b>.<br/>
+      Internally we use: <span class="mono">username@csvtest.local</span>
+      <div class="build" id="buildTag">BUILD: LOGIN-2026-01-14B</div>
+    </div>
+
+    <div class="card">
+      <label for="username">Username</label>
+      <input id="username" type="text" autocomplete="username" placeholder="e.g. superuser" />
+
+      <label for="password">Password</label>
+      <input id="password" type="password" autocomplete="current-password" />
+
+      <div class="actions">
+        <button class="btn-primary" id="loginBtn" type="button">Login</button>
+        <button class="btn-muted" id="logoutBtn" type="button">Logout</button>
+      </div>
+
+      <div class="error" id="errBox"></div>
+
+      <div class="hint">
+        <b>Important:</b> the user must exist in Supabase Auth as email
+        <span class="mono">username@csvtest.local</span> and must have a matching row in
+        <span class="mono">public.profiles</span>.
+      </div>
+
+      <div class="actions" style="margin-top:14px;">
+        <a class="btn-outline" href="./library.html">Read Only</a>
+        <a class="btn-outline" href="./index.html">Mode Selection</a>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      "use strict";
+
+      // ---- FIXED, LOCAL CONFIG (no dependency on AUTH.*) ----
+      const BUILD = "LOGIN-2026-01-14B";
+      const SUPABASE_URL = "https://bdidrcyufazskpuwmfca.supabase.co";
+      const SUPABASE_ANON_KEY =
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJkaWRyY3l1ZmF6c2twdXdtZmNhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc5NDI4ODMsImV4cCI6MjA4MzUxODg4M30.Uqj4WCzoNS9wnlzI-xew6iTFzTUi77dcGeBjUgFjZbQ";
+      const USERNAME_DOMAIN = "csvtest.local";
+
+      const errEl = document.getElementById("errBox");
+      function setError(msg) { errEl.textContent = msg; errEl.style.display = "block"; }
+      function clearError() { errEl.textContent = ""; errEl.style.display = "none"; }
+
+      if (!window.supabase?.createClient) {
+        setError("Supabase JS not loaded. Check the @supabase/supabase-js script tag.");
+        return;
+      }
+
+      const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+        auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
+      });
+
+      function usernameToEmail(usernameOrEmail) {
+        const v = String(usernameOrEmail || "").trim();
+        if (!v) return "";
+        if (v.includes("@")) return v;
+        return `${v}@${USERNAME_DOMAIN}`;
+      }
+
+      function qs(name) {
+        try { return new URLSearchParams(window.location.search || "").get(name); }
+        catch (_) { return null; }
+      }
+
+      function safePath(p) {
+        const v = String(p || "").trim();
+        if (!v) return "";
+        if (v.startsWith("http://") || v.startsWith("https://") || v.startsWith("//")) return "";
+        if (v.includes("..")) return "";
+        if (!v.endsWith(".html")) return "";
+        return v;
+      }
+
+      async function fetchMyProfile(userId) {
+        const { data, error } = await supabaseClient
+          .from("profiles")
+          .select("id, username, role, vessel_id, is_active, position")
+          .eq("id", userId)
+          .single();
+        if (error) throw error;
+        return data;
+      }
+
+      function routeByRole(role) {
+        // role values must match your DB: public.profiles.role
+
+============================================================
+CSS RULES PROBABLY AFFECTING LOGIN
+============================================================
+
+---------------- public/style.css ----------------
+5:  --content-line-height: 1.5;
+12:  --li-margin-bottom: 6px;
+14:  /* C.S.V. BEACON brand aliases for legacy style.css */
+15:  --legacy-brand-navy: var(--brand-navy, #062A5E);
+16:  --legacy-brand-navy-dark: var(--brand-navy-dark, #031B3F);
+17:  --legacy-brand-teal: var(--brand-teal, #0097A7);
+18:  --legacy-brand-gold: var(--brand-gold, #F4A000);
+20:  --legacy-bg-card: var(--bg-card, #FFFFFF);
+27:body { 
+28:  margin: 0;
+31:  line-height: var(--content-line-height);
+37:  background: var(--legacy-brand-navy);
+39:  padding: 10px 18px;
+53:  padding: 7px 18px;
+58:  margin-top: 7px;
+59:  margin-left: 18px;
+65:  margin: 8px 0 4px 24px;
+72:  padding: 5px 12px 5px 10px;
+82:    margin: 9px 0 3px 10px;
+86:    padding: 5px 9px 5px 8px;
+92:  background: var(--legacy-brand-navy);
+94:  padding: 18px 20px 10px 20px;
+96:  flex-wrap: wrap;
+108:  margin-right: 24px;
+109:  background: var(--legacy-brand-navy-dark);
+110:  padding: 7px 15px;
+115:  margin: 0 5px 0 0;
+119:#filters label { font-weight: 600; margin-right: 6px; }
+123:  padding: 6px 8px;
+124:  margin-right: 20px;
+125:  margin-bottom: 6px;
+129:html, body {
+130:  height: 100%;
+131:  min-height: 100vh;
+132:  margin: 0;
+133:  padding: 0;
+137:/* ---------- Main Content Layout (List + Panel) ---------- */
+138:#container {
+141:  min-height: 100vh;
+142:  height: 100vh;
+148:  min-height: 0;
+149:  height: 100%;
+150:  overflow: hidden;
+159:  overflow-y: auto;
+160:  padding: 20px 12px 20px 20px;
+161:  height: 100%;
+164:#details-panel {
+166:  padding: 20px 18px 20px 22px;
+167:  overflow-y: auto;
+168:  background: var(--legacy-bg-card);
+172:  height: 100%;
+184:  padding: 10px 6px;
+185:  margin-bottom: 6px;
+193:  border-left: 4px solid var(--legacy-brand-teal);
+197:/* ---------- Meta Info Table Styles (Details Panel) ---------- */
+201:  /* overflow: hidden; */
+202:  margin-bottom: 20px;
+203:  margin-top: 14px;
+209:  margin-bottom: 0;
+214:  padding: 6px 14px 6px 14px;
+223:  white-space: nowrap;
+238:  overflow-x: auto;
+239:  -webkit-overflow-scrolling: touch;
+260:    margin-bottom: 10px;
+269:    padding: 8px 8px 8px 8px;
+287:  padding: 8px 16px 8px 10px;
+290:  margin-bottom: 0;
+291:  margin-top: 12px;
+300:  transition: transform 0.2s;
+306:  padding: 14px 10px 8px 18px;
+309:  margin-bottom: 7px;
+313:  line-height: var(--content-line-height);
+318:.answer-block { margin-top: 18px; }
+321:  margin-top: 4px;
+325:  padding: 7px;
+326:  margin-bottom: 10px;
+331:.answer-block textarea { height: 50px; }
+334:  background: var(--legacy-brand-navy);
+338:  padding: 10px 24px;
+340:  margin-top: 14px;
+341:  margin-bottom: 30px;
+343:.submit-btn:hover { background: var(--legacy-brand-navy-dark); }
+345:.remarks-row { display: flex; gap: 14px; margin-top: 12px; }
+359:  padding: 5px 7px;
+360:  min-height: 44px;
+369:  line-height: var(--content-line-height);
+385:  padding: 0 2px;
+391:  margin-left: 3px;
+397:  padding: 9px 9px;
+402:  height: 34px;
+406:  padding: 0 12px;
+407:  margin-right: 6px;
+408:  background: var(--legacy-bg-card);
+414:  border-color: var(--legacy-brand-teal);
+419:li { margin-bottom: var(--li-margin-bottom); }
+423:  html, body { background: #fff !important; }
+427:  #printView, #printSingleView { margin: 0 !important; }
+431:  @page { size: A4 portrait; margin: 5mm; }
+432:  body { background: #fff !important; }
+444:    padding: 14px 4vw 10px 4vw;
+455:    padding: 10px 3vw 10px 3vw;
+456:    height: auto;
+458:  #details-panel { padding: 12px 2vw 12px 2vw; }
+468:  margin-bottom: 7px;
+469:  margin-top: 1px;
+470:  line-height: var(--content-line-height);
+479:  height: 100vh;
+484:  background: linear-gradient(135deg, var(--legacy-brand-navy-dark), var(--legacy-brand-navy));
+491:  border: 1px solid var(--legacy-brand-navy);
+492:  background: var(--legacy-brand-navy-dark);
+496:#userManagementPanel {
+501:  background: var(--legacy-bg-card);
+502:  border: 2px solid var(--legacy-brand-navy);
+505:  padding: 28px 36px 22px 36px;
+510:  max-height: 70vh;
+511:  overflow: auto;
+
+---------------- public/csv-beacon-theme.css ----------------
+2:   Dark mode is enabled via: html[data-theme="dark"]
+4:   Locked brand:
+6:   Marine Assurance & Compliance Platform
+10:  /* ---------- C.S.V. BEACON Brand Palette ---------- */
+11:  --brand-navy: #062A5E;          /* Beacon Navy */
+12:  --brand-navy-dark: #031B3F;     /* Deep Marine Navy */
+13:  --brand-teal: #0097A7;          /* Signal Teal */
+14:  --brand-teal-soft: #DDF7FA;     /* Light Signal Teal */
+15:  --brand-gold: #F4A000;          /* Beacon Gold */
+18:  --bg-card: #FFFFFF;
+32:  --navy-900: var(--brand-navy-dark);
+33:  --navy-800: var(--brand-navy);
+34:  --ocean-600: var(--brand-teal);
+44:  --surface: var(--bg-card);
+51:  --link: var(--brand-teal);
+54:  --btn-primary-bg: var(--brand-navy);
+56:  --btn-primary-bg-hover: var(--brand-navy-dark);
+59:  --btn-secondary-text: var(--brand-navy);
+61:  --btn-secondary-bg-hover: var(--brand-teal-soft);
+72:html[data-theme="dark"]{
+100:html, body{
+116:.csvb-brand{
+123:.csvb-brand-logo{
+125:  height:46px;
+131:.csvb-brand-logo-full{
+134:  height:auto;
+139:.csvb-brand-text{
+143:.csvb-brand-title{
+144:  margin:0;
+146:  line-height:1.1;
+152:.csvb-brand-subtitle{
+153:  margin-top:3px;
+155:  line-height:1.15;
+162:  color:var(--brand-navy);
+215:  padding: 8px 12px;
+238:   C.S.V. BEACON Branding Batch 3
+242:html, body{
+249:  background: linear-gradient(90deg, var(--brand-navy-dark), var(--brand-navy)) !important;
+255:.topbar:not(:has(.csvb-brand))::before,
+256:header.topbar:not(:has(.csvb-brand))::before{
+259:  height:42px;
+268:.topbar .brand,
+269:header.topbar .brand{
+280:.hero{
+281:  background: linear-gradient(135deg, var(--brand-navy-dark), var(--brand-navy)) !important;
+287:.hero h1,
+288:.hero .title{
+292:.hero p,
+293:.hero .sub{
+297:.card,
+298:.panel,
+299:.statCard,
+300:.summary-card,
+301:.kpi-card,
+303:  background: var(--bg-card) !important;
+309:.card h1,
+310:.card h2,
+311:.card h3,
+312:.panel h1,
+313:.panel h2,
+314:.panel h3,
+315:.card-title,
+320:  color: var(--brand-navy) !important;
+330:  background: var(--brand-navy) !important;
+332:  border-color: var(--brand-navy) !important;
+340:  background: var(--brand-navy-dark) !important;
+341:  border-color: var(--brand-navy-dark) !important;
+352:  color: var(--brand-navy) !important;
+361:.hero .btn.light,
+362:.hero .btn-outline,
+363:.hero a.btn.btn-outline{
+384:  border-color: var(--brand-teal) !important;
+388:  background: var(--bg-card);
+394:  color: var(--brand-navy) !important;
+450:  background: var(--brand-navy) !important;
+
+---------------- public/csvb-ui-polish.css ----------------
+25:body,
+35:.card,
+36:.panel,
+67:  .cardTitle,
+73:  .brand,
+95:.wrap,
+96:.container,
+101:.dashboardWrap,
+103:.appWrap,
+104:.adminWrap{
+107:  margin-left: auto !important;
+108:  margin-right: auto !important;
+110:  padding-left: var(--csvb-page-pad) !important;
+111:  padding-right: var(--csvb-page-pad) !important;
+130:  line-height: 1.32 !important;
+135:   3. Compact cards, panels and layout gaps
+138:.card,
+139:.panel,
+140:.qa-panel,
+141:.qo-panel,
+145:  padding: 12px !important;
+163:.card h1,
+164:.card h2,
+165:.card h3,
+166:.panel h1,
+167:.panel h2,
+168:.panel h3,
+169:.qa-panel h1,
+170:.qa-panel h2,
+171:.qo-panel h1,
+172:.qo-panel h2{
+173:  margin-top: 0 !important;
+174:  margin-bottom: 6px !important;
+186:  padding: 7px 10px !important;
+188:  line-height: 1.15 !important;
+195:  padding: 5px 8px !important;
+209:  padding: 8px 9px !important;
+214:   5. Friendlier dashboard/module cards
+217:[data-card]{
+219:  transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease;
+222:[data-card]:hover{
+223:  transform: translateY(-1px);
+228:.csvb-card-icon{
+233:  height: 30px;
+236:  margin-right: 8px;
+241:  line-height: 1;
+244:.csvb-card-title-icon-wrap{
+252:  margin-right: 5px;
+261:  padding: 7px 8px !important;
+262:  white-space: nowrap;
+265:tbody td{
+266:  padding: 7px 8px !important;
+269:tbody tr:hover td{
+
+---------------- public/csvb-help-tooltips.css ----------------
+7:  padding: 9px 11px;
+14:  line-height: 1.35;
+18:  transform: translateY(4px);
+19:  transition: opacity .12s ease, transform .12s ease;
+24:  transform: translateY(0);
+33:  height: 10px;
+35:  transform: rotate(45deg);
+56:  height: 17px;
+57:  margin-left: 5px;
+
+---------------- public/csvb-100pct-fit.css ----------------
+12:  --csvb-fit-panel-pad: 9px;
+22:html,
+23:body{
+27:  overflow-x:hidden !important;
+31:body{
+32:  margin:0 !important;
+41:img,
+49:   1. Global page containers must fit the browser at 100%
+53:.wrap,
+54:.container,
+58:.dashboardWrap,
+60:.appWrap,
+61:.adminWrap,
+62:.qa-panel,
+63:.qo-panel{
+67:  margin-left:auto !important;
+68:  margin-right:auto !important;
+69:  padding-left:var(--csvb-fit-page-pad) !important;
+70:  padding-right:var(--csvb-fit-page-pad) !important;
+73:/* Avoid nested full-viewport + padding overflow */
+74:.wrap,
+75:.container,
+79:.dashboardWrap,
+81:.appWrap,
+82:.adminWrap{
+83:  padding-top:8px !important;
+84:  padding-bottom:8px !important;
+97:  padding:7px 10px !important;
+99:  flex-wrap:wrap !important;
+109:.brand img,
+110:.logo,
+111:header img,
+112:.topbar img{
+113:  max-height:42px !important;
+118:   3. Compact panels/cards/forms
+121:.panel,
+122:.card,
+123:.qa-panel,
+124:.qo-panel,
+132:  padding:var(--csvb-fit-panel-pad) !important;
+140:.cards,
+152:.cards > *,
+168:  padding:var(--csvb-fit-btn-pad-y) var(--csvb-fit-btn-pad-x) !important;
+170:  line-height:1.12 !important;
+171:  min-height:0 !important;
+186:  padding:4px 7px !important;
+204:  padding:var(--csvb-fit-input-pad-y) var(--csvb-fit-input-pad-x) !important;
+210:  min-height:70px !important;
+217:.table-wrap,
+218:.tableWrapper,
+220:.qa-table-wrap,
+221:.qo-table-wrap{
+223:  overflow-x:auto !important;
+238:  padding:5px 6px !important;
+239:  line-height:1.25 !important;
+241:  overflow-wrap:anywhere !important;
+253:   7. Dashboard cards fit more cards per row
+256:[data-card]{
+258:  padding:10px !important;
+261:[data-card] p,
+262:[data-card] .muted{
+263:  margin-top:4px !important;
+264:  margin-bottom:6px !important;
+271:html[data-csvb-page="q-questions-editor.html"] body{
+276:html[data-csvb-page="q-questions-editor.html"] .wrap,
+277:html[data-csvb-page="q-questions-editor.html"] main,
+278:html[data-csvb-page="q-questions-editor.html"] .page,
+279:html[data-csvb-page="q-questions-editor.html"] .container{
+282:  padding-left:7px !important;
+283:  padding-right:7px !important;
+287:html[data-csvb-page="q-questions-editor.html"] .grid,
+288:html[data-csvb-page="q-questions-editor.html"] .editorGrid,
+289:html[data-csvb-page="q-questions-editor.html"] .questionEditorGrid,
+290:html[data-csvb-page="q-questions-editor.html"] .layout,
+291:html[data-csvb-page="q-questions-editor.html"] .mainGrid{
+300:html[data-csvb-page="q-questions-editor.html"] #questionList,
+301:html[data-csvb-page="q-questions-editor.html"] #questionsList,
+302:html[data-csvb-page="q-questions-editor.html"] #questionListBox,
+303:html[data-csvb-page="q-questions-editor.html"] #listBox,
+304:html[data-csvb-page="q-questions-editor.html"] .questionList,
+305:html[data-csvb-page="q-questions-editor.html"] .questionsList{
+310:/* right detail panel must shrink instead of forcing overflow */
+311:html[data-csvb-page="q-questions-editor.html"] #viewPanel,
+312:html[data-csvb-page="q-questions-editor.html"] #editPanel,
+313:html[data-csvb-page="q-questions-editor.html"] #detailsPanel,
+314:html[data-csvb-page="q-questions-editor.html"] .detailPanel,
+315:html[data-csvb-page="q-questions-editor.html"] .questionDetail{
+318:  overflow-x:hidden !important;
+321:/* list cards more compact */
+322:html[data-csvb-page="q-questions-editor.html"] .qCard,
+323:html[data-csvb-page="q-questions-editor.html"] .questionCard,
+324:html[data-csvb-page="q-questions-editor.html"] [data-question-id],
+325:html[data-csvb-page="q-questions-editor.html"] [data-qid]{
+326:  padding:6px 7px !important;
+328:  line-height:1.2 !important;
+331:/* long question text must wrap inside fields/panels */
+332:html[data-csvb-page="q-questions-editor.html"] input,
+333:html[data-csvb-page="q-questions-editor.html"] textarea,
+334:html[data-csvb-page="q-questions-editor.html"] .readonly-box,
+335:html[data-csvb-page="q-questions-editor.html"] .field,
+336:html[data-csvb-page="q-questions-editor.html"] .box{
+339:  overflow-wrap:anywhere !important;
+343:html[data-csvb-page="q-questions-editor.html"] .fltDD,
+344:html[data-csvb-page="q-questions-editor.html"] .filter,
+345:html[data-csvb-page="q-questions-editor.html"] .filterBtn{
+354:html[data-csvb-page="q-company.html"] body,
+355:html[data-csvb-page="q-answer.html"] body,
+356:html[data-csvb-page="su-admin.html"] body,
+357:html[data-csvb-page="post_inspection.html"] body,
+358:html[data-csvb-page="post_inspection_detail.html"] body{
+362:html[data-csvb-page="q-company.html"] .wrap,
+363:html[data-csvb-page="q-answer.html"] .wrap,
+364:html[data-csvb-page="su-admin.html"] .wrap,
+365:html[data-csvb-page="post_inspection.html"] .wrap,
+366:html[data-csvb-page="post_inspection_detail.html"] .wrap{
+372:   10. Emergency horizontal overflow guard
+375:body > *{
+382:  overflow-x:auto !important;
+383:  white-space:pre-wrap !important;
+
+============================================================
+ACTIVE LOGIN-RELATED FILES
+============================================================
+public/csvb-100pct-fit.css
+public/csvb-company-builder-compact-actions.css
+public/csvb-company-builder-density-fix.css
+public/csvb-company-builder-layout-repair.css
+public/csvb-company-builder-polish.css
+public/csvb-dashboard-polish.css
+public/csv-beacon-theme.css
+public/csvb-help-tooltips.css
+public/csvb-post-inspection-stats-polish.css
+public/csvb-post-stats-safe-css-polish.css
+public/csvb-qeditor-polish.css
+public/csvb-su-admin-polish.css
+public/csvb-ui-polish.css
+public/login.html
+public/q-questions-editor.css
+public/service-worker.js
+public/style.css
+public/theme.js
