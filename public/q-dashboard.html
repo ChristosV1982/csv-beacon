@@ -194,6 +194,15 @@
         </div>
       </div>
 
+
+      <div class="card" data-card="threads">
+        <div class="title">Threads</div>
+        <div class="muted">Company-specific discussion threads for questions, PGNOs, observations, audits and vessel follow-up.</div>
+        <div style="margin-top:12px;">
+          <button class="btn2" type="button" onclick="location.href='./threads.html'">Open</button>
+        </div>
+      </div>
+
       <!-- Questions Editor (role-based) -->
       <div class="card" data-card="qeditor">
         <div class="title">Questions Editor</div>
@@ -264,6 +273,7 @@
       reports: "fleet_reports",
       inspector: "sire_2_vetting",
       qeditor: "questions_editor",
+      threads: "threads",
       suadmin: "platform_administration"
     };
 
@@ -455,6 +465,7 @@
           "reports",
           "inspector",
           "qeditor",
+          "threads",
           "suadmin"
         ].forEach(k => setVisible(k, true, moduleAccess));
         return;
@@ -470,6 +481,7 @@
         setVisible("reports", false, moduleAccess);
         setVisible("inspector", false, moduleAccess);
         setVisible("qeditor", false, moduleAccess);
+        setVisible("threads", true, moduleAccess);
         setVisible("suadmin", false, moduleAccess);
         return;
       }
@@ -484,7 +496,8 @@
           "audit_observations",
           "reports",
           "inspector",
-          "qeditor"
+          "qeditor",
+          "threads"
         ].forEach(k => setVisible(k, true, moduleAccess));
         setVisible("suadmin", false, moduleAccess);
         return;
@@ -500,6 +513,7 @@
         setVisible("reports", true, moduleAccess);
         setVisible("inspector", true, moduleAccess);
         setVisible("qeditor", true, moduleAccess);
+        setVisible("threads", true, moduleAccess);
         setVisible("suadmin", false, moduleAccess);
         return;
       }

@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>C.S.V. BEACON — Threads</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <link rel="stylesheet" href="./csvb-threads.css?v=20260501_1" />
+  <link rel="stylesheet" href="./csvb-help-tooltips.css?v=20260430_1" />
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="./app-config.js"></script>
+  <script src="./auth.js"></script>
+  <script src="./csvb-module-guard.js?v=20260429_1"></script>
+</head>
+
+<body>
+  <header class="topbar">
+    <div class="brand">🧵 C.S.V. BEACON — Threads</div>
+    <div class="topbar-spacer"></div>
+    <span class="badge" id="userBadge">Loading…</span>
+    <button class="secondary" id="dashboardBtn" type="button" data-csvb-help="Return to the dashboard.">Dashboard</button>
+    <button class="secondary" id="refreshBtn" type="button" data-csvb-help="Reload threads and messages.">Refresh</button>
+    <button id="logoutBtn" type="button" data-csvb-help="Sign out of the current session.">Logout</button>
+  </header>
+
+  <main class="wrap">
+    <section class="hero">
+      <h1>Threads</h1>
+      <p>
+        Company-specific discussion threads for questions, PGNOs, post-inspection follow-up,
+        audit observations, vessel items, and general operational discussions.
+      </p>
+      <div id="msgBox" class="msg"></div>
+    </section>
+
+    <section id="platformCompanyCard" class="card" style="display:none;">
+      <h2>Platform company view</h2>
+      <div class="row">
+        <div class="field">
+          <label for="platformCompanySelect">Company</label>
+          <select id="platformCompanySelect"></select>
+        </div>
+      </div>
+      <div class="compact-note">
+        Platform users can access company threads only when the company allows platform visibility.
+      </div>
+    </section>
+
+    <div class="grid">
+      <section class="card">
+        <h2>Thread List</h2>
+
+        <div class="row">
+          <div class="field">
+            <label for="statusFilter">Status</label>
+            <select id="statusFilter">
+              <option value="">All statuses</option>
+              <option value="open">Open</option>
+              <option value="in_progress">In progress</option>
+              <option value="awaiting_vessel_reply">Awaiting vessel reply</option>
+              <option value="awaiting_office_review">Awaiting office review</option>
+              <option value="returned_for_correction">Returned for correction</option>
+              <option value="closed">Closed</option>
+              <option value="archived">Archived</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="vesselFilter">Vessel</label>
+            <select id="vesselFilter"></select>
+          </div>
+
+          <div class="field">
+            <label for="searchInput">Search</label>
+            <input id="searchInput" placeholder="Title, question no., PGNO…" />
+          </div>
+
+          <div class="field" style="flex:0 0 auto; align-self:end;">
+            <button class="secondary" id="applyFilterBtn" type="button" data-csvb-help="Apply the selected filters.">Apply</button>
+          </div>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Thread</th>
+                <th>Status</th>
+                <th>Priority</th>
+                <th>Vessel</th>
+                <th>Question / PGNO</th>
+                <th>Messages</th>
+                <th>Updated</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="threadsTbody">
+              <tr><td colspan="8" class="muted">Loading threads…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section>
+        <div class="card">
+          <h2>Create Thread</h2>
+
+          <div class="row">
+            <div class="field">
+              <label for="createVessel">Vessel</label>
+              <select id="createVessel"></select>
+            </div>
+
+            <div class="field">
+              <label for="createType">Type</label>
+              <select id="createType">
+                <option value="general">General</option>
+                <option value="question">Question</option>
+                <option value="pgno">PGNO</option>
+                <option value="post_inspection_observation">Post-inspection observation</option>
+                <option value="audit_observation">Audit observation</option>
+                <option value="vessel">Vessel</option>
+                <option value="manual">Manual</option>
+              </select>
+            </div>
+
+            <div class="field">
+              <label for="createPriority">Priority</label>
+              <select id="createPriority">
+                <option value="low">Low</option>
+                <option value="normal" selected>Normal</option>
+                <option value="high">High</option>
+                <option value="critical">Critical</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="field wide">
+              <label for="createTitle">Title</label>
+              <input id="createTitle" placeholder="Short thread title…" />
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="field">
+              <label for="createQuestionNo">Question No.</label>
+              <input id="createQuestionNo" placeholder="e.g. 02.01.01" />
+            </div>
+
+            <div class="field">
+              <label for="createPgnoIndex">PGNO Index</label>
+              <input id="createPgnoIndex" type="number" min="1" placeholder="optional" />
+            </div>
+
+            <div class="field">
+              <label for="createPgnoCode">PGNO Code</label>
+              <input id="createPgnoCode" placeholder="optional" />
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="field wide">
+              <label for="createPgnoText">PGNO Text</label>
+              <textarea id="createPgnoText" placeholder="Optional PGNO text…"></textarea>
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="field wide">
+              <label for="createInitialMessage">Initial Message</label>
+              <textarea id="createInitialMessage" placeholder="Write the opening discussion message…"></textarea>
+            </div>
+          </div>
+
+          <div class="row">
+            <button id="createThreadBtn" type="button" data-csvb-help="Create the thread and optionally add the first message.">Create Thread</button>
+            <button class="secondary" id="clearCreateBtn" type="button" data-csvb-help="Clear the create-thread form.">Clear</button>
+          </div>
+        </div>
+
+        <div class="card" id="threadDetailCard">
+          <h2>Thread Detail</h2>
+          <div id="threadDetailBox" class="muted">Select a thread to open it.</div>
+
+          <div id="threadDetailActions" style="display:none;">
+            <div class="row">
+              <div class="field">
+                <label for="statusUpdateSelect">Status</label>
+                <select id="statusUpdateSelect">
+                  <option value="open">Open</option>
+                  <option value="in_progress">In progress</option>
+                  <option value="awaiting_vessel_reply">Awaiting vessel reply</option>
+                  <option value="awaiting_office_review">Awaiting office review</option>
+                  <option value="returned_for_correction">Returned for correction</option>
+                  <option value="closed">Closed</option>
+                  <option value="archived">Archived</option>
+                </select>
+              </div>
+              <div class="field" style="flex:0 0 auto; align-self:end;">
+                <button class="secondary" id="updateStatusBtn" type="button" data-csvb-help="Update the selected thread status.">Update Status</button>
+              </div>
+            </div>
+
+            <h2 style="margin-top:14px;">Messages</h2>
+            <div id="messagesBox" class="message-list"></div>
+
+            <div class="row">
+              <div class="field wide">
+                <label for="newMessageText">Add Message</label>
+                <textarea id="newMessageText" placeholder="Write a message…"></textarea>
+              </div>
+            </div>
+
+            <div class="row">
+              <button id="addMessageBtn" type="button" data-csvb-help="Add your message to the selected thread.">Add Message</button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script src="./threads.js?v=20260501_1"></script>
+  <script src="./csvb-help-tooltips.js?v=20260430_1"></script>
+</body>
+</html>

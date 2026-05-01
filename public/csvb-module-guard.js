@@ -41,6 +41,7 @@
 
     "q-questions-editor.html": "questions_editor",
     "q-company-overrides.html": "questions_editor",
+    "threads.html": "threads",
 
     "su-admin.html": "platform_administration"
   };
