@@ -5,7 +5,7 @@
   <title>C.S.V. BEACON — Threads</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-  <link rel="stylesheet" href="./csvb-threads.css?v=20260501_1" />
+  <link rel="stylesheet" href="./csvb-threads.css?v=20260501_2" />
   <link rel="stylesheet" href="./csvb-help-tooltips.css?v=20260430_1" />
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -18,9 +18,10 @@
   <header class="topbar">
     <div class="brand">🧵 C.S.V. BEACON — Threads</div>
     <div class="topbar-spacer"></div>
+    <button class="secondary" id="notificationsBtn" type="button" data-csvb-help="View unread thread alerts.">Alerts: 0</button>
     <span class="badge" id="userBadge">Loading…</span>
     <button class="secondary" id="dashboardBtn" type="button" data-csvb-help="Return to the dashboard.">Dashboard</button>
-    <button class="secondary" id="refreshBtn" type="button" data-csvb-help="Reload threads and messages.">Refresh</button>
+    <button class="secondary" id="refreshBtn" type="button" data-csvb-help="Reload threads, participants and alerts.">Refresh</button>
     <button id="logoutBtn" type="button" data-csvb-help="Sign out of the current session.">Logout</button>
   </header>
 
@@ -28,10 +29,18 @@
     <section class="hero">
       <h1>Threads</h1>
       <p>
-        Company-specific discussion threads for questions, PGNOs, post-inspection follow-up,
-        audit observations, vessel items, and general operational discussions.
+        Company-specific discussion threads for general matters, questions, PGNOs,
+        post-inspection follow-up, audit observations and vessel items.
       </p>
       <div id="msgBox" class="msg"></div>
+    </section>
+
+    <section id="notificationsCard" class="card" style="display:none;">
+      <div class="section-head">
+        <h2>Alerts</h2>
+        <button class="secondary" id="markAlertsReadBtn" type="button" data-csvb-help="Mark all unread alerts as read.">Mark all read</button>
+      </div>
+      <div id="notificationsList" class="notification-list muted">No unread alerts.</div>
     </section>
 
     <section id="platformCompanyCard" class="card" style="display:none;">
@@ -113,15 +122,11 @@
             </div>
 
             <div class="field">
-              <label for="createType">Type</label>
-              <select id="createType">
-                <option value="general">General</option>
-                <option value="question">Question</option>
-                <option value="pgno">PGNO</option>
-                <option value="post_inspection_observation">Post-inspection observation</option>
-                <option value="audit_observation">Audit observation</option>
-                <option value="vessel">Vessel</option>
-                <option value="manual">Manual</option>
+              <label for="createSourceMode">Source</label>
+              <select id="createSourceMode">
+                <option value="general">General / free text</option>
+                <option value="question">Specific question</option>
+                <option value="pgno">Specific PGNO</option>
               </select>
             </div>
 
@@ -136,34 +141,50 @@
             </div>
           </div>
 
+          <div id="questionSelectorBlock" class="selector-block" style="display:none;">
+            <div class="row">
+              <div class="field wide">
+                <label for="questionSearchInput">Search company question library</label>
+                <input id="questionSearchInput" placeholder="Search question number or text…" />
+              </div>
+              <div class="field" style="flex:0 0 auto; align-self:end;">
+                <button class="secondary" id="questionSearchBtn" type="button" data-csvb-help="Search available questions for the selected company.">Search Questions</button>
+              </div>
+            </div>
+
+            <div class="table-wrap compact-table-wrap">
+              <table class="compact-table">
+                <thead>
+                  <tr>
+                    <th>Question</th>
+                    <th>Text</th>
+                    <th>Source</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody id="questionResultsTbody">
+                  <tr><td colspan="4" class="muted">Search or select source to load questions.</td></tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div id="selectedQuestionBox" class="selected-box muted">No question selected.</div>
+          </div>
+
+          <div id="pgnoSelectorBlock" class="selector-block" style="display:none;">
+            <div class="row">
+              <div class="field wide">
+                <label for="pgnoSelect">Select PGNO</label>
+                <select id="pgnoSelect"></select>
+              </div>
+            </div>
+            <div id="selectedPgnoBox" class="selected-box muted">No PGNO selected.</div>
+          </div>
+
           <div class="row">
             <div class="field wide">
               <label for="createTitle">Title</label>
               <input id="createTitle" placeholder="Short thread title…" />
-            </div>
-          </div>
-
-          <div class="row">
-            <div class="field">
-              <label for="createQuestionNo">Question No.</label>
-              <input id="createQuestionNo" placeholder="e.g. 02.01.01" />
-            </div>
-
-            <div class="field">
-              <label for="createPgnoIndex">PGNO Index</label>
-              <input id="createPgnoIndex" type="number" min="1" placeholder="optional" />
-            </div>
-
-            <div class="field">
-              <label for="createPgnoCode">PGNO Code</label>
-              <input id="createPgnoCode" placeholder="optional" />
-            </div>
-          </div>
-
-          <div class="row">
-            <div class="field wide">
-              <label for="createPgnoText">PGNO Text</label>
-              <textarea id="createPgnoText" placeholder="Optional PGNO text…"></textarea>
             </div>
           </div>
 
@@ -174,8 +195,27 @@
             </div>
           </div>
 
+          <h2 style="margin-top:12px;">Participants</h2>
+          <div class="compact-note">Select users from the same company. Participants will receive thread alerts.</div>
+
           <div class="row">
-            <button id="createThreadBtn" type="button" data-csvb-help="Create the thread and optionally add the first message.">Create Thread</button>
+            <div class="field">
+              <label for="responsibleSelect">Responsible</label>
+              <select id="responsibleSelect"></select>
+            </div>
+
+            <div class="field">
+              <label for="verifierSelect">Verifier</label>
+              <select id="verifierSelect"></select>
+            </div>
+          </div>
+
+          <div class="participant-box" id="participantList">
+            <div class="muted">Loading participants…</div>
+          </div>
+
+          <div class="row">
+            <button id="createThreadBtn" type="button" data-csvb-help="Create the thread and notify selected participants.">Create Thread</button>
             <button class="secondary" id="clearCreateBtn" type="button" data-csvb-help="Clear the create-thread form.">Clear</button>
           </div>
         </div>
@@ -203,7 +243,10 @@
               </div>
             </div>
 
-            <h2 style="margin-top:14px;">Messages</h2>
+            <h2 style="margin-top:12px;">Participants</h2>
+            <div id="threadParticipantsBox" class="participant-detail-list muted">No participants loaded.</div>
+
+            <h2 style="margin-top:12px;">Messages</h2>
             <div id="messagesBox" class="message-list"></div>
 
             <div class="row">
@@ -214,7 +257,7 @@
             </div>
 
             <div class="row">
-              <button id="addMessageBtn" type="button" data-csvb-help="Add your message to the selected thread.">Add Message</button>
+              <button id="addMessageBtn" type="button" data-csvb-help="Add your message and notify thread participants.">Add Message</button>
             </div>
           </div>
         </div>
@@ -222,7 +265,7 @@
     </div>
   </main>
 
-  <script src="./threads.js?v=20260501_1"></script>
+  <script src="./threads.js?v=20260501_2"></script>
   <script src="./csvb-help-tooltips.js?v=20260430_1"></script>
 </body>
 </html>
