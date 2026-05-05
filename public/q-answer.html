@@ -87,6 +87,7 @@
       resize:vertical;
     }
     .saveRow{display:flex;gap:10px;align-items:center;margin-top:10px;flex-wrap:wrap;}
+    .threadBtn{font-size:.92rem;}
     .status{font-weight:900;}
     .err{
       background:#fff2f2;color:#7a1f1f;
@@ -172,6 +173,34 @@
     function radioName(qno, idx){ return `resp_${cssId(qno)}_${idx}`; }
     function taId(qno, idx){ return `rm_${cssId(qno)}_${idx}`; }
     function saveId(qno, idx){ return `sv_${cssId(qno)}_${idx}`; }
+    function threadId(qno, idx){ return `th_${cssId(qno)}_${idx}`; }
+
+    function openThreadForPgno(qid, qno, idx, pgnoText, questionText){
+      const pgnoIndex = Number(idx || 0);
+      const pgnoCode = qno && pgnoIndex ? `${qno}.${String(pgnoIndex).padStart(2, "0")}` : "";
+      const title = `Q ${qno} / PGNO ${pgnoIndex}`;
+      const initial = [
+        "Thread opened from questionnaire PGNO.",
+        "",
+        qno ? `Question: ${qno}` : "",
+        questionText ? `Question text: ${questionText}` : "",
+        pgnoText ? `PGNO: ${pgnoText}` : ""
+      ].filter(Boolean).join("\n");
+
+      const params = new URLSearchParams({
+        source: "questionnaire_pgno",
+        qid: String(qid || ""),
+        question_no: String(qno || ""),
+        pgno_index: String(pgnoIndex || ""),
+        pgno_code: String(pgnoCode || ""),
+        pgno_text: String(pgnoText || ""),
+        question_text: String(questionText || ""),
+        title,
+        initial_message: initial
+      });
+
+      window.location.href = "./threads.html?" + params.toString();
+    }
     function statusId(qno, idx){ return `st_${cssId(qno)}_${idx}`; }
 
     function choiceRadio(qno, idx, val, current){
@@ -258,6 +287,7 @@
 
             <div class="saveRow">
               <button class="btn" type="button" id="${saveId(qno,row.pgno_index)}">Save</button>
+              <button class="btn-outline threadBtn" type="button" id="${threadId(qno,row.pgno_index)}">Create Thread</button>
               <span class="status" id="${statusId(qno,row.pgno_index)}"></span>
             </div>
           `;
@@ -269,6 +299,13 @@
         btn.addEventListener("click", async ()=>{
           await savePgno(row.questionnaire_id, qno, row.pgno_index, row.pgno_text || "");
         });
+
+        const thBtn = wrapper.querySelector(`#${threadId(qno,row.pgno_index)}`);
+        if (thBtn) {
+          thBtn.addEventListener("click", ()=>{
+            openThreadForPgno(row.questionnaire_id, qno, row.pgno_index, row.pgno_text || "", qtext || "");
+          });
+        }
       });
 
       return wrapper;

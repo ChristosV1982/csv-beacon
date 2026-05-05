@@ -469,6 +469,59 @@
     box.innerHTML = `<strong>${esc(state.selectedPgno.code)}</strong> — ${esc(state.selectedPgno.text)}`;
   }
 
+  function applyIncomingPrefill() {
+    const params = new URLSearchParams(window.location.search || "");
+    const source = params.get("source") || "";
+
+    if (source !== "questionnaire_pgno") return;
+
+    const qno = params.get("question_no") || "";
+    const qText = params.get("question_text") || "";
+    const pgnoIndex = Number(params.get("pgno_index") || 0);
+    const pgnoCode = params.get("pgno_code") || "";
+    const pgnoText = params.get("pgno_text") || "";
+
+    const title = params.get("title") || (qno ? `Q ${qno} / PGNO ${pgnoIndex || ""}` : "Questionnaire PGNO thread");
+    const initial = params.get("initial_message") || "";
+
+    if ($("createSourceMode")) $("createSourceMode").value = "pgno";
+    if ($("createTitle")) $("createTitle").value = title;
+    if ($("createInitialMessage")) $("createInitialMessage").value = initial;
+
+    state.selectedQuestion = {
+      id: "",
+      number: qno,
+      text: qText,
+      source_type: "questionnaire",
+      is_custom: false,
+      pgno: []
+    };
+
+    state.selectedPgno = {
+      index: pgnoIndex || 1,
+      code: pgnoCode || (qno ? `${qno}.${String(pgnoIndex || 1).padStart(2, "0")}` : String(pgnoIndex || 1)),
+      text: pgnoText
+    };
+
+    state.pgnoItems = [state.selectedPgno];
+
+    updateCreateModeUI();
+
+    const qBox = $("selectedQuestionBox");
+    if (qBox) {
+      qBox.className = "selected-box";
+      qBox.innerHTML = `<strong>${esc(qno || "Question")}</strong>${qText ? " — " + esc(qText) : ""}`;
+    }
+
+    renderPgnoSelect();
+
+    const sel = $("pgnoSelect");
+    if (sel) {
+      sel.value = "0";
+      updatePgnoSelection();
+    }
+  }
+
   function updateCreateModeUI() {
     const mode = $("createSourceMode")?.value || "general";
 
@@ -787,7 +840,7 @@
 
     wire();
     await loadBootstrap();
-    updateCreateModeUI();
+    applyIncomingPrefill();
     await loadThreads();
   }
 
