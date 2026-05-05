@@ -21,7 +21,9 @@
     selectedThread: null,
     messages: [],
     threadParticipants: [],
-    notifications: []
+    notifications: [],
+    prefillThreadType: null,
+    prefillSourceModule: null
   };
 
   const $ = (id) => document.getElementById(id);
@@ -522,6 +524,62 @@
     }
   }
 
+  function applyIncomingPostInspectionPrefill() {
+    const params = new URLSearchParams(window.location.search || "");
+    const source = params.get("source") || "";
+
+    if (source !== "post_inspection_observation") return;
+
+    const qno = params.get("question_no") || "";
+    const qText = params.get("question_text") || "";
+    const pgnoText = params.get("pgno_text") || "";
+    const title = params.get("title") || (qno ? `Post-inspection observation — Q ${qno}` : "Post-inspection observation thread");
+    const initial = params.get("initial_message") || "";
+
+    state.prefillThreadType = "post_inspection_observation";
+    state.prefillSourceModule = "post_inspection";
+
+    if ($("createSourceMode")) $("createSourceMode").value = pgnoText ? "pgno" : "question";
+    if ($("createTitle")) $("createTitle").value = title;
+    if ($("createInitialMessage")) $("createInitialMessage").value = initial;
+
+    state.selectedQuestion = {
+      id: "",
+      number: qno,
+      text: qText,
+      source_type: "post_inspection",
+      is_custom: false,
+      pgno: []
+    };
+
+    if (pgnoText) {
+      state.selectedPgno = {
+        index: 1,
+        code: qno ? `${qno}.PGNO` : "PGNO",
+        text: pgnoText
+      };
+      state.pgnoItems = [state.selectedPgno];
+    } else {
+      state.selectedPgno = null;
+      state.pgnoItems = [];
+    }
+
+    updateCreateModeUI();
+
+    const qBox = $("selectedQuestionBox");
+    if (qBox) {
+      qBox.className = "selected-box";
+      qBox.innerHTML = `<strong>${esc(qno || "Post-inspection observation")}</strong>${qText ? " — " + esc(qText) : ""}`;
+    }
+
+    renderPgnoSelect();
+
+    if (pgnoText && $("pgnoSelect")) {
+      $("pgnoSelect").value = "0";
+      updatePgnoSelection();
+    }
+  }
+
   function updateCreateModeUI() {
     const mode = $("createSourceMode")?.value || "general";
 
@@ -656,8 +714,8 @@
       p_company_id: isPlatformRole(state.me?.profile?.role) ? activeCompanyId() : null,
       p_vessel_id: $("createVessel")?.value || null,
       p_title: title,
-      p_thread_type: mode === "general" ? "general" : mode,
-      p_source_module: mode === "general" ? "threads" : "questions",
+      p_thread_type: state.prefillThreadType || (mode === "general" ? "general" : mode),
+      p_source_module: state.prefillSourceModule || (mode === "general" ? "threads" : "questions"),
       p_source_record_id: null,
       p_questionnaire_id: null,
       p_question_no: state.selectedQuestion?.number || null,
@@ -704,6 +762,8 @@
     state.selectedQuestion = null;
     state.pgnoItems = [];
     state.selectedPgno = null;
+    state.prefillThreadType = null;
+    state.prefillSourceModule = null;
 
     renderQuestionResults("Search or select source to load questions.");
     renderPgnoSelect();
@@ -841,6 +901,7 @@
     wire();
     await loadBootstrap();
     applyIncomingPrefill();
+    applyIncomingPostInspectionPrefill();
     await loadThreads();
   }
 
