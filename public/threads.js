@@ -905,6 +905,12 @@
     await loadThreads();
   }
 
+  window.CSVB_THREADS_OPEN_THREAD = openThread;
+  window.CSVB_THREADS_RELOAD = async function(){
+    await loadThreads();
+    await loadNotifications();
+  };
+
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", () => init().catch((e) => msg("err", String(e.message || e))));
   } else {

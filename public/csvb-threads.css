@@ -462,3 +462,20 @@ tbody tr:hover td {
 #notificationsBtn {
   position: relative;
 }
+
+
+/* === Threads related/delete extension === */
+
+#csvbRelatedThreadsCard {
+  margin-bottom: 10px;
+}
+
+#csvbRelatedThreadsCard .notification-item {
+  background: #fff;
+}
+
+[data-delete-thread] {
+  border-color: #F2B7B7 !important;
+  background: #FFEAEA !important;
+  color: #9B1C1C !important;
+}
