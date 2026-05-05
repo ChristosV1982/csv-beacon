@@ -905,6 +905,10 @@
     await loadThreads();
   }
 
+  window.CSVB_THREADS_GET_SELECTED_THREAD = function(){
+    return state.selectedThread || null;
+  };
+
   window.CSVB_THREADS_OPEN_THREAD = openThread;
   window.CSVB_THREADS_RELOAD = async function(){
     await loadThreads();

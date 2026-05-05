@@ -479,3 +479,68 @@ tbody tr:hover td {
   background: #FFEAEA !important;
   color: #9B1C1C !important;
 }
+
+
+/* === Thread attachment UI === */
+
+.thread-attachments-panel {
+  margin-top: 12px;
+}
+
+.thread-attachment-upload-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin: 8px 0;
+}
+
+.thread-attachment-upload-row input[type="file"] {
+  flex: 1 1 320px;
+  min-height: 34px;
+  border: 1px solid #C8DAEF;
+  border-radius: 8px;
+  padding: 6px 8px;
+  background: #fff;
+}
+
+.thread-attachment-status {
+  margin: 6px 0;
+}
+
+.thread-attachment-status.ok {
+  color: #087334;
+}
+
+.thread-attachment-status.err {
+  color: #9B1C1C;
+}
+
+.thread-attachment-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.thread-attachment-item {
+  border: 1px solid #D6E4F5;
+  background: #F7FAFE;
+  border-radius: 10px;
+  padding: 7px 8px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.thread-attachment-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.thread-attachment-delete {
+  border-color: #F2B7B7 !important;
+  background: #FFEAEA !important;
+  color: #9B1C1C !important;
+}
