@@ -23,7 +23,7 @@
     .title{font-weight:950;color:var(--brand-navy);font-size:1.05rem;}
     .muted{color:var(--text-muted);font-weight:650;margin-top:6px;line-height:1.35;}
     .warn{display:none;margin-top:12px;color:#8b1d1d;background:#ffeaea;border:1px solid #ffc7c7;padding:10px 12px;border-radius:12px;font-weight:800;white-space:pre-wrap;}
-  
+
     .csvb-company-view-wrap{
       display:flex;
       align-items:center;
@@ -194,12 +194,19 @@
         </div>
       </div>
 
-
       <div class="card" data-card="threads">
         <div class="title">Threads</div>
         <div class="muted">Company-specific discussion threads for questions, PGNOs, observations, audits and vessel follow-up.</div>
         <div style="margin-top:12px;">
           <button class="btn2" type="button" onclick="location.href='./threads.html'">Open</button>
+        </div>
+      </div>
+
+      <div class="card" data-card="company_policy">
+        <div class="title">Company Policy</div>
+        <div class="muted">Controlled policy book structure, future rich-text policy editing, change requests, manuals and AI source-based search.</div>
+        <div style="margin-top:12px;">
+          <button class="btn2" type="button" onclick="location.href='./company_policy.html'">Open</button>
         </div>
       </div>
 
@@ -274,6 +281,7 @@
       inspector: "sire_2_vetting",
       qeditor: "questions_editor",
       threads: "threads",
+      company_policy: "company_policy",
       suadmin: "platform_administration"
     };
 
@@ -466,6 +474,7 @@
           "inspector",
           "qeditor",
           "threads",
+          "company_policy",
           "suadmin"
         ].forEach(k => setVisible(k, true, moduleAccess));
         return;
@@ -482,6 +491,7 @@
         setVisible("inspector", false, moduleAccess);
         setVisible("qeditor", false, moduleAccess);
         setVisible("threads", true, moduleAccess);
+        setVisible("company_policy", true, moduleAccess);
         setVisible("suadmin", false, moduleAccess);
         return;
       }
@@ -497,7 +507,8 @@
           "reports",
           "inspector",
           "qeditor",
-          "threads"
+          "threads",
+          "company_policy"
         ].forEach(k => setVisible(k, true, moduleAccess));
         setVisible("suadmin", false, moduleAccess);
         return;
@@ -514,6 +525,7 @@
         setVisible("inspector", true, moduleAccess);
         setVisible("qeditor", true, moduleAccess);
         setVisible("threads", true, moduleAccess);
+        setVisible("company_policy", true, moduleAccess);
         setVisible("suadmin", false, moduleAccess);
         return;
       }
@@ -525,6 +537,7 @@
         setVisible("inspector_intelligence", false, moduleAccess);
         setVisible("audit_observations", false, moduleAccess);
         setVisible("qeditor", false, moduleAccess);
+        setVisible("company_policy", true, moduleAccess);
         setVisible("suadmin", false, moduleAccess);
         return;
       }
