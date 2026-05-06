@@ -1,46 +1,12 @@
 // public/company_policy.js
-// C.S.V. BEACON – Company Policy module shell
-// v1: front-end structure only. No SQL/RLS/import/AI yet.
+// C.S.V. BEACON – Company Policy module
+// CP-2B: Load Policy Book chapter/node structure from Supabase.
+// Supports unlimited hierarchy through parent_node_id.
 
-const POLICY_CHAPTERS = [
-  { code: "0", title: "SPRINGFIELD MANAGEMENT SYSTEM MANUAL" },
-  { code: "1", title: "GENERAL ISSUES" },
-  { code: "2", title: "COMPANY'S POLICIES AND MANAGEMENT COMMITMENT" },
-  { code: "3", title: "COMPANY AND SHIPBOARD ORGANIZATION, RESPONSIBILITIES AND AUTHORITIES" },
-  { code: "4", title: "DPA" },
-  { code: "5", title: "MASTER'S RESPONSIBILITY AND AUTHORITY" },
-  { code: "6.1", title: "RESOURCES AND PERSONNEL (CREW)" },
-  { code: "6.2", title: "RESOURCES AND PERSONNEL (SHORE)" },
-  { code: "7.1", title: "GENERAL PROVISIONS FOR KEY SHIPBOARD OPERATIONS" },
-  { code: "7.2", title: "NAVIGATION" },
-  { code: "7.2a", title: "ECDIS PROCEDURES" },
-  { code: "7.3", title: "MOORING & ANCHORING OPERATIONS" },
-  { code: "7.4", title: "ENGINE ROOM OPERATIONS" },
-  { code: "7.5", title: "CARGO AND BALLAST OPERATIONS (ANNEX I CARGOES)" },
-  { code: "7.6", title: "ENVIRONMENTAL PROCEDURES" },
-  { code: "7.7", title: "DRUG AND ALCOHOL (D&A) CONTROL" },
-  { code: "7.8", title: "COMMUNICATIONS" },
-  { code: "7.9", title: "PROCEDURES FOR SAFE WORK PERFORMANCE" },
-  { code: "7.10", title: "HEALTH, HYGIENE AND MEDICAL ISSUES" },
-  { code: "7.11", title: "FATIGUE" },
-  { code: "8", title: "EMERGENCY PREPAREDNESS" },
-  { code: "9", title: "REPORTING, ROOT CAUSE ANALYSIS AND INVESTIGATION OF NON-CONFORMITIES, INCIDENTS, AND NEAR-MISSES" },
-  { code: "10", title: "MAINTENANCE OF THE SHIP AND EQUIPMENT" },
-  { code: "11", title: "DOCUMENT/DATA CONTROL" },
-  { code: "12", title: "VERIFICATION, REVIEW AND EVALUATION" },
-  { code: "13", title: "MANAGEMENT OF CHANGE" },
-  { code: "14", title: "RISK ASSESSMENT (RA) AND RISK MANAGEMENT (RM)" },
-  { code: "15", title: "NEW ACQUISITIONS AND SHIPBUILDING PROJECTS" },
-  { code: "16", title: "QUALITY MANAGEMENT" },
-  { code: "17", title: "CONTRACTORS MANAGEMENT" },
-  { code: "18", title: "PURCHASING" },
-  { code: "19", title: "EXTERNAL SHIP SURVEYS AND INSPECTIONS" },
-  { code: "20", title: "CYBER SECURITY" },
-  { code: "21.1", title: "COMPANY GUIDE TO TRAVEL FOR SEAFARERS, CONTRACTORS AND COMPANY PERSONNEL" },
-  { code: "21.4", title: "BUSINESS CONTINUITY PLAN" }
-];
-
-let selectedChapterCode = POLICY_CHAPTERS[0]?.code || "";
+let policyNodes = [];
+let policyTree = [];
+let selectedNodeId = "";
+let authBundle = null;
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -72,48 +38,228 @@ function showOk(message) {
   }
 }
 
-function findChapter(code) {
-  return POLICY_CHAPTERS.find((chapter) => chapter.code === code) || null;
+function nodeLabel(node) {
+  if (!node) return "";
+  const code = node.node_code ? `Chapter ${node.node_code}` : "Policy node";
+  return `${code} - ${node.title || ""}`;
+}
+
+function normalizeNode(raw) {
+  return {
+    id: raw.id,
+    book_id: raw.book_id,
+    parent_node_id: raw.parent_node_id || null,
+    node_type: raw.node_type || "heading",
+    node_code: raw.node_code || "",
+    title: raw.title || "",
+    sort_order: Number(raw.sort_order || 0),
+    depth: Number(raw.depth || 0),
+    is_content_node: raw.is_content_node !== false,
+    is_active: raw.is_active !== false,
+    created_at: raw.created_at || null,
+    updated_at: raw.updated_at || null,
+    children: []
+  };
+}
+
+function buildTree(nodes) {
+  const byId = new Map();
+  const roots = [];
+
+  nodes.forEach((node) => {
+    node.children = [];
+    byId.set(node.id, node);
+  });
+
+  nodes.forEach((node) => {
+    if (node.parent_node_id && byId.has(node.parent_node_id)) {
+      byId.get(node.parent_node_id).children.push(node);
+    } else {
+      roots.push(node);
+    }
+  });
+
+  function sortBranch(branch) {
+    branch.sort((a, b) => {
+      const s = Number(a.sort_order || 0) - Number(b.sort_order || 0);
+      if (s !== 0) return s;
+      return String(a.node_code || "").localeCompare(String(b.node_code || ""), undefined, {
+        numeric: true,
+        sensitivity: "base"
+      });
+    });
+
+    branch.forEach((node) => sortBranch(node.children));
+  }
+
+  sortBranch(roots);
+  return roots;
+}
+
+function flattenTree(nodes, output = []) {
+  nodes.forEach((node) => {
+    output.push(node);
+    if (node.children?.length) flattenTree(node.children, output);
+  });
+  return output;
+}
+
+function findNode(nodeId) {
+  return policyNodes.find((node) => node.id === nodeId) || null;
+}
+
+function getNodeDepth(node) {
+  if (!node) return 0;
+  let depth = 0;
+  let current = node;
+
+  while (current?.parent_node_id) {
+    const parent = findNode(current.parent_node_id);
+    if (!parent) break;
+    depth += 1;
+    current = parent;
+  }
+
+  return depth;
+}
+
+async function setupAuth() {
+  if (!window.AUTH?.setupAuthButtons) {
+    showWarn("AUTH helper not available. Login controls may not work.");
+    return null;
+  }
+
+  const bundle = await AUTH.setupAuthButtons({
+    badgeId: "userBadge",
+    loginBtnId: "loginBtn",
+    logoutBtnId: "logoutBtn",
+    switchBtnId: "switchUserBtn"
+  });
+
+  authBundle = bundle;
+
+  if (!bundle?.session?.user) {
+    showWarn("You are logged out. Login is required to view the Company Policy module.");
+    return bundle;
+  }
+
+  showWarn("");
+  return bundle;
+}
+
+async function loadPolicyNodesFromSupabase() {
+  if (!authBundle?.session?.user) {
+    policyNodes = [];
+    policyTree = [];
+    return;
+  }
+
+  const sb = AUTH.ensureSupabase();
+
+  const { data, error } = await sb.rpc("csvb_company_policy_list_nodes", {
+    p_book_key: "main_policy"
+  });
+
+  if (error) {
+    throw new Error("Could not load Company Policy chapters: " + error.message);
+  }
+
+  policyNodes = (data || []).map(normalizeNode);
+  policyTree = buildTree(policyNodes);
+
+  if (!selectedNodeId && policyNodes.length) {
+    selectedNodeId = flattenTree(policyTree)[0]?.id || "";
+  }
+}
+
+async function loadCurrentPublishedVersion(nodeId) {
+  if (!nodeId) return null;
+
+  const sb = AUTH.ensureSupabase();
+
+  const { data, error } = await sb
+    .from("company_policy_node_versions")
+    .select("id, version_no, version_label, version_status, is_current, content_html, content_text, published_at, effective_from")
+    .eq("node_id", nodeId)
+    .eq("version_status", "published")
+    .eq("is_current", true)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error("Could not load published policy text: " + error.message);
+  }
+
+  return data || null;
+}
+
+function renderNodeButton(node) {
+  const active = node.id === selectedNodeId ? " active" : "";
+  const depth = getNodeDepth(node);
+  const indent = Math.min(depth, 8) * 18;
+  const childMark = node.children?.length ? "▸" : "•";
+
+  return `
+    <button
+      class="chapter-btn${active}"
+      type="button"
+      data-node-id="${escapeHtml(node.id)}"
+      style="padding-left:${8 + indent}px;"
+      title="${escapeHtml(nodeLabel(node))}"
+    >
+      <span class="tree-mark">${escapeHtml(childMark)}</span>
+      <span class="chapter-code">Chapter ${escapeHtml(node.node_code)}</span>
+      ${escapeHtml(node.title)}
+    </button>
+  `;
+}
+
+function renderNodeBranch(nodes) {
+  return nodes.map((node) => {
+    const own = renderNodeButton(node);
+    const children = node.children?.length ? renderNodeBranch(node.children) : "";
+    return own + children;
+  }).join("");
 }
 
 function renderChapterList() {
   const list = document.getElementById("chapterList");
   if (!list) return;
 
-  list.innerHTML = POLICY_CHAPTERS.map((chapter) => {
-    const active = chapter.code === selectedChapterCode ? " active" : "";
-    return `
-      <button class="chapter-btn${active}" type="button" data-chapter-code="${escapeHtml(chapter.code)}">
-        <span class="chapter-code">Chapter ${escapeHtml(chapter.code)}</span>
-        ${escapeHtml(chapter.title)}
-      </button>
+  if (!policyTree.length) {
+    list.innerHTML = `
+      <div class="content-box">
+        No Company Policy chapters were found.
+      </div>
     `;
-  }).join("");
+    return;
+  }
 
-  list.querySelectorAll("[data-chapter-code]").forEach((btn) => {
+  list.innerHTML = renderNodeBranch(policyTree);
+
+  list.querySelectorAll("[data-node-id]").forEach((btn) => {
     btn.addEventListener("click", () => {
-      selectChapter(btn.getAttribute("data-chapter-code"));
+      selectNode(btn.getAttribute("data-node-id"));
     });
   });
 }
 
-function selectChapter(code) {
-  const chapter = findChapter(code);
-  if (!chapter) return;
+async function selectNode(nodeId) {
+  const node = findNode(nodeId);
+  if (!node) return;
 
-  selectedChapterCode = chapter.code;
+  selectedNodeId = node.id;
   renderChapterList();
-  renderSelectedChapter();
+  await renderSelectedNode();
 }
 
-function renderSelectedChapter() {
-  const chapter = findChapter(selectedChapterCode);
+async function renderSelectedNode() {
+  const node = findNode(selectedNodeId);
 
   const titleEl = document.getElementById("chapterTitle");
   const metaEl = document.getElementById("chapterMeta");
   const contentEl = document.getElementById("chapterContent");
 
-  if (!chapter) {
+  if (!node) {
     if (titleEl) titleEl.textContent = "Select a chapter";
     if (metaEl) metaEl.textContent = "No chapter selected.";
     if (contentEl) contentEl.textContent = "Select a chapter from the left side.";
@@ -121,27 +267,75 @@ function renderSelectedChapter() {
   }
 
   if (titleEl) {
-    titleEl.textContent = `Chapter ${chapter.code} - ${chapter.title}`;
+    titleEl.textContent = nodeLabel(node);
   }
 
   if (metaEl) {
-    metaEl.textContent = "Policy structure placeholder. No controlled policy text has been inserted yet.";
+    const depth = getNodeDepth(node);
+    const typeLabel = String(node.node_type || "heading").replaceAll("_", " ");
+    metaEl.textContent = `Database-backed policy node. Type: ${typeLabel}. Level: ${depth}.`;
   }
 
   if (contentEl) {
     contentEl.innerHTML = `
       <div>
-        <strong>Chapter ${escapeHtml(chapter.code)} - ${escapeHtml(chapter.title)}</strong>
+        <strong>${escapeHtml(nodeLabel(node))}</strong>
       </div>
       <br />
       <div>
-        This chapter is currently created as a structural placeholder.
-      </div>
-      <br />
-      <div>
-        Later this area will contain the approved policy text, divided into sections, with revision control, approval workflow, exact search, AI source-based search, and change requests.
+        Loading published policy text...
       </div>
     `;
+  }
+
+  try {
+    const version = await loadCurrentPublishedVersion(node.id);
+
+    if (!contentEl) return;
+
+    if (version?.content_html) {
+      contentEl.innerHTML = version.content_html;
+      return;
+    }
+
+    if (version?.content_text) {
+      contentEl.innerHTML = `
+        <div>
+          <strong>${escapeHtml(nodeLabel(node))}</strong>
+        </div>
+        <br />
+        <div>${escapeHtml(version.content_text).replaceAll("\n", "<br />")}</div>
+      `;
+      return;
+    }
+
+    contentEl.innerHTML = `
+      <div>
+        <strong>${escapeHtml(nodeLabel(node))}</strong>
+      </div>
+      <br />
+      <div>
+        No published policy text has been inserted for this item yet.
+      </div>
+      <br />
+      <div>
+        The structure is now loaded from Supabase. Later, this area will show the approved rich-text policy content, including sections, images, tables, revision control, exact search, AI source-based search, and change requests.
+      </div>
+    `;
+  } catch (error) {
+    if (contentEl) {
+      contentEl.innerHTML = `
+        <div>
+          <strong>${escapeHtml(nodeLabel(node))}</strong>
+        </div>
+        <br />
+        <div>
+          The chapter was loaded, but the published text could not be checked.
+        </div>
+        <br />
+        <div>${escapeHtml(String(error?.message || error))}</div>
+      `;
+    }
   }
 }
 
@@ -180,31 +374,35 @@ function runSearch() {
     return;
   }
 
-  const matches = POLICY_CHAPTERS.filter((chapter) => {
-    const haystack = `${chapter.code} ${chapter.title}`.toLowerCase();
+  const flat = flattenTree(policyTree);
+  const matches = flat.filter((node) => {
+    const haystack = `${node.node_code} ${node.title} ${node.node_type}`.toLowerCase();
     return haystack.includes(query);
   });
 
   if (!matches.length) {
     results.innerHTML = `
       <div class="content-box">
-        No matching chapter found for: <strong>${escapeHtml(query)}</strong>
+        No matching policy item found for: <strong>${escapeHtml(query)}</strong>
       </div>
     `;
     return;
   }
 
-  results.innerHTML = matches.map((chapter) => `
-    <div class="result-item" data-result-code="${escapeHtml(chapter.code)}">
-      <div class="result-title">Chapter ${escapeHtml(chapter.code)} - ${escapeHtml(chapter.title)}</div>
-      <div class="result-text">Click to open this chapter in the Policy Book tab.</div>
+  results.innerHTML = matches.map((node) => `
+    <div class="result-item" data-result-id="${escapeHtml(node.id)}">
+      <div class="result-title">${escapeHtml(nodeLabel(node))}</div>
+      <div class="result-text">
+        Type: ${escapeHtml(String(node.node_type || "heading").replaceAll("_", " "))}.
+        Click to open this item in the Policy Book tab.
+      </div>
     </div>
   `).join("");
 
-  results.querySelectorAll("[data-result-code]").forEach((item) => {
-    item.addEventListener("click", () => {
-      const code = item.getAttribute("data-result-code");
-      selectChapter(code);
+  results.querySelectorAll("[data-result-id]").forEach((item) => {
+    item.addEventListener("click", async () => {
+      const id = item.getAttribute("data-result-id");
+      await selectNode(id);
 
       const tabBtn = document.querySelector('[data-tab="policyBook"]');
       if (tabBtn) tabBtn.click();
@@ -241,49 +439,38 @@ function setupPlaceholderButtons() {
 
   if (changeBtn) {
     changeBtn.addEventListener("click", () => {
-      const chapter = findChapter(selectedChapterCode);
-      const label = chapter ? `Chapter ${chapter.code} - ${chapter.title}` : "the selected chapter";
+      const node = findNode(selectedNodeId);
+      const label = node ? nodeLabel(node) : "the selected policy item";
       showOk(`Change request workflow will be added later for ${label}.`);
     });
   }
 
   if (editBtn) {
     editBtn.addEventListener("click", () => {
-      showOk("Draft editing will be added after the database/versioning phase.");
+      showOk("Draft editing will be added after the editor/versioning phase.");
     });
   }
 }
 
-async function setupAuth() {
-  if (!window.AUTH?.setupAuthButtons) {
-    showWarn("AUTH helper not available. Login controls may not work.");
-    return null;
-  }
-
-  const bundle = await AUTH.setupAuthButtons({
-    badgeId: "userBadge",
-    loginBtnId: "loginBtn",
-    logoutBtnId: "logoutBtn",
-    switchBtnId: "switchUserBtn"
-  });
-
-  if (!bundle?.session?.user) {
-    showWarn("You are logged out. Login will be required before this module becomes rights-controlled.");
-    return bundle;
-  }
-
-  showWarn("");
-  return bundle;
-}
-
 async function init() {
   try {
+    showWarn("");
+
     await setupAuth();
     setupTabs();
-    renderChapterList();
-    renderSelectedChapter();
     setupSearch();
     setupPlaceholderButtons();
+
+    if (!authBundle?.session?.user) {
+      renderChapterList();
+      await renderSelectedNode();
+      return;
+    }
+
+    await loadPolicyNodesFromSupabase();
+    renderChapterList();
+    await renderSelectedNode();
+    runSearch();
   } catch (error) {
     showWarn(String(error?.message || error));
   }
