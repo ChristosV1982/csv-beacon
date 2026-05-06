@@ -22,6 +22,7 @@
     messages: [],
     threadParticipants: [],
     notifications: [],
+    attachments: [],
     prefillThreadType: null,
     prefillSourceModule: null
   };
@@ -608,6 +609,12 @@
     state.messages = await rpc("csvb_thread_messages_for_me", { p_thread_id: id });
     state.threadParticipants = await rpc("csvb_thread_participants_for_me", { p_thread_id: id });
 
+    try {
+      state.attachments = await rpc("csvb_thread_attachments_for_me", { p_thread_id: id });
+    } catch (_) {
+      state.attachments = [];
+    }
+
     renderThreadDetail();
   }
 
@@ -668,6 +675,115 @@
     }).join("");
   }
 
+  function safeAttachmentFileName(name) {
+    return String(name || "attachment")
+      .normalize("NFKD")
+      .replace(/[^\w.\-]+/g, "_")
+      .replace(/_+/g, "_")
+      .replace(/^_+|_+$/g, "")
+      .slice(0, 160) || "attachment";
+  }
+
+  function formatAttachmentSize(bytes) {
+    const n = Number(bytes || 0);
+    if (!n) return "";
+    if (n < 1024) return n + " B";
+    if (n < 1024 * 1024) return (n / 1024).toFixed(1) + " KB";
+    return (n / 1024 / 1024).toFixed(1) + " MB";
+  }
+
+  function messageAttachmentsFor(messageId) {
+    return (state.attachments || []).filter((a) => {
+      return String(a.message_id || "") === String(messageId || "");
+    });
+  }
+
+  function messageAttachmentsHtml(messageId) {
+    const rows = messageAttachmentsFor(messageId);
+
+    if (!rows.length) return "";
+
+    return `
+      <div class="message-attachments">
+        <div class="message-attachments-title">Attachments</div>
+        ${rows.map((a) => `
+          <div class="message-attachment-item">
+            <div>
+              <div class="message-attachment-name">${esc(a.file_name || "Attachment")}</div>
+              <div class="message-attachment-meta">
+                ${esc(a.mime_type || "")}
+                ${a.size_bytes ? " • " + esc(formatAttachmentSize(a.size_bytes)) : ""}
+              </div>
+            </div>
+            <button class="secondary" type="button" data-message-attachment-path="${esc(a.storage_path)}">
+              Open
+            </button>
+          </div>
+        `).join("")}
+      </div>
+    `;
+  }
+
+  async function openMessageAttachment(path) {
+    if (!path) return;
+
+    try {
+      const { data, error } = await state.sb.storage
+        .from("thread-attachments")
+        .createSignedUrl(path, 60 * 10);
+
+      if (error) throw error;
+
+      if (data?.signedUrl) {
+        window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+      }
+    } catch (e) {
+      alert("Could not open attachment:\n" + (e?.message || String(e)));
+    }
+  }
+
+  function bindMessageAttachmentButtons() {
+    document.querySelectorAll("[data-message-attachment-path]").forEach((btn) => {
+      if (btn.dataset.bound === "1") return;
+      btn.dataset.bound = "1";
+      btn.addEventListener("click", () => {
+        openMessageAttachment(btn.getAttribute("data-message-attachment-path"));
+      });
+    });
+  }
+
+  async function uploadFilesForMessage(threadId, messageId, files) {
+    const list = Array.from(files || []);
+
+    if (!list.length || !threadId || !messageId) return;
+
+    for (const file of list) {
+      const ts = new Date().toISOString().replace(/[:.]/g, "-");
+      const rand = Math.random().toString(36).slice(2, 8);
+      const safeName = safeAttachmentFileName(file.name);
+      const path = `${threadId}/${messageId}/${ts}_${rand}_${safeName}`;
+
+      const { error: uploadError } = await state.sb.storage
+        .from("thread-attachments")
+        .upload(path, file, {
+          cacheControl: "3600",
+          upsert: false,
+          contentType: file.type || "application/octet-stream"
+        });
+
+      if (uploadError) throw uploadError;
+
+      await rpc("csvb_register_thread_attachment", {
+        p_thread_id: threadId,
+        p_message_id: messageId,
+        p_storage_path: path,
+        p_file_name: file.name,
+        p_mime_type: file.type || null,
+        p_size_bytes: file.size || null
+      });
+    }
+  }
+
   function renderMessages() {
     const box = $("messagesBox");
     if (!box) return;
@@ -678,15 +794,17 @@
     }
 
     box.innerHTML = state.messages.map((m) => `
-      <div class="message">
+      <div class="message" data-message-id="${esc(m.id)}">
         <div class="message-meta">
           ${esc(m.created_by_username || "Unknown")} • ${esc(m.created_by_role || "")} • ${esc(fmtDate(m.created_at))}
           ${m.is_system ? " • system" : ""}
         </div>
         <div class="message-text">${esc(m.message_text || "")}</div>
+        ${messageAttachmentsHtml(m.id)}
       </div>
     `).join("");
 
+    bindMessageAttachmentButtons();
     box.scrollTop = box.scrollHeight;
   }
 
@@ -785,13 +903,22 @@
       return;
     }
 
-    await rpc("csvb_add_thread_message", {
+    const createdMessage = await rpc("csvb_add_thread_message", {
       p_thread_id: state.selectedThread.id,
       p_message_text: text,
       p_message_type: "comment"
     });
 
+    const messageRow = Array.isArray(createdMessage) ? createdMessage[0] : createdMessage;
+    const messageFiles = Array.from($("newMessageFiles")?.files || []);
+
+    if (messageFiles.length && messageRow?.id) {
+      msg("warn", "Uploading message attachment(s)…");
+      await uploadFilesForMessage(state.selectedThread.id, messageRow.id, messageFiles);
+    }
+
     $("newMessageText").value = "";
+    if ($("newMessageFiles")) $("newMessageFiles").value = "";
     await openThread(state.selectedThread.id);
     await loadThreads();
     await loadNotifications();

@@ -262,7 +262,17 @@
             </div>
 
             <div class="row">
-              <button id="addMessageBtn" type="button" data-csvb-help="Add your message and notify thread participants.">Add Message</button>
+              <div class="field wide">
+                <label for="newMessageFiles">Attach file(s) to this message</label>
+                <input id="newMessageFiles" type="file" multiple />
+                <div class="compact-note">
+                  Optional. Files uploaded here will be linked directly to this message.
+                </div>
+              </div>
+            </div>
+
+            <div class="row">
+              <button id="addMessageBtn" type="button" data-csvb-help="Add your message and upload any selected message attachments.">Add Message</button>
             </div>
           </div>
         </div>

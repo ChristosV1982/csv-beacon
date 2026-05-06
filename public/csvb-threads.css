@@ -610,3 +610,53 @@ tbody tr:hover td {
 #csvbThreadInboxStatus.err {
   color: #9B1C1C;
 }
+
+
+/* === Message-level attachments === */
+
+#newMessageFiles {
+  width: 100%;
+  min-height: 34px;
+  border: 1px solid #C8DAEF;
+  border-radius: 8px;
+  padding: 6px 8px;
+  background: #fff;
+}
+
+.message-attachments {
+  margin-top: 8px;
+  border-top: 1px solid #D6E4F5;
+  padding-top: 7px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.message-attachments-title {
+  font-size: .84rem;
+  color: #062A5E;
+  font-weight: 600;
+}
+
+.message-attachment-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  border: 1px solid #D6E4F5;
+  background: #fff;
+  border-radius: 8px;
+  padding: 6px 7px;
+}
+
+.message-attachment-name {
+  color: #062A5E;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.message-attachment-meta {
+  color: #5E6F86;
+  font-size: .8rem;
+  margin-top: 2px;
+}
