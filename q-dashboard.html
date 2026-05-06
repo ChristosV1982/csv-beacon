@@ -1,427 +1,552 @@
+<!-- public/q-dashboard.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SIRE 2.0 – Dashboard</title>
+  <title>C.S.V. BEACON – Dashboard</title>
 
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="./csv-beacon-theme.css?v=20260428_3" />
+  <link rel="stylesheet" href="./style.css?v=20260428_3" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="./auth.js"></script>
 
   <style>
-    body{
-      min-height:100vh;
-      margin:0;
-      padding:18px 14px;
-      background: radial-gradient(1200px 700px at 20% 10%, #1a4170 0%, #0b1c33 55%, #071426 100%);
-      font-family:"Segoe UI", Arial, sans-serif;
-      color:#fff;
-    }
-    .wrap{ max-width: 1400px; margin: 0 auto; }
+    body{margin:0;font-family:var(--font-sans);background:var(--bg-main);color:var(--text-main);}
+    .topbar{background:linear-gradient(90deg,var(--brand-navy-dark),var(--brand-navy));color:#fff;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;box-shadow:0 8px 24px rgba(3,27,63,.16);}
+    .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+    .wrap{padding:18px;max-width:1200px;margin:0 auto;}
+    .btn{background:var(--brand-navy);color:#fff;border:1px solid var(--brand-navy);border-radius:10px;padding:10px 14px;font-weight:900;cursor:pointer;}
+    .btn2{background:var(--btn-secondary-bg);color:var(--brand-navy);border:1px solid var(--btn-secondary-border);border-radius:10px;padding:10px 14px;font-weight:900;cursor:pointer;}
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin-top:14px;}
+    .card{background:var(--bg-card);border:1px solid var(--border-soft);border-radius:14px;padding:14px;box-shadow:0 10px 30px rgba(3,27,63,0.06);}
+    .title{font-weight:950;color:var(--brand-navy);font-size:1.05rem;}
+    .muted{color:var(--text-muted);font-weight:650;margin-top:6px;line-height:1.35;}
+    .warn{display:none;margin-top:12px;color:#8b1d1d;background:#ffeaea;border:1px solid #ffc7c7;padding:10px 12px;border-radius:12px;font-weight:800;white-space:pre-wrap;}
 
-    .topbar{
+    .csvb-company-view-wrap{
       display:flex;
-      gap:12px;
-      flex-wrap:wrap;
       align-items:center;
-      justify-content:space-between;
-      margin-bottom: 12px;
+      gap:8px;
+      padding:6px 8px;
+      border:1px solid rgba(255,255,255,.28);
+      border-radius:12px;
+      background:rgba(255,255,255,.10);
     }
-    .title{
-      font-weight:950;
-      letter-spacing:0.03em;
-      margin:0;
-      font-size:1.35rem;
-      text-shadow: 0 3px 12px rgba(0,0,0,0.35);
+    .csvb-company-view-label{
+      color:#BFEFF4;
+      font-weight:900;
+      font-size:.85rem;
     }
-    .sub{
-      margin-top:6px;
-      opacity:0.92;
+    .csvb-company-view-select{
+      min-width:210px;
+      max-width:280px;
+      border-radius:10px;
+      border:1px solid rgba(255,255,255,.35);
+      padding:8px 10px;
       font-weight:850;
-      line-height:1.35;
-    }
-    .top-actions{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
-
-    .btn{
-      border:none; border-radius:10px;
-      padding:10px 14px;
-      font-weight:900;
-      cursor:pointer;
-      text-decoration:none;
-      display:inline-block;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.15);
-      background:#295eb0;
-      color:#fff;
-      white-space: nowrap;
-    }
-    .btn:hover{ filter:brightness(0.96); }
-    .btn-outline{ background:transparent; border:1px solid rgba(255,255,255,0.65); color:#fff; box-shadow:none; }
-    .btn-muted{ background:#eaf1fb; border:1px solid #d5deef; color:#1a4170; box-shadow:none; }
-    .btn:disabled{ opacity:0.55; cursor:not-allowed; filter:none; }
-
-    .panel{
-      background: rgba(12,33,58,0.68);
-      border: 1px solid rgba(213,222,239,0.35);
-      border-radius: 18px;
-      padding: 14px;
-      box-shadow: 0 10px 46px rgba(0,0,0,0.35);
-      backdrop-filter: blur(3px);
-    }
-
-    .card{
+      color:#062A5E;
       background:#fff;
-      color:#1a4170;
-      border:1px solid #d5deef;
-      border-radius:16px;
-      padding:14px;
-      box-shadow: 0 4px 18px rgba(18, 44, 87, 0.16);
     }
-
-    .mono{
-      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
-      font-size: 0.92rem;
-      color:#35507b;
+    .csvb-company-view-clear{
+      padding:8px 10px;
     }
-
-    .warn{
-      margin-top:10px;
+    .csvb-sim-banner{
+      margin:0 0 12px 0;
       padding:10px 12px;
       border-radius:12px;
-      border:1px solid #f1c7c7;
-      background:#fff2f2;
-      color:#7a1f1f;
-      font-weight: 900;
-      line-height:1.35;
-      display:none;
-    }
-
-    .ok{
-      margin-top:10px;
-      padding:10px 12px;
-      border-radius:12px;
-      border:1px solid #bce9c9;
-      background:#e9fff0;
-      color:#11612b;
-      font-weight: 900;
-      line-height:1.35;
-      display:none;
-    }
-
-    .grid{
-      display:grid;
-      grid-template-columns: 420px 1fr;
-      gap:12px;
-      margin-top: 12px;
-      align-items:start;
-    }
-    @media (max-width: 1050px){
-      .grid{ grid-template-columns: 1fr; }
-    }
-
-    .box{
-      border:1px solid #d5deef;
-      border-radius:12px;
-      background:#f7fbff;
-      padding:10px;
-      color:#1a4170;
-    }
-
-    .kvRow{
-      display:flex;
-      gap:10px;
-      flex-wrap:wrap;
-      align-items:flex-start;
-      margin-bottom:6px;
-    }
-    .k{ font-weight:950; min-width: 140px; }
-    .v{ font-weight:850; color:#35507b; flex:1; min-width: 200px; }
-
-    .tiles{
-      display:grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap:10px;
-    }
-    @media (max-width: 1200px){
-      .tiles{ grid-template-columns: repeat(2, 1fr); }
-    }
-    @media (max-width: 650px){
-      .tiles{ grid-template-columns: 1fr; }
-    }
-
-    .tile{
-      border:1px solid #d5deef;
-      border-radius:14px;
-      padding:12px;
-      background:#fff;
-      box-shadow: 0 4px 18px rgba(18, 44, 87, 0.10);
-    }
-    .tileTitle{ font-weight:950; color:#1a4170; margin-bottom:6px; }
-    .tileNum{ font-size:1.8rem; font-weight:950; color:#1a4170; }
-    .tileSub{ margin-top:6px; font-weight:850; color:#35507b; line-height:1.35; }
-
-    .pill{
-      display:inline-block;
-      padding:3px 10px;
-      border-radius:999px;
+      border:1px solid #F6D58F;
+      background:#FFF6E0;
+      color:#8A5A00;
       font-weight:900;
-      font-size:0.85rem;
-      border:1px solid #d5deef;
-      background:#eaf1fb;
-      color:#1a4170;
-      white-space: nowrap;
-    }
-    .pill.progress{ background:#fff4df; border-color:#f0d39a; color:#7a4a00; }
-    .pill.pending{ background:#fff0f0; border-color:#f1c7c7; color:#7a1f1f; }
-    .pill.submitted{ background:#e9fff0; border-color:#bce9c9; color:#11612b; }
-
-    .routeBtns{
-      display:flex;
-      gap:10px;
-      flex-wrap:wrap;
-      margin-top:10px;
     }
   </style>
+  <link rel="stylesheet" href="./csvb-ui-polish.css?v=20260430_1" />
+  <link rel="stylesheet" href="./csvb-help-tooltips.css?v=20260430_1" />
+  <link rel="stylesheet" href="./csvb-100pct-fit.css?v=20260430_1" />
+  <link rel="stylesheet" href="./csvb-dashboard-polish.css?v=20260430_1" />
 </head>
 
 <body>
-  <div class="wrap">
-    <div class="topbar">
-      <div>
-        <h1 class="title">Dashboard (Supabase)</h1>
-        <div class="sub" id="subLine">Checking session...</div>
-      </div>
-
-      <div class="top-actions">
-        <a class="btn btn-outline" href="./library.html">Read Only</a>
-        <a class="btn btn-outline" href="./index.html">Mode Selection</a>
-        <a class="btn btn-muted" href="./login.html">Login</a>
-        <button class="btn btn-outline" id="logoutBtn" type="button">Logout</button>
+  <div class="topbar">
+    <div class="csvb-brand">
+      <img class="csvb-brand-logo" src="./assets/csv-beacon-icon.png" alt="C.S.V. BEACON logo" />
+      <div class="csvb-brand-text">
+        <div class="csvb-brand-title">C.S.V. BEACON</div>
+        <div class="csvb-brand-subtitle">Marine Assurance & Compliance Platform</div>
       </div>
     </div>
+    <div class="row">
+      <div id="userBadge" style="font-weight:800;opacity:.95;"></div>
+      <div id="csvbCompanyViewWrap" class="csvb-company-view-wrap" style="display:none;">
+        <span class="csvb-company-view-label">View as</span>
+        <select id="csvbCompanyViewSelect" class="csvb-company-view-select">
+          <option value="">Platform</option>
+        </select>
+        <button class="btn2 csvb-company-view-clear" id="csvbCompanyViewClearBtn" type="button">Platform view</button>
+      </div>
+      <button class="btn2" id="loginBtn" type="button" style="display:none;">Login</button>
+      <button class="btn2" id="switchUserBtn" type="button">Switch User</button>
+      <button class="btn" id="logoutBtn" type="button" style="display:none;">Logout</button>
+    </div>
+  </div>
 
-    <div class="panel">
-      <div class="card">
-        <div id="warnBox" class="warn"></div>
-        <div id="okBox" class="ok"></div>
+  <div class="wrap">
+    <div id="warnBox" class="warn"></div>
 
-        <div class="box">
-          <div class="kvRow">
-            <div class="k">Session</div>
-            <div class="v mono" id="sessionLine">...</div>
-          </div>
-          <div class="kvRow">
-            <div class="k">Role</div>
-            <div class="v" id="roleLine">...</div>
-          </div>
-          <div class="kvRow" style="margin-bottom:0;">
-            <div class="k">Vessel</div>
-            <div class="v" id="vesselLine">...</div>
-          </div>
-
-          <div class="routeBtns">
-            <a class="btn" id="goPrimaryBtn" href="#">Go to Your Area</a>
-            <a class="btn btn-muted" href="./q-company.html">Company</a>
-            <a class="btn btn-muted" href="./q-vessel.html">Vessel</a>
-            <a class="btn btn-muted" href="./q-inspector.html">Inspector</a>
-            <a class="btn btn-muted" href="./q-report.html">Reports</a>
-            <button class="btn btn-muted" id="refreshBtn" type="button">Refresh</button>
-          </div>
-
-          <div style="margin-top:10px;" class="mono">
-            Counts below are based on what your account can see (RLS scope).
-          </div>
+    <div class="grid">
+      <!-- Always available -->
+      <div class="card" data-card="library">
+        <div class="title">Read-Only Library</div>
+        <div class="muted">Open the locked SIRE 2.0 question library (no edits).</div>
+        <div style="margin-top:12px;">
+          <button class="btn2" type="button" onclick="location.href='./library.html?mode=study'">Open</button>
         </div>
+      </div>
 
-        <div style="margin-top:12px;" class="tiles">
-          <div class="tile">
-            <div class="tileTitle">Total questionnaires</div>
-            <div class="tileNum" id="countAll">-</div>
-            <div class="tileSub">All statuses</div>
-          </div>
-          <div class="tile">
-            <div class="tileTitle">In Progress</div>
-            <div class="tileNum" id="countProgress">-</div>
-            <div class="tileSub"><span class="pill progress">in_progress</span></div>
-          </div>
-          <div class="tile">
-            <div class="tileTitle">Pending Office Review</div>
-            <div class="tileNum" id="countPending">-</div>
-            <div class="tileSub"><span class="pill pending">pending_office_review</span></div>
-          </div>
-          <div class="tile">
-            <div class="tileTitle">Submitted</div>
-            <div class="tileNum" id="countSubmitted">-</div>
-            <div class="tileSub"><span class="pill submitted">submitted</span></div>
-          </div>
+      <div class="card" data-card="compare">
+        <div class="title">Pre/Post Compare</div>
+        <div class="muted">Compare Self-Assessment vs Post-Inspection statistics.</div>
+        <div style="margin-top:12px;">
+          <button class="btn2" type="button" onclick="location.href='./sa_compare.html'">Open</button>
         </div>
+      </div>
 
-        <div class="box" style="margin-top:12px;">
-          <div class="mono">
-            Supabase project:
-            <div style="margin-top:6px;">https://bdidrcyufazskpuwmfca.supabase.co</div>
-          </div>
+      <!-- Vessel -->
+      <div class="card" data-card="vessel">
+        <div class="title">Vessel View – My Questionnaires</div>
+        <div class="muted">Vessel users see only assigned questionnaires. Master sees all for the vessel.</div>
+        <div style="margin-top:12px;">
+          <button class="btn2" type="button" onclick="location.href='./q-vessel.html'">Open</button>
         </div>
+      </div>
 
+      <div class="card" data-card="tasks">
+        <div class="title">My Self-Assessment Tasks</div>
+        <div class="muted">See tasks assigned to you (via RLS) and open questionnaires.</div>
+        <div style="margin-top:12px;">
+          <button class="btn2" type="button" onclick="location.href='./sa_tasks.html'">Open</button>
+        </div>
+      </div>
+
+      <!-- Company / Office -->
+      <div class="card" data-card="company">
+        <div class="title">Company Builder</div>
+        <div class="muted">Create questionnaires from filters/templates and assign roles.</div>
+        <div style="margin-top:12px;">
+          <button class="btn2" type="button" onclick="location.href='./q-company.html'">Open</button>
+        </div>
+      </div>
+
+      <div class="card" data-card="assignments">
+        <div class="title">Self-Assessment Assignments</div>
+        <div class="muted">Create campaigns and assign questionnaires to vessel/company roles.</div>
+        <div style="margin-top:12px;">
+          <button class="btn2" type="button" onclick="location.href='./sa_assignments.html'">Open</button>
+        </div>
+      </div>
+
+      <div class="card" data-card="post">
+        <div class="title">Post-Inspection Entry</div>
+        <div class="muted">Mark which questions received observations and record PGNO tick(s).</div>
+        <div style="margin-top:12px;">
+          <button class="btn2" type="button" onclick="location.href='./post_inspection.html'">Open</button>
+        </div>
+      </div>
+
+      <div class="card" data-card="poststats">
+        <div class="title">Post-Inspection Stats</div>
+        <div class="muted">Statistics for the post-inspection module.</div>
+        <div style="margin-top:12px;">
+          <button class="btn2" type="button" onclick="location.href='./post_inspection_stats.html'">Open</button>
+        </div>
+      </div>
+
+      <div class="card" data-card="inspector_intelligence">
+        <div class="title">Inspector Intelligence</div>
+        <div class="muted">Inspector records from own fleet inspections and third-party intelligence. Third-party records do not count toward fleet statistics.</div>
+        <div style="margin-top:12px;">
+          <button class="btn2" type="button" onclick="location.href='./inspector_intelligence.html'">Open</button>
+        </div>
+      </div>
+
+      <div class="card" data-card="audit_observations">
+        <div class="title">Audit Observations</div>
+        <div class="muted">Internal and external audit findings using SIRE 2.0 classification fields.</div>
+        <div style="margin-top:12px;">
+          <button class="btn2" type="button" onclick="location.href='./audit_observations.html'">Open</button>
+        </div>
+      </div>
+
+      <div class="card" data-card="reports">
+        <div class="title">Reports</div>
+        <div class="muted">Reporting & exports for office users.</div>
+        <div style="margin-top:12px;">
+          <button class="btn2" type="button" onclick="location.href='./q-report.html'">Open</button>
+        </div>
+      </div>
+
+      <div class="card" data-card="inspector">
+        <div class="title">Inspector / Third-Party</div>
+        <div class="muted">Inspector portal (as permitted by role/RLS).</div>
+        <div style="margin-top:12px;">
+          <button class="btn2" type="button" onclick="location.href='./q-inspector.html'">Open</button>
+        </div>
+      </div>
+
+      <div class="card" data-card="threads">
+        <div class="title">Threads</div>
+        <div class="muted">Company-specific discussion threads for questions, PGNOs, observations, audits and vessel follow-up.</div>
+        <div style="margin-top:12px;">
+          <button class="btn2" type="button" onclick="location.href='./threads.html'">Open</button>
+        </div>
+      </div>
+
+      <div class="card" data-card="company_policy">
+        <div class="title">Company Policy</div>
+        <div class="muted">Controlled policy book structure, future rich-text policy editing, change requests, manuals and AI source-based search.</div>
+        <div style="margin-top:12px;">
+          <button class="btn2" type="button" onclick="location.href='./company_policy.html'">Open</button>
+        </div>
+      </div>
+
+      <!-- Questions Editor (role-based) -->
+      <div class="card" data-card="qeditor">
+        <div class="title">Questions Editor</div>
+        <div class="muted">Edit or review the question library (as permitted by your role).</div>
+        <div style="margin-top:12px;">
+          <button class="btn2" type="button" onclick="location.href='./q-questions-editor.html'">Open</button>
+        </div>
+      </div>
+
+      <!-- Super Admin only -->
+      <div class="card" data-card="suadmin">
+        <div class="title">Superuser Administration</div>
+        <div class="muted">Manage roles/rights/module access (scaffold page).</div>
+        <div style="margin-top:12px;">
+          <button class="btn2" type="button" onclick="location.href='./su-admin.html'">Open</button>
+        </div>
       </div>
     </div>
   </div>
 
   <script>
-    // =====================
-    // Supabase config (your values)
-    // =====================
-    const SUPABASE_URL = "https://bdidrcyufazskpuwmfca.supabase.co";
-    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJkaWRyY3l1ZmF6c2twdXdtZmNhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc5NDI4ODMsImV4cCI6MjA4MzUxODg4M30.Uqj4WCzoNS9wnlzI-xew6iTFzTUi77dcGeBjUgFjZbQ";
-    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const CSVB_COMPANY_VIEW_ID_KEY = "csvb_superuser_company_view_id";
+    const CSVB_COMPANY_VIEW_NAME_KEY = "csvb_superuser_company_view_name";
 
-    // Compatibility key (older pages)
-    const SESSION_KEY_COMPAT = "q_session_v1";
-
-    const UI_ROLE_MAP = {
-      super_admin: "Super Admin",
-      company_admin: "Company Admin",
-      company_superintendent: "Company Superintendent",
-      vessel: "Vessel",
-      inspector: "Inspector / Third Party"
-    };
-    function roleToUi(role){ return UI_ROLE_MAP[role] || role || ""; }
-
-    function setSubLine(text){ document.getElementById("subLine").textContent = text; }
     function showWarn(msg){
-      const w = document.getElementById("warnBox");
-      w.textContent = msg;
-      w.style.display = "block";
+      const w=document.getElementById("warnBox");
+      w.textContent=msg||"";
+      w.style.display=msg?"block":"none";
     }
+
     function clearWarn(){
-      const w = document.getElementById("warnBox");
-      w.textContent = "";
-      w.style.display = "none";
-    }
-    function showOk(msg){
-      const o = document.getElementById("okBox");
-      o.textContent = msg;
-      o.style.display = "block";
-      setTimeout(() => { o.style.display = "none"; }, 1400);
+      showWarn("");
     }
 
-    async function getUser(){
-      const { data: { user }, error } = await supabaseClient.auth.getUser();
-      if (error) showWarn("Auth error: " + error.message);
-      return user || null;
+    function isPlatformRole(role){
+      return role === "super_admin" || role === "platform_owner";
     }
 
-    async function getMyProfile(userId){
-      const { data, error } = await supabaseClient
-        .from("profiles")
-        .select("username, role, vessel_id, vessels(name)")
-        .eq("id", userId)
-        .single();
-      if (error) throw error;
-      return data;
+    function getSimulatedCompanyId(){
+      return localStorage.getItem(CSVB_COMPANY_VIEW_ID_KEY) || "";
     }
 
-    async function loadQuestionnairesCounts(){
-      // RLS will scope what is visible here
-      const { data, error } = await supabaseClient
-        .from("questionnaires")
-        .select("id, status");
-
-      if (error) throw error;
-
-      const rows = data || [];
-      const all = rows.length;
-      const progress = rows.filter(r => r.status === "in_progress").length;
-      const pending = rows.filter(r => r.status === "pending_office_review").length;
-      const submitted = rows.filter(r => r.status === "submitted").length;
-
-      return { all, progress, pending, submitted };
+    function getSimulatedCompanyName(){
+      return localStorage.getItem(CSVB_COMPANY_VIEW_NAME_KEY) || "";
     }
 
-    function setCounts(c){
-      document.getElementById("countAll").textContent = c.all;
-      document.getElementById("countProgress").textContent = c.progress;
-      document.getElementById("countPending").textContent = c.pending;
-      document.getElementById("countSubmitted").textContent = c.submitted;
-    }
-
-    function resolvePrimaryRoute(uiRole){
-      if (uiRole === "Vessel") return "./q-vessel.html";
-      if (uiRole === "Inspector / Third Party") return "./q-inspector.html";
-      if (uiRole === "Company Admin" || uiRole === "Company Superintendent" || uiRole === "Super Admin") return "./q-company.html";
-      return "./q-dashboard.html";
-    }
-
-    async function doLogout(){
-      clearWarn();
-      await supabaseClient.auth.signOut();
-      localStorage.removeItem(SESSION_KEY_COMPAT);
-      setSubLine("Logged out.");
-      showWarn("Logged out. Go to login.html to sign in again.");
-    }
-
-    async function refreshAll(profile, user){
-      clearWarn();
-      setSubLine("Loading counts...");
-      try{
-        const c = await loadQuestionnairesCounts();
-        setCounts(c);
-        setSubLine("Ready.");
-        showOk("Refreshed.");
-      }catch(e){
-        showWarn("Counts load failed: " + String(e.message || e));
-        setSubLine("Error loading counts.");
+    function setSimulatedCompany(id, name){
+      if (id) {
+        localStorage.setItem(CSVB_COMPANY_VIEW_ID_KEY, id);
+        localStorage.setItem(CSVB_COMPANY_VIEW_NAME_KEY, name || "");
+      } else {
+        localStorage.removeItem(CSVB_COMPANY_VIEW_ID_KEY);
+        localStorage.removeItem(CSVB_COMPANY_VIEW_NAME_KEY);
       }
     }
 
-    async function init(){
-      clearWarn();
+    const DASHBOARD_MODULE_BY_CARD = {
+      library: "read_only_library",
+      compare: "post_inspection_stats",
+      vessel: "self_assessment",
+      tasks: "self_assessment",
+      company: "self_assessment",
+      assignments: "self_assessment",
+      post: "post_inspection",
+      poststats: "post_inspection_stats",
+      inspector_intelligence: "inspector_intelligence",
+      audit_observations: "audit_observations",
+      reports: "fleet_reports",
+      inspector: "sire_2_vetting",
+      qeditor: "questions_editor",
+      threads: "threads",
+      company_policy: "company_policy",
+      suadmin: "platform_administration"
+    };
 
-      const user = await getUser();
-      if (!user){
-        setSubLine("Not logged in.");
-        showWarn("You are not logged in. Please login first (login.html).");
+    async function setupSuperuserCompanyContext(bundle){
+      const wrap = document.getElementById("csvbCompanyViewWrap");
+      const sel = document.getElementById("csvbCompanyViewSelect");
+      const clearBtn = document.getElementById("csvbCompanyViewClearBtn");
+
+      if (!wrap || !sel || !clearBtn) return;
+
+      const role = bundle?.profile?.role || "";
+      if (!isPlatformRole(role)) {
+        wrap.style.display = "none";
         return;
       }
 
-      let profile;
-      try{
-        profile = await getMyProfile(user.id);
-      }catch(e){
-        setSubLine("Logged in, but profile missing or blocked.");
-        showWarn("Profile missing or blocked by RLS. Ensure a row exists in public.profiles for this user.");
+      wrap.style.display = "flex";
+
+      const sb = AUTH.ensureSupabase();
+
+      const { data, error } = await sb.rpc("csvb_admin_list_companies");
+      if (error) {
+        showWarn("Could not load companies for superuser company context: " + error.message);
         return;
       }
 
-      const uiRole = roleToUi(profile.role);
-      const username = profile.username || user.email || "(unknown)";
-      const vesselName = profile?.vessels?.name || "";
+      const current = getSimulatedCompanyId();
 
-      document.getElementById("sessionLine").textContent = username;
-      document.getElementById("roleLine").textContent = uiRole;
-      document.getElementById("vesselLine").textContent = vesselName || "(n/a)";
+      sel.innerHTML = [
+        '<option value="">Platform / all companies</option>',
+        ...(data || []).map((c) => {
+          const label = c.company_name || c.short_name || c.company_code || c.id;
+          return '<option value="' + String(c.id).replaceAll('"','&quot;') + '">' +
+            String(label).replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;") +
+            '</option>';
+        })
+      ].join("");
 
-      // Compatibility session until all pages migrated
-      localStorage.setItem(SESSION_KEY_COMPAT, JSON.stringify({
-        username: profile.username || "",
-        role: uiRole,
-        vessel: vesselName,
-        created_at: new Date().toISOString()
-      }));
+      sel.value = current || "";
 
-      // Primary route button
-      const primaryHref = resolvePrimaryRoute(uiRole);
-      const primaryBtn = document.getElementById("goPrimaryBtn");
-      primaryBtn.href = primaryHref;
+      sel.addEventListener("change", () => {
+        const id = sel.value || "";
+        const name = sel.options[sel.selectedIndex]?.textContent || "";
+        setSimulatedCompany(id, name);
+        location.reload();
+      });
 
-      // Event handlers
-      document.getElementById("logoutBtn").addEventListener("click", doLogout);
-      document.getElementById("refreshBtn").addEventListener("click", () => refreshAll(profile, user));
+      clearBtn.addEventListener("click", () => {
+        setSimulatedCompany("", "");
+        location.reload();
+      });
 
-      setSubLine("Loading counts...");
-      await refreshAll(profile, user);
+      if (current) {
+        const banner = document.createElement("div");
+        banner.className = "csvb-sim-banner";
+        banner.textContent =
+          "Superuser simulation active: viewing dashboard/module visibility as " +
+          (getSimulatedCompanyName() || "selected company") +
+          ". RLS remains platform-level for the actual superuser account.";
+        const warn = document.getElementById("warnBox");
+        if (warn && warn.parentElement && !document.querySelector(".csvb-sim-banner")) {
+          warn.parentElement.insertBefore(banner, warn.nextSibling);
+        }
+      }
     }
 
-    init();
+    async function loadEnabledModules(bundle){
+      const role = bundle?.profile?.role || "";
+      const isPlatform = isPlatformRole(role);
+      const sb = AUTH.ensureSupabase();
+
+      if (isPlatform) {
+        const simulatedCompanyId = getSimulatedCompanyId();
+
+        if (simulatedCompanyId) {
+          const { data, error } = await sb.rpc("csvb_admin_list_company_modules", {
+            p_company_id: simulatedCompanyId
+          });
+
+          if (error) {
+            throw new Error("Could not load simulated company module access: " + error.message);
+          }
+
+          return {
+            isPlatform: false,
+            isSimulatedCompany: true,
+            simulatedCompanyId,
+            simulatedCompanyName: getSimulatedCompanyName(),
+            enabled: new Set((data || []).filter((m) => m.is_enabled === true).map((m) => m.module_key)),
+            raw: data || []
+          };
+        }
+
+        return {
+          isPlatform: true,
+          isSimulatedCompany: false,
+          enabled: new Set(Object.values(DASHBOARD_MODULE_BY_CARD).filter(Boolean)),
+          raw: []
+        };
+      }
+
+      const { data, error } = await sb.rpc("csvb_my_company_modules");
+
+      if (error) {
+        throw new Error("Could not load company module access: " + error.message);
+      }
+
+      return {
+        isPlatform: false,
+        isSimulatedCompany: false,
+        enabled: new Set((data || []).filter((m) => m.is_enabled === true).map((m) => m.module_key)),
+        raw: data || []
+      };
+    }
+
+    function hideAllCards(){
+      document.querySelectorAll("[data-card]").forEach((el) => {
+        el.style.display = "none";
+      });
+    }
+
+    function cardAllowedByModule(cardKey, moduleAccess){
+      if (moduleAccess?.isPlatform) return true;
+      const moduleKey = DASHBOARD_MODULE_BY_CARD[cardKey];
+      if (!moduleKey) return true;
+      return moduleAccess?.enabled?.has(moduleKey) === true;
+    }
+
+    function setVisible(cardKey, roleAllowed, moduleAccess){
+      const el = document.querySelector(`[data-card="${cardKey}"]`);
+      if (!el) return;
+      const allowed = !!roleAllowed && cardAllowedByModule(cardKey, moduleAccess);
+      el.style.display = allowed ? "block" : "none";
+    }
+
+    (async () => {
+      clearWarn();
+
+      const bundle = await AUTH.setupAuthButtons({
+        badgeId: "userBadge",
+        loginBtnId: "loginBtn",
+        logoutBtnId: "logoutBtn",
+        switchBtnId: "switchUserBtn"
+      });
+
+      await setupSuperuserCompanyContext(bundle);
+
+      if (!bundle?.session?.user) {
+        showWarn("You are logged out. Please Login.");
+
+        document.querySelectorAll("[data-card]").forEach(c => {
+          const k = c.getAttribute("data-card");
+          const keep = (k === "library" || k === "compare");
+          c.style.display = keep ? "block" : "none";
+        });
+
+        return;
+      }
+
+      const moduleAccess = await loadEnabledModules(bundle);
+      window.CSVB_DASHBOARD_MODULE_ACCESS = moduleAccess;
+
+      const role = bundle.profile?.role;
+      const R = AUTH.ROLES;
+
+      const isSuper = role === R.SUPER_ADMIN || role === "platform_owner";
+      const isCompanyAdmin = role === R.COMPANY_ADMIN;
+      const isCompanySup = role === R.COMPANY_SUPERINTENDENT;
+      const isVessel = role === R.VESSEL;
+      const isInspector = role === R.INSPECTOR;
+
+      hideAllCards();
+
+      setVisible("library", true, moduleAccess);
+      setVisible("compare", true, moduleAccess);
+      setVisible("tasks", true, moduleAccess);
+      setVisible("vessel", true, moduleAccess);
+
+      setVisible("qeditor", (isSuper || isCompanyAdmin || isCompanySup), moduleAccess);
+
+      if (isSuper) {
+        [
+          "company",
+          "assignments",
+          "post",
+          "poststats",
+          "inspector_intelligence",
+          "audit_observations",
+          "reports",
+          "inspector",
+          "qeditor",
+          "threads",
+          "company_policy",
+          "suadmin"
+        ].forEach(k => setVisible(k, true, moduleAccess));
+        return;
+      }
+
+      if (isVessel) {
+        setVisible("company", false, moduleAccess);
+        setVisible("assignments", false, moduleAccess);
+        setVisible("post", false, moduleAccess);
+        setVisible("poststats", false, moduleAccess);
+        setVisible("inspector_intelligence", false, moduleAccess);
+        setVisible("audit_observations", false, moduleAccess);
+        setVisible("reports", false, moduleAccess);
+        setVisible("inspector", false, moduleAccess);
+        setVisible("qeditor", false, moduleAccess);
+        setVisible("threads", true, moduleAccess);
+        setVisible("company_policy", true, moduleAccess);
+        setVisible("suadmin", false, moduleAccess);
+        return;
+      }
+
+      if (isCompanyAdmin) {
+        [
+          "company",
+          "assignments",
+          "post",
+          "poststats",
+          "inspector_intelligence",
+          "audit_observations",
+          "reports",
+          "inspector",
+          "qeditor",
+          "threads",
+          "company_policy"
+        ].forEach(k => setVisible(k, true, moduleAccess));
+        setVisible("suadmin", false, moduleAccess);
+        return;
+      }
+
+      if (isCompanySup) {
+        setVisible("company", false, moduleAccess);
+        setVisible("assignments", false, moduleAccess);
+        setVisible("post", true, moduleAccess);
+        setVisible("poststats", true, moduleAccess);
+        setVisible("inspector_intelligence", true, moduleAccess);
+        setVisible("audit_observations", true, moduleAccess);
+        setVisible("reports", true, moduleAccess);
+        setVisible("inspector", true, moduleAccess);
+        setVisible("qeditor", true, moduleAccess);
+        setVisible("threads", true, moduleAccess);
+        setVisible("company_policy", true, moduleAccess);
+        setVisible("suadmin", false, moduleAccess);
+        return;
+      }
+
+      if (isInspector) {
+        setVisible("tasks", false, moduleAccess);
+        setVisible("vessel", false, moduleAccess);
+        setVisible("inspector", true, moduleAccess);
+        setVisible("inspector_intelligence", false, moduleAccess);
+        setVisible("audit_observations", false, moduleAccess);
+        setVisible("qeditor", false, moduleAccess);
+        setVisible("company_policy", true, moduleAccess);
+        setVisible("suadmin", false, moduleAccess);
+        return;
+      }
+    })().catch(e => showWarn(String(e?.message || e)));
   </script>
+  <script src="./csvb-ui-polish.js?v=20260430_1"></script>
+  <script src="./csvb-help-tooltips.js?v=20260430_1"></script>
+  <script src="./csvb-100pct-fit.js?v=20260430_1"></script>
+  <script src="./csvb-dashboard-polish.js?v=20260430_1"></script>
+  <script src="./csvb-dashboard-threads-badge.js?v=20260505_1"></script>
 </body>
 </html>

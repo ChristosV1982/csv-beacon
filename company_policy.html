@@ -1,0 +1,509 @@
+<!-- public/company_policy.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>C.S.V. BEACON – Company Policy</title>
+
+  <link rel="stylesheet" href="./csv-beacon-theme.css?v=20260428_3" />
+  <link rel="stylesheet" href="./style.css?v=20260428_3" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="./auth.js"></script>
+
+  <style>
+    body {
+      margin: 0;
+      font-family: var(--font-sans, "Segoe UI", Arial, sans-serif);
+      background: var(--bg-main, #f4f7fb);
+      color: var(--text-main, #10233f);
+    }
+
+    .topbar {
+      background: linear-gradient(90deg, var(--brand-navy-dark, #061d3d), var(--brand-navy, #1a4170));
+      color: #fff;
+      padding: 12px 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      box-shadow: 0 8px 24px rgba(3,27,63,.16);
+    }
+
+    .row {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .wrap {
+      width: 100%;
+      max-width: none;
+      margin: 0;
+      padding: 14px;
+      box-sizing: border-box;
+    }
+
+    .btn {
+      background: var(--brand-navy, #1a4170);
+      color: #fff;
+      border: 1px solid var(--brand-navy, #1a4170);
+      border-radius: 10px;
+      padding: 9px 13px;
+      font-weight: 900;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-block;
+      white-space: nowrap;
+    }
+
+    .btn2 {
+      background: var(--btn-secondary-bg, #eaf1fb);
+      color: var(--brand-navy, #1a4170);
+      border: 1px solid var(--btn-secondary-border, #c9d7eb);
+      border-radius: 10px;
+      padding: 9px 13px;
+      font-weight: 900;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-block;
+      white-space: nowrap;
+    }
+
+    .btn:disabled,
+    .btn2:disabled {
+      opacity: .55;
+      cursor: not-allowed;
+    }
+
+    .page-head {
+      background: #fff;
+      border: 1px solid var(--border-soft, #dbe6f6);
+      border-radius: 14px;
+      padding: 12px 14px;
+      box-shadow: 0 10px 30px rgba(3,27,63,0.06);
+      margin-bottom: 12px;
+    }
+
+    .page-title {
+      margin: 0;
+      color: var(--brand-navy, #1a4170);
+      font-size: 1.35rem;
+      font-weight: 950;
+      letter-spacing: .01em;
+    }
+
+    .page-subtitle {
+      margin-top: 5px;
+      color: var(--text-muted, #4d6283);
+      font-weight: 700;
+      line-height: 1.35;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 10px;
+    }
+
+    .tab-btn {
+      border-radius: 999px;
+      padding: 8px 12px;
+      border: 1px solid #cbd8ea;
+      background: #f7fbff;
+      color: #1a4170;
+      font-weight: 900;
+      cursor: pointer;
+    }
+
+    .tab-btn.active {
+      background: #1a4170;
+      color: #fff;
+      border-color: #1a4170;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 360px minmax(0, 1fr);
+      gap: 12px;
+      align-items: start;
+    }
+
+    @media (max-width: 980px) {
+      .layout {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .panel {
+      background: #fff;
+      border: 1px solid var(--border-soft, #dbe6f6);
+      border-radius: 14px;
+      padding: 12px;
+      box-shadow: 0 10px 30px rgba(3,27,63,0.06);
+      min-width: 0;
+    }
+
+    .panel-title {
+      color: #1a4170;
+      font-weight: 950;
+      font-size: 1rem;
+      margin-bottom: 8px;
+    }
+
+    .chapter-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      max-height: calc(100vh - 250px);
+      overflow: auto;
+      padding-right: 4px;
+    }
+
+    .chapter-btn {
+      width: 100%;
+      border: 1px solid #dbe6f6;
+      background: #f7fbff;
+      color: #173a68;
+      border-radius: 10px;
+      padding: 8px 9px;
+      text-align: left;
+      cursor: pointer;
+      font-weight: 800;
+      line-height: 1.25;
+    }
+
+    .chapter-btn:hover {
+      background: #eef6ff;
+    }
+
+    .chapter-btn.active {
+      background: #e4f0ff;
+      border-color: #8fb4e8;
+      color: #0b2f5f;
+    }
+
+    .chapter-code {
+      font-weight: 950;
+      color: #0b2f5f;
+      margin-right: 4px;
+    }
+
+    .viewer-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 10px;
+      flex-wrap: wrap;
+      border-bottom: 1px solid #dbe6f6;
+      padding-bottom: 10px;
+      margin-bottom: 10px;
+    }
+
+    .viewer-title {
+      margin: 0;
+      color: #1a4170;
+      font-size: 1.2rem;
+      font-weight: 950;
+      line-height: 1.25;
+    }
+
+    .viewer-meta {
+      margin-top: 5px;
+      color: #4d6283;
+      font-weight: 750;
+      line-height: 1.35;
+    }
+
+    .status-pill {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: #fff6e0;
+      color: #8a5a00;
+      border: 1px solid #f6d58f;
+      font-weight: 950;
+      font-size: .86rem;
+      white-space: nowrap;
+    }
+
+    .content-box {
+      border: 1px dashed #b9c8df;
+      background: #f9fbfe;
+      border-radius: 12px;
+      padding: 13px;
+      color: #213a5f;
+      font-weight: 700;
+      line-height: 1.5;
+      min-height: 180px;
+    }
+
+    .module-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 12px;
+    }
+
+    .mini-card {
+      border: 1px solid #dbe6f6;
+      border-radius: 12px;
+      background: #fff;
+      padding: 12px;
+    }
+
+    .mini-card-title {
+      color: #1a4170;
+      font-weight: 950;
+      margin-bottom: 6px;
+    }
+
+    .mini-card-text {
+      color: #4d6283;
+      font-weight: 700;
+      line-height: 1.35;
+    }
+
+    .search-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 10px;
+    }
+
+    .search-input {
+      flex: 1;
+      min-width: 240px;
+      border: 1px solid #cbd8ea;
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-weight: 750;
+      color: #10233f;
+    }
+
+    .result-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .result-item {
+      border: 1px solid #dbe6f6;
+      border-radius: 12px;
+      padding: 10px;
+      background: #f7fbff;
+      cursor: pointer;
+    }
+
+    .result-item:hover {
+      background: #eef6ff;
+    }
+
+    .result-title {
+      color: #1a4170;
+      font-weight: 950;
+    }
+
+    .result-text {
+      margin-top: 4px;
+      color: #4d6283;
+      font-weight: 700;
+      line-height: 1.35;
+    }
+
+    .warn {
+      display: none;
+      margin-bottom: 12px;
+      color: #8b1d1d;
+      background: #ffeaea;
+      border: 1px solid #ffc7c7;
+      padding: 10px 12px;
+      border-radius: 12px;
+      font-weight: 800;
+      white-space: pre-wrap;
+    }
+
+    .ok {
+      display: none;
+      margin-bottom: 12px;
+      color: #11612b;
+      background: #e9fff0;
+      border: 1px solid #bce9c9;
+      padding: 10px 12px;
+      border-radius: 12px;
+      font-weight: 850;
+      white-space: pre-wrap;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+  </style>
+
+  <link rel="stylesheet" href="./csvb-ui-polish.css?v=20260430_1" />
+  <link rel="stylesheet" href="./csvb-help-tooltips.css?v=20260430_1" />
+  <link rel="stylesheet" href="./csvb-100pct-fit.css?v=20260430_1" />
+</head>
+
+<body>
+  <div class="topbar">
+    <div class="csvb-brand">
+      <img class="csvb-brand-logo" src="./assets/csv-beacon-icon.png" alt="C.S.V. BEACON logo" />
+      <div class="csvb-brand-text">
+        <div class="csvb-brand-title">C.S.V. BEACON</div>
+        <div class="csvb-brand-subtitle">Marine Assurance & Compliance Platform</div>
+      </div>
+    </div>
+
+    <div class="row">
+      <div id="userBadge" style="font-weight:800;opacity:.95;"></div>
+      <button class="btn2" id="loginBtn" type="button" style="display:none;">Login</button>
+      <button class="btn2" id="switchUserBtn" type="button">Switch User</button>
+      <button class="btn" id="logoutBtn" type="button" style="display:none;">Logout</button>
+      <button class="btn2" type="button" onclick="location.href='./q-dashboard.html'">Dashboard</button>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <div id="warnBox" class="warn"></div>
+    <div id="okBox" class="ok"></div>
+
+    <div class="page-head">
+      <h1 class="page-title">Company Policy</h1>
+      <div class="page-subtitle">
+        Controlled policy book structure. The full policy text will be inserted later by Word/PDF import or controlled editing.
+      </div>
+
+      <div class="tabs">
+        <button class="tab-btn active" type="button" data-tab="policyBook">Policy Book</button>
+        <button class="tab-btn" type="button" data-tab="search">Search</button>
+        <button class="tab-btn" type="button" data-tab="aiSearch">AI Search</button>
+        <button class="tab-btn" type="button" data-tab="changeRequests">Change Requests</button>
+        <button class="tab-btn" type="button" data-tab="manuals">Manuals / Documents</button>
+        <button class="tab-btn" type="button" data-tab="adminSetup">Admin / Setup</button>
+      </div>
+    </div>
+
+    <section id="tab-policyBook" class="tab-panel">
+      <div class="layout">
+        <div class="panel">
+          <div class="panel-title">Policy Book Chapters</div>
+          <div id="chapterList" class="chapter-list"></div>
+        </div>
+
+        <div class="panel">
+          <div class="viewer-header">
+            <div>
+              <h2 id="chapterTitle" class="viewer-title">Select a chapter</h2>
+              <div id="chapterMeta" class="viewer-meta">No chapter selected.</div>
+            </div>
+            <div class="row">
+              <span class="status-pill">Structure only</span>
+              <button id="submitChangeRequestBtn" class="btn2" type="button">Submit Change Request</button>
+              <button id="editDraftBtn" class="btn" type="button" disabled>Edit Draft</button>
+            </div>
+          </div>
+
+          <div id="chapterContent" class="content-box">
+            Select a chapter from the left side.
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="tab-search" class="tab-panel hidden">
+      <div class="panel">
+        <div class="panel-title">Exact Search</div>
+        <div class="search-row">
+          <input id="searchInput" class="search-input" type="search" placeholder="Search chapter number or title..." />
+          <button id="searchBtn" class="btn" type="button">Search</button>
+          <button id="clearSearchBtn" class="btn2" type="button">Clear</button>
+        </div>
+        <div id="searchResults" class="result-list"></div>
+      </div>
+    </section>
+
+    <section id="tab-aiSearch" class="tab-panel hidden">
+      <div class="panel">
+        <div class="panel-title">AI Policy Search</div>
+        <div class="content-box">
+          AI Policy Search is intentionally not active yet.
+          <br /><br />
+          It will be added after the approved policy text exists and has been indexed. The AI answer must be based only on approved policy text and must show the source chapter/section used.
+        </div>
+      </div>
+    </section>
+
+    <section id="tab-changeRequests" class="tab-panel hidden">
+      <div class="panel">
+        <div class="panel-title">Change Requests</div>
+        <div class="module-grid">
+          <div class="mini-card">
+            <div class="mini-card-title">Submit Request</div>
+            <div class="mini-card-text">
+              Users with permission will be able to request corrections, additions, deletions, or clarifications against a chapter/section.
+            </div>
+          </div>
+          <div class="mini-card">
+            <div class="mini-card-title">Review / Approval</div>
+            <div class="mini-card-text">
+              Reviewers will be able to approve, reject, or close requests. This will be tied to the future approval workflow.
+            </div>
+          </div>
+          <div class="mini-card">
+            <div class="mini-card-title">Traceability</div>
+            <div class="mini-card-text">
+              Every request and decision will be traceable to the user, company, chapter, time, and decision comment.
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="tab-manuals" class="tab-panel hidden">
+      <div class="panel">
+        <div class="panel-title">Manuals / Documents Repository</div>
+        <div class="module-grid">
+          <div class="mini-card">
+            <div class="mini-card-title">Folders</div>
+            <div class="mini-card-text">
+              Future folders for Company Manuals, Vessel Manuals, Maker Manuals, Forms, Circulars, and vessel-specific documents.
+            </div>
+          </div>
+          <div class="mini-card">
+            <div class="mini-card-title">Files</div>
+            <div class="mini-card-text">
+              Future upload area for PDF, Word, images, and other controlled documents.
+            </div>
+          </div>
+          <div class="mini-card">
+            <div class="mini-card-title">Company / Vessel Scope</div>
+            <div class="mini-card-text">
+              Documents will later be assigned to a company and optionally to a specific vessel.
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="tab-adminSetup" class="tab-panel hidden">
+      <div class="panel">
+        <div class="panel-title">Admin / Setup</div>
+        <div class="content-box">
+          This area will later be used for chapter management, company chapter assignments, import from Word/PDF, version control, and publication settings.
+          <br /><br />
+          For this first step, the module is a safe front-end structure only.
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script src="./company_policy.js?v=20260506_1"></script>
+  <script src="./csvb-ui-polish.js?v=20260430_1"></script>
+  <script src="./csvb-help-tooltips.js?v=20260430_1"></script>
+  <script src="./csvb-100pct-fit.js?v=20260430_1"></script>
+</body>
+</html>
