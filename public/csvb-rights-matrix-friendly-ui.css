@@ -1,0 +1,89 @@
+/* public/csvb-rights-matrix-friendly-ui.css
+   C.S.V. BEACON — Rights Matrix friendly UI labels.
+   UI-only. Does not change stored permission values.
+*/
+
+#csvbRightsMatrixLegend {
+  border: 1px solid #D6E4F5;
+  background: #F7FAFE;
+  border-radius: 10px;
+  padding: 8px 9px;
+  margin: 8px 0;
+}
+
+#csvbRightsMatrixLegend .rm-legend-title {
+  color: #062A5E;
+  font-weight: 700;
+  margin-bottom: 5px;
+}
+
+#csvbRightsMatrixLegend .rm-legend-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.rm-scope-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid #D6E4F5;
+  background: #fff;
+  border-radius: 999px;
+  padding: 4px 8px;
+  font-size: .84rem;
+  color: #163457;
+}
+
+.rm-scope-pill.off {
+  border-color: #D6E4F5;
+  background: #F4F8FC;
+  color: #5E6F86;
+}
+
+.rm-scope-pill.own {
+  border-color: #AEE3F1;
+  background: #E9F7FB;
+  color: #062A5E;
+}
+
+.rm-scope-pill.company {
+  border-color: #B8E7C8;
+  background: #EAF9EF;
+  color: #087334;
+}
+
+.rm-scope-pill.platform {
+  border-color: #F6D58F;
+  background: #FFF6E0;
+  color: #8A5A00;
+}
+
+.rm-friendly-select {
+  font-weight: 500 !important;
+}
+
+.rm-friendly-select.rm-scope-off {
+  color: #5E6F86 !important;
+  background: #F4F8FC !important;
+}
+
+.rm-friendly-select.rm-scope-own,
+.rm-friendly-select.rm-scope-any {
+  color: #062A5E !important;
+  background: #F7FCFE !important;
+}
+
+.rm-friendly-select.rm-scope-company {
+  color: #087334 !important;
+  background: #F5FFF8 !important;
+}
+
+.rm-friendly-select.rm-scope-platform {
+  color: #8A5A00 !important;
+  background: #FFFDF4 !important;
+}
+
+#tab-rights .muted.small .mono {
+  font-weight: 500 !important;
+}
