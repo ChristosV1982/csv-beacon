@@ -6,7 +6,7 @@
 // - Bump cache version + clean old caches on activate
 
 const CACHE_PREFIX = "sire-test-";
-const CACHE_VERSION = "v73-company-policy-shell";              // <-- bump this if you change caching behavior again
+const CACHE_VERSION = "v74-company-policy-tree-visuals";
 const CACHE_NAME = `${CACHE_PREFIX}${CACHE_VERSION}`;
 
 const CORE_ASSETS = [
@@ -64,7 +64,6 @@ async function networkFirst(request) {
   const cache = await caches.open(CACHE_NAME);
   try {
     const fresh = await fetch(request, { cache: "no-store" });
-    // Cache only valid responses
     if (fresh && fresh.ok) {
       cache.put(request, fresh.clone());
     }
@@ -87,7 +86,6 @@ async function staleWhileRevalidate(request) {
     })
     .catch(() => null);
 
-  // If cached exists, return it immediately; otherwise wait for network
   return cached || (await fetchPromise) || cached;
 }
 

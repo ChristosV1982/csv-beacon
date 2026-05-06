@@ -1,6 +1,6 @@
 // public/company_policy.js
 // C.S.V. BEACON – Company Policy module
-// CP-2C-2: Database-backed policy tree with Super Admin structure controls.
+// CP-2C-3: Database-backed policy tree with clearer visual hierarchy.
 
 let policyNodes = [];
 let policyTree = [];
@@ -36,6 +36,88 @@ function showOk(message) {
       el.textContent = "";
     }, 2000);
   }
+}
+
+function injectTreeVisualStyles() {
+  if (document.getElementById("csvb-policy-tree-visual-styles")) return;
+
+  const style = document.createElement("style");
+  style.id = "csvb-policy-tree-visual-styles";
+  style.textContent = `
+    #chapterList .chapter-btn {
+      display: flex !important;
+      align-items: center !important;
+      gap: 5px !important;
+      min-height: 22px !important;
+    }
+
+    #chapterList .chapter-btn[data-depth="0"] {
+      background: #f7fbff !important;
+      border-left: 1px solid #dbe6f6 !important;
+    }
+
+    #chapterList .chapter-btn[data-depth="1"] {
+      background: #eef7ff !important;
+      border-left: 4px solid #2f78c4 !important;
+    }
+
+    #chapterList .chapter-btn[data-depth="2"] {
+      background: #f5fbff !important;
+      border-left: 4px solid #58a6da !important;
+    }
+
+    #chapterList .chapter-btn[data-depth="3"] {
+      background: #fbfdff !important;
+      border-left: 4px solid #8dbdea !important;
+    }
+
+    #chapterList .chapter-btn[data-depth="4"],
+    #chapterList .chapter-btn[data-depth="5"],
+    #chapterList .chapter-btn[data-depth="6"],
+    #chapterList .chapter-btn[data-depth="7"],
+    #chapterList .chapter-btn[data-depth="8"] {
+      background: #ffffff !important;
+      border-left: 4px solid #b9d7f2 !important;
+    }
+
+    #chapterList .chapter-btn.active {
+      background: #dbeeff !important;
+      border-color: #2f78c4 !important;
+      box-shadow: inset 0 0 0 1px #2f78c4 !important;
+    }
+
+    #chapterList .tree-mark {
+      width: 16px !important;
+      min-width: 16px !important;
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      color: #4d6283 !important;
+      font-weight: 700 !important;
+    }
+
+    #chapterList .node-title {
+      white-space: nowrap !important;
+      font-weight: inherit !important;
+    }
+
+    #chapterList .chapter-code {
+      white-space: nowrap !important;
+    }
+
+    #chapterList .chapter-btn[data-depth="0"] .chapter-code,
+    #chapterList .chapter-btn[data-depth="0"] .node-title {
+      font-weight: 700 !important;
+    }
+
+    #chapterList .chapter-btn[data-depth="1"] .chapter-code,
+    #chapterList .chapter-btn[data-depth="2"] .chapter-code,
+    #chapterList .chapter-btn[data-depth="3"] .chapter-code {
+      color: #0b4f90 !important;
+    }
+  `;
+
+  document.head.appendChild(style);
 }
 
 function isStructureAdmin() {
@@ -192,13 +274,13 @@ function fillNodeSelect(selectEl, options = {}) {
   } = options;
 
   const excluded = new Set();
+
   if (excludeNodeId) {
     excluded.add(excludeNodeId);
     getDescendantIds(excludeNodeId).forEach((id) => excluded.add(id));
   }
 
   const flat = flattenTree(policyTree).filter((node) => !excluded.has(node.id));
-
   const html = [];
 
   if (includeTopLevel) {
@@ -295,20 +377,22 @@ async function loadCurrentPublishedVersion(nodeId) {
 function renderNodeButton(node) {
   const active = node.id === selectedNodeId ? " active" : "";
   const depth = getNodeDepth(node);
-  const indent = Math.min(depth, 8) * 18;
-  const childMark = node.children?.length ? "▸" : "•";
+  const visualDepth = Math.min(depth, 8);
+  const leftPadding = 8 + visualDepth * 34;
+  const childMark = node.children?.length ? "▾" : (depth > 0 ? "↳" : "•");
 
   return `
     <button
       class="chapter-btn${active}"
       type="button"
       data-node-id="${escapeHtml(node.id)}"
-      style="padding-left:${8 + indent}px;"
+      data-depth="${escapeHtml(visualDepth)}"
+      style="padding-left:${leftPadding}px;"
       title="${escapeHtml(nodeLabel(node))}"
     >
       <span class="tree-mark">${escapeHtml(childMark)}</span>
       <span class="chapter-code">${escapeHtml(nodeTypeLabel(node.node_type))} ${escapeHtml(node.node_code)}</span>
-      ${escapeHtml(node.title)}
+      <span class="node-title">${escapeHtml(node.title)}</span>
     </button>
   `;
 }
@@ -898,7 +982,6 @@ async function restoreArchivedNode(nodeId) {
   }
 
   const restoreChildren = document.getElementById("restoreChildren")?.checked === true;
-
   const sb = AUTH.ensureSupabase();
 
   const { error } = await sb.rpc("csvb_company_policy_restore_node", {
@@ -1010,6 +1093,7 @@ function setupAdminControls() {
 async function init() {
   try {
     showWarn("");
+    injectTreeVisualStyles();
 
     await setupAuth();
     setupTabs();
