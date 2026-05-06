@@ -1433,10 +1433,18 @@ async function rmSaveGrants() {
     }
   });
 
-  rmSetStatus("Saving…");
-  const res = await callSuAdmin({ action: "set_role_permissions", role, position, grants });
+  rmSetStatus("Saving with audit trail…");
 
-  rmSetStatus(`Saved (${res.updated ?? "ok"})`);
+  const { data, error } = await sb.rpc("csvb_set_role_permissions_audited", {
+    p_role: role,
+    p_position: position,
+    p_grants: grants
+  });
+
+  if (error) throw error;
+
+  const saved = data || {};
+  rmSetStatus(`Saved with audit trail (${saved.updated ?? 0} updated, ${saved.inserted ?? 0} inserted)`);
   await rmLoadGrants();
 }
 
