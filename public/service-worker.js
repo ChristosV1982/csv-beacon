@@ -6,7 +6,7 @@
 // - Bump cache version + clean old caches on activate
 
 const CACHE_PREFIX = "sire-test-";
-const CACHE_VERSION = "v76-company-policy-content-editor";
+const CACHE_VERSION = "v77-company-policy-change-requests";
 const CACHE_NAME = `${CACHE_PREFIX}${CACHE_VERSION}`;
 
 const CORE_ASSETS = [
@@ -14,6 +14,7 @@ const CORE_ASSETS = [
   "./index.html",
   "./company_policy.html",
   "./company_policy.js",
+  "./company_policy_change_requests.js",
   "./style.css",
   "./csv-beacon-theme.css",
   "./auth.js",
