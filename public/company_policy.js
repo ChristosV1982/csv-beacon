@@ -1,12 +1,15 @@
 // public/company_policy.js
 // C.S.V. BEACON – Company Policy module
-// CP-2C-3: Database-backed policy tree with clearer visual hierarchy.
+// CP-2C-4: Database-backed policy tree with collapsible hierarchy and clearer level shading.
 
 let policyNodes = [];
 let policyTree = [];
 let archivedNodes = [];
 let selectedNodeId = "";
 let authBundle = null;
+
+const COLLAPSED_STORAGE_KEY = "csvb_company_policy_collapsed_nodes_v1";
+let collapsedNodeIds = new Set();
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -38,6 +41,22 @@ function showOk(message) {
   }
 }
 
+function loadCollapsedState() {
+  try {
+    const raw = localStorage.getItem(COLLAPSED_STORAGE_KEY);
+    const arr = raw ? JSON.parse(raw) : [];
+    collapsedNodeIds = new Set(Array.isArray(arr) ? arr : []);
+  } catch (_) {
+    collapsedNodeIds = new Set();
+  }
+}
+
+function saveCollapsedState() {
+  try {
+    localStorage.setItem(COLLAPSED_STORAGE_KEY, JSON.stringify([...collapsedNodeIds]));
+  } catch (_) {}
+}
+
 function injectTreeVisualStyles() {
   if (document.getElementById("csvb-policy-tree-visual-styles")) return;
 
@@ -47,52 +66,62 @@ function injectTreeVisualStyles() {
     #chapterList .chapter-btn {
       display: flex !important;
       align-items: center !important;
-      gap: 5px !important;
-      min-height: 22px !important;
+      gap: 6px !important;
+      min-height: 24px !important;
+      transition: background .12s ease, border-color .12s ease, box-shadow .12s ease !important;
     }
 
     #chapterList .chapter-btn[data-depth="0"] {
       background: #f7fbff !important;
-      border-left: 1px solid #dbe6f6 !important;
+      border-left: 2px solid #dbe6f6 !important;
     }
 
     #chapterList .chapter-btn[data-depth="1"] {
-      background: #eef7ff !important;
-      border-left: 4px solid #2f78c4 !important;
+      background: #e9f4ff !important;
+      border-left: 5px solid #2f78c4 !important;
     }
 
     #chapterList .chapter-btn[data-depth="2"] {
-      background: #f5fbff !important;
-      border-left: 4px solid #58a6da !important;
+      background: #f1f8ff !important;
+      border-left: 5px solid #4f9bd3 !important;
     }
 
     #chapterList .chapter-btn[data-depth="3"] {
-      background: #fbfdff !important;
-      border-left: 4px solid #8dbdea !important;
+      background: #f7fbff !important;
+      border-left: 5px solid #7eb7e5 !important;
     }
 
-    #chapterList .chapter-btn[data-depth="4"],
+    #chapterList .chapter-btn[data-depth="4"] {
+      background: #fbfdff !important;
+      border-left: 5px solid #a6cee9 !important;
+    }
+
     #chapterList .chapter-btn[data-depth="5"],
     #chapterList .chapter-btn[data-depth="6"],
     #chapterList .chapter-btn[data-depth="7"],
     #chapterList .chapter-btn[data-depth="8"] {
       background: #ffffff !important;
-      border-left: 4px solid #b9d7f2 !important;
+      border-left: 5px solid #c3ddf2 !important;
+    }
+
+    #chapterList .chapter-btn:hover {
+      background: #dff0ff !important;
+      border-color: #7fb3e6 !important;
     }
 
     #chapterList .chapter-btn.active {
-      background: #dbeeff !important;
+      background: #d6ebff !important;
       border-color: #2f78c4 !important;
       box-shadow: inset 0 0 0 1px #2f78c4 !important;
     }
 
     #chapterList .tree-mark {
-      width: 16px !important;
-      min-width: 16px !important;
+      width: 18px !important;
+      min-width: 18px !important;
       display: inline-flex !important;
       align-items: center !important;
       justify-content: center !important;
-      color: #4d6283 !important;
+      color: #365a84 !important;
       font-weight: 700 !important;
     }
 
@@ -112,7 +141,12 @@ function injectTreeVisualStyles() {
 
     #chapterList .chapter-btn[data-depth="1"] .chapter-code,
     #chapterList .chapter-btn[data-depth="2"] .chapter-code,
-    #chapterList .chapter-btn[data-depth="3"] .chapter-code {
+    #chapterList .chapter-btn[data-depth="3"] .chapter-code,
+    #chapterList .chapter-btn[data-depth="4"] .chapter-code {
+      color: #0b4f90 !important;
+    }
+
+    #chapterList .chapter-btn[data-collapsed="true"] .tree-mark {
       color: #0b4f90 !important;
     }
   `;
@@ -229,6 +263,45 @@ function getNodeDepth(node) {
   return depth;
 }
 
+function nodeHasChildren(node) {
+  return !!node?.children?.length;
+}
+
+function isNodeCollapsed(nodeId) {
+  return collapsedNodeIds.has(nodeId);
+}
+
+function toggleNodeCollapsed(nodeId) {
+  if (!nodeId) return;
+
+  if (collapsedNodeIds.has(nodeId)) {
+    collapsedNodeIds.delete(nodeId);
+  } else {
+    collapsedNodeIds.add(nodeId);
+  }
+
+  saveCollapsedState();
+}
+
+function expandNode(nodeId) {
+  if (!nodeId) return;
+  if (collapsedNodeIds.has(nodeId)) {
+    collapsedNodeIds.delete(nodeId);
+    saveCollapsedState();
+  }
+}
+
+function expandAncestors(nodeId) {
+  let current = findNode(nodeId);
+
+  while (current?.parent_node_id) {
+    collapsedNodeIds.delete(current.parent_node_id);
+    current = findNode(current.parent_node_id);
+  }
+
+  saveCollapsedState();
+}
+
 function getDescendantIds(nodeId) {
   const ids = new Set();
 
@@ -343,6 +416,10 @@ async function loadPolicyNodesFromSupabase() {
   policyNodes = (data || []).map(normalizeNode);
   policyTree = buildTree(policyNodes);
 
+  const activeIds = new Set(policyNodes.map((node) => node.id));
+  collapsedNodeIds = new Set([...collapsedNodeIds].filter((id) => activeIds.has(id)));
+  saveCollapsedState();
+
   const flat = flattenTree(policyTree);
 
   if (selectedNodeId && !policyNodes.some((node) => node.id === selectedNodeId)) {
@@ -352,6 +429,8 @@ async function loadPolicyNodesFromSupabase() {
   if (!selectedNodeId && flat.length) {
     selectedNodeId = flat[0].id;
   }
+
+  expandAncestors(selectedNodeId);
 }
 
 async function loadCurrentPublishedVersion(nodeId) {
@@ -378,8 +457,10 @@ function renderNodeButton(node) {
   const active = node.id === selectedNodeId ? " active" : "";
   const depth = getNodeDepth(node);
   const visualDepth = Math.min(depth, 8);
-  const leftPadding = 8 + visualDepth * 34;
-  const childMark = node.children?.length ? "▾" : (depth > 0 ? "↳" : "•");
+  const leftPadding = 8 + visualDepth * 46;
+  const hasChildren = nodeHasChildren(node);
+  const collapsed = hasChildren && isNodeCollapsed(node.id);
+  const childMark = hasChildren ? (collapsed ? "▸" : "▾") : (depth > 0 ? "↳" : "•");
 
   return `
     <button
@@ -387,8 +468,9 @@ function renderNodeButton(node) {
       type="button"
       data-node-id="${escapeHtml(node.id)}"
       data-depth="${escapeHtml(visualDepth)}"
-      style="padding-left:${leftPadding}px;"
+      data-collapsed="${collapsed ? "true" : "false"}"
       title="${escapeHtml(nodeLabel(node))}"
+      style="padding-left:${leftPadding}px;"
     >
       <span class="tree-mark">${escapeHtml(childMark)}</span>
       <span class="chapter-code">${escapeHtml(nodeTypeLabel(node.node_type))} ${escapeHtml(node.node_code)}</span>
@@ -400,7 +482,8 @@ function renderNodeButton(node) {
 function renderNodeBranch(nodes) {
   return nodes.map((node) => {
     const own = renderNodeButton(node);
-    const children = node.children?.length ? renderNodeBranch(node.children) : "";
+    const showChildren = node.children?.length && !isNodeCollapsed(node.id);
+    const children = showChildren ? renderNodeBranch(node.children) : "";
     return own + children;
   }).join("");
 }
@@ -422,15 +505,30 @@ function renderChapterList() {
 
   list.querySelectorAll("[data-node-id]").forEach((btn) => {
     btn.addEventListener("click", () => {
-      selectNode(btn.getAttribute("data-node-id"));
+      handleTreeNodeClick(btn.getAttribute("data-node-id"));
     });
   });
+}
+
+async function handleTreeNodeClick(nodeId) {
+  const node = findNode(nodeId);
+  if (!node) return;
+
+  if (nodeHasChildren(node)) {
+    toggleNodeCollapsed(node.id);
+  }
+
+  selectedNodeId = node.id;
+  renderChapterList();
+  await renderSelectedNode();
+  refreshAdminUi();
 }
 
 async function selectNode(nodeId) {
   const node = findNode(nodeId);
   if (!node) return;
 
+  expandAncestors(node.id);
   selectedNodeId = node.id;
   renderChapterList();
   await renderSelectedNode();
@@ -458,7 +556,10 @@ async function renderSelectedNode() {
   if (metaEl) {
     const depth = getNodeDepth(node);
     const typeLabel = nodeTypeLabel(node.node_type);
-    metaEl.textContent = `Database-backed policy item. Type: ${typeLabel}. Level: ${depth}.`;
+    const childrenInfo = nodeHasChildren(node)
+      ? ` Children: ${node.children.length}. Click the item in the tree to expand/collapse.`
+      : "";
+    metaEl.textContent = `Database-backed policy item. Type: ${typeLabel}. Level: ${depth}.${childrenInfo}`;
   }
 
   if (contentEl) {
@@ -742,6 +843,7 @@ async function reloadPolicyTree(preferredNodeId = "") {
 
   if (preferredNodeId && policyNodes.some((node) => node.id === preferredNodeId)) {
     selectedNodeId = preferredNodeId;
+    expandAncestors(preferredNodeId);
   }
 
   renderChapterList();
@@ -771,6 +873,10 @@ async function createPolicyNode() {
   if (!title) {
     showWarn("Title is required.");
     return;
+  }
+
+  if (parentId) {
+    expandNode(parentId);
   }
 
   const sb = AUTH.ensureSupabase();
@@ -861,6 +967,10 @@ async function moveSelectedNode() {
   const newParentId = document.getElementById("moveParentNode")?.value || null;
   const newSortOrder = parseSortOrder(document.getElementById("moveSortOrder")?.value);
 
+  if (newParentId) {
+    expandNode(newParentId);
+  }
+
   const sb = AUTH.ensureSupabase();
 
   const { error } = await sb.rpc("csvb_company_policy_move_node", {
@@ -915,6 +1025,9 @@ async function archiveSelectedNode() {
 
   const reasonEl = document.getElementById("archiveReason");
   if (reasonEl) reasonEl.value = "";
+
+  collapsedNodeIds.delete(node.id);
+  saveCollapsedState();
 
   selectedNodeId = "";
   await reloadPolicyTree();
@@ -1093,6 +1206,7 @@ function setupAdminControls() {
 async function init() {
   try {
     showWarn("");
+    loadCollapsedState();
     injectTreeVisualStyles();
 
     await setupAuth();
