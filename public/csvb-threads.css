@@ -544,3 +544,69 @@ tbody tr:hover td {
   background: #FFEAEA !important;
   color: #9B1C1C !important;
 }
+
+
+/* === Threads Action Inbox UI === */
+
+#csvbThreadInboxCard {
+  margin-bottom: 10px;
+}
+
+.thread-inbox-grid {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(110px, 1fr));
+  gap: 8px;
+  margin: 8px 0;
+}
+
+@media (max-width: 1200px) {
+  .thread-inbox-grid {
+    grid-template-columns: repeat(4, minmax(110px, 1fr));
+  }
+}
+
+@media (max-width: 700px) {
+  .thread-inbox-grid {
+    grid-template-columns: repeat(2, minmax(110px, 1fr));
+  }
+}
+
+.thread-inbox-tile {
+  border: 1px solid #D6E4F5;
+  background: #F7FAFE;
+  border-radius: 10px;
+  padding: 8px 9px;
+}
+
+.thread-inbox-tile .n {
+  color: #062A5E;
+  font-size: 1.25rem;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.thread-inbox-tile .t {
+  color: #5E6F86;
+  font-size: .82rem;
+  margin-top: 3px;
+}
+
+.thread-inbox-tile.warn {
+  border-color: #F6D58F;
+  background: #FFF6E0;
+}
+
+.thread-inbox-actions {
+  display: flex;
+  gap: 7px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+#csvbThreadInboxStatus.ok {
+  color: #087334;
+}
+
+#csvbThreadInboxStatus.err {
+  color: #9B1C1C;
+}

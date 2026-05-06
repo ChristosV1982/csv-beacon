@@ -725,7 +725,7 @@
       p_priority: $("createPriority")?.value || "normal",
       p_responsible_user_id: $("responsibleSelect")?.value || null,
       p_verifier_user_id: $("verifierSelect")?.value || null,
-      p_target_date: null,
+      p_target_date: $("createTargetDate")?.value || null,
       p_initial_message: initial || null
     });
 
