@@ -1,12 +1,17 @@
 // public/company_policy.js
 // C.S.V. BEACON – Company Policy module
-// CP-2C-4: Database-backed policy tree with collapsible hierarchy and clearer level shading.
+// CP-3B: Policy tree + structure admin + draft/publish content editor.
 
 let policyNodes = [];
 let policyTree = [];
 let archivedNodes = [];
+let versionHistory = [];
 let selectedNodeId = "";
 let authBundle = null;
+
+let currentEditorState = null;
+let currentPublishedVersion = null;
+let activeContentTab = "published";
 
 const COLLAPSED_STORAGE_KEY = "csvb_company_policy_collapsed_nodes_v1";
 let collapsedNodeIds = new Set();
@@ -37,7 +42,7 @@ function showOk(message) {
     window.setTimeout(() => {
       el.style.display = "none";
       el.textContent = "";
-    }, 2000);
+    }, 2200);
   }
 }
 
@@ -433,24 +438,61 @@ async function loadPolicyNodesFromSupabase() {
   expandAncestors(selectedNodeId);
 }
 
-async function loadCurrentPublishedVersion(nodeId) {
+async function loadPublishedContent(nodeId) {
   if (!nodeId) return null;
 
   const sb = AUTH.ensureSupabase();
 
-  const { data, error } = await sb
-    .from("company_policy_node_versions")
-    .select("id, version_no, version_label, version_status, is_current, content_html, content_text, published_at, effective_from")
-    .eq("node_id", nodeId)
-    .eq("version_status", "published")
-    .eq("is_current", true)
-    .maybeSingle();
+  const { data, error } = await sb.rpc("csvb_company_policy_get_published_content", {
+    p_node_id: nodeId
+  });
 
   if (error) {
     throw new Error("Could not load published policy text: " + error.message);
   }
 
-  return data || null;
+  return Array.isArray(data) && data.length ? data[0] : null;
+}
+
+async function loadEditorState(nodeId) {
+  if (!isStructureAdmin() || !nodeId) {
+    currentEditorState = null;
+    return null;
+  }
+
+  const sb = AUTH.ensureSupabase();
+
+  const { data, error } = await sb.rpc("csvb_company_policy_get_editor_state", {
+    p_node_id: nodeId
+  });
+
+  if (error) {
+    throw new Error("Could not load editor state: " + error.message);
+  }
+
+  currentEditorState = Array.isArray(data) && data.length ? data[0] : null;
+  return currentEditorState;
+}
+
+async function loadVersionHistory(nodeId) {
+  if (!isStructureAdmin() || !nodeId) {
+    versionHistory = [];
+    renderVersionHistory();
+    return;
+  }
+
+  const sb = AUTH.ensureSupabase();
+
+  const { data, error } = await sb.rpc("csvb_company_policy_list_versions", {
+    p_node_id: nodeId
+  });
+
+  if (error) {
+    throw new Error("Could not load version history: " + error.message);
+  }
+
+  versionHistory = data || [];
+  renderVersionHistory();
 }
 
 function renderNodeButton(node) {
@@ -535,17 +577,188 @@ async function selectNode(nodeId) {
   refreshAdminUi();
 }
 
+function setContentStatus(text) {
+  const pill = document.getElementById("contentStatusPill");
+  if (!pill) return;
+  pill.textContent = text || "";
+}
+
+function renderPublishedContent(version) {
+  const contentEl = document.getElementById("chapterContent");
+  const node = findNode(selectedNodeId);
+
+  if (!contentEl) return;
+
+  if (!node) {
+    contentEl.textContent = "Select a policy item from the left side.";
+    setContentStatus("No item selected");
+    return;
+  }
+
+  if (!version) {
+    contentEl.innerHTML = `
+      <div>
+        <strong>${escapeHtml(nodeLabel(node))}</strong>
+      </div>
+      <br />
+      <div>
+        No published policy text has been inserted for this item yet.
+      </div>
+    `;
+    setContentStatus("No published text");
+    return;
+  }
+
+  if (version.content_html) {
+    contentEl.innerHTML = version.content_html;
+  } else if (version.content_text) {
+    contentEl.innerHTML = escapeHtml(version.content_text).replaceAll("\n", "<br />");
+  } else {
+    contentEl.innerHTML = "Published version exists, but no content is stored.";
+  }
+
+  setContentStatus(`Published v${version.version_no}`);
+}
+
+function refreshEditorVisibility() {
+  const denied = document.getElementById("editorDeniedBox");
+  const tools = document.getElementById("editorTools");
+
+  if (!denied || !tools) return;
+
+  if (isStructureAdmin()) {
+    denied.classList.add("hidden");
+    tools.classList.remove("hidden");
+  } else {
+    tools.classList.add("hidden");
+    denied.classList.remove("hidden");
+  }
+}
+
+function renderEditorState() {
+  refreshEditorVisibility();
+
+  const box = document.getElementById("editorStateBox");
+  const editor = document.getElementById("policyEditor");
+  const summary = document.getElementById("policyChangeSummary");
+  const editBtn = document.getElementById("editDraftBtn");
+
+  if (editBtn) {
+    editBtn.disabled = !isStructureAdmin();
+  }
+
+  if (!isStructureAdmin()) return;
+
+  const node = findNode(selectedNodeId);
+
+  if (!node) {
+    if (box) box.textContent = "No policy item selected.";
+    if (editor) editor.innerHTML = "";
+    if (summary) summary.value = "";
+    return;
+  }
+
+  const state = currentEditorState;
+  const status = state?.work_version_status || "none";
+  const workVersionId = state?.work_version_id || "";
+  const workVersionNo = state?.work_version_no || "";
+  const publishedVersionNo = state?.published_version_no || "";
+
+  if (box) {
+    box.innerHTML = `
+      <strong>Selected item:</strong> ${escapeHtml(nodeLabel(node))}<br />
+      <strong>Work version:</strong> ${workVersionId ? `v${escapeHtml(workVersionNo)} / ${escapeHtml(status)}` : "none"}<br />
+      <strong>Published version:</strong> ${publishedVersionNo ? `v${escapeHtml(publishedVersionNo)}` : "none"}
+    `;
+  }
+
+  if (editor) {
+    if (state?.work_content_html) {
+      editor.innerHTML = state.work_content_html;
+    } else if (state?.published_content_html) {
+      editor.innerHTML = state.published_content_html;
+    } else {
+      editor.innerHTML = "";
+    }
+  }
+
+  if (summary) {
+    summary.value = state?.work_change_summary || "";
+  }
+
+  updateWorkflowButtons();
+}
+
+function updateWorkflowButtons() {
+  const state = currentEditorState;
+  const status = state?.work_version_status || "";
+  const hasWork = !!state?.work_version_id;
+
+  const submitBtn = document.getElementById("submitDraftBtn");
+  const approveBtn = document.getElementById("approveVersionBtn");
+  const publishBtn = document.getElementById("publishVersionBtn");
+  const rejectBtn = document.getElementById("rejectVersionBtn");
+  const discardBtn = document.getElementById("discardWorkVersionBtn");
+
+  if (submitBtn) submitBtn.disabled = !(hasWork && status === "draft");
+  if (approveBtn) approveBtn.disabled = !(hasWork && status === "pending_approval");
+  if (publishBtn) publishBtn.disabled = !(hasWork && status === "approved");
+  if (rejectBtn) rejectBtn.disabled = !(hasWork && ["draft", "pending_approval", "approved"].includes(status));
+  if (discardBtn) discardBtn.disabled = !(hasWork && ["draft", "pending_approval", "approved"].includes(status));
+}
+
+function renderVersionHistory() {
+  const box = document.getElementById("versionHistoryBox");
+  if (!box) return;
+
+  if (!isStructureAdmin()) {
+    box.innerHTML = `
+      <div class="content-box">
+        Version history is restricted to Super Admin.
+      </div>
+    `;
+    return;
+  }
+
+  if (!versionHistory.length) {
+    box.innerHTML = `
+      <div class="content-box">
+        No version history exists for this policy item.
+      </div>
+    `;
+    return;
+  }
+
+  box.innerHTML = versionHistory.map((v) => `
+    <div class="version-item">
+      <div class="version-title">
+        Version ${escapeHtml(v.version_no)} — ${escapeHtml(v.version_status)}${v.is_current ? " — current" : ""}
+      </div>
+      <div class="version-meta">
+        ${v.change_summary ? `<div><strong>Summary:</strong> ${escapeHtml(v.change_summary)}</div>` : ""}
+        <div>Created: ${escapeHtml(v.created_at || "")}</div>
+        ${v.submitted_at ? `<div>Submitted: ${escapeHtml(v.submitted_at)}</div>` : ""}
+        ${v.approved_at ? `<div>Approved: ${escapeHtml(v.approved_at)}</div>` : ""}
+        ${v.published_at ? `<div>Published: ${escapeHtml(v.published_at)}</div>` : ""}
+        ${v.rejected_at ? `<div>Rejected: ${escapeHtml(v.rejected_at)}</div>` : ""}
+        ${v.rejection_reason ? `<div>Reason: ${escapeHtml(v.rejection_reason)}</div>` : ""}
+      </div>
+    </div>
+  `).join("");
+}
+
 async function renderSelectedNode() {
   const node = findNode(selectedNodeId);
 
   const titleEl = document.getElementById("chapterTitle");
   const metaEl = document.getElementById("chapterMeta");
-  const contentEl = document.getElementById("chapterContent");
 
   if (!node) {
     if (titleEl) titleEl.textContent = "Select a policy item";
     if (metaEl) metaEl.textContent = "No policy item selected.";
-    if (contentEl) contentEl.textContent = "Select a policy item from the left side.";
+    renderPublishedContent(null);
+    renderEditorState();
+    renderVersionHistory();
     return;
   }
 
@@ -562,66 +775,22 @@ async function renderSelectedNode() {
     metaEl.textContent = `Database-backed policy item. Type: ${typeLabel}. Level: ${depth}.${childrenInfo}`;
   }
 
-  if (contentEl) {
-    contentEl.innerHTML = `
-      <div>
-        <strong>${escapeHtml(nodeLabel(node))}</strong>
-      </div>
-      <br />
-      <div>
-        Loading published policy text...
-      </div>
-    `;
-  }
-
   try {
-    const version = await loadCurrentPublishedVersion(node.id);
+    currentPublishedVersion = await loadPublishedContent(node.id);
+    renderPublishedContent(currentPublishedVersion);
 
-    if (!contentEl) return;
-
-    if (version?.content_html) {
-      contentEl.innerHTML = version.content_html;
-      return;
+    if (isStructureAdmin()) {
+      await loadEditorState(node.id);
+      renderEditorState();
+      await loadVersionHistory(node.id);
+    } else {
+      currentEditorState = null;
+      versionHistory = [];
+      renderEditorState();
+      renderVersionHistory();
     }
-
-    if (version?.content_text) {
-      contentEl.innerHTML = `
-        <div>
-          <strong>${escapeHtml(nodeLabel(node))}</strong>
-        </div>
-        <br />
-        <div>${escapeHtml(version.content_text).replaceAll("\n", "<br />")}</div>
-      `;
-      return;
-    }
-
-    contentEl.innerHTML = `
-      <div>
-        <strong>${escapeHtml(nodeLabel(node))}</strong>
-      </div>
-      <br />
-      <div>
-        No published policy text has been inserted for this item yet.
-      </div>
-      <br />
-      <div>
-        The structure is loaded from Supabase. Later, this area will show approved rich-text policy content, including sections, images, tables, revision control, exact search, AI source-based search, and change requests.
-      </div>
-    `;
   } catch (error) {
-    if (contentEl) {
-      contentEl.innerHTML = `
-        <div>
-          <strong>${escapeHtml(nodeLabel(node))}</strong>
-        </div>
-        <br />
-        <div>
-          The policy item was loaded, but the published text could not be checked.
-        </div>
-        <br />
-        <div>${escapeHtml(String(error?.message || error))}</div>
-      `;
-    }
+    showWarn(String(error?.message || error));
   }
 }
 
@@ -645,6 +814,30 @@ function setupTabs() {
       }
     });
   });
+}
+
+function setupContentTabs() {
+  const buttons = document.querySelectorAll("[data-content-tab]");
+  const panels = document.querySelectorAll(".content-panel");
+
+  buttons.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const target = btn.getAttribute("data-content-tab");
+      activeContentTab = target;
+
+      buttons.forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+
+      panels.forEach((panel) => {
+        panel.classList.toggle("hidden", panel.id !== `contentTab-${target}`);
+      });
+    });
+  });
+}
+
+function switchContentTab(target) {
+  const btn = document.querySelector(`[data-content-tab="${target}"]`);
+  if (btn) btn.click();
 }
 
 function runSearch() {
@@ -737,7 +930,7 @@ function setupPlaceholderButtons() {
 
   if (editBtn) {
     editBtn.addEventListener("click", () => {
-      showOk("Draft editing will be added after the editor/versioning phase.");
+      switchContentTab("draft");
     });
   }
 }
@@ -1113,6 +1306,247 @@ async function restoreArchivedNode(nodeId) {
   showOk("Policy item restored.");
 }
 
+function editorHtml() {
+  const editor = document.getElementById("policyEditor");
+  return editor ? editor.innerHTML : "";
+}
+
+function editorText() {
+  const editor = document.getElementById("policyEditor");
+  return editor ? editor.innerText : "";
+}
+
+async function saveDraft() {
+  if (!isStructureAdmin()) {
+    showWarn("Access denied. Draft editing requires Super Admin rights.");
+    return;
+  }
+
+  const node = findNode(selectedNodeId);
+  if (!node) {
+    showWarn("Select a policy item first.");
+    return;
+  }
+
+  const summary = String(document.getElementById("policyChangeSummary")?.value || "").trim();
+  const html = editorHtml();
+  const text = editorText();
+
+  const sb = AUTH.ensureSupabase();
+
+  const { error } = await sb.rpc("csvb_company_policy_save_draft", {
+    p_node_id: node.id,
+    p_content_html: html,
+    p_content_text: text,
+    p_change_summary: summary || null
+  });
+
+  if (error) {
+    throw new Error("Save draft failed: " + error.message);
+  }
+
+  await loadEditorState(node.id);
+  renderEditorState();
+  await loadVersionHistory(node.id);
+
+  showOk("Draft saved.");
+}
+
+async function submitDraft() {
+  const state = currentEditorState;
+  if (!state?.work_version_id) {
+    showWarn("No work version exists. Save a draft first.");
+    return;
+  }
+
+  const note = String(document.getElementById("policyChangeSummary")?.value || "").trim();
+  const sb = AUTH.ensureSupabase();
+
+  const { error } = await sb.rpc("csvb_company_policy_submit_draft", {
+    p_version_id: state.work_version_id,
+    p_submission_note: note || null
+  });
+
+  if (error) {
+    throw new Error("Submit failed: " + error.message);
+  }
+
+  await loadEditorState(selectedNodeId);
+  renderEditorState();
+  await loadVersionHistory(selectedNodeId);
+
+  showOk("Draft submitted for approval.");
+}
+
+async function approveVersion() {
+  const state = currentEditorState;
+  if (!state?.work_version_id) {
+    showWarn("No work version selected.");
+    return;
+  }
+
+  const sb = AUTH.ensureSupabase();
+
+  const { error } = await sb.rpc("csvb_company_policy_approve_version", {
+    p_version_id: state.work_version_id,
+    p_approval_note: "Approved from Company Policy editor."
+  });
+
+  if (error) {
+    throw new Error("Approve failed: " + error.message);
+  }
+
+  await loadEditorState(selectedNodeId);
+  renderEditorState();
+  await loadVersionHistory(selectedNodeId);
+
+  showOk("Version approved.");
+}
+
+async function publishVersion() {
+  const state = currentEditorState;
+  if (!state?.work_version_id) {
+    showWarn("No approved version selected.");
+    return;
+  }
+
+  const confirmed = window.confirm("Publish this approved policy version? This will become the current published policy text.");
+  if (!confirmed) return;
+
+  const sb = AUTH.ensureSupabase();
+
+  const { error } = await sb.rpc("csvb_company_policy_publish_version", {
+    p_version_id: state.work_version_id,
+    p_effective_from: new Date().toISOString().slice(0, 10)
+  });
+
+  if (error) {
+    throw new Error("Publish failed: " + error.message);
+  }
+
+  await renderSelectedNode();
+  switchContentTab("published");
+
+  showOk("Policy version published.");
+}
+
+async function rejectVersion() {
+  const state = currentEditorState;
+  if (!state?.work_version_id) {
+    showWarn("No work version selected.");
+    return;
+  }
+
+  const reason = window.prompt("Enter rejection reason:");
+  if (!reason || !reason.trim()) return;
+
+  const sb = AUTH.ensureSupabase();
+
+  const { error } = await sb.rpc("csvb_company_policy_reject_version", {
+    p_version_id: state.work_version_id,
+    p_rejection_reason: reason.trim()
+  });
+
+  if (error) {
+    throw new Error("Reject failed: " + error.message);
+  }
+
+  await loadEditorState(selectedNodeId);
+  renderEditorState();
+  await loadVersionHistory(selectedNodeId);
+
+  showOk("Version rejected.");
+}
+
+async function discardWorkVersion() {
+  const state = currentEditorState;
+  if (!state?.work_version_id) {
+    showWarn("No work version selected.");
+    return;
+  }
+
+  const confirmed = window.confirm("Discard/archive the current work version? This will not delete the published text.");
+  if (!confirmed) return;
+
+  const sb = AUTH.ensureSupabase();
+
+  const { error } = await sb.rpc("csvb_company_policy_discard_work_version", {
+    p_version_id: state.work_version_id,
+    p_reason: "Discarded from Company Policy editor."
+  });
+
+  if (error) {
+    throw new Error("Discard failed: " + error.message);
+  }
+
+  await loadEditorState(selectedNodeId);
+  renderEditorState();
+  await loadVersionHistory(selectedNodeId);
+
+  showOk("Work version discarded.");
+}
+
+function setupEditorToolbar() {
+  document.querySelectorAll("[data-editor-cmd]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const cmd = btn.getAttribute("data-editor-cmd");
+      document.execCommand(cmd, false, null);
+      document.getElementById("policyEditor")?.focus();
+    });
+  });
+
+  document.querySelectorAll("[data-editor-block]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const block = btn.getAttribute("data-editor-block");
+      document.execCommand("formatBlock", false, block);
+      document.getElementById("policyEditor")?.focus();
+    });
+  });
+
+  const linkBtn = document.getElementById("insertLinkBtn");
+  if (linkBtn) {
+    linkBtn.addEventListener("click", () => {
+      const url = window.prompt("Enter link URL:");
+      if (!url) return;
+      document.execCommand("createLink", false, url);
+      document.getElementById("policyEditor")?.focus();
+    });
+  }
+}
+
+function setupContentEditorControls() {
+  const saveBtn = document.getElementById("saveDraftBtn");
+  const submitBtn = document.getElementById("submitDraftBtn");
+  const approveBtn = document.getElementById("approveVersionBtn");
+  const publishBtn = document.getElementById("publishVersionBtn");
+  const rejectBtn = document.getElementById("rejectVersionBtn");
+  const discardBtn = document.getElementById("discardWorkVersionBtn");
+  const reloadBtn = document.getElementById("reloadEditorBtn");
+
+  const guarded = (fn) => async () => {
+    try {
+      showWarn("");
+      await fn();
+    } catch (error) {
+      showWarn(String(error?.message || error));
+    }
+  };
+
+  if (saveBtn) saveBtn.addEventListener("click", guarded(saveDraft));
+  if (submitBtn) submitBtn.addEventListener("click", guarded(submitDraft));
+  if (approveBtn) approveBtn.addEventListener("click", guarded(approveVersion));
+  if (publishBtn) publishBtn.addEventListener("click", guarded(publishVersion));
+  if (rejectBtn) rejectBtn.addEventListener("click", guarded(rejectVersion));
+  if (discardBtn) discardBtn.addEventListener("click", guarded(discardWorkVersion));
+
+  if (reloadBtn) {
+    reloadBtn.addEventListener("click", guarded(async () => {
+      await renderSelectedNode();
+      showOk("Editor reloaded.");
+    }));
+  }
+}
+
 function setupAdminControls() {
   const createBtn = document.getElementById("createNodeBtn");
   const useSelectedBtn = document.getElementById("createChildOfSelectedBtn");
@@ -1210,10 +1644,14 @@ async function init() {
     injectTreeVisualStyles();
 
     await setupAuth();
+
     setupTabs();
+    setupContentTabs();
     setupSearch();
     setupPlaceholderButtons();
     setupAdminControls();
+    setupEditorToolbar();
+    setupContentEditorControls();
 
     if (!authBundle?.session?.user) {
       renderChapterList();

@@ -112,14 +112,16 @@
       font-size: 0.92rem;
     }
 
-    .tabs {
+    .tabs,
+    .content-tabs {
       display: flex;
       gap: 7px;
       flex-wrap: wrap;
       margin-top: 9px;
     }
 
-    .tab-btn {
+    .tab-btn,
+    .content-tab-btn {
       border-radius: 999px;
       padding: 7px 11px;
       border: 1px solid #cbd8ea;
@@ -130,7 +132,8 @@
       font-size: 0.88rem;
     }
 
-    .tab-btn.active {
+    .tab-btn.active,
+    .content-tab-btn.active {
       background: #1a4170;
       color: #fff;
       border-color: #1a4170;
@@ -162,8 +165,8 @@
     }
 
     .viewer-panel {
-      flex: 1 1 360px;
-      min-width: 340px;
+      flex: 1 1 500px;
+      min-width: 500px;
       max-width: none;
     }
 
@@ -202,14 +205,10 @@
       max-width: none;
     }
 
-    .chapter-btn:hover {
-      background: #eef6ff;
-    }
-
-    .chapter-btn.active {
-      background: #e4f0ff;
-      border-color: #8fb4e8;
+    .chapter-code {
+      font-weight: 700;
       color: #0b2f5f;
+      margin-right: 4px;
     }
 
     .tree-mark {
@@ -217,12 +216,6 @@
       width: 14px;
       color: #5a6d88;
       font-weight: 500;
-    }
-
-    .chapter-code {
-      font-weight: 700;
-      color: #0b2f5f;
-      margin-right: 4px;
     }
 
     .viewer-header {
@@ -279,6 +272,11 @@
     .content-box strong,
     .content-box b {
       font-weight: 700;
+    }
+
+    .published-content {
+      min-height: 220px;
+      overflow: auto;
     }
 
     .module-grid {
@@ -525,6 +523,102 @@
       font-size: 0.86rem;
     }
 
+    .editor-wrap {
+      border: 1px solid #dbe6f6;
+      border-radius: 12px;
+      background: #fff;
+      overflow: hidden;
+    }
+
+    .editor-toolbar {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      align-items: center;
+      padding: 8px;
+      border-bottom: 1px solid #dbe6f6;
+      background: #f7fbff;
+    }
+
+    .tool-btn {
+      border: 1px solid #cbd8ea;
+      background: #fff;
+      color: #1a4170;
+      border-radius: 8px;
+      padding: 6px 9px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.84rem;
+    }
+
+    .tool-btn:hover {
+      background: #eaf1fb;
+    }
+
+    .editor-area {
+      min-height: 280px;
+      padding: 14px;
+      outline: none;
+      color: #10233f;
+      line-height: 1.5;
+      font-size: 0.96rem;
+      background: #fff;
+      overflow: auto;
+    }
+
+    .editor-area:empty::before {
+      content: "Type policy text here...";
+      color: #8090a8;
+    }
+
+    .editor-meta {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin: 9px 0;
+      color: #4d6283;
+      font-size: 0.88rem;
+    }
+
+    .version-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      max-height: 420px;
+      overflow: auto;
+    }
+
+    .version-item {
+      border: 1px solid #dbe6f6;
+      background: #f7fbff;
+      border-radius: 12px;
+      padding: 10px;
+    }
+
+    .version-title {
+      color: #1a4170;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .version-meta {
+      color: #4d6283;
+      font-weight: 400;
+      line-height: 1.35;
+      font-size: 0.88rem;
+    }
+
+    .content-workflow {
+      border: 1px solid #dbe6f6;
+      border-radius: 12px;
+      background: #f9fbfe;
+      padding: 10px;
+      margin-bottom: 10px;
+      color: #213a5f;
+      font-size: 0.9rem;
+      line-height: 1.35;
+    }
+
     @media (max-width: 900px) {
       .layout {
         flex-direction: column;
@@ -605,18 +699,81 @@
         <div class="panel viewer-panel">
           <div class="viewer-header">
             <div>
-              <h2 id="chapterTitle" class="viewer-title">Select a chapter</h2>
-              <div id="chapterMeta" class="viewer-meta">No chapter selected.</div>
+              <h2 id="chapterTitle" class="viewer-title">Select a policy item</h2>
+              <div id="chapterMeta" class="viewer-meta">No policy item selected.</div>
             </div>
             <div class="row">
-              <span class="status-pill">Structure only</span>
+              <span id="contentStatusPill" class="status-pill">No published text</span>
               <button id="submitChangeRequestBtn" class="btn2" type="button">Submit Change Request</button>
               <button id="editDraftBtn" class="btn" type="button" disabled>Edit Draft</button>
             </div>
           </div>
 
-          <div id="chapterContent" class="content-box">
-            Select a chapter from the left side.
+          <div class="content-tabs">
+            <button class="content-tab-btn active" type="button" data-content-tab="published">Published View</button>
+            <button class="content-tab-btn" type="button" data-content-tab="draft">Draft Editor</button>
+            <button class="content-tab-btn" type="button" data-content-tab="history">Version History</button>
+          </div>
+
+          <div style="height:10px;"></div>
+
+          <div id="contentTab-published" class="content-panel">
+            <div id="chapterContent" class="content-box published-content">
+              Select a policy item from the left side.
+            </div>
+          </div>
+
+          <div id="contentTab-draft" class="content-panel hidden">
+            <div id="editorDeniedBox" class="content-box hidden">
+              Draft editing is restricted to Super Admin.
+            </div>
+
+            <div id="editorTools" class="hidden">
+              <div id="editorStateBox" class="content-workflow">
+                No draft loaded.
+              </div>
+
+              <div class="field">
+                <label>Change summary</label>
+                <input id="policyChangeSummary" placeholder="Brief description of the policy change" />
+              </div>
+
+              <div class="editor-wrap">
+                <div class="editor-toolbar">
+                  <button class="tool-btn" type="button" data-editor-cmd="bold">Bold</button>
+                  <button class="tool-btn" type="button" data-editor-cmd="italic">Italic</button>
+                  <button class="tool-btn" type="button" data-editor-cmd="underline">Underline</button>
+                  <button class="tool-btn" type="button" data-editor-block="p">Paragraph</button>
+                  <button class="tool-btn" type="button" data-editor-block="h2">Heading</button>
+                  <button class="tool-btn" type="button" data-editor-block="h3">Subheading</button>
+                  <button class="tool-btn" type="button" data-editor-cmd="insertUnorderedList">Bullets</button>
+                  <button class="tool-btn" type="button" data-editor-cmd="insertOrderedList">Numbering</button>
+                  <button class="tool-btn" type="button" data-editor-cmd="justifyLeft">Left</button>
+                  <button class="tool-btn" type="button" data-editor-cmd="justifyCenter">Center</button>
+                  <button class="tool-btn" type="button" data-editor-cmd="justifyRight">Right</button>
+                  <button class="tool-btn" type="button" id="insertLinkBtn">Link</button>
+                  <button class="tool-btn" type="button" data-editor-cmd="removeFormat">Clear Format</button>
+                </div>
+
+                <div id="policyEditor" class="editor-area" contenteditable="true"></div>
+              </div>
+
+              <div class="admin-actions">
+                <button class="btn" id="saveDraftBtn" type="button">Save Draft</button>
+                <button class="btn2" id="submitDraftBtn" type="button">Submit for Approval</button>
+                <button class="btn2" id="approveVersionBtn" type="button">Approve</button>
+                <button class="btn" id="publishVersionBtn" type="button">Publish</button>
+                <button class="btnDanger" id="rejectVersionBtn" type="button">Reject</button>
+                <button class="btnDanger" id="discardWorkVersionBtn" type="button">Discard Work Version</button>
+                <button class="btn2" id="reloadEditorBtn" type="button">Reload Editor</button>
+              </div>
+            </div>
+          </div>
+
+          <div id="contentTab-history" class="content-panel hidden">
+            <div id="versionHistoryBox" class="version-list">
+              No version history loaded.
+            </div>
           </div>
         </div>
       </div>
@@ -877,7 +1034,7 @@
     </section>
   </div>
 
-  <script src="./company_policy.js?v=20260506_6"></script>
+  <script src="./company_policy.js?v=20260506_7"></script>
   <script src="./csvb-ui-polish.js?v=20260430_1"></script>
   <script src="./csvb-help-tooltips.js?v=20260430_1"></script>
   <script src="./csvb-100pct-fit.js?v=20260430_1"></script>
