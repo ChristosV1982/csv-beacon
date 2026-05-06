@@ -63,6 +63,7 @@ function showOk(message) {
   if (!el) return;
   el.textContent = message || "";
   el.style.display = message ? "block" : "none";
+
   if (message) {
     window.setTimeout(() => {
       el.style.display = "none";
@@ -130,7 +131,7 @@ function renderSelectedChapter() {
   if (contentEl) {
     contentEl.innerHTML = `
       <div>
-        <b>Chapter ${escapeHtml(chapter.code)} - ${escapeHtml(chapter.title)}</b>
+        <strong>Chapter ${escapeHtml(chapter.code)} - ${escapeHtml(chapter.title)}</strong>
       </div>
       <br />
       <div>
@@ -187,7 +188,7 @@ function runSearch() {
   if (!matches.length) {
     results.innerHTML = `
       <div class="content-box">
-        No matching chapter found for: <b>${escapeHtml(query)}</b>
+        No matching chapter found for: <strong>${escapeHtml(query)}</strong>
       </div>
     `;
     return;
@@ -204,6 +205,7 @@ function runSearch() {
     item.addEventListener("click", () => {
       const code = item.getAttribute("data-result-code");
       selectChapter(code);
+
       const tabBtn = document.querySelector('[data-tab="policyBook"]');
       if (tabBtn) tabBtn.click();
     });
