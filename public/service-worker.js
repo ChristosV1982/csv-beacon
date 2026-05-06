@@ -6,7 +6,7 @@
 // - Bump cache version + clean old caches on activate
 
 const CACHE_PREFIX = "sire-test-";
-const CACHE_VERSION = "v74-company-policy-tree-visuals";
+const CACHE_VERSION = "v75-company-policy-collapsible-tree";
 const CACHE_NAME = `${CACHE_PREFIX}${CACHE_VERSION}`;
 
 const CORE_ASSETS = [
@@ -62,6 +62,7 @@ self.addEventListener("activate", (event) => {
 // Helpers
 async function networkFirst(request) {
   const cache = await caches.open(CACHE_NAME);
+
   try {
     const fresh = await fetch(request, { cache: "no-store" });
     if (fresh && fresh.ok) {
