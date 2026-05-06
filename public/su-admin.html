@@ -168,6 +168,7 @@
   <link rel="stylesheet" href="./csvb-100pct-fit.css?v=20260430_1" />
   <link rel="stylesheet" href="./csvb-su-admin-polish.css?v=20260430_1" />
   <link rel="stylesheet" href="./csvb-su-admin-density-polish.css?v=20260505_1" />
+  <link rel="stylesheet" href="./csvb-rights-matrix-source-labels.css?v=20260506_1" />
 </head>
 
 <body class="csvb-su-admin-density-page">
@@ -723,7 +724,18 @@
         </div>
 
         <div class="muted small" style="margin-top:10px;">
-          Each cell controls the <span class="mono">scope</span> for an action. Choosing “No access” sets <span class="mono">is_granted=false</span>.
+          Each cell controls whether the action is allowed and at what scope. <span class="mono">Off</span> means no access.
+        </div>
+
+        <div id="rmScopeGuide">
+          <div class="rm-guide-title">Permission scope guide</div>
+          <div class="rm-guide-row">
+            <span class="rm-guide-pill off">Off — no access</span>
+            <span class="rm-guide-pill vessel">Own vessel — assigned vessel only</span>
+            <span class="rm-guide-pill vessel">Any vessel — permitted vessels</span>
+            <span class="rm-guide-pill company">Company-wide — own company</span>
+            <span class="rm-guide-pill platform">Platform-wide — all companies</span>
+          </div>
         </div>
       </div>
 

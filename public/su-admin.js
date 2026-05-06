@@ -1252,12 +1252,20 @@ function initSearch() {
 /* ======================== Rights Matrix ======================== */
 const RM_ACTIONS = ["view", "edit", "admin", "export"];
 const RM_SCOPES = [
-  { value: "", label: "No access" },
-  { value: "global", label: "global" },
-  { value: "company", label: "company" },
-  { value: "vessel_assigned", label: "vessel_assigned" },
-  { value: "vessel_any", label: "vessel_any" },
+  { value: "", label: "Off" },
+  { value: "vessel_assigned", label: "Own vessel" },
+  { value: "vessel_any", label: "Any vessel" },
+  { value: "company", label: "Company-wide" },
+  { value: "global", label: "Platform-wide" },
 ];
+
+const RM_SCOPE_HELP = {
+  "": "Off — no access.",
+  vessel_assigned: "Own vessel — access only to the user's assigned vessel.",
+  vessel_any: "Any vessel — access to permitted vessels within the company scope.",
+  company: "Company-wide — access within the user's own company.",
+  global: "Platform-wide — access across companies. Normally only for Super Admin."
+};
 
 function rmSetStatus(msg) {
   const el = document.getElementById("rmStatus");
@@ -1307,6 +1315,7 @@ function rmCellSelect(currentValue, permission_id) {
     const opt = document.createElement("option");
     opt.value = s.value;
     opt.textContent = s.label;
+    opt.title = RM_SCOPE_HELP[s.value] || s.label;
     sel.appendChild(opt);
   });
 
