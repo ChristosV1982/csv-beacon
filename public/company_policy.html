@@ -49,7 +49,8 @@
     }
 
     .btn,
-    .btn2 {
+    .btn2,
+    .btnDanger {
       border-radius: 10px;
       padding: 8px 12px;
       font-weight: 600;
@@ -73,8 +74,15 @@
       border: 1px solid var(--btn-secondary-border, #c9d7eb);
     }
 
+    .btnDanger {
+      background: #b02a2a;
+      color: #fff;
+      border: 1px solid #b02a2a;
+    }
+
     .btn:disabled,
-    .btn2:disabled {
+    .btn2:disabled,
+    .btnDanger:disabled {
       opacity: .55;
       cursor: not-allowed;
     }
@@ -202,6 +210,13 @@
       background: #e4f0ff;
       border-color: #8fb4e8;
       color: #0b2f5f;
+    }
+
+    .tree-mark {
+      display: inline-block;
+      width: 14px;
+      color: #5a6d88;
+      font-weight: 500;
     }
 
     .chapter-code {
@@ -364,6 +379,150 @@
 
     .hidden {
       display: none !important;
+    }
+
+    .admin-layout {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 10px;
+      align-items: start;
+    }
+
+    .admin-card {
+      border: 1px solid #dbe6f6;
+      background: #fff;
+      border-radius: 12px;
+      padding: 11px;
+    }
+
+    .admin-card-title {
+      color: #1a4170;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+
+    .admin-note {
+      color: #4d6283;
+      font-weight: 400;
+      line-height: 1.35;
+      font-size: 0.9rem;
+      margin-bottom: 10px;
+    }
+
+    .admin-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      gap: 8px;
+    }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      margin-bottom: 8px;
+    }
+
+    label {
+      color: #1a4170;
+      font-weight: 600;
+      font-size: 0.9rem;
+    }
+
+    input,
+    select,
+    textarea {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 8px 10px;
+      border-radius: 10px;
+      border: 1px solid #cbd8ea;
+      background: #fff;
+      color: #10233f;
+      font-family: inherit;
+      font-size: 0.9rem;
+      font-weight: 400;
+    }
+
+    textarea {
+      min-height: 70px;
+      resize: vertical;
+    }
+
+    .checkbox-line {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: #213a5f;
+      font-weight: 400;
+      font-size: 0.9rem;
+      margin: 8px 0;
+    }
+
+    .checkbox-line input {
+      width: auto;
+    }
+
+    .admin-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+      margin-top: 8px;
+    }
+
+    .selected-box {
+      border: 1px solid #dbe6f6;
+      background: #f7fbff;
+      border-radius: 12px;
+      padding: 9px 10px;
+      color: #213a5f;
+      font-size: 0.9rem;
+      line-height: 1.35;
+      margin-bottom: 10px;
+    }
+
+    .selected-box strong {
+      color: #1a4170;
+      font-weight: 700;
+    }
+
+    .danger-box {
+      border: 1px solid #f0c2c2;
+      background: #fff7f7;
+      border-radius: 12px;
+      padding: 10px;
+    }
+
+    .archived-list {
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+      max-height: 300px;
+      overflow: auto;
+    }
+
+    .archived-item {
+      border: 1px solid #dbe6f6;
+      background: #f7fbff;
+      border-radius: 12px;
+      padding: 9px;
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      justify-content: space-between;
+    }
+
+    .archived-title {
+      color: #1a4170;
+      font-weight: 700;
+      line-height: 1.25;
+    }
+
+    .archived-meta {
+      margin-top: 3px;
+      color: #4d6283;
+      font-weight: 400;
+      font-size: 0.86rem;
     }
 
     @media (max-width: 900px) {
@@ -540,17 +699,185 @@
 
     <section id="tab-adminSetup" class="tab-panel hidden">
       <div class="panel">
-        <div class="panel-title">Admin / Setup</div>
-        <div class="content-box">
-          This area will later be used for chapter management, company chapter assignments, import from Word/PDF, version control, and publication settings.
-          <br /><br />
-          For this first step, the module is a safe front-end structure only.
+        <div class="panel-title">Policy structure administration</div>
+
+        <div id="adminDeniedBox" class="content-box hidden">
+          Structure administration is restricted to Super Admin.
+        </div>
+
+        <div id="adminTools" class="admin-layout hidden">
+          <div class="admin-card">
+            <div class="admin-card-title">Create policy item</div>
+            <div class="admin-note">
+              Create a top-level chapter or add a child item under any existing chapter, subchapter, section, or heading.
+            </div>
+
+            <div class="field">
+              <label>Parent item</label>
+              <select id="createParentNode"></select>
+            </div>
+
+            <div class="admin-grid">
+              <div class="field">
+                <label>Item type</label>
+                <select id="createNodeType">
+                  <option value="chapter">Chapter</option>
+                  <option value="subchapter">Subchapter</option>
+                  <option value="section">Section</option>
+                  <option value="subsection">Subsection</option>
+                  <option value="paragraph">Paragraph</option>
+                  <option value="heading">Heading</option>
+                  <option value="annex">Annex</option>
+                  <option value="appendix">Appendix</option>
+                  <option value="book_part">Book part</option>
+                </select>
+              </div>
+
+              <div class="field">
+                <label>Code</label>
+                <input id="createNodeCode" placeholder="e.g. 7.9.1" />
+              </div>
+
+              <div class="field">
+                <label>Sort order</label>
+                <input id="createSortOrder" type="number" step="0.01" placeholder="Auto if blank" />
+              </div>
+            </div>
+
+            <div class="field">
+              <label>Title</label>
+              <input id="createNodeTitle" placeholder="New policy item title" />
+            </div>
+
+            <label class="checkbox-line">
+              <input id="createIsContentNode" type="checkbox" checked />
+              This item can contain policy text
+            </label>
+
+            <div class="admin-actions">
+              <button class="btn" id="createNodeBtn" type="button">Create item</button>
+              <button class="btn2" id="createChildOfSelectedBtn" type="button">Use selected as parent</button>
+              <button class="btn2" id="clearCreateBtn" type="button">Clear</button>
+            </div>
+          </div>
+
+          <div class="admin-card">
+            <div class="admin-card-title">Edit selected item</div>
+            <div id="selectedAdminBox" class="selected-box">
+              No policy item selected.
+            </div>
+
+            <div class="admin-grid">
+              <div class="field">
+                <label>Item type</label>
+                <select id="editNodeType">
+                  <option value="chapter">Chapter</option>
+                  <option value="subchapter">Subchapter</option>
+                  <option value="section">Section</option>
+                  <option value="subsection">Subsection</option>
+                  <option value="paragraph">Paragraph</option>
+                  <option value="heading">Heading</option>
+                  <option value="annex">Annex</option>
+                  <option value="appendix">Appendix</option>
+                  <option value="book_part">Book part</option>
+                </select>
+              </div>
+
+              <div class="field">
+                <label>Code</label>
+                <input id="editNodeCode" />
+              </div>
+
+              <div class="field">
+                <label>Sort order</label>
+                <input id="editSortOrder" type="number" step="0.01" />
+              </div>
+            </div>
+
+            <div class="field">
+              <label>Title</label>
+              <input id="editNodeTitle" />
+            </div>
+
+            <label class="checkbox-line">
+              <input id="editIsContentNode" type="checkbox" />
+              This item can contain policy text
+            </label>
+
+            <div class="admin-actions">
+              <button class="btn" id="saveNodeBtn" type="button">Save selected item</button>
+              <button class="btn2" id="reloadPolicyBtn" type="button">Reload tree</button>
+            </div>
+          </div>
+
+          <div class="admin-card">
+            <div class="admin-card-title">Move selected item</div>
+            <div class="admin-note">
+              Move the selected item under another parent. Descendant levels are recalculated automatically.
+            </div>
+
+            <div class="field">
+              <label>New parent item</label>
+              <select id="moveParentNode"></select>
+            </div>
+
+            <div class="field">
+              <label>New sort order</label>
+              <input id="moveSortOrder" type="number" step="0.01" placeholder="Auto if blank" />
+            </div>
+
+            <div class="admin-actions">
+              <button class="btn" id="moveNodeBtn" type="button">Move selected item</button>
+            </div>
+          </div>
+
+          <div class="admin-card danger-box">
+            <div class="admin-card-title">Archive selected item</div>
+            <div class="admin-note">
+              Archiving removes the item from the active Policy Book but keeps history and audit traceability. This is not a physical delete.
+            </div>
+
+            <label class="checkbox-line">
+              <input id="archiveChildren" type="checkbox" checked />
+              Archive child items also
+            </label>
+
+            <div class="field">
+              <label>Reason</label>
+              <textarea id="archiveReason" placeholder="Optional reason"></textarea>
+            </div>
+
+            <div class="admin-actions">
+              <button class="btnDanger" id="archiveNodeBtn" type="button">Archive selected item</button>
+            </div>
+          </div>
+
+          <div class="admin-card">
+            <div class="admin-card-title">Archived items</div>
+            <div class="admin-note">
+              Restore archived policy structure items when required.
+            </div>
+
+            <label class="checkbox-line">
+              <input id="restoreChildren" type="checkbox" />
+              Restore child items also
+            </label>
+
+            <div class="admin-actions">
+              <button class="btn2" id="refreshArchivedBtn" type="button">Refresh archived list</button>
+            </div>
+
+            <div style="height:8px;"></div>
+            <div id="archivedNodesList" class="archived-list">
+              No archived items loaded.
+            </div>
+          </div>
         </div>
       </div>
     </section>
   </div>
 
-  <script src="./company_policy.js?v=20260506_4"></script>
+  <script src="./company_policy.js?v=20260506_6"></script>
   <script src="./csvb-ui-polish.js?v=20260430_1"></script>
   <script src="./csvb-help-tooltips.js?v=20260430_1"></script>
   <script src="./csvb-100pct-fit.js?v=20260430_1"></script>

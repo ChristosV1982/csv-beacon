@@ -1,10 +1,10 @@
 // public/company_policy.js
 // C.S.V. BEACON – Company Policy module
-// CP-2B: Load Policy Book chapter/node structure from Supabase.
-// Supports unlimited hierarchy through parent_node_id.
+// CP-2C-2: Database-backed policy tree with Super Admin structure controls.
 
 let policyNodes = [];
 let policyTree = [];
+let archivedNodes = [];
 let selectedNodeId = "";
 let authBundle = null;
 
@@ -34,14 +34,36 @@ function showOk(message) {
     window.setTimeout(() => {
       el.style.display = "none";
       el.textContent = "";
-    }, 1800);
+    }, 2000);
   }
+}
+
+function isStructureAdmin() {
+  const role = authBundle?.profile?.role || "";
+  return role === "super_admin" || role === "platform_owner";
+}
+
+function nodeTypeLabel(type) {
+  const map = {
+    book_part: "Book part",
+    chapter: "Chapter",
+    subchapter: "Subchapter",
+    section: "Section",
+    subsection: "Subsection",
+    paragraph: "Paragraph",
+    annex: "Annex",
+    appendix: "Appendix",
+    heading: "Heading"
+  };
+
+  return map[type] || "Policy item";
 }
 
 function nodeLabel(node) {
   if (!node) return "";
-  const code = node.node_code ? `Chapter ${node.node_code}` : "Policy node";
-  return `${code} - ${node.title || ""}`;
+  const type = nodeTypeLabel(node.node_type);
+  const code = node.node_code ? ` ${node.node_code}` : "";
+  return `${type}${code} - ${node.title || ""}`;
 }
 
 function normalizeNode(raw) {
@@ -83,6 +105,7 @@ function buildTree(nodes) {
     branch.sort((a, b) => {
       const s = Number(a.sort_order || 0) - Number(b.sort_order || 0);
       if (s !== 0) return s;
+
       return String(a.node_code || "").localeCompare(String(b.node_code || ""), undefined, {
         numeric: true,
         sensitivity: "base"
@@ -110,6 +133,7 @@ function findNode(nodeId) {
 
 function getNodeDepth(node) {
   if (!node) return 0;
+
   let depth = 0;
   let current = node;
 
@@ -121,6 +145,76 @@ function getNodeDepth(node) {
   }
 
   return depth;
+}
+
+function getDescendantIds(nodeId) {
+  const ids = new Set();
+
+  function walk(parentId) {
+    policyNodes
+      .filter((node) => node.parent_node_id === parentId)
+      .forEach((child) => {
+        ids.add(child.id);
+        walk(child.id);
+      });
+  }
+
+  walk(nodeId);
+  return ids;
+}
+
+function parseSortOrder(value) {
+  const text = String(value ?? "").trim();
+  if (!text) return null;
+
+  const num = Number(text);
+  if (!Number.isFinite(num)) {
+    throw new Error("Sort order must be a valid number.");
+  }
+
+  return num;
+}
+
+function optionLabel(node) {
+  const depth = getNodeDepth(node);
+  const prefix = "— ".repeat(depth);
+  return `${prefix}${nodeLabel(node)}`;
+}
+
+function fillNodeSelect(selectEl, options = {}) {
+  if (!selectEl) return;
+
+  const {
+    includeTopLevel = true,
+    excludeNodeId = "",
+    selectedValue = "",
+    topLabel = "Top level",
+  } = options;
+
+  const excluded = new Set();
+  if (excludeNodeId) {
+    excluded.add(excludeNodeId);
+    getDescendantIds(excludeNodeId).forEach((id) => excluded.add(id));
+  }
+
+  const flat = flattenTree(policyTree).filter((node) => !excluded.has(node.id));
+
+  const html = [];
+
+  if (includeTopLevel) {
+    html.push(`<option value="">${escapeHtml(topLabel)}</option>`);
+  }
+
+  flat.forEach((node) => {
+    html.push(`
+      <option value="${escapeHtml(node.id)}">
+        ${escapeHtml(optionLabel(node))}
+      </option>
+    `);
+  });
+
+  selectEl.innerHTML = html.join("");
+  selectEl.value = selectedValue || "";
 }
 
 async function setupAuth() {
@@ -167,8 +261,14 @@ async function loadPolicyNodesFromSupabase() {
   policyNodes = (data || []).map(normalizeNode);
   policyTree = buildTree(policyNodes);
 
-  if (!selectedNodeId && policyNodes.length) {
-    selectedNodeId = flattenTree(policyTree)[0]?.id || "";
+  const flat = flattenTree(policyTree);
+
+  if (selectedNodeId && !policyNodes.some((node) => node.id === selectedNodeId)) {
+    selectedNodeId = "";
+  }
+
+  if (!selectedNodeId && flat.length) {
+    selectedNodeId = flat[0].id;
   }
 }
 
@@ -207,7 +307,7 @@ function renderNodeButton(node) {
       title="${escapeHtml(nodeLabel(node))}"
     >
       <span class="tree-mark">${escapeHtml(childMark)}</span>
-      <span class="chapter-code">Chapter ${escapeHtml(node.node_code)}</span>
+      <span class="chapter-code">${escapeHtml(nodeTypeLabel(node.node_type))} ${escapeHtml(node.node_code)}</span>
       ${escapeHtml(node.title)}
     </button>
   `;
@@ -250,6 +350,7 @@ async function selectNode(nodeId) {
   selectedNodeId = node.id;
   renderChapterList();
   await renderSelectedNode();
+  refreshAdminUi();
 }
 
 async function renderSelectedNode() {
@@ -260,9 +361,9 @@ async function renderSelectedNode() {
   const contentEl = document.getElementById("chapterContent");
 
   if (!node) {
-    if (titleEl) titleEl.textContent = "Select a chapter";
-    if (metaEl) metaEl.textContent = "No chapter selected.";
-    if (contentEl) contentEl.textContent = "Select a chapter from the left side.";
+    if (titleEl) titleEl.textContent = "Select a policy item";
+    if (metaEl) metaEl.textContent = "No policy item selected.";
+    if (contentEl) contentEl.textContent = "Select a policy item from the left side.";
     return;
   }
 
@@ -272,8 +373,8 @@ async function renderSelectedNode() {
 
   if (metaEl) {
     const depth = getNodeDepth(node);
-    const typeLabel = String(node.node_type || "heading").replaceAll("_", " ");
-    metaEl.textContent = `Database-backed policy node. Type: ${typeLabel}. Level: ${depth}.`;
+    const typeLabel = nodeTypeLabel(node.node_type);
+    metaEl.textContent = `Database-backed policy item. Type: ${typeLabel}. Level: ${depth}.`;
   }
 
   if (contentEl) {
@@ -319,7 +420,7 @@ async function renderSelectedNode() {
       </div>
       <br />
       <div>
-        The structure is now loaded from Supabase. Later, this area will show the approved rich-text policy content, including sections, images, tables, revision control, exact search, AI source-based search, and change requests.
+        The structure is loaded from Supabase. Later, this area will show approved rich-text policy content, including sections, images, tables, revision control, exact search, AI source-based search, and change requests.
       </div>
     `;
   } catch (error) {
@@ -330,7 +431,7 @@ async function renderSelectedNode() {
         </div>
         <br />
         <div>
-          The chapter was loaded, but the published text could not be checked.
+          The policy item was loaded, but the published text could not be checked.
         </div>
         <br />
         <div>${escapeHtml(String(error?.message || error))}</div>
@@ -353,6 +454,10 @@ function setupTabs() {
       panels.forEach((panel) => {
         panel.classList.toggle("hidden", panel.id !== `tab-${target}`);
       });
+
+      if (target === "adminSetup") {
+        refreshAdminUi();
+      }
     });
   });
 }
@@ -393,7 +498,7 @@ function runSearch() {
     <div class="result-item" data-result-id="${escapeHtml(node.id)}">
       <div class="result-title">${escapeHtml(nodeLabel(node))}</div>
       <div class="result-text">
-        Type: ${escapeHtml(String(node.node_type || "heading").replaceAll("_", " "))}.
+        Type: ${escapeHtml(nodeTypeLabel(node.node_type))}.
         Click to open this item in the Policy Book tab.
       </div>
     </div>
@@ -452,6 +557,456 @@ function setupPlaceholderButtons() {
   }
 }
 
+function refreshAdminVisibility() {
+  const denied = document.getElementById("adminDeniedBox");
+  const tools = document.getElementById("adminTools");
+
+  if (!denied || !tools) return;
+
+  if (isStructureAdmin()) {
+    denied.classList.add("hidden");
+    tools.classList.remove("hidden");
+  } else {
+    tools.classList.add("hidden");
+    denied.classList.remove("hidden");
+  }
+}
+
+function fillAdminSelects() {
+  fillNodeSelect(document.getElementById("createParentNode"), {
+    includeTopLevel: true,
+    selectedValue: selectedNodeId || "",
+    topLabel: "Top level item"
+  });
+
+  fillNodeSelect(document.getElementById("moveParentNode"), {
+    includeTopLevel: true,
+    excludeNodeId: selectedNodeId || "",
+    selectedValue: findNode(selectedNodeId)?.parent_node_id || "",
+    topLabel: "Top level item"
+  });
+}
+
+function fillEditFields() {
+  const node = findNode(selectedNodeId);
+
+  const box = document.getElementById("selectedAdminBox");
+  const type = document.getElementById("editNodeType");
+  const code = document.getElementById("editNodeCode");
+  const title = document.getElementById("editNodeTitle");
+  const sortOrder = document.getElementById("editSortOrder");
+  const isContent = document.getElementById("editIsContentNode");
+
+  if (!node) {
+    if (box) box.innerHTML = "No policy item selected.";
+    if (type) type.value = "chapter";
+    if (code) code.value = "";
+    if (title) title.value = "";
+    if (sortOrder) sortOrder.value = "";
+    if (isContent) isContent.checked = true;
+    return;
+  }
+
+  if (box) {
+    box.innerHTML = `
+      <strong>Selected:</strong><br />
+      ${escapeHtml(nodeLabel(node))}<br />
+      <span style="color:#4d6283;">Level ${getNodeDepth(node)} • Sort ${escapeHtml(node.sort_order)}</span>
+    `;
+  }
+
+  if (type) type.value = node.node_type || "heading";
+  if (code) code.value = node.node_code || "";
+  if (title) title.value = node.title || "";
+  if (sortOrder) sortOrder.value = String(node.sort_order ?? "");
+  if (isContent) isContent.checked = node.is_content_node !== false;
+}
+
+function refreshAdminUi() {
+  refreshAdminVisibility();
+
+  if (!isStructureAdmin()) return;
+
+  fillAdminSelects();
+  fillEditFields();
+}
+
+function clearCreateForm() {
+  const fields = [
+    "createNodeCode",
+    "createNodeTitle",
+    "createSortOrder"
+  ];
+
+  fields.forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) el.value = "";
+  });
+
+  const type = document.getElementById("createNodeType");
+  if (type) type.value = "section";
+
+  const parent = document.getElementById("createParentNode");
+  if (parent) parent.value = selectedNodeId || "";
+
+  const isContent = document.getElementById("createIsContentNode");
+  if (isContent) isContent.checked = true;
+}
+
+async function reloadPolicyTree(preferredNodeId = "") {
+  await loadPolicyNodesFromSupabase();
+
+  if (preferredNodeId && policyNodes.some((node) => node.id === preferredNodeId)) {
+    selectedNodeId = preferredNodeId;
+  }
+
+  renderChapterList();
+  await renderSelectedNode();
+  runSearch();
+  refreshAdminUi();
+}
+
+async function createPolicyNode() {
+  if (!isStructureAdmin()) {
+    showWarn("Access denied. Structure administration requires Super Admin rights.");
+    return;
+  }
+
+  const parentId = document.getElementById("createParentNode")?.value || null;
+  const nodeType = document.getElementById("createNodeType")?.value || "section";
+  const nodeCode = String(document.getElementById("createNodeCode")?.value || "").trim();
+  const title = String(document.getElementById("createNodeTitle")?.value || "").trim();
+  const sortOrder = parseSortOrder(document.getElementById("createSortOrder")?.value);
+  const isContentNode = document.getElementById("createIsContentNode")?.checked !== false;
+
+  if (!nodeCode) {
+    showWarn("Code is required.");
+    return;
+  }
+
+  if (!title) {
+    showWarn("Title is required.");
+    return;
+  }
+
+  const sb = AUTH.ensureSupabase();
+
+  const { data, error } = await sb.rpc("csvb_company_policy_create_node", {
+    p_book_key: "main_policy",
+    p_parent_node_id: parentId,
+    p_node_type: nodeType,
+    p_node_code: nodeCode,
+    p_title: title,
+    p_sort_order: sortOrder,
+    p_is_content_node: isContentNode
+  });
+
+  if (error) {
+    throw new Error("Create failed: " + error.message);
+  }
+
+  const created = Array.isArray(data) ? data[0] : data;
+  const createdId = created?.id || "";
+
+  selectedNodeId = createdId || selectedNodeId;
+  clearCreateForm();
+  await reloadPolicyTree(createdId);
+
+  showOk("Policy item created.");
+}
+
+async function saveSelectedNode() {
+  if (!isStructureAdmin()) {
+    showWarn("Access denied. Structure administration requires Super Admin rights.");
+    return;
+  }
+
+  const node = findNode(selectedNodeId);
+  if (!node) {
+    showWarn("Select a policy item first.");
+    return;
+  }
+
+  const nodeType = document.getElementById("editNodeType")?.value || node.node_type;
+  const nodeCode = String(document.getElementById("editNodeCode")?.value || "").trim();
+  const title = String(document.getElementById("editNodeTitle")?.value || "").trim();
+  const sortOrder = parseSortOrder(document.getElementById("editSortOrder")?.value);
+  const isContentNode = document.getElementById("editIsContentNode")?.checked !== false;
+
+  if (!nodeCode) {
+    showWarn("Code is required.");
+    return;
+  }
+
+  if (!title) {
+    showWarn("Title is required.");
+    return;
+  }
+
+  const sb = AUTH.ensureSupabase();
+
+  const { error } = await sb.rpc("csvb_company_policy_update_node", {
+    p_node_id: node.id,
+    p_node_type: nodeType,
+    p_node_code: nodeCode,
+    p_title: title,
+    p_sort_order: sortOrder,
+    p_is_content_node: isContentNode
+  });
+
+  if (error) {
+    throw new Error("Save failed: " + error.message);
+  }
+
+  await reloadPolicyTree(node.id);
+  showOk("Policy item saved.");
+}
+
+async function moveSelectedNode() {
+  if (!isStructureAdmin()) {
+    showWarn("Access denied. Structure administration requires Super Admin rights.");
+    return;
+  }
+
+  const node = findNode(selectedNodeId);
+  if (!node) {
+    showWarn("Select a policy item first.");
+    return;
+  }
+
+  const newParentId = document.getElementById("moveParentNode")?.value || null;
+  const newSortOrder = parseSortOrder(document.getElementById("moveSortOrder")?.value);
+
+  const sb = AUTH.ensureSupabase();
+
+  const { error } = await sb.rpc("csvb_company_policy_move_node", {
+    p_node_id: node.id,
+    p_new_parent_node_id: newParentId,
+    p_new_sort_order: newSortOrder
+  });
+
+  if (error) {
+    throw new Error("Move failed: " + error.message);
+  }
+
+  const moveSort = document.getElementById("moveSortOrder");
+  if (moveSort) moveSort.value = "";
+
+  await reloadPolicyTree(node.id);
+  showOk("Policy item moved.");
+}
+
+async function archiveSelectedNode() {
+  if (!isStructureAdmin()) {
+    showWarn("Access denied. Structure administration requires Super Admin rights.");
+    return;
+  }
+
+  const node = findNode(selectedNodeId);
+  if (!node) {
+    showWarn("Select a policy item first.");
+    return;
+  }
+
+  const archiveChildren = document.getElementById("archiveChildren")?.checked !== false;
+  const reason = String(document.getElementById("archiveReason")?.value || "").trim();
+
+  const confirmed = window.confirm(
+    `Archive this policy item?\n\n${nodeLabel(node)}\n\nThis is not a physical delete.`
+  );
+
+  if (!confirmed) return;
+
+  const sb = AUTH.ensureSupabase();
+
+  const { error } = await sb.rpc("csvb_company_policy_archive_node", {
+    p_node_id: node.id,
+    p_archive_children: archiveChildren,
+    p_reason: reason || null
+  });
+
+  if (error) {
+    throw new Error("Archive failed: " + error.message);
+  }
+
+  const reasonEl = document.getElementById("archiveReason");
+  if (reasonEl) reasonEl.value = "";
+
+  selectedNodeId = "";
+  await reloadPolicyTree();
+  await loadArchivedNodes();
+
+  showOk("Policy item archived.");
+}
+
+async function loadArchivedNodes() {
+  if (!isStructureAdmin()) return;
+
+  const list = document.getElementById("archivedNodesList");
+  if (list) {
+    list.innerHTML = "Loading archived items...";
+  }
+
+  const sb = AUTH.ensureSupabase();
+
+  const { data, error } = await sb.rpc("csvb_company_policy_list_archived_nodes", {
+    p_book_key: "main_policy"
+  });
+
+  if (error) {
+    throw new Error("Could not load archived items: " + error.message);
+  }
+
+  archivedNodes = (data || []).map(normalizeNode);
+  renderArchivedNodes();
+}
+
+function renderArchivedNodes() {
+  const list = document.getElementById("archivedNodesList");
+  if (!list) return;
+
+  if (!archivedNodes.length) {
+    list.innerHTML = `
+      <div class="content-box" style="min-height:0;">
+        No archived policy items found.
+      </div>
+    `;
+    return;
+  }
+
+  list.innerHTML = archivedNodes.map((node) => `
+    <div class="archived-item">
+      <div>
+        <div class="archived-title">${escapeHtml(nodeLabel(node))}</div>
+        <div class="archived-meta">Level ${escapeHtml(node.depth)} • Updated ${escapeHtml(node.updated_at || "")}</div>
+      </div>
+      <button class="btn2" type="button" data-restore-id="${escapeHtml(node.id)}">Restore</button>
+    </div>
+  `).join("");
+
+  list.querySelectorAll("[data-restore-id]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      await restoreArchivedNode(btn.getAttribute("data-restore-id"));
+    });
+  });
+}
+
+async function restoreArchivedNode(nodeId) {
+  if (!isStructureAdmin()) {
+    showWarn("Access denied. Structure administration requires Super Admin rights.");
+    return;
+  }
+
+  const restoreChildren = document.getElementById("restoreChildren")?.checked === true;
+
+  const sb = AUTH.ensureSupabase();
+
+  const { error } = await sb.rpc("csvb_company_policy_restore_node", {
+    p_node_id: nodeId,
+    p_restore_children: restoreChildren
+  });
+
+  if (error) {
+    throw new Error("Restore failed: " + error.message);
+  }
+
+  selectedNodeId = nodeId;
+  await reloadPolicyTree(nodeId);
+  await loadArchivedNodes();
+
+  showOk("Policy item restored.");
+}
+
+function setupAdminControls() {
+  const createBtn = document.getElementById("createNodeBtn");
+  const useSelectedBtn = document.getElementById("createChildOfSelectedBtn");
+  const clearCreateBtn = document.getElementById("clearCreateBtn");
+  const saveBtn = document.getElementById("saveNodeBtn");
+  const reloadBtn = document.getElementById("reloadPolicyBtn");
+  const moveBtn = document.getElementById("moveNodeBtn");
+  const archiveBtn = document.getElementById("archiveNodeBtn");
+  const refreshArchivedBtn = document.getElementById("refreshArchivedBtn");
+
+  if (createBtn) {
+    createBtn.addEventListener("click", async () => {
+      try {
+        showWarn("");
+        await createPolicyNode();
+      } catch (error) {
+        showWarn(String(error?.message || error));
+      }
+    });
+  }
+
+  if (useSelectedBtn) {
+    useSelectedBtn.addEventListener("click", () => {
+      const parent = document.getElementById("createParentNode");
+      if (parent) parent.value = selectedNodeId || "";
+    });
+  }
+
+  if (clearCreateBtn) {
+    clearCreateBtn.addEventListener("click", clearCreateForm);
+  }
+
+  if (saveBtn) {
+    saveBtn.addEventListener("click", async () => {
+      try {
+        showWarn("");
+        await saveSelectedNode();
+      } catch (error) {
+        showWarn(String(error?.message || error));
+      }
+    });
+  }
+
+  if (reloadBtn) {
+    reloadBtn.addEventListener("click", async () => {
+      try {
+        showWarn("");
+        await reloadPolicyTree(selectedNodeId);
+        showOk("Policy tree reloaded.");
+      } catch (error) {
+        showWarn(String(error?.message || error));
+      }
+    });
+  }
+
+  if (moveBtn) {
+    moveBtn.addEventListener("click", async () => {
+      try {
+        showWarn("");
+        await moveSelectedNode();
+      } catch (error) {
+        showWarn(String(error?.message || error));
+      }
+    });
+  }
+
+  if (archiveBtn) {
+    archiveBtn.addEventListener("click", async () => {
+      try {
+        showWarn("");
+        await archiveSelectedNode();
+      } catch (error) {
+        showWarn(String(error?.message || error));
+      }
+    });
+  }
+
+  if (refreshArchivedBtn) {
+    refreshArchivedBtn.addEventListener("click", async () => {
+      try {
+        showWarn("");
+        await loadArchivedNodes();
+        showOk("Archived list refreshed.");
+      } catch (error) {
+        showWarn(String(error?.message || error));
+      }
+    });
+  }
+}
+
 async function init() {
   try {
     showWarn("");
@@ -460,10 +1015,12 @@ async function init() {
     setupTabs();
     setupSearch();
     setupPlaceholderButtons();
+    setupAdminControls();
 
     if (!authBundle?.session?.user) {
       renderChapterList();
       await renderSelectedNode();
+      refreshAdminUi();
       return;
     }
 
@@ -471,6 +1028,11 @@ async function init() {
     renderChapterList();
     await renderSelectedNode();
     runSearch();
+    refreshAdminUi();
+
+    if (isStructureAdmin()) {
+      await loadArchivedNodes();
+    }
   } catch (error) {
     showWarn(String(error?.message || error));
   }
