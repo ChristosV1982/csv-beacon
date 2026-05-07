@@ -6,7 +6,7 @@
 // - Bump cache version + clean old caches on activate
 
 const CACHE_PREFIX = "sire-test-";
-const CACHE_VERSION = "v88-company-policy-image-modal";
+const CACHE_VERSION = "v89-company-policy-table-tools";
 const CACHE_NAME = `${CACHE_PREFIX}${CACHE_VERSION}`;
 
 const CORE_ASSETS = [
@@ -20,6 +20,7 @@ const CORE_ASSETS = [
   "./company_policy_ai_search.js",
   "./company_policy_permissions.js",
   "./company_policy_editor_assets.js",
+  "./company_policy_editor_tables.js",
   "./company_policy_print_export.js",
   "./style.css",
   "./csv-beacon-theme.css",
@@ -69,9 +70,11 @@ async function networkFirst(request) {
 
   try {
     const fresh = await fetch(request, { cache: "no-store" });
+
     if (fresh && fresh.ok) {
       cache.put(request, fresh.clone());
     }
+
     return fresh;
   } catch (e) {
     const cached = await cache.match(request);
@@ -100,6 +103,7 @@ self.addEventListener("fetch", (event) => {
   if (req.method !== "GET") return;
 
   const url = new URL(req.url);
+
   if (url.origin !== self.location.origin) return;
 
   const accept = req.headers.get("accept") || "";
