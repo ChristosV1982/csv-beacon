@@ -1,12 +1,12 @@
 // public/service-worker.js
 // Goal: stop “stale” pages/scripts forcing multiple hard refreshes.
 // Strategy:
-// - Network-first for HTML navigations (always try to fetch latest)
-// - Stale-while-revalidate for static assets (fast, but updates in background)
+// - Network-first for HTML navigations
+// - Stale-while-revalidate for static assets
 // - Bump cache version + clean old caches on activate
 
 const CACHE_PREFIX = "sire-test-";
-const CACHE_VERSION = "v82-company-policy-ai-search-ui";
+const CACHE_VERSION = "v84-company-policy-fine-permissions";
 const CACHE_NAME = `${CACHE_PREFIX}${CACHE_VERSION}`;
 
 const CORE_ASSETS = [
@@ -18,6 +18,7 @@ const CORE_ASSETS = [
   "./company_policy_documents.js",
   "./company_policy_search.js",
   "./company_policy_ai_search.js",
+  "./company_policy_permissions.js",
   "./style.css",
   "./csv-beacon-theme.css",
   "./auth.js",
@@ -32,7 +33,6 @@ const CORE_ASSETS = [
   "./sire_questions_all_columns_named.json"
 ];
 
-// Install: pre-cache core assets (best effort) + activate immediately
 self.addEventListener("install", (event) => {
   event.waitUntil(
     (async () => {
@@ -40,7 +40,7 @@ self.addEventListener("install", (event) => {
         const cache = await caches.open(CACHE_NAME);
         await cache.addAll(CORE_ASSETS);
       } catch (e) {
-        // If any asset fails to cache, still proceed (do not block install)
+        // If any asset fails to cache, still proceed.
       } finally {
         await self.skipWaiting();
       }
@@ -48,7 +48,6 @@ self.addEventListener("install", (event) => {
   );
 });
 
-// Activate: remove old caches + take control immediately
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     (async () => {
@@ -63,7 +62,6 @@ self.addEventListener("activate", (event) => {
   );
 });
 
-// Helpers
 async function networkFirst(request) {
   const cache = await caches.open(CACHE_NAME);
 
@@ -94,7 +92,6 @@ async function staleWhileRevalidate(request) {
   return cached || (await fetchPromise) || cached;
 }
 
-// Fetch handling
 self.addEventListener("fetch", (event) => {
   const req = event.request;
 
