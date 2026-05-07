@@ -6,7 +6,7 @@
 // - Bump cache version + clean old caches on activate
 
 const CACHE_PREFIX = "sire-test-";
-const CACHE_VERSION = "v89-company-policy-table-tools";
+const CACHE_VERSION = "v90-company-policy-controlled-blocks";
 const CACHE_NAME = `${CACHE_PREFIX}${CACHE_VERSION}`;
 
 const CORE_ASSETS = [
@@ -21,6 +21,7 @@ const CORE_ASSETS = [
   "./company_policy_permissions.js",
   "./company_policy_editor_assets.js",
   "./company_policy_editor_tables.js",
+  "./company_policy_editor_blocks.js",
   "./company_policy_print_export.js",
   "./style.css",
   "./csv-beacon-theme.css",
