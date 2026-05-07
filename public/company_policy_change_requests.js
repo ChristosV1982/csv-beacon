@@ -1,6 +1,6 @@
 // public/company_policy_change_requests.js
 // C.S.V. BEACON – Company Policy Change Requests UI
-// CP-4C-2: submit, list, review, comment, status-control, and implementation helpers.
+// CP-4D-2: implementation becomes automatic on publishing linked policy version.
 
 (() => {
   "use strict";
@@ -52,9 +52,7 @@
     if (window.AUTH?.getSessionUserProfile) {
       try {
         await window.AUTH.getSessionUserProfile();
-      } catch (_) {
-        // Do not block page. Other auth handlers already show auth errors.
-      }
+      } catch (_) {}
     }
   }
 
@@ -639,13 +637,15 @@
       <div class="cr-detail-section">
         <div class="cr-detail-section-title">Implementation helpers</div>
         ${renderImplementationBox()}
+        <div class="cr-note" style="margin-top:8px;">
+          When the linked work version is published, this request will automatically be marked as implemented.
+        </div>
         <div class="cr-helper-grid">
           <button class="btn2" id="crOpenPolicyItemBtn" type="button">Open policy item</button>
           <button class="btn2" id="crCopyRequestedBtn" type="button">Copy requested change</button>
           <button class="btn2" id="crCopyProposedBtn" type="button">Copy proposed text</button>
           <button class="btn2" id="crLoadProposedToEditorBtn" type="button">Load proposed text into Draft Editor</button>
           <button class="btn2" id="crLinkWorkVersionBtn" type="button">Link current work version</button>
-          <button class="btn" id="crMarkImplementedBtn" type="button">Mark implemented from current published</button>
         </div>
       </div>
     ` : "";
@@ -786,13 +786,6 @@
     if (linkWorkBtn) {
       linkWorkBtn.addEventListener("click", async () => {
         await guardedInline(() => linkCurrentWorkVersion(req));
-      });
-    }
-
-    const markImplementedBtn = document.getElementById("crMarkImplementedBtn");
-    if (markImplementedBtn) {
-      markImplementedBtn.addEventListener("click", async () => {
-        await guardedInline(() => markImplementedFromCurrentPublished(req));
       });
     }
   }
@@ -988,7 +981,7 @@
       p_request_id: req.id,
       p_draft_version_id: workVersionId,
       p_published_version_id: null,
-      p_implementation_note: "Linked to current work version from Change Requests UI.",
+      p_implementation_note: "Linked to current work version from Change Requests UI. Request will be marked implemented automatically when the linked version is published.",
       p_mark_implemented: false,
     });
 
@@ -998,34 +991,7 @@
 
     await loadRequestDetail(req.id);
 
-    showOk("Current work version linked to this change request.");
-  }
-
-  async function markImplementedFromCurrentPublished(req) {
-    if (!STATE.isAdmin) {
-      showWarn("This action is restricted to Super Admin.");
-      return;
-    }
-
-    const confirmed = window.confirm(
-      "Mark this change request as implemented using the current published policy version?"
-    );
-
-    if (!confirmed) return;
-
-    const { error } = await sb().rpc("csvb_company_policy_mark_change_request_implemented_from_current_published", {
-      p_request_id: req.id,
-      p_implementation_note: "Implemented by current published policy version from Change Requests UI.",
-    });
-
-    if (error) {
-      throw new Error("Could not mark implemented: " + error.message);
-    }
-
-    await loadRequests();
-    await loadRequestDetail(req.id);
-
-    showOk("Change request marked as implemented and linked to the current published version.");
+    showOk("Current work version linked. The request will be marked implemented automatically when this version is published.");
   }
 
   function wireUi() {
