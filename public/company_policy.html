@@ -1046,7 +1046,14 @@
   <script src="./company_policy_editor_blocks.js?v=20260507_1"></script>
   <script src="./company_policy_editor_paste_cleanup.js?v=20260507_1"></script>
   <script src="https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js"></script>
-  <script src="./company_policy_editor_import.js?v=20260507_2"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script>
+    if (window.pdfjsLib) {
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc =
+        "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+    }
+  </script>
+  <script src="./company_policy_editor_import.js?v=20260507_3"></script>
   <script src="./company_policy_print_export.js?v=20260507_1"></script>
   <script src="./csvb-ui-polish.js?v=20260430_1"></script>
   <script src="./csvb-help-tooltips.js?v=20260430_1"></script>

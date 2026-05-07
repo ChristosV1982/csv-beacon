@@ -1,13 +1,13 @@
 // public/company_policy_editor_import.js
 // C.S.V. BEACON – Company Policy editor import
-// CP-11B: import cleaned TXT / HTML / DOCX content into the Draft Editor.
+// CP-11C: import cleaned TXT / HTML / DOCX / PDF content into the Draft Editor.
 
 (() => {
   "use strict";
 
-  const BUILD = "CP11B-2026-05-07";
+  const BUILD = "CP11C-2026-05-07";
   const MODAL_ID = "policyImportModal";
-  const MAX_IMPORT_BYTES = 8 * 1024 * 1024;
+  const MAX_IMPORT_BYTES = 16 * 1024 * 1024;
 
   let savedRange = null;
   let importedCleanHtml = "";
@@ -185,6 +185,13 @@
     );
   }
 
+  function isPdfFile(file) {
+    const lower = String(file?.name || "").toLowerCase();
+    const type = String(file?.type || "").toLowerCase();
+
+    return lower.endsWith(".pdf") || type === "application/pdf";
+  }
+
   function isAllowedImportFile(file) {
     const lower = String(file?.name || "").toLowerCase();
     const type = String(file?.type || "").toLowerCase();
@@ -194,8 +201,10 @@
       lower.endsWith(".html") ||
       lower.endsWith(".htm") ||
       lower.endsWith(".docx") ||
+      lower.endsWith(".pdf") ||
       type.includes("text/plain") ||
       type.includes("text/html") ||
+      type === "application/pdf" ||
       type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
     );
   }
@@ -246,17 +255,163 @@
     return cleaned;
   }
 
+  function groupPdfItemsIntoLines(items) {
+    const textItems = (items || [])
+      .map((item) => {
+        const transform = item.transform || [];
+        return {
+          text: String(item.str || "").trim(),
+          x: Number(transform[4] || 0),
+          y: Number(transform[5] || 0),
+        };
+      })
+      .filter((item) => item.text);
+
+    const groups = [];
+
+    textItems.forEach((item) => {
+      let group = groups.find((g) => Math.abs(g.y - item.y) <= 3);
+
+      if (!group) {
+        group = { y: item.y, items: [] };
+        groups.push(group);
+      }
+
+      group.items.push(item);
+    });
+
+    groups.sort((a, b) => b.y - a.y);
+
+    return groups.map((group) => {
+      group.items.sort((a, b) => a.x - b.x);
+      return group.items.map((item) => item.text).join(" ").replace(/\s+/g, " ").trim();
+    }).filter(Boolean);
+  }
+
+  function pdfLinesToHtml(pageBlocks, includePageHeaders) {
+    const parts = [];
+
+    pageBlocks.forEach((page) => {
+      if (includePageHeaders) {
+        parts.push(`<h3>PDF Page ${page.pageNo}</h3>`);
+      }
+
+      if (!page.lines.length) {
+        return;
+      }
+
+      let paragraphLines = [];
+
+      function flushParagraph() {
+        if (!paragraphLines.length) return;
+
+        const text = paragraphLines.join(" ").replace(/\s+/g, " ").trim();
+
+        if (text) {
+          parts.push(`<p>${escapeHtml(text)}</p>`);
+        }
+
+        paragraphLines = [];
+      }
+
+      page.lines.forEach((line) => {
+        const clean = String(line || "").trim();
+
+        if (!clean) {
+          flushParagraph();
+          return;
+        }
+
+        const isLikelyHeading =
+          clean.length <= 90 &&
+          (
+            /^[0-9]+(\.[0-9]+)*\s+/.test(clean) ||
+            clean === clean.toUpperCase()
+          );
+
+        if (isLikelyHeading) {
+          flushParagraph();
+          parts.push(`<h3>${escapeHtml(clean)}</h3>`);
+          return;
+        }
+
+        paragraphLines.push(clean);
+
+        if (/[.!?:;)]$/.test(clean) && paragraphLines.join(" ").length > 160) {
+          flushParagraph();
+        }
+      });
+
+      flushParagraph();
+    });
+
+    return parts.join("\n");
+  }
+
+  async function convertPdfToCleanHtml(file) {
+    if (!window.pdfjsLib?.getDocument) {
+      throw new Error(
+        "PDF converter is not loaded. Check internet access/CDN loading, then refresh and try again."
+      );
+    }
+
+    const includePageHeaders =
+      document.getElementById("policyImportPdfPageHeaders")?.checked !== false;
+
+    const arrayBuffer = await readFileAsArrayBuffer(file);
+    const pdf = await window.pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+
+    const pageBlocks = [];
+
+    for (let pageNo = 1; pageNo <= pdf.numPages; pageNo += 1) {
+      const page = await pdf.getPage(pageNo);
+      const textContent = await page.getTextContent();
+      const lines = groupPdfItemsIntoLines(textContent.items || []);
+
+      pageBlocks.push({
+        pageNo,
+        lines,
+      });
+    }
+
+    const rawHtml = pdfLinesToHtml(pageBlocks, includePageHeaders);
+    const cleaned = cleanImportedText(rawHtml, "converted.html", "text/html");
+
+    const extractedTextCount = pageBlocks.reduce((sum, page) => {
+      return sum + page.lines.join(" ").trim().length;
+    }, 0);
+
+    const messageBox = document.getElementById("policyImportConverterMessages");
+    if (messageBox) {
+      messageBox.innerHTML = `
+        <div><strong>PDF extraction notes:</strong></div>
+        <div>Pages processed: ${escapeHtml(pdf.numPages)}</div>
+        <div>Text characters extracted: ${escapeHtml(extractedTextCount)}</div>
+        <div>Images, signatures, stamps and scanned pages are not extracted. Use Insert Image for controlled image upload.</div>
+      `;
+      messageBox.style.display = "block";
+    }
+
+    if (!extractedTextCount) {
+      throw new Error(
+        "No selectable text was extracted from this PDF. It may be scanned/image-only. OCR is not included in this import step."
+      );
+    }
+
+    return cleaned;
+  }
+
   async function loadImportFile(file) {
     if (!file) {
-      throw new Error("Select a TXT, HTML, or DOCX file first.");
+      throw new Error("Select a TXT, HTML, DOCX, or PDF file first.");
     }
 
     if (!isAllowedImportFile(file)) {
-      throw new Error("Unsupported file type. Use .txt, .html, .htm, or .docx only.");
+      throw new Error("Unsupported file type. Use .txt, .html, .htm, .docx, or .pdf only.");
     }
 
     if (file.size > MAX_IMPORT_BYTES) {
-      throw new Error("Import file is larger than 8 MB. Split the policy text into smaller parts.");
+      throw new Error("Import file is larger than 16 MB. Split the policy text into smaller parts.");
     }
 
     let cleanHtml = "";
@@ -264,6 +419,9 @@
     if (isDocxFile(file)) {
       showOk("Converting DOCX file...");
       cleanHtml = await convertDocxToCleanHtml(file);
+    } else if (isPdfFile(file)) {
+      showOk("Extracting text from PDF file...");
+      cleanHtml = await convertPdfToCleanHtml(file);
     } else {
       const raw = await readFileAsText(file);
       cleanHtml = cleanImportedText(raw, file.name, file.type);
@@ -282,7 +440,12 @@
     const fileInfo = document.getElementById("policyImportFileInfo");
 
     if (fileInfo) {
-      const fileType = isDocxFile(file) ? "DOCX" : "Text/HTML";
+      const fileType = isDocxFile(file)
+        ? "DOCX"
+        : isPdfFile(file)
+          ? "PDF"
+          : "Text/HTML";
+
       fileInfo.textContent = `${importedFileName} • ${fileType} • ${Math.round(file.size / 1024)} KB`;
     }
 
@@ -547,7 +710,7 @@
     modal.innerHTML = `
       <div class="policy-import-dialog" role="dialog" aria-modal="true" aria-labelledby="policyImportModalTitle">
         <div class="policy-import-head">
-          <div id="policyImportModalTitle" class="policy-import-title">Import Text / HTML / DOCX into Draft Editor</div>
+          <div id="policyImportModalTitle" class="policy-import-title">Import Text / HTML / DOCX / PDF into Draft Editor</div>
           <button id="policyImportCloseBtn" class="btn2" type="button">Close</button>
         </div>
 
@@ -556,10 +719,15 @@
             <div>
               <div class="field">
                 <label>Import file</label>
-                <input id="policyImportFile" type="file" accept=".txt,.html,.htm,.docx,text/plain,text/html,application/vnd.openxmlformats-officedocument.wordprocessingml.document" />
+                <input id="policyImportFile" type="file" accept=".txt,.html,.htm,.docx,.pdf,text/plain,text/html,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" />
                 <div id="policyImportFileInfo" class="policy-import-file-info"></div>
                 <div id="policyImportConverterMessages" class="policy-import-converter-messages"></div>
               </div>
+
+              <label class="checkbox-line">
+                <input id="policyImportPdfPageHeaders" type="checkbox" checked />
+                Add page headers when importing PDF text
+              </label>
 
               <div class="field">
                 <label>Insert mode</label>
@@ -571,7 +739,7 @@
               </div>
 
               <div class="content-box" style="min-height:0;">
-                DOCX/HTML content is converted and cleaned before insertion. Imported images are removed; use Insert Image for controlled image upload.
+                DOCX/HTML/PDF content is converted and cleaned before insertion. Imported images are removed; use Insert Image for controlled image upload. PDF import works only for selectable text, not scanned PDFs.
               </div>
             </div>
 
@@ -653,7 +821,7 @@
     const sep = document.createElement("span");
     sep.className = "policy-editor-import-separator";
 
-    const importBtn = makeButton("Import TXT/HTML/DOCX", "Import cleaned TXT/HTML/DOCX file into Draft Editor", openModal);
+    const importBtn = makeButton("Import TXT/HTML/DOCX/PDF", "Import cleaned TXT/HTML/DOCX/PDF file into Draft Editor", openModal);
     importBtn.id = "policyImportContentBtn";
 
     toolbar.appendChild(sep);
@@ -693,6 +861,7 @@
       openModal,
       cleanImportedText,
       convertDocxToCleanHtml,
+      convertPdfToCleanHtml,
     };
   }
 
