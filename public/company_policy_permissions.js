@@ -1,11 +1,11 @@
 // public/company_policy_permissions.js
 // C.S.V. BEACON – Company Policy fine-grained permission enforcement
-// CP-8D: hides/disables tabs and controls based on Rights Matrix grants.
+// CP-8D-1: Search and AI Search remain visible for all users with COMPANY_POLICY.view.
 
 (() => {
   "use strict";
 
-  const BUILD = "CP8D-2026-05-07";
+  const BUILD = "CP8D-1-2026-05-07";
 
   const STATE = {
     loaded: false,
@@ -144,7 +144,10 @@
     const canPolicyEdit = has("COMPANY_POLICY", "edit");
     const canPolicyAdmin = has("COMPANY_POLICY", "admin");
 
-    const canAiSearch = has("COMPANY_POLICY_AI_SEARCH", "view");
+    // Decision:
+    // Exact Search and AI Search are available to everyone who can read the Company Policy.
+    const canExactSearch = canPolicyView;
+    const canAiSearch = canPolicyView;
 
     const canCrView = has("COMPANY_POLICY_CHANGE_REQUESTS", "view");
     const canCrSubmit = has("COMPANY_POLICY_CHANGE_REQUESTS", "edit");
@@ -157,7 +160,7 @@
 
     // Main tabs
     hideTab("policyBook", canPolicyView);
-    hideTab("search", canPolicyView);
+    hideTab("search", canExactSearch);
     hideTab("aiSearch", canAiSearch);
     hideTab("changeRequests", canCrView || canCrSubmit);
     hideTab("manuals", canDocsView);
@@ -229,9 +232,14 @@
       setEnabled(btn, canDocsEdit);
     });
 
-    // AI controls
+    // Exact Search controls
+    disableButton("policyExactSearchBtn", canExactSearch);
+    disableButton("policyExactClearBtn", canExactSearch);
+
+    // AI Search controls
     disableButton("policyAiRunBtn", canAiSearch);
     disableButton("policyAiCopyAnswerBtn", canAiSearch);
+    disableButton("policyAiClearBtn", canAiSearch);
   }
 
   function startObserver() {
