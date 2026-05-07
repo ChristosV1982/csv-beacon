@@ -1,11 +1,11 @@
 // public/csvb-module-guard.js
 // C.S.V. BEACON — Direct Page Module Access Guard
-// MC-8B: respects superuser simulated company context.
+// CP-8C: adds Company Policy module guard mapping.
 
 (() => {
   "use strict";
 
-  const BUILD = "MC8B-2026-04-30";
+  const BUILD = "CP8C-2026-05-07";
 
   const CSVB_COMPANY_VIEW_ID_KEY = "csvb_superuser_company_view_id";
   const CSVB_COMPANY_VIEW_NAME_KEY = "csvb_superuser_company_view_name";
@@ -41,7 +41,10 @@
 
     "q-questions-editor.html": "questions_editor",
     "q-company-overrides.html": "questions_editor",
+
     "threads.html": "threads",
+
+    "company_policy.html": "company_policy",
 
     "su-admin.html": "platform_administration"
   };
@@ -51,16 +54,19 @@
     return p.split("/").pop() || "index.html";
   }
 
-  function getSimulatedCompanyId(){
+  function getSimulatedCompanyId() {
     return localStorage.getItem(CSVB_COMPANY_VIEW_ID_KEY) || "";
   }
 
-  function getSimulatedCompanyName(){
+  function getSimulatedCompanyName() {
     return localStorage.getItem(CSVB_COMPANY_VIEW_NAME_KEY) || "";
   }
 
   function showAccessDenied(message) {
-    let box = document.getElementById("warnBox") || document.getElementById("errBox") || document.getElementById("loginError");
+    let box =
+      document.getElementById("warnBox") ||
+      document.getElementById("errBox") ||
+      document.getElementById("loginError");
 
     if (!box) {
       box = document.createElement("div");
@@ -118,7 +124,15 @@
     if (isPlatformRole(role)) {
       const simulatedCompanyId = getSimulatedCompanyId();
 
-      if (!simulatedCompanyId) return;
+      if (!simulatedCompanyId) {
+        window.CSVB_MODULE_GUARD = {
+          page,
+          moduleKey,
+          allowed: true,
+          platformSimulation: false
+        };
+        return;
+      }
 
       const allowedBySimulation = await simulatedCompanyAllowsModule(sb, simulatedCompanyId, moduleKey);
 
