@@ -6,7 +6,7 @@
 // - Bump cache version + clean old caches on activate
 
 const CACHE_PREFIX = "sire-test-";
-const CACHE_VERSION = "v73-company-policy-shell";              // <-- bump this if you change caching behavior again
+const CACHE_VERSION = "v81-company-policy-exact-search-ui";
 const CACHE_NAME = `${CACHE_PREFIX}${CACHE_VERSION}`;
 
 const CORE_ASSETS = [
@@ -14,6 +14,9 @@ const CORE_ASSETS = [
   "./index.html",
   "./company_policy.html",
   "./company_policy.js",
+  "./company_policy_change_requests.js",
+  "./company_policy_documents.js",
+  "./company_policy_search.js",
   "./style.css",
   "./csv-beacon-theme.css",
   "./auth.js",
@@ -62,9 +65,9 @@ self.addEventListener("activate", (event) => {
 // Helpers
 async function networkFirst(request) {
   const cache = await caches.open(CACHE_NAME);
+
   try {
     const fresh = await fetch(request, { cache: "no-store" });
-    // Cache only valid responses
     if (fresh && fresh.ok) {
       cache.put(request, fresh.clone());
     }
@@ -87,7 +90,6 @@ async function staleWhileRevalidate(request) {
     })
     .catch(() => null);
 
-  // If cached exists, return it immediately; otherwise wait for network
   return cached || (await fetchPromise) || cached;
 }
 
