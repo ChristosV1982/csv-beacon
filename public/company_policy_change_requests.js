@@ -1,6 +1,6 @@
 // public/company_policy_change_requests.js
 // C.S.V. BEACON – Company Policy Change Requests UI
-// CP-4B: submit, list, review, comment, and status-control change requests.
+// CP-4C-2: submit, list, review, comment, status-control, and implementation helpers.
 
 (() => {
   "use strict";
@@ -9,6 +9,8 @@
     requests: [],
     events: [],
     selectedRequestId: "",
+    selectedRequest: null,
+    selectedImplementation: null,
     isAdmin: false,
   };
 
@@ -19,6 +21,10 @@
       .replaceAll(">", "&gt;")
       .replaceAll('"', "&quot;")
       .replaceAll("'", "&#039;");
+  }
+
+  function plainTextToHtml(value) {
+    return escapeHtml(value || "").replaceAll("\n", "<br />");
   }
 
   function showWarn(message) {
@@ -39,6 +45,16 @@
         el.style.display = "none";
         el.textContent = "";
       }, 2200);
+    }
+  }
+
+  async function ensureContext() {
+    if (window.AUTH?.getSessionUserProfile) {
+      try {
+        await window.AUTH.getSessionUserProfile();
+      } catch (_) {
+        // Do not block page. Other auth handlers already show auth errors.
+      }
     }
   }
 
@@ -158,9 +174,7 @@
         margin-right: 5px;
       }
 
-      .cr-pill.open {
-        background: #eaf1fb;
-      }
+      .cr-pill.open { background: #eaf1fb; }
 
       .cr-pill.under_review {
         background: #fff6e0;
@@ -192,9 +206,7 @@
         border-color: #d5dbe5;
       }
 
-      .cr-detail {
-        margin-top: 10px;
-      }
+      .cr-detail { margin-top: 10px; }
 
       .cr-detail-section {
         border-top: 1px solid #dbe6f6;
@@ -234,6 +246,23 @@
         font-size: .86rem;
         line-height: 1.35;
         margin-top: 3px;
+      }
+
+      .cr-implementation-box {
+        border: 1px solid #dbe6f6;
+        background: #f7fbff;
+        border-radius: 12px;
+        padding: 9px 10px;
+        color: #213a5f;
+        font-size: .9rem;
+        line-height: 1.35;
+      }
+
+      .cr-helper-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+        gap: 8px;
+        margin-top: 8px;
       }
 
       @media (max-width: 980px) {
@@ -531,6 +560,24 @@
     STATE.events = data || [];
   }
 
+  async function loadImplementation(requestId) {
+    if (!requestId) {
+      STATE.selectedImplementation = null;
+      return null;
+    }
+
+    const { data, error } = await sb().rpc("csvb_company_policy_get_change_request_implementation", {
+      p_request_id: requestId,
+    });
+
+    if (error) {
+      throw new Error("Could not load implementation links: " + error.message);
+    }
+
+    STATE.selectedImplementation = Array.isArray(data) && data.length ? data[0] : null;
+    return STATE.selectedImplementation;
+  }
+
   async function loadRequestDetail(requestId) {
     if (!requestId) return;
 
@@ -546,16 +593,62 @@
     if (!req) return;
 
     STATE.selectedRequestId = req.id;
+    STATE.selectedRequest = req;
 
     await loadEvents(req.id);
+    await loadImplementation(req.id);
 
     renderRequestList();
     renderRequestDetail(req);
   }
 
+  function renderImplementationBox() {
+    const impl = STATE.selectedImplementation;
+
+    if (!impl) {
+      return `
+        <div class="cr-implementation-box">
+          No implementation link loaded.
+        </div>
+      `;
+    }
+
+    return `
+      <div class="cr-implementation-box">
+        <div><strong>Draft link:</strong> ${
+          impl.draft_version_id
+            ? `v${escapeHtml(impl.draft_version_no)} / ${escapeHtml(impl.draft_version_status)}`
+            : "none"
+        }</div>
+        <div><strong>Published link:</strong> ${
+          impl.published_version_id
+            ? `v${escapeHtml(impl.published_version_no)} / ${escapeHtml(impl.published_version_status)}`
+            : "none"
+        }</div>
+        <div><strong>Implementation note:</strong> ${escapeHtml(impl.implementation_note || "none")}</div>
+        <div><strong>Implemented by:</strong> ${escapeHtml(impl.implemented_by_username || "n/a")} ${impl.implemented_at ? "• " + escapeHtml(impl.implemented_at) : ""}</div>
+      </div>
+    `;
+  }
+
   function renderRequestDetail(req) {
     const box = document.getElementById("crDetailBody");
     if (!box) return;
+
+    const implementationControls = STATE.isAdmin ? `
+      <div class="cr-detail-section">
+        <div class="cr-detail-section-title">Implementation helpers</div>
+        ${renderImplementationBox()}
+        <div class="cr-helper-grid">
+          <button class="btn2" id="crOpenPolicyItemBtn" type="button">Open policy item</button>
+          <button class="btn2" id="crCopyRequestedBtn" type="button">Copy requested change</button>
+          <button class="btn2" id="crCopyProposedBtn" type="button">Copy proposed text</button>
+          <button class="btn2" id="crLoadProposedToEditorBtn" type="button">Load proposed text into Draft Editor</button>
+          <button class="btn2" id="crLinkWorkVersionBtn" type="button">Link current work version</button>
+          <button class="btn" id="crMarkImplementedBtn" type="button">Mark implemented from current published</button>
+        </div>
+      </div>
+    ` : "";
 
     const adminControls = STATE.isAdmin ? `
       <div class="cr-detail-section">
@@ -600,36 +693,37 @@
       ${req.selected_text ? `
         <div class="cr-detail-section">
           <div class="cr-detail-section-title">Selected text / reference</div>
-          <div>${escapeHtml(req.selected_text).replaceAll("\n", "<br />")}</div>
+          <div>${plainTextToHtml(req.selected_text)}</div>
         </div>
       ` : ""}
 
       <div class="cr-detail-section">
         <div class="cr-detail-section-title">Requested change</div>
-        <div>${escapeHtml(req.requested_change || "").replaceAll("\n", "<br />")}</div>
+        <div>${plainTextToHtml(req.requested_change || "")}</div>
       </div>
 
       ${req.reason ? `
         <div class="cr-detail-section">
           <div class="cr-detail-section-title">Reason</div>
-          <div>${escapeHtml(req.reason).replaceAll("\n", "<br />")}</div>
+          <div>${plainTextToHtml(req.reason)}</div>
         </div>
       ` : ""}
 
       ${req.proposed_text ? `
         <div class="cr-detail-section">
           <div class="cr-detail-section-title">Proposed text</div>
-          <div>${escapeHtml(req.proposed_text).replaceAll("\n", "<br />")}</div>
+          <div>${plainTextToHtml(req.proposed_text)}</div>
         </div>
       ` : ""}
 
       ${req.status_note ? `
         <div class="cr-detail-section">
           <div class="cr-detail-section-title">Latest status note</div>
-          <div>${escapeHtml(req.status_note).replaceAll("\n", "<br />")}</div>
+          <div>${plainTextToHtml(req.status_note)}</div>
         </div>
       ` : ""}
 
+      ${implementationControls}
       ${adminControls}
 
       <div class="cr-detail-section">
@@ -649,21 +743,67 @@
     const statusSel = document.getElementById("crNewStatus");
     if (statusSel) statusSel.value = req.status || "open";
 
-    const setStatusBtn = document.getElementById("crSetStatusBtn");
-    if (setStatusBtn) {
-      setStatusBtn.addEventListener("click", async () => {
-        await setRequestStatus(req.id);
-      });
-    }
-
-    const addCommentBtn = document.getElementById("crAddCommentBtn");
-    if (addCommentBtn) {
-      addCommentBtn.addEventListener("click", async () => {
-        await addComment(req.id);
-      });
-    }
-
+    wireDetailButtons(req);
     renderEvents();
+  }
+
+  function wireDetailButtons(req) {
+    const statusBtn = document.getElementById("crSetStatusBtn");
+    if (statusBtn) {
+      statusBtn.addEventListener("click", async () => {
+        await guardedInline(() => setRequestStatus(req.id));
+      });
+    }
+
+    const commentBtn = document.getElementById("crAddCommentBtn");
+    if (commentBtn) {
+      commentBtn.addEventListener("click", async () => {
+        await guardedInline(() => addComment(req.id));
+      });
+    }
+
+    const openBtn = document.getElementById("crOpenPolicyItemBtn");
+    if (openBtn) {
+      openBtn.addEventListener("click", () => openPolicyItem(req));
+    }
+
+    const copyRequestedBtn = document.getElementById("crCopyRequestedBtn");
+    if (copyRequestedBtn) {
+      copyRequestedBtn.addEventListener("click", () => copyToClipboard(req.requested_change || "", "Requested change copied."));
+    }
+
+    const copyProposedBtn = document.getElementById("crCopyProposedBtn");
+    if (copyProposedBtn) {
+      copyProposedBtn.addEventListener("click", () => copyToClipboard(req.proposed_text || "", "Proposed text copied."));
+    }
+
+    const loadProposedBtn = document.getElementById("crLoadProposedToEditorBtn");
+    if (loadProposedBtn) {
+      loadProposedBtn.addEventListener("click", () => loadProposedTextIntoDraftEditor(req));
+    }
+
+    const linkWorkBtn = document.getElementById("crLinkWorkVersionBtn");
+    if (linkWorkBtn) {
+      linkWorkBtn.addEventListener("click", async () => {
+        await guardedInline(() => linkCurrentWorkVersion(req));
+      });
+    }
+
+    const markImplementedBtn = document.getElementById("crMarkImplementedBtn");
+    if (markImplementedBtn) {
+      markImplementedBtn.addEventListener("click", async () => {
+        await guardedInline(() => markImplementedFromCurrentPublished(req));
+      });
+    }
+  }
+
+  async function guardedInline(fn) {
+    try {
+      showWarn("");
+      await fn();
+    } catch (error) {
+      showWarn(String(error?.message || error));
+    }
   }
 
   function renderEvents() {
@@ -687,7 +827,7 @@
         </div>
         <div class="cr-event-text">
           <div>By: ${escapeHtml(event.actor_username || "")} • ${escapeHtml(event.created_at || "")}</div>
-          ${event.comment ? `<div>${escapeHtml(event.comment).replaceAll("\n", "<br />")}</div>` : ""}
+          ${event.comment ? `<div>${plainTextToHtml(event.comment)}</div>` : ""}
         </div>
       </div>
     `).join("");
@@ -740,6 +880,154 @@
     showOk("Status updated.");
   }
 
+  function openPolicyItem(req) {
+    const policyBookTab = document.querySelector('[data-tab="policyBook"]');
+    if (policyBookTab) policyBookTab.click();
+
+    const directBtn = document.querySelector(`#chapterList [data-node-id="${req.node_id}"]`);
+
+    if (directBtn) {
+      directBtn.click();
+      showOk("Policy item opened.");
+      return;
+    }
+
+    const searchTab = document.querySelector('[data-tab="search"]');
+    if (searchTab) searchTab.click();
+
+    const searchInput = document.getElementById("searchInput");
+    const searchBtn = document.getElementById("searchBtn");
+
+    if (searchInput && searchBtn) {
+      searchInput.value = req.node_code || req.node_title || "";
+      searchBtn.click();
+
+      setTimeout(() => {
+        const result = document.querySelector(`[data-result-id="${req.node_id}"]`);
+        if (result) {
+          result.click();
+          showOk("Policy item opened through search.");
+        } else {
+          showWarn("Policy item was not visible in the tree. Search results have been opened; select the matching item manually.");
+        }
+      }, 100);
+    }
+  }
+
+  async function copyToClipboard(text, okMessage) {
+    const value = String(text || "");
+
+    if (!value) {
+      showWarn("There is no text to copy.");
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(value);
+      showOk(okMessage || "Copied.");
+    } catch (_) {
+      showWarn("Clipboard copy failed. Select and copy the text manually.");
+    }
+  }
+
+  function loadProposedTextIntoDraftEditor(req) {
+    const proposed = String(req.proposed_text || "").trim();
+
+    if (!proposed) {
+      showWarn("This change request has no proposed text.");
+      return;
+    }
+
+    openPolicyItem(req);
+
+    setTimeout(() => {
+      const draftTab = document.querySelector('[data-content-tab="draft"]');
+      if (draftTab) draftTab.click();
+
+      const editor = document.getElementById("policyEditor");
+      const summary = document.getElementById("policyChangeSummary");
+
+      if (!editor) {
+        showWarn("Draft editor was not found.");
+        return;
+      }
+
+      editor.innerHTML = plainTextToHtml(proposed);
+
+      if (summary) {
+        summary.value = `${requestCode(req)} - ${req.request_type || "change request"}`;
+      }
+
+      showOk("Proposed text loaded into Draft Editor. Review it, then save the draft.");
+    }, 250);
+  }
+
+  async function linkCurrentWorkVersion(req) {
+    if (!STATE.isAdmin) {
+      showWarn("This action is restricted to Super Admin.");
+      return;
+    }
+
+    const { data, error } = await sb().rpc("csvb_company_policy_get_editor_state", {
+      p_node_id: req.node_id,
+    });
+
+    if (error) {
+      throw new Error("Could not load current work version: " + error.message);
+    }
+
+    const state = Array.isArray(data) && data.length ? data[0] : null;
+    const workVersionId = state?.work_version_id || "";
+
+    if (!workVersionId) {
+      showWarn("No draft / pending / approved work version exists for this policy item. Save a draft first.");
+      return;
+    }
+
+    const { error: linkError } = await sb().rpc("csvb_company_policy_link_change_request_version", {
+      p_request_id: req.id,
+      p_draft_version_id: workVersionId,
+      p_published_version_id: null,
+      p_implementation_note: "Linked to current work version from Change Requests UI.",
+      p_mark_implemented: false,
+    });
+
+    if (linkError) {
+      throw new Error("Could not link work version: " + linkError.message);
+    }
+
+    await loadRequestDetail(req.id);
+
+    showOk("Current work version linked to this change request.");
+  }
+
+  async function markImplementedFromCurrentPublished(req) {
+    if (!STATE.isAdmin) {
+      showWarn("This action is restricted to Super Admin.");
+      return;
+    }
+
+    const confirmed = window.confirm(
+      "Mark this change request as implemented using the current published policy version?"
+    );
+
+    if (!confirmed) return;
+
+    const { error } = await sb().rpc("csvb_company_policy_mark_change_request_implemented_from_current_published", {
+      p_request_id: req.id,
+      p_implementation_note: "Implemented by current published policy version from Change Requests UI.",
+    });
+
+    if (error) {
+      throw new Error("Could not mark implemented: " + error.message);
+    }
+
+    await loadRequests();
+    await loadRequestDetail(req.id);
+
+    showOk("Change request marked as implemented and linked to the current published version.");
+  }
+
   function wireUi() {
     const submitBtn = document.getElementById("crSubmitBtn");
     const clearBtn = document.getElementById("crClearFormBtn");
@@ -788,6 +1076,8 @@
 
   async function init() {
     try {
+      await ensureContext();
+
       injectStyles();
       renderShell();
 
@@ -811,5 +1101,6 @@
   window.CSVB_POLICY_CHANGE_REQUESTS = {
     refresh: loadRequests,
     renderSelectedNodeBox,
+    openPolicyItem,
   };
 })();
