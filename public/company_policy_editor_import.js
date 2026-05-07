@@ -1,13 +1,13 @@
 // public/company_policy_editor_import.js
 // C.S.V. BEACON – Company Policy editor import
-// CP-11A: import cleaned TXT/HTML content into the Draft Editor.
+// CP-11B: import cleaned TXT / HTML / DOCX content into the Draft Editor.
 
 (() => {
   "use strict";
 
-  const BUILD = "CP11A-2026-05-07";
+  const BUILD = "CP11B-2026-05-07";
   const MODAL_ID = "policyImportModal";
-  const MAX_IMPORT_BYTES = 2 * 1024 * 1024;
+  const MAX_IMPORT_BYTES = 8 * 1024 * 1024;
 
   let savedRange = null;
   let importedCleanHtml = "";
@@ -98,7 +98,9 @@
     const parser = new DOMParser();
     const doc = parser.parseFromString(String(html || ""), "text/html");
 
-    doc.querySelectorAll("script, style, meta, link, iframe, object, embed, img, svg, form, input, button, select, textarea").forEach((el) => el.remove());
+    doc.querySelectorAll(
+      "script, style, meta, link, iframe, object, embed, img, svg, form, input, button, select, textarea"
+    ).forEach((el) => el.remove());
 
     doc.querySelectorAll("*").forEach((el) => {
       [...el.attributes].forEach((attr) => {
@@ -143,6 +145,14 @@
     return fallbackCleanPlainText(rawText);
   }
 
+  function cleanConvertedDocxHtml(html) {
+    if (window.CSVB_POLICY_PASTE_CLEANUP?.cleanPastedHtml) {
+      return window.CSVB_POLICY_PASTE_CLEANUP.cleanPastedHtml(html);
+    }
+
+    return fallbackCleanHtml(html);
+  }
+
   function readFileAsText(file) {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -154,29 +164,116 @@
     });
   }
 
-  async function loadImportFile(file) {
-    if (!file) {
-      throw new Error("Select a TXT or HTML file first.");
-    }
+  function readFileAsArrayBuffer(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
 
-    const lower = String(file.name || "").toLowerCase();
-    const allowed =
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(reader.error || new Error("Could not read file."));
+
+      reader.readAsArrayBuffer(file);
+    });
+  }
+
+  function isDocxFile(file) {
+    const lower = String(file?.name || "").toLowerCase();
+    const type = String(file?.type || "").toLowerCase();
+
+    return (
+      lower.endsWith(".docx") ||
+      type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    );
+  }
+
+  function isAllowedImportFile(file) {
+    const lower = String(file?.name || "").toLowerCase();
+    const type = String(file?.type || "").toLowerCase();
+
+    return (
       lower.endsWith(".txt") ||
       lower.endsWith(".html") ||
       lower.endsWith(".htm") ||
-      String(file.type || "").includes("text/plain") ||
-      String(file.type || "").includes("text/html");
+      lower.endsWith(".docx") ||
+      type.includes("text/plain") ||
+      type.includes("text/html") ||
+      type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    );
+  }
 
-    if (!allowed) {
-      throw new Error("Unsupported file type. Use .txt, .html, or .htm only.");
+  async function convertDocxToCleanHtml(file) {
+    if (!window.mammoth?.convertToHtml) {
+      throw new Error(
+        "DOCX converter is not loaded. Check internet access/CDN loading, then refresh and try again."
+      );
+    }
+
+    const arrayBuffer = await readFileAsArrayBuffer(file);
+
+    const result = await window.mammoth.convertToHtml(
+      { arrayBuffer },
+      {
+        styleMap: [
+          "p[style-name='Title'] => h1:fresh",
+          "p[style-name='Heading 1'] => h1:fresh",
+          "p[style-name='Heading 2'] => h2:fresh",
+          "p[style-name='Heading 3'] => h3:fresh",
+          "p[style-name='Heading 4'] => h4:fresh",
+          "p[style-name='Quote'] => blockquote:fresh"
+        ],
+        includeDefaultStyleMap: true
+      }
+    );
+
+    const messages = Array.isArray(result?.messages) ? result.messages : [];
+    const html = String(result?.value || "");
+
+    const cleaned = cleanConvertedDocxHtml(html);
+
+    const messageBox = document.getElementById("policyImportConverterMessages");
+    if (messageBox) {
+      if (messages.length) {
+        messageBox.innerHTML = `
+          <div><strong>DOCX conversion notes:</strong></div>
+          ${messages.slice(0, 8).map((m) => `<div>${escapeHtml(m.message || String(m))}</div>`).join("")}
+        `;
+        messageBox.style.display = "block";
+      } else {
+        messageBox.innerHTML = "";
+        messageBox.style.display = "none";
+      }
+    }
+
+    return cleaned;
+  }
+
+  async function loadImportFile(file) {
+    if (!file) {
+      throw new Error("Select a TXT, HTML, or DOCX file first.");
+    }
+
+    if (!isAllowedImportFile(file)) {
+      throw new Error("Unsupported file type. Use .txt, .html, .htm, or .docx only.");
     }
 
     if (file.size > MAX_IMPORT_BYTES) {
-      throw new Error("Import file is larger than 2 MB. Split the policy text into smaller parts.");
+      throw new Error("Import file is larger than 8 MB. Split the policy text into smaller parts.");
     }
 
-    const raw = await readFileAsText(file);
-    const cleanHtml = cleanImportedText(raw, file.name, file.type);
+    let cleanHtml = "";
+
+    if (isDocxFile(file)) {
+      showOk("Converting DOCX file...");
+      cleanHtml = await convertDocxToCleanHtml(file);
+    } else {
+      const raw = await readFileAsText(file);
+      cleanHtml = cleanImportedText(raw, file.name, file.type);
+
+      const messageBox = document.getElementById("policyImportConverterMessages");
+      if (messageBox) {
+        messageBox.innerHTML = "";
+        messageBox.style.display = "none";
+      }
+    }
 
     importedCleanHtml = cleanHtml;
     importedFileName = file.name || "Imported file";
@@ -185,7 +282,8 @@
     const fileInfo = document.getElementById("policyImportFileInfo");
 
     if (fileInfo) {
-      fileInfo.textContent = `${importedFileName} • ${Math.round(file.size / 1024)} KB`;
+      const fileType = isDocxFile(file) ? "DOCX" : "Text/HTML";
+      fileInfo.textContent = `${importedFileName} • ${fileType} • ${Math.round(file.size / 1024)} KB`;
     }
 
     if (preview) {
@@ -272,10 +370,15 @@
     const input = document.getElementById("policyImportFile");
     const preview = document.getElementById("policyImportPreview");
     const fileInfo = document.getElementById("policyImportFileInfo");
+    const messageBox = document.getElementById("policyImportConverterMessages");
 
     if (input) input.value = "";
     if (preview) preview.innerHTML = "No import file loaded.";
     if (fileInfo) fileInfo.textContent = "";
+    if (messageBox) {
+      messageBox.innerHTML = "";
+      messageBox.style.display = "none";
+    }
   }
 
   function openModal() {
@@ -395,6 +498,18 @@
         margin-top: 6px;
       }
 
+      .policy-import-converter-messages {
+        display: none;
+        color: #8a5a00;
+        background: #fff8e6;
+        border: 1px solid #f6d58f;
+        border-radius: 10px;
+        padding: 8px;
+        font-size: .84rem;
+        line-height: 1.3;
+        margin-top: 8px;
+      }
+
       .policy-import-actions {
         display: flex;
         justify-content: flex-end;
@@ -432,7 +547,7 @@
     modal.innerHTML = `
       <div class="policy-import-dialog" role="dialog" aria-modal="true" aria-labelledby="policyImportModalTitle">
         <div class="policy-import-head">
-          <div id="policyImportModalTitle" class="policy-import-title">Import Text / HTML into Draft Editor</div>
+          <div id="policyImportModalTitle" class="policy-import-title">Import Text / HTML / DOCX into Draft Editor</div>
           <button id="policyImportCloseBtn" class="btn2" type="button">Close</button>
         </div>
 
@@ -441,8 +556,9 @@
             <div>
               <div class="field">
                 <label>Import file</label>
-                <input id="policyImportFile" type="file" accept=".txt,.html,.htm,text/plain,text/html" />
+                <input id="policyImportFile" type="file" accept=".txt,.html,.htm,.docx,text/plain,text/html,application/vnd.openxmlformats-officedocument.wordprocessingml.document" />
                 <div id="policyImportFileInfo" class="policy-import-file-info"></div>
+                <div id="policyImportConverterMessages" class="policy-import-converter-messages"></div>
               </div>
 
               <div class="field">
@@ -455,7 +571,7 @@
               </div>
 
               <div class="content-box" style="min-height:0;">
-                Imported HTML is cleaned before insertion. Pasted or imported images are removed; use Insert Image for controlled image upload.
+                DOCX/HTML content is converted and cleaned before insertion. Imported images are removed; use Insert Image for controlled image upload.
               </div>
             </div>
 
@@ -537,7 +653,7 @@
     const sep = document.createElement("span");
     sep.className = "policy-editor-import-separator";
 
-    const importBtn = makeButton("Import Text/HTML", "Import cleaned TXT/HTML file into Draft Editor", openModal);
+    const importBtn = makeButton("Import TXT/HTML/DOCX", "Import cleaned TXT/HTML/DOCX file into Draft Editor", openModal);
     importBtn.id = "policyImportContentBtn";
 
     toolbar.appendChild(sep);
@@ -576,6 +692,7 @@
       build: BUILD,
       openModal,
       cleanImportedText,
+      convertDocxToCleanHtml,
     };
   }
 
