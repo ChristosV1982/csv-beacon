@@ -1,17 +1,22 @@
 // public/csvb-dashboard-platform-areas.js
 // C.S.V. BEACON – Dashboard Platform Areas
-// PA-1: group dashboard cards into configurable major platform areas.
+// PA-2: square platform area cards with representative icons and selected-area module panel.
 
 (() => {
   "use strict";
 
-  const BUILD = "PA1-2026-05-08";
+  const BUILD = "PA2-2026-05-10";
 
   /*
     To add a new major platform area later:
     1. Add a new object to PLATFORM_AREAS.
-    2. Add existing dashboard data-card keys to cards: [...]
-    3. If the area has no modules yet, use placeholder text.
+    2. Add:
+       - key
+       - title
+       - icon
+       - description
+       - cards: [...]
+    3. Existing dashboard module cards are identified by their data-card value.
 
     Existing dashboard card keys:
     library, compare, vessel, tasks, company, assignments,
@@ -23,15 +28,17 @@
     {
       key: "company_policy",
       title: "Company Policy",
+      icon: "📘",
       description:
         "Controlled policy book, policy text, change requests, manuals, print/export and AI source-based search.",
       cards: ["company_policy"],
-      defaultOpen: true,
+      defaultSelected: true,
     },
 
     {
       key: "sire_inspections",
       title: "SIRE Inspections",
+      icon: "🛳️",
       description:
         "SIRE 2.0 library, pre-inspection/self-assessment, post-inspection, inspection statistics, inspector intelligence, reports and related discussion threads.",
       cards: [
@@ -49,63 +56,50 @@
         "qeditor",
         "threads",
       ],
-      defaultOpen: true,
     },
 
     {
       key: "marine_applications_vessel_interaction",
       title: "Marine Applications & Vessel Interaction",
+      icon: "⚓",
       description:
         "Future area for vessel-facing marine applications, operational interactions, vessel submissions and ship/office exchange workflows.",
       cards: [],
       placeholder:
         "No modules have been assigned to this area yet. This area is reserved for future marine applications and vessel interaction workflows.",
-      defaultOpen: false,
       showWhenEmpty: true,
     },
 
     {
       key: "vessel_office_audits",
       title: "Vessel and Office Audits",
+      icon: "📝",
       description:
         "Audit observations, internal/external audits and future vessel/office audit workflows.",
       cards: ["audit_observations"],
       placeholder:
         "Audit Observations is currently the first module in this area. Additional audit modules can be added later.",
-      defaultOpen: false,
       showWhenEmpty: true,
     },
 
     {
       key: "platform_administration",
       title: "Platform Administration",
+      icon: "⚙️",
       description:
         "Superuser administration, companies, users, module enablement and rights matrix.",
       cards: ["suadmin"],
-      defaultOpen: false,
     },
   ];
 
-  const STORAGE_KEY = "csvb_dashboard_platform_areas_open_v1";
+  const SELECTED_KEY = "csvb_dashboard_selected_platform_area_v2";
 
-  function loadOpenState() {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      const parsed = raw ? JSON.parse(raw) : {};
-      return parsed && typeof parsed === "object" ? parsed : {};
-    } catch (_) {
-      return {};
-    }
-  }
-
-  function saveOpenState(state) {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state || {}));
-    } catch (_) {}
+  function allAreaCardKeys() {
+    return new Set(PLATFORM_AREAS.flatMap((area) => area.cards || []));
   }
 
   function visibleCardCount(area) {
-    return area.cards.reduce((count, cardKey) => {
+    return (area.cards || []).reduce((count, cardKey) => {
       const card = document.querySelector(`[data-card="${cardKey}"]`);
       if (!card) return count;
 
@@ -114,8 +108,45 @@
     }, 0);
   }
 
-  function allAreaCardKeys() {
-    return new Set(PLATFORM_AREAS.flatMap((area) => area.cards || []));
+  function hasVisibleModules(area) {
+    return visibleCardCount(area) > 0;
+  }
+
+  function shouldShowArea(area) {
+    const hasCards = (area.cards || []).length > 0;
+    return hasVisibleModules(area) || (area.showWhenEmpty === true && !hasCards);
+  }
+
+  function loadSelectedKey() {
+    try {
+      return localStorage.getItem(SELECTED_KEY) || "";
+    } catch (_) {
+      return "";
+    }
+  }
+
+  function saveSelectedKey(key) {
+    try {
+      localStorage.setItem(SELECTED_KEY, key || "");
+    } catch (_) {}
+  }
+
+  function firstVisibleAreaKey() {
+    const persisted = loadSelectedKey();
+    const persistedArea = PLATFORM_AREAS.find((a) => a.key === persisted && shouldShowArea(a));
+    if (persistedArea) return persistedArea.key;
+
+    const defaultArea = PLATFORM_AREAS.find((a) => a.defaultSelected === true && shouldShowArea(a));
+    if (defaultArea) return defaultArea.key;
+
+    const first = PLATFORM_AREAS.find((a) => shouldShowArea(a));
+    return first ? first.key : "";
+  }
+
+  function selectedAreaKey() {
+    const active = document.querySelector(".csvb-platform-area-card.active");
+    if (active) return active.getAttribute("data-platform-area-card") || "";
+    return firstVisibleAreaKey();
   }
 
   function injectStyles() {
@@ -153,63 +184,117 @@
         font-size: .92rem;
       }
 
-      .csvb-platform-area {
+      .csvb-platform-area-tiles {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+        gap: 12px;
+      }
+
+      .csvb-platform-area-card {
+        min-height: 172px;
         background: #ffffff;
         border: 1px solid #dbe6f6;
         border-radius: 14px;
         box-shadow: 0 10px 30px rgba(3,27,63,0.06);
-        overflow: hidden;
-      }
-
-      .csvb-platform-area-toggle {
-        width: 100%;
-        border: 0;
-        background: #f7fbff;
-        color: #10233f;
-        padding: 11px 13px;
+        padding: 14px;
         text-align: left;
-        display: grid;
-        grid-template-columns: 22px minmax(180px, 1fr) auto;
-        gap: 8px;
-        align-items: center;
         cursor: pointer;
+        display: grid;
+        grid-template-rows: auto auto 1fr auto;
+        gap: 8px;
+        color: #10233f;
       }
 
-      .csvb-platform-area-toggle:hover {
-        background: #eef6ff;
+      .csvb-platform-area-card:hover {
+        background: #f7fbff;
+        border-color: #bcd0ea;
       }
 
-      .csvb-platform-area-caret {
-        color: #1a4170;
-        font-weight: 700;
-        font-size: .95rem;
+      .csvb-platform-area-card.active {
+        border-color: #1a4170;
+        box-shadow:
+          0 10px 30px rgba(3,27,63,0.08),
+          inset 0 0 0 2px #1a4170;
+        background: #f7fbff;
+      }
+
+      .csvb-platform-area-icon {
+        width: 44px;
+        height: 44px;
+        border-radius: 14px;
+        border: 1px solid #cbd8ea;
+        background: #eaf1fb;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.55rem;
+        line-height: 1;
       }
 
       .csvb-platform-area-title {
         color: #1a4170;
         font-weight: 700;
-        font-size: 1rem;
-        line-height: 1.2;
-      }
-
-      .csvb-platform-area-count {
-        color: #4d6283;
-        font-weight: 500;
-        font-size: .86rem;
-        white-space: nowrap;
+        font-size: 1.02rem;
+        line-height: 1.22;
       }
 
       .csvb-platform-area-desc {
         color: #4d6283;
         font-weight: 400;
         line-height: 1.35;
-        padding: 0 13px 10px 43px;
-        font-size: .9rem;
-        background: #f7fbff;
+        font-size: .88rem;
       }
 
-      .csvb-platform-area-body {
+      .csvb-platform-area-count {
+        color: #1a4170;
+        font-weight: 600;
+        font-size: .84rem;
+        border-top: 1px solid #dbe6f6;
+        padding-top: 8px;
+      }
+
+      .csvb-platform-selected-panel {
+        background: #ffffff;
+        border: 1px solid #dbe6f6;
+        border-radius: 14px;
+        box-shadow: 0 10px 30px rgba(3,27,63,0.06);
         padding: 12px;
+      }
+
+      .csvb-platform-selected-header {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+        border-bottom: 1px solid #dbe6f6;
+        padding-bottom: 10px;
+        margin-bottom: 12px;
+      }
+
+      .csvb-platform-selected-icon {
+        width: 38px;
+        height: 38px;
+        border-radius: 12px;
+        border: 1px solid #cbd8ea;
+        background: #eaf1fb;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.35rem;
+      }
+
+      .csvb-platform-selected-title {
+        color: #1a4170;
+        font-weight: 700;
+        font-size: 1rem;
+      }
+
+      .csvb-platform-selected-text {
+        color: #4d6283;
+        font-weight: 400;
+        line-height: 1.35;
+        font-size: .9rem;
+        margin-top: 2px;
       }
 
       .csvb-platform-area-grid {
@@ -236,42 +321,22 @@
     document.head.appendChild(style);
   }
 
-  function createAreaShell(area, openState) {
-    const persisted = Object.prototype.hasOwnProperty.call(openState, area.key)
-      ? openState[area.key] === true
-      : area.defaultOpen === true;
+  function areaCardHtml(area, selected) {
+    const count = visibleCardCount(area);
+    const countText = count === 1 ? "1 module" : `${count} modules`;
 
-    const section = document.createElement("section");
-    section.className = "csvb-platform-area";
-    section.setAttribute("data-platform-area", area.key);
-
-    section.innerHTML = `
-      <button class="csvb-platform-area-toggle" type="button" data-platform-area-toggle="${area.key}">
-        <span class="csvb-platform-area-caret">${persisted ? "▾" : "▸"}</span>
+    return `
+      <button
+        type="button"
+        class="csvb-platform-area-card${selected ? " active" : ""}"
+        data-platform-area-card="${area.key}"
+      >
+        <span class="csvb-platform-area-icon">${area.icon || "▣"}</span>
         <span class="csvb-platform-area-title">${area.title}</span>
-        <span class="csvb-platform-area-count" data-platform-area-count="${area.key}"></span>
+        <span class="csvb-platform-area-desc">${area.description || ""}</span>
+        <span class="csvb-platform-area-count">${countText}</span>
       </button>
-      <div class="csvb-platform-area-desc">${area.description || ""}</div>
-      <div class="csvb-platform-area-body" data-platform-area-body="${area.key}" style="${persisted ? "" : "display:none;"}">
-        <div class="csvb-platform-area-grid" data-platform-area-grid="${area.key}"></div>
-      </div>
     `;
-
-    const toggle = section.querySelector("[data-platform-area-toggle]");
-    const body = section.querySelector("[data-platform-area-body]");
-    const caret = section.querySelector(".csvb-platform-area-caret");
-
-    toggle.addEventListener("click", () => {
-      const isOpen = body.style.display === "none";
-      body.style.display = isOpen ? "" : "none";
-      caret.textContent = isOpen ? "▾" : "▸";
-
-      const nextState = loadOpenState();
-      nextState[area.key] = isOpen;
-      saveOpenState(nextState);
-    });
-
-    return section;
   }
 
   function buildAreaLayout() {
@@ -281,8 +346,6 @@
     if (document.getElementById("csvbPlatformAreaRoot")) return;
 
     injectStyles();
-
-    const openState = loadOpenState();
 
     const root = document.createElement("div");
     root.id = "csvbPlatformAreaRoot";
@@ -297,115 +360,115 @@
       </div>
     `;
 
-    root.appendChild(headline);
+    const tiles = document.createElement("div");
+    tiles.id = "csvbPlatformAreaTiles";
+    tiles.className = "csvb-platform-area-tiles";
 
-    PLATFORM_AREAS.forEach((area) => {
-      root.appendChild(createAreaShell(area, openState));
-    });
+    const panel = document.createElement("section");
+    panel.id = "csvbPlatformSelectedPanel";
+    panel.className = "csvb-platform-selected-panel";
+
+    root.appendChild(headline);
+    root.appendChild(tiles);
+    root.appendChild(panel);
 
     originalGrid.parentElement.insertBefore(root, originalGrid);
     originalGrid.classList.add("csvb-dashboard-original-grid-hidden");
 
-    moveCardsIntoAreas();
-    refreshAreaVisibility();
+    refreshAreaLayout();
   }
 
-  function moveCardsIntoAreas() {
-    const knownCards = allAreaCardKeys();
+  function moveVisibleCardsToSelectedArea(area) {
+    const panel = document.getElementById("csvbPlatformSelectedPanel");
+    if (!panel || !area) return;
 
-    PLATFORM_AREAS.forEach((area) => {
-      const areaGrid = document.querySelector(`[data-platform-area-grid="${area.key}"]`);
-      if (!areaGrid) return;
+    panel.innerHTML = `
+      <div class="csvb-platform-selected-header">
+        <span class="csvb-platform-selected-icon">${area.icon || "▣"}</span>
+        <div>
+          <div class="csvb-platform-selected-title">${area.title}</div>
+          <div class="csvb-platform-selected-text">${area.description || ""}</div>
+        </div>
+      </div>
+      <div class="csvb-platform-area-grid" data-platform-area-grid="${area.key}"></div>
+    `;
 
-      (area.cards || []).forEach((cardKey) => {
-        const card = document.querySelector(`[data-card="${cardKey}"]`);
-        if (card && card.parentElement !== areaGrid) {
-          areaGrid.appendChild(card);
-        }
+    const grid = panel.querySelector(`[data-platform-area-grid="${area.key}"]`);
+    if (!grid) return;
+
+    const visibleCards = [];
+
+    (area.cards || []).forEach((cardKey) => {
+      const card = document.querySelector(`[data-card="${cardKey}"]`);
+      if (!card) return;
+
+      if (card.style.display !== "none") {
+        visibleCards.push(card);
+      }
+    });
+
+    if (!visibleCards.length) {
+      const placeholder = document.createElement("div");
+      placeholder.className = "csvb-platform-area-placeholder";
+      placeholder.textContent =
+        area.placeholder || "No modules are currently available in this platform area.";
+      grid.appendChild(placeholder);
+      return;
+    }
+
+    visibleCards.forEach((card) => {
+      grid.appendChild(card);
+    });
+  }
+
+  function parkCardsNotInSelectedArea(selectedArea) {
+    const originalGrid = document.querySelector(".wrap > .grid");
+    if (!originalGrid) return;
+
+    const selectedSet = new Set(selectedArea?.cards || []);
+
+    Array.from(document.querySelectorAll("[data-card]")).forEach((card) => {
+      const key = card.getAttribute("data-card") || "";
+
+      if (!selectedSet.has(key) && card.parentElement !== originalGrid) {
+        originalGrid.appendChild(card);
+      }
+    });
+  }
+
+  function refreshAreaLayout() {
+    const tiles = document.getElementById("csvbPlatformAreaTiles");
+    if (!tiles) return;
+
+    const visibleAreas = PLATFORM_AREAS.filter(shouldShowArea);
+    let selectedKey = selectedAreaKey();
+
+    if (!visibleAreas.some((area) => area.key === selectedKey)) {
+      selectedKey = visibleAreas[0]?.key || "";
+      saveSelectedKey(selectedKey);
+    }
+
+    tiles.innerHTML = visibleAreas
+      .map((area) => areaCardHtml(area, area.key === selectedKey))
+      .join("");
+
+    tiles.querySelectorAll("[data-platform-area-card]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const key = btn.getAttribute("data-platform-area-card") || "";
+        saveSelectedKey(key);
+        refreshAreaLayout();
       });
     });
 
-    const uncategorized = Array.from(document.querySelectorAll("[data-card]"))
-      .filter((card) => !knownCards.has(card.getAttribute("data-card") || ""));
+    const selectedArea = PLATFORM_AREAS.find((area) => area.key === selectedKey) || visibleAreas[0];
 
-    if (uncategorized.length) {
-      let area = document.querySelector('[data-platform-area="uncategorized"]');
-      let grid = document.querySelector('[data-platform-area-grid="uncategorized"]');
-
-      if (!area) {
-        const root = document.getElementById("csvbPlatformAreaRoot");
-        if (!root) return;
-
-        const shell = createAreaShell({
-          key: "uncategorized",
-          title: "Other Modules",
-          description:
-            "Modules not yet assigned to a major platform area. Add them to PLATFORM_AREAS later.",
-          cards: [],
-          defaultOpen: false,
-          showWhenEmpty: false,
-        }, loadOpenState());
-
-        root.appendChild(shell);
-        grid = shell.querySelector('[data-platform-area-grid="uncategorized"]');
-      }
-
-      uncategorized.forEach((card) => grid.appendChild(card));
-    }
-  }
-
-  function refreshAreaVisibility() {
-    PLATFORM_AREAS.forEach((area) => {
-      const section = document.querySelector(`[data-platform-area="${area.key}"]`);
-      const countEl = document.querySelector(`[data-platform-area-count="${area.key}"]`);
-      const grid = document.querySelector(`[data-platform-area-grid="${area.key}"]`);
-
-      if (!section || !grid) return;
-
-      const count = visibleCardCount(area);
-      const hasAssignedCards = (area.cards || []).length > 0;
-      const shouldShow = count > 0 || (area.showWhenEmpty === true && !hasAssignedCards);
-
-      section.style.display = shouldShow ? "" : "none";
-
-      if (countEl) {
-        countEl.textContent = count === 1 ? "1 module" : `${count} modules`;
-      }
-
-      let placeholder = grid.querySelector(".csvb-platform-area-placeholder");
-
-      if (count === 0 && area.showWhenEmpty === true) {
-        if (!placeholder) {
-          placeholder = document.createElement("div");
-          placeholder.className = "csvb-platform-area-placeholder";
-          grid.appendChild(placeholder);
-        }
-        placeholder.textContent = area.placeholder || "No modules assigned to this area yet.";
-      } else if (placeholder) {
-        placeholder.remove();
-      }
-    });
-
-    const uncategorizedGrid = document.querySelector('[data-platform-area-grid="uncategorized"]');
-    const uncategorizedSection = document.querySelector('[data-platform-area="uncategorized"]');
-
-    if (uncategorizedGrid && uncategorizedSection) {
-      const visible = Array.from(uncategorizedGrid.querySelectorAll("[data-card]"))
-        .filter((card) => card.style.display !== "none").length;
-
-      uncategorizedSection.style.display = visible ? "" : "none";
-
-      const countEl = document.querySelector('[data-platform-area-count="uncategorized"]');
-      if (countEl) countEl.textContent = visible === 1 ? "1 module" : `${visible} modules`;
-    }
+    parkCardsNotInSelectedArea(selectedArea);
+    moveVisibleCardsToSelectedArea(selectedArea);
   }
 
   function startObserver() {
     const observer = new MutationObserver(() => {
-      window.requestAnimationFrame(() => {
-        moveCardsIntoAreas();
-        refreshAreaVisibility();
-      });
+      window.requestAnimationFrame(refreshAreaLayout);
     });
 
     observer.observe(document.body, {
@@ -423,7 +486,7 @@
     window.CSVB_DASHBOARD_PLATFORM_AREAS = {
       build: BUILD,
       areas: PLATFORM_AREAS,
-      refresh: refreshAreaVisibility,
+      refresh: refreshAreaLayout,
     };
   }
 
