@@ -6,7 +6,7 @@
 // - Bump cache version + clean old caches on activate
 
 const CACHE_PREFIX = "sire-test-";
-const CACHE_VERSION = "v103-dashboard-area-home";
+const CACHE_VERSION = "v104-dashboard-area-home-no-duplicates";
 const CACHE_NAME = `${CACHE_PREFIX}${CACHE_VERSION}`;
 
 const CORE_ASSETS = [

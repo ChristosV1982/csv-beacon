@@ -1,11 +1,11 @@
 // public/csvb-dashboard-area-home.js
 // C.S.V. BEACON – Dashboard Area Home / Landing Navigation
-// PA-7: selected Platform Area gets structured landing shortcuts.
+// PA-7B: selected Platform Area shows structured shortcuts only; duplicate module cards hidden.
 
 (() => {
   "use strict";
 
-  const BUILD = "PA7-2026-05-10";
+  const BUILD = "PA7B-2026-05-10";
 
   const AREA_HOME = {
     company_policy: {
@@ -275,7 +275,7 @@
         html: `
           <div class="csvb-area-home">
             <div class="csvb-area-home-title">Area Home</div>
-            <div class="csvb-area-home-text">Available modules for this platform area are shown below.</div>
+            <div class="csvb-area-home-text">Available shortcuts for this platform area are shown here.</div>
           </div>
         `,
       };
@@ -322,7 +322,7 @@
         border-radius: 14px;
         background: #f9fbfe;
         padding: 12px;
-        margin-bottom: 12px;
+        margin-bottom: 0;
       }
 
       .csvb-area-home-title {
@@ -430,9 +430,17 @@
         color: #4d6283;
         font-weight: 400;
       }
+
+      .csvb-area-home-hide-module-cards .csvb-platform-area-grid {
+        display: none !important;
+      }
     `;
 
     document.head.appendChild(style);
+  }
+
+  function hideOriginalModuleCards(panel) {
+    panel.classList.add("csvb-area-home-hide-module-cards");
   }
 
   function ensureAreaHome(panel) {
@@ -443,6 +451,8 @@
     const header = panel.querySelector(".csvb-platform-selected-header");
 
     if (!grid || !header) return;
+
+    hideOriginalModuleCards(panel);
 
     const rendered = renderHome(areaKey);
 
