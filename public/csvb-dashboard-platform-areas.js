@@ -1,12 +1,29 @@
 // public/csvb-dashboard-platform-areas.js
 // C.S.V. BEACON – Dashboard Platform Areas
-// PA-3: stable platform area cards with representative icons and reliable module buttons.
+// PA-4: always show major platform areas; show permitted modules inside selected area.
 
 (() => {
   "use strict";
 
-  const BUILD = "PA3-2026-05-10";
-  const SELECTED_KEY = "csvb_dashboard_selected_platform_area_v3";
+  const BUILD = "PA4-2026-05-10";
+  const SELECTED_KEY = "csvb_dashboard_selected_platform_area_v4";
+
+  /*
+    To add a new major platform area later:
+    1. Add one object inside PLATFORM_AREAS.
+    2. Give it:
+       - key
+       - title
+       - icon
+       - description
+       - cards: [...]
+    3. Add existing dashboard card keys into cards: [...]
+
+    Existing dashboard card keys:
+    library, compare, vessel, tasks, company, assignments,
+    post, poststats, inspector_intelligence, audit_observations,
+    reports, inspector, threads, company_policy, qeditor, suadmin
+  */
 
   const PLATFORM_AREAS = [
     {
@@ -18,6 +35,7 @@
       cards: ["company_policy"],
       defaultSelected: true,
     },
+
     {
       key: "sire_inspections",
       title: "SIRE Inspections",
@@ -40,6 +58,7 @@
         "threads",
       ],
     },
+
     {
       key: "marine_applications_vessel_interaction",
       title: "Marine Applications & Vessel Interaction",
@@ -49,8 +68,8 @@
       cards: [],
       placeholder:
         "No modules have been assigned to this area yet. This area is reserved for future marine applications and vessel interaction workflows.",
-      showWhenEmpty: true,
     },
+
     {
       key: "vessel_office_audits",
       title: "Vessel and Office Audits",
@@ -60,8 +79,8 @@
       cards: ["audit_observations"],
       placeholder:
         "Audit Observations is currently the first module in this area. Additional audit modules can be added later.",
-      showWhenEmpty: true,
     },
+
     {
       key: "platform_administration",
       title: "Platform Administration",
@@ -69,6 +88,8 @@
       description:
         "Superuser administration, companies, users, module enablement and rights matrix.",
       cards: ["suadmin"],
+      placeholder:
+        "No administration modules are available to this user.",
     },
   ];
 
@@ -102,6 +123,8 @@
   function isCardVisible(cardKey) {
     const card = getCard(cardKey);
     if (!card) return false;
+
+    // Role/module logic applies inline style.display on the actual module card.
     return card.style.display !== "none";
   }
 
@@ -111,32 +134,27 @@
     }, 0);
   }
 
-  function shouldShowArea(area) {
-    const assigned = (area.cards || []).length > 0;
-    return visibleCardCount(area) > 0 || (area.showWhenEmpty === true && !assigned);
-  }
-
-  function visibleAreas() {
-    return PLATFORM_AREAS.filter(shouldShowArea);
+  function allAreas() {
+    // Major platform areas must remain visible even when no module is currently available.
+    return PLATFORM_AREAS.slice();
   }
 
   function selectedAreaKey() {
-    const visible = visibleAreas();
     const persisted = loadSelectedKey();
 
-    if (visible.some((area) => area.key === persisted)) {
+    if (allAreas().some((area) => area.key === persisted)) {
       return persisted;
     }
 
-    const defaultArea = visible.find((area) => area.defaultSelected === true);
+    const defaultArea = allAreas().find((area) => area.defaultSelected === true);
     if (defaultArea) return defaultArea.key;
 
-    return visible[0]?.key || "";
+    return allAreas()[0]?.key || "";
   }
 
   function selectedArea() {
     const key = selectedAreaKey();
-    return PLATFORM_AREAS.find((area) => area.key === key) || visibleAreas()[0] || null;
+    return allAreas().find((area) => area.key === key) || allAreas()[0] || null;
   }
 
   function injectStyles() {
@@ -349,6 +367,8 @@
       if (!key) return;
 
       saveSelectedKey(key);
+      lastTilesSignature = "";
+      lastSelectedPanelKey = "";
       refreshAll();
     });
 
@@ -377,16 +397,16 @@
     const tiles = document.getElementById("csvbPlatformAreaTiles");
     if (!tiles) return;
 
-    const visible = visibleAreas();
     const selectedKey = area?.key || "";
-    const signature = visible
+
+    const signature = allAreas()
       .map((a) => `${a.key}:${visibleCardCount(a)}:${a.key === selectedKey ? "1" : "0"}`)
       .join("|");
 
     if (signature === lastTilesSignature) return;
 
     lastTilesSignature = signature;
-    tiles.innerHTML = visible.map((a) => areaTileHtml(a, a.key === selectedKey)).join("");
+    tiles.innerHTML = allAreas().map((a) => areaTileHtml(a, a.key === selectedKey)).join("");
   }
 
   function ensureSelectedPanel(area) {
@@ -497,7 +517,6 @@
     refreshAll();
     startObserver();
 
-    // Let the dashboard role/module visibility finish, then refresh again.
     setTimeout(refreshAll, 400);
     setTimeout(refreshAll, 1000);
     setTimeout(refreshAll, 1800);
