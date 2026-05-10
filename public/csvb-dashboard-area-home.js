@@ -1,11 +1,11 @@
 // public/csvb-dashboard-area-home.js
 // C.S.V. BEACON – Dashboard Area Home / Landing Navigation
-// PA-7B: selected Platform Area shows structured shortcuts only; duplicate module cards hidden.
+// PA-7C: symmetrical equal-size Area Home shortcut cards; duplicate module cards hidden.
 
 (() => {
   "use strict";
 
-  const BUILD = "PA7B-2026-05-10";
+  const BUILD = "PA7C-2026-05-10";
 
   const AREA_HOME = {
     company_policy: {
@@ -352,8 +352,9 @@
 
       .csvb-area-home-group-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        grid-template-columns: repeat(4, minmax(0, 1fr));
         gap: 10px;
+        align-items: stretch;
       }
 
       .csvb-area-home-item {
@@ -364,7 +365,9 @@
         display: grid;
         grid-template-columns: 38px minmax(0, 1fr);
         gap: 9px;
-        min-height: 102px;
+        min-height: 128px;
+        height: 100%;
+        box-sizing: border-box;
       }
 
       .csvb-area-home-item-icon {
@@ -378,6 +381,12 @@
         justify-content: center;
         font-size: 1.18rem;
         line-height: 1;
+      }
+
+      .csvb-area-home-item-main {
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
       }
 
       .csvb-area-home-item-title {
@@ -395,7 +404,8 @@
       }
 
       .csvb-area-home-item-actions {
-        margin-top: 9px;
+        margin-top: auto;
+        padding-top: 9px;
       }
 
       .csvb-area-home-action {
@@ -433,6 +443,24 @@
 
       .csvb-area-home-hide-module-cards .csvb-platform-area-grid {
         display: none !important;
+      }
+
+      @media (max-width: 1500px) {
+        .csvb-area-home-group-grid {
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+      }
+
+      @media (max-width: 1050px) {
+        .csvb-area-home-group-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+
+      @media (max-width: 680px) {
+        .csvb-area-home-group-grid {
+          grid-template-columns: 1fr;
+        }
       }
     `;
 
