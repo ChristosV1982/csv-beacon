@@ -1,12 +1,12 @@
 // public/csvb-dashboard-platform-areas.js
 // C.S.V. BEACON – Dashboard Platform Areas
-// PA-4: always show major platform areas; show permitted modules inside selected area.
+// PA-5: stable area cards; module cards stay inside permanent area panels.
 
 (() => {
   "use strict";
 
-  const BUILD = "PA4-2026-05-10";
-  const SELECTED_KEY = "csvb_dashboard_selected_platform_area_v4";
+  const BUILD = "PA5-2026-05-10";
+  const SELECTED_KEY = "csvb_dashboard_selected_platform_area_v5";
 
   /*
     To add a new major platform area later:
@@ -17,7 +17,7 @@
        - icon
        - description
        - cards: [...]
-    3. Add existing dashboard card keys into cards: [...]
+    3. Add existing dashboard card data-card keys into cards: [...]
 
     Existing dashboard card keys:
     library, compare, vessel, tasks, company, assignments,
@@ -34,6 +34,7 @@
         "Controlled policy book, policy text, change requests, manuals, print/export and AI source-based search.",
       cards: ["company_policy"],
       defaultSelected: true,
+      placeholder: "No Company Policy module is currently available to this user.",
     },
 
     {
@@ -57,6 +58,7 @@
         "qeditor",
         "threads",
       ],
+      placeholder: "No SIRE Inspection modules are currently available to this user.",
     },
 
     {
@@ -88,18 +90,33 @@
       description:
         "Superuser administration, companies, users, module enablement and rights matrix.",
       cards: ["suadmin"],
-      placeholder:
-        "No administration modules are available to this user.",
+      placeholder: "No administration modules are currently available to this user.",
     },
   ];
 
-  let lastTilesSignature = "";
-  let lastSelectedPanelKey = "";
-  let refreshQueued = false;
   let observer = null;
+  let refreshQueued = false;
 
   function safeText(value) {
     return String(value ?? "");
+  }
+
+  function getCard(cardKey) {
+    return document.querySelector(`[data-card="${cardKey}"]`);
+  }
+
+  function isCardAvailable(cardKey) {
+    const card = getCard(cardKey);
+    if (!card) return false;
+
+    // Dashboard role/module logic uses inline style.display.
+    return card.style.display !== "none";
+  }
+
+  function availableCardCount(area) {
+    return (area.cards || []).reduce((count, cardKey) => {
+      return count + (isCardAvailable(cardKey) ? 1 : 0);
+    }, 0);
   }
 
   function loadSelectedKey() {
@@ -116,45 +133,20 @@
     } catch (_) {}
   }
 
-  function getCard(cardKey) {
-    return document.querySelector(`[data-card="${cardKey}"]`);
-  }
-
-  function isCardVisible(cardKey) {
-    const card = getCard(cardKey);
-    if (!card) return false;
-
-    // Role/module logic applies inline style.display on the actual module card.
-    return card.style.display !== "none";
-  }
-
-  function visibleCardCount(area) {
-    return (area.cards || []).reduce((count, cardKey) => {
-      return count + (isCardVisible(cardKey) ? 1 : 0);
-    }, 0);
-  }
-
-  function allAreas() {
-    // Major platform areas must remain visible even when no module is currently available.
-    return PLATFORM_AREAS.slice();
-  }
-
   function selectedAreaKey() {
-    const persisted = loadSelectedKey();
+    const saved = loadSelectedKey();
 
-    if (allAreas().some((area) => area.key === persisted)) {
-      return persisted;
+    if (PLATFORM_AREAS.some((area) => area.key === saved)) {
+      return saved;
     }
 
-    const defaultArea = allAreas().find((area) => area.defaultSelected === true);
-    if (defaultArea) return defaultArea.key;
-
-    return allAreas()[0]?.key || "";
+    const defaultArea = PLATFORM_AREAS.find((area) => area.defaultSelected === true);
+    return defaultArea?.key || PLATFORM_AREAS[0]?.key || "";
   }
 
   function selectedArea() {
     const key = selectedAreaKey();
-    return allAreas().find((area) => area.key === key) || allAreas()[0] || null;
+    return PLATFORM_AREAS.find((area) => area.key === key) || PLATFORM_AREAS[0];
   }
 
   function injectStyles() {
@@ -261,12 +253,22 @@
         padding-top: 8px;
       }
 
+      .csvb-platform-panels {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+
       .csvb-platform-selected-panel {
         background: #ffffff;
         border: 1px solid #dbe6f6;
         border-radius: 14px;
         box-shadow: 0 10px 30px rgba(3,27,63,0.06);
         padding: 12px;
+      }
+
+      .csvb-platform-selected-panel.hidden {
+        display: none !important;
       }
 
       .csvb-platform-selected-header {
@@ -329,6 +331,42 @@
     document.head.appendChild(style);
   }
 
+  function areaTileHtml(area, active) {
+    const count = availableCardCount(area);
+    const countText = count === 1 ? "1 module" : `${count} modules`;
+
+    return `
+      <button
+        type="button"
+        class="csvb-platform-area-card${active ? " active" : ""}"
+        data-platform-area-card="${safeText(area.key)}"
+      >
+        <span class="csvb-platform-area-icon">${safeText(area.icon || "▣")}</span>
+        <span class="csvb-platform-area-title">${safeText(area.title)}</span>
+        <span class="csvb-platform-area-desc">${safeText(area.description || "")}</span>
+        <span class="csvb-platform-area-count" data-platform-area-count="${safeText(area.key)}">${safeText(countText)}</span>
+      </button>
+    `;
+  }
+
+  function areaPanelHtml(area) {
+    return `
+      <section
+        class="csvb-platform-selected-panel hidden"
+        data-platform-area-panel="${safeText(area.key)}"
+      >
+        <div class="csvb-platform-selected-header">
+          <span class="csvb-platform-selected-icon">${safeText(area.icon || "▣")}</span>
+          <div>
+            <div class="csvb-platform-selected-title">${safeText(area.title)}</div>
+            <div class="csvb-platform-selected-text">${safeText(area.description || "")}</div>
+          </div>
+        </div>
+        <div class="csvb-platform-area-grid" data-platform-area-grid="${safeText(area.key)}"></div>
+      </section>
+    `;
+  }
+
   function createRoot() {
     const originalGrid = document.querySelector(".wrap > .grid");
     if (!originalGrid) return null;
@@ -352,7 +390,7 @@
 
       <div id="csvbPlatformAreaTiles" class="csvb-platform-area-tiles"></div>
 
-      <section id="csvbPlatformSelectedPanel" class="csvb-platform-selected-panel"></section>
+      <div id="csvbPlatformAreaPanels" class="csvb-platform-panels"></div>
     `;
 
     originalGrid.parentElement.insertBefore(root, originalGrid);
@@ -360,131 +398,107 @@
 
     const tiles = root.querySelector("#csvbPlatformAreaTiles");
     tiles.addEventListener("click", (event) => {
-      const card = event.target.closest("[data-platform-area-card]");
-      if (!card) return;
+      const btn = event.target.closest("[data-platform-area-card]");
+      if (!btn) return;
 
-      const key = card.getAttribute("data-platform-area-card") || "";
+      const key = btn.getAttribute("data-platform-area-card") || "";
       if (!key) return;
 
       saveSelectedKey(key);
-      lastTilesSignature = "";
-      lastSelectedPanelKey = "";
-      refreshAll();
+      refreshDisplay();
     });
+
+    renderStaticShell();
+    moveCardsOnce();
 
     return root;
   }
 
-  function areaTileHtml(area, active) {
-    const count = visibleCardCount(area);
-    const countText = count === 1 ? "1 module" : `${count} modules`;
-
-    return `
-      <button
-        type="button"
-        class="csvb-platform-area-card${active ? " active" : ""}"
-        data-platform-area-card="${safeText(area.key)}"
-      >
-        <span class="csvb-platform-area-icon">${safeText(area.icon || "▣")}</span>
-        <span class="csvb-platform-area-title">${safeText(area.title)}</span>
-        <span class="csvb-platform-area-desc">${safeText(area.description || "")}</span>
-        <span class="csvb-platform-area-count">${safeText(countText)}</span>
-      </button>
-    `;
-  }
-
-  function renderTiles(area) {
+  function renderStaticShell() {
     const tiles = document.getElementById("csvbPlatformAreaTiles");
-    if (!tiles) return;
+    const panels = document.getElementById("csvbPlatformAreaPanels");
 
-    const selectedKey = area?.key || "";
+    if (!tiles || !panels) return;
 
-    const signature = allAreas()
-      .map((a) => `${a.key}:${visibleCardCount(a)}:${a.key === selectedKey ? "1" : "0"}`)
-      .join("|");
+    const activeKey = selectedAreaKey();
 
-    if (signature === lastTilesSignature) return;
+    tiles.innerHTML = PLATFORM_AREAS
+      .map((area) => areaTileHtml(area, area.key === activeKey))
+      .join("");
 
-    lastTilesSignature = signature;
-    tiles.innerHTML = allAreas().map((a) => areaTileHtml(a, a.key === selectedKey)).join("");
+    panels.innerHTML = PLATFORM_AREAS
+      .map((area) => areaPanelHtml(area))
+      .join("");
   }
 
-  function ensureSelectedPanel(area) {
-    const panel = document.getElementById("csvbPlatformSelectedPanel");
-    if (!panel || !area) return null;
+  function moveCardsOnce() {
+    PLATFORM_AREAS.forEach((area) => {
+      const grid = document.querySelector(`[data-platform-area-grid="${area.key}"]`);
+      if (!grid) return;
 
-    if (lastSelectedPanelKey !== area.key) {
-      lastSelectedPanelKey = area.key;
+      (area.cards || []).forEach((cardKey) => {
+        const card = getCard(cardKey);
+        if (!card) return;
 
-      panel.innerHTML = `
-        <div class="csvb-platform-selected-header">
-          <span class="csvb-platform-selected-icon">${safeText(area.icon || "▣")}</span>
-          <div>
-            <div class="csvb-platform-selected-title">${safeText(area.title)}</div>
-            <div class="csvb-platform-selected-text">${safeText(area.description || "")}</div>
-          </div>
-        </div>
-        <div class="csvb-platform-area-grid" data-platform-area-grid="${safeText(area.key)}"></div>
-      `;
-    }
-
-    return panel.querySelector(`[data-platform-area-grid="${area.key}"]`);
+        if (card.parentElement !== grid) {
+          grid.appendChild(card);
+        }
+      });
+    });
   }
 
-  function parkNonSelectedCards(area) {
-    const originalGrid = document.querySelector(".wrap > .grid");
-    if (!originalGrid || !area) return;
+  function updateAreaCounts() {
+    PLATFORM_AREAS.forEach((area) => {
+      const count = availableCardCount(area);
+      const countText = count === 1 ? "1 module" : `${count} modules`;
+      const countEl = document.querySelector(`[data-platform-area-count="${area.key}"]`);
 
-    const selectedCards = new Set(area.cards || []);
-
-    document.querySelectorAll("[data-card]").forEach((card) => {
-      const key = card.getAttribute("data-card") || "";
-      if (selectedCards.has(key)) return;
-
-      if (card.parentElement !== originalGrid) {
-        originalGrid.appendChild(card);
+      if (countEl) {
+        countEl.textContent = countText;
       }
     });
   }
 
-  function renderSelectedAreaModules(area) {
-    const grid = ensureSelectedPanel(area);
-    if (!grid || !area) return;
+  function updateSelectedTile() {
+    const key = selectedAreaKey();
 
-    parkNonSelectedCards(area);
+    document.querySelectorAll("[data-platform-area-card]").forEach((btn) => {
+      btn.classList.toggle("active", btn.getAttribute("data-platform-area-card") === key);
+    });
+  }
 
-    const visibleCards = (area.cards || [])
-      .map((key) => getCard(key))
-      .filter((card) => card && card.style.display !== "none");
+  function updatePanels() {
+    const key = selectedAreaKey();
 
-    grid.querySelectorAll(".csvb-platform-area-placeholder").forEach((el) => el.remove());
+    document.querySelectorAll("[data-platform-area-panel]").forEach((panel) => {
+      const panelKey = panel.getAttribute("data-platform-area-panel") || "";
+      panel.classList.toggle("hidden", panelKey !== key);
+    });
 
-    if (!visibleCards.length) {
-      if (!grid.querySelector(".csvb-platform-area-placeholder")) {
+    PLATFORM_AREAS.forEach((area) => {
+      const grid = document.querySelector(`[data-platform-area-grid="${area.key}"]`);
+      if (!grid) return;
+
+      grid.querySelectorAll(".csvb-platform-area-placeholder").forEach((el) => el.remove());
+
+      const count = availableCardCount(area);
+
+      if (count === 0) {
         const placeholder = document.createElement("div");
         placeholder.className = "csvb-platform-area-placeholder";
         placeholder.textContent =
           area.placeholder || "No modules are currently available in this platform area.";
         grid.appendChild(placeholder);
       }
-      return;
-    }
-
-    visibleCards.forEach((card) => {
-      if (card.parentElement !== grid) {
-        grid.appendChild(card);
-      }
     });
   }
 
-  function refreshAll() {
+  function refreshDisplay() {
     createRoot();
-
-    const area = selectedArea();
-    if (!area) return;
-
-    renderTiles(area);
-    renderSelectedAreaModules(area);
+    moveCardsOnce();
+    updateAreaCounts();
+    updateSelectedTile();
+    updatePanels();
   }
 
   function scheduleRefresh() {
@@ -494,7 +508,7 @@
 
     window.requestAnimationFrame(() => {
       refreshQueued = false;
-      refreshAll();
+      refreshDisplay();
     });
   }
 
@@ -514,17 +528,18 @@
   }
 
   function init() {
-    refreshAll();
+    refreshDisplay();
     startObserver();
 
-    setTimeout(refreshAll, 400);
-    setTimeout(refreshAll, 1000);
-    setTimeout(refreshAll, 1800);
+    // Allow dashboard role/module visibility to finish, then refresh counts.
+    setTimeout(refreshDisplay, 400);
+    setTimeout(refreshDisplay, 1000);
+    setTimeout(refreshDisplay, 1800);
 
     window.CSVB_DASHBOARD_PLATFORM_AREAS = {
       build: BUILD,
       areas: PLATFORM_AREAS,
-      refresh: refreshAll,
+      refresh: refreshDisplay,
     };
   }
 
