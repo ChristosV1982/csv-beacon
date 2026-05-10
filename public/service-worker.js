@@ -6,13 +6,15 @@
 // - Bump cache version + clean old caches on activate
 
 const CACHE_PREFIX = "sire-test-";
-const CACHE_VERSION = "v101-dashboard-platform-areas-supabase";
+const CACHE_VERSION = "v102-platform-areas-admin-ui";
 const CACHE_NAME = `${CACHE_PREFIX}${CACHE_VERSION}`;
 
 const CORE_ASSETS = [
   "./",
   "./index.html",
   "./q-dashboard.html",
+  "./su-admin.html",
+  "./su-admin.js",
   "./company_policy.html",
   "./company_policy.js",
   "./company_policy_change_requests.js",
@@ -28,6 +30,7 @@ const CORE_ASSETS = [
   "./company_policy_editor_import_splitter.js",
   "./company_policy_print_export.js",
   "./csvb-dashboard-platform-areas.js",
+  "./csvb-platform-areas-admin.js",
   "./style.css",
   "./csv-beacon-theme.css",
   "./auth.js",
