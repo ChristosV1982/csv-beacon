@@ -1,31 +1,26 @@
 // public/csvb-dashboard-platform-areas.js
 // C.S.V. BEACON – Dashboard Platform Areas
-// PA-5: stable area cards; module cards stay inside permanent area panels.
+// PA-6B: load platform areas from Supabase, with hardcoded fallback.
 
 (() => {
   "use strict";
 
-  const BUILD = "PA5-2026-05-10";
-  const SELECTED_KEY = "csvb_dashboard_selected_platform_area_v5";
+  const BUILD = "PA6B-2026-05-10";
+  const SELECTED_KEY = "csvb_dashboard_selected_platform_area_v6";
 
   /*
-    To add a new major platform area later:
-    1. Add one object inside PLATFORM_AREAS.
-    2. Give it:
-       - key
-       - title
-       - icon
-       - description
-       - cards: [...]
-    3. Add existing dashboard card data-card keys into cards: [...]
+    Database source:
+      public.csvb_dashboard_list_platform_areas()
 
-    Existing dashboard card keys:
-    library, compare, vessel, tasks, company, assignments,
-    post, poststats, inspector_intelligence, audit_observations,
-    reports, inspector, threads, company_policy, qeditor, suadmin
+    Fallback:
+      DEFAULT_PLATFORM_AREAS below.
+
+    To add/edit platform areas later:
+      Prefer Supabase data via dashboard_platform_areas and dashboard_platform_area_modules.
+      This file remains the fallback only.
   */
 
-  const PLATFORM_AREAS = [
+  const DEFAULT_PLATFORM_AREAS = [
     {
       key: "company_policy",
       title: "Company Policy",
@@ -94,11 +89,98 @@
     },
   ];
 
+  let platformAreas = DEFAULT_PLATFORM_AREAS.slice();
+  let platformAreaSource = "fallback";
   let observer = null;
   let refreshQueued = false;
 
   function safeText(value) {
     return String(value ?? "");
+  }
+
+  function normalizeModuleCards(value) {
+    if (Array.isArray(value)) {
+      return value
+        .map((x) => String(x || "").trim())
+        .filter(Boolean)
+        .filter((x) => x.toLowerCase() !== "null");
+    }
+
+    if (typeof value === "string") {
+      const trimmed = value.trim();
+
+      if (!trimmed || trimmed === "[null]") return [];
+
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (Array.isArray(parsed)) {
+          return parsed
+            .map((x) => String(x || "").trim())
+            .filter(Boolean)
+            .filter((x) => x.toLowerCase() !== "null");
+        }
+      } catch (_) {}
+
+      return trimmed
+        .replace(/^\{/, "")
+        .replace(/\}$/, "")
+        .split(",")
+        .map((x) => x.replace(/^"|"$/g, "").trim())
+        .filter(Boolean)
+        .filter((x) => x.toLowerCase() !== "null");
+    }
+
+    return [];
+  }
+
+  function normalizeDbArea(row) {
+    return {
+      key: String(row.area_key || "").trim(),
+      title: String(row.title || row.area_key || "Untitled Area").trim(),
+      icon: String(row.icon || "▣").trim(),
+      description: String(row.description || "").trim(),
+      placeholder: String(row.placeholder || "No modules are currently available in this platform area.").trim(),
+      cards: normalizeModuleCards(row.module_cards),
+      defaultSelected: row.default_selected === true,
+    };
+  }
+
+  async function loadPlatformAreasFromSupabase() {
+    if (!window.AUTH?.ensureSupabase) {
+      throw new Error("AUTH helper is not available.");
+    }
+
+    const sb = window.AUTH.ensureSupabase();
+
+    const { data, error } = await sb.rpc("csvb_dashboard_list_platform_areas");
+
+    if (error) {
+      throw new Error(error.message || "Could not load dashboard platform areas.");
+    }
+
+    const rows = Array.isArray(data) ? data : [];
+
+    const areas = rows
+      .map(normalizeDbArea)
+      .filter((area) => area.key && area.title);
+
+    if (!areas.length) {
+      throw new Error("No active dashboard platform areas returned by Supabase.");
+    }
+
+    return areas;
+  }
+
+  async function loadPlatformAreas() {
+    try {
+      const dbAreas = await loadPlatformAreasFromSupabase();
+      platformAreas = dbAreas;
+      platformAreaSource = "supabase";
+    } catch (error) {
+      console.warn("C.S.V. BEACON dashboard platform areas using fallback:", error);
+      platformAreas = DEFAULT_PLATFORM_AREAS.slice();
+      platformAreaSource = "fallback";
+    }
   }
 
   function getCard(cardKey) {
@@ -136,17 +218,12 @@
   function selectedAreaKey() {
     const saved = loadSelectedKey();
 
-    if (PLATFORM_AREAS.some((area) => area.key === saved)) {
+    if (platformAreas.some((area) => area.key === saved)) {
       return saved;
     }
 
-    const defaultArea = PLATFORM_AREAS.find((area) => area.defaultSelected === true);
-    return defaultArea?.key || PLATFORM_AREAS[0]?.key || "";
-  }
-
-  function selectedArea() {
-    const key = selectedAreaKey();
-    return PLATFORM_AREAS.find((area) => area.key === key) || PLATFORM_AREAS[0];
+    const defaultArea = platformAreas.find((area) => area.defaultSelected === true);
+    return defaultArea?.key || platformAreas[0]?.key || "";
   }
 
   function injectStyles() {
@@ -182,6 +259,13 @@
         margin-top: 4px;
         line-height: 1.35;
         font-size: .92rem;
+      }
+
+      .csvb-platform-area-source {
+        color: #6b7890;
+        font-weight: 400;
+        font-size: .78rem;
+        margin-top: 5px;
       }
 
       .csvb-platform-area-tiles {
@@ -386,6 +470,7 @@
         <div class="csvb-platform-area-headline-text">
           Modules are grouped by major operational area. Module permissions and company enablement continue to control what each user can see.
         </div>
+        <div id="csvbPlatformAreaSource" class="csvb-platform-area-source"></div>
       </div>
 
       <div id="csvbPlatformAreaTiles" class="csvb-platform-area-tiles"></div>
@@ -422,17 +507,25 @@
 
     const activeKey = selectedAreaKey();
 
-    tiles.innerHTML = PLATFORM_AREAS
+    tiles.innerHTML = platformAreas
       .map((area) => areaTileHtml(area, area.key === activeKey))
       .join("");
 
-    panels.innerHTML = PLATFORM_AREAS
+    panels.innerHTML = platformAreas
       .map((area) => areaPanelHtml(area))
       .join("");
+
+    const source = document.getElementById("csvbPlatformAreaSource");
+    if (source) {
+      source.textContent =
+        platformAreaSource === "supabase"
+          ? "Platform area configuration loaded from Supabase."
+          : "Platform area configuration loaded from local fallback.";
+    }
   }
 
   function moveCardsOnce() {
-    PLATFORM_AREAS.forEach((area) => {
+    platformAreas.forEach((area) => {
       const grid = document.querySelector(`[data-platform-area-grid="${area.key}"]`);
       if (!grid) return;
 
@@ -448,7 +541,7 @@
   }
 
   function updateAreaCounts() {
-    PLATFORM_AREAS.forEach((area) => {
+    platformAreas.forEach((area) => {
       const count = availableCardCount(area);
       const countText = count === 1 ? "1 module" : `${count} modules`;
       const countEl = document.querySelector(`[data-platform-area-count="${area.key}"]`);
@@ -475,7 +568,7 @@
       panel.classList.toggle("hidden", panelKey !== key);
     });
 
-    PLATFORM_AREAS.forEach((area) => {
+    platformAreas.forEach((area) => {
       const grid = document.querySelector(`[data-platform-area-grid="${area.key}"]`);
       if (!grid) return;
 
@@ -527,19 +620,25 @@
     });
   }
 
-  function init() {
+  async function init() {
+    await loadPlatformAreas();
+
     refreshDisplay();
     startObserver();
 
-    // Allow dashboard role/module visibility to finish, then refresh counts.
     setTimeout(refreshDisplay, 400);
     setTimeout(refreshDisplay, 1000);
     setTimeout(refreshDisplay, 1800);
 
     window.CSVB_DASHBOARD_PLATFORM_AREAS = {
       build: BUILD,
-      areas: PLATFORM_AREAS,
+      source: platformAreaSource,
+      areas: platformAreas,
       refresh: refreshDisplay,
+      reload: async () => {
+        await loadPlatformAreas();
+        location.reload();
+      },
     };
   }
 
