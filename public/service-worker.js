@@ -6,12 +6,13 @@
 // - Bump cache version + clean old caches on activate
 
 const CACHE_PREFIX = "sire-test-";
-const CACHE_VERSION = "v95-company-policy-import-splitter";
+const CACHE_VERSION = "v96-dashboard-platform-areas";
 const CACHE_NAME = `${CACHE_PREFIX}${CACHE_VERSION}`;
 
 const CORE_ASSETS = [
   "./",
   "./index.html",
+  "./q-dashboard.html",
   "./company_policy.html",
   "./company_policy.js",
   "./company_policy_change_requests.js",
@@ -26,6 +27,7 @@ const CORE_ASSETS = [
   "./company_policy_editor_import.js",
   "./company_policy_editor_import_splitter.js",
   "./company_policy_print_export.js",
+  "./csvb-dashboard-platform-areas.js",
   "./style.css",
   "./csv-beacon-theme.css",
   "./auth.js",
@@ -33,6 +35,8 @@ const CORE_ASSETS = [
   "./csvb-ui-polish.js",
   "./csvb-question-admin.js",
   "./csvb-question-overrides-admin.js",
+  "./csvb-dashboard-polish.js",
+  "./csvb-dashboard-threads-badge.js",
   "./assets/csv-beacon-icon.png",
   "./assets/csv-beacon-logo-full.png",
   "./icon-192.png",
