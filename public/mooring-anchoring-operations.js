@@ -1,10 +1,10 @@
 // public/mooring-anchoring-operations.js
-// C.S.V. BEACON – MAI Vessel Operation Recording UI
+// C.S.V. BEACON – MAI Vessel Operations Portal + Port Dropdown
 
 (() => {
   "use strict";
 
-  const BUILD = "MAI-OPERATIONS-20260511-1";
+  const BUILD = "MAI-OPERATIONS-20260511-2";
 
   const state = {
     sb: null,
@@ -15,6 +15,8 @@
     operationTypes: [],
     components: [],
     operations: [],
+    ports: [],
+    facilities: [],
     selectedComponents: new Set()
   };
 
@@ -29,12 +31,14 @@
       "warnBox", "okBox", "reloadBtn",
       "viewerMode", "viewerHint",
       "operationVessel", "operationType", "operationStart", "operationEnd", "durationPreview",
+      "portSelect", "facilitySelect", "openMapBtn", "mapHint",
       "operationReference", "portName", "berthTerminal", "anchorageName",
       "unusualEvent", "requiresInspection", "eventDescription", "operationRemarks",
       "operationSummaryBox", "recordOperationSubmitBtn", "resetFormBtn",
       "componentSelectionMeta", "selectAllComponentsBtn", "clearComponentsBtn",
       "componentTypeFilter", "componentSearch", "componentChecks",
-      "historyMeta", "operationHistory"
+      "historyMeta", "operationHistory",
+      "historyDateFrom", "historyDateTo", "historyOperationType", "historySearch", "clearHistoryFiltersBtn"
     ].forEach((id) => {
       el[id] = $(id);
     });
@@ -70,6 +74,14 @@
     return role === "vessel";
   }
 
+  function asDate(value) {
+    if (!value) return "—";
+    const raw = String(value).slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return String(value);
+    const [y, m, d] = raw.split("-");
+    return `${d}.${m}.${y}`;
+  }
+
   function asDateTime(value) {
     if (!value) return "—";
     try {
@@ -102,8 +114,7 @@
 
     if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return null;
 
-    const hours = (end.getTime() - start.getTime()) / 3600000;
-    return hours;
+    return (end.getTime() - start.getTime()) / 3600000;
   }
 
   function selectedVesselId() {
@@ -114,33 +125,54 @@
     return state.operationTypes.find((t) => t.operation_type_key === el.operationType.value) || null;
   }
 
+  function selectedPort() {
+    return state.ports.find((p) => p.port_id === el.portSelect.value) || null;
+  }
+
+  function selectedFacility() {
+    return state.facilities.find((f) => f.port_facility_id === el.facilitySelect.value) || null;
+  }
+
+  function selectedCoordinates() {
+    const facility = selectedFacility();
+    const port = selectedPort();
+
+    const lat = facility?.latitude ?? port?.latitude;
+    const lon = facility?.longitude ?? port?.longitude;
+
+    if (lat === null || lat === undefined || lon === null || lon === undefined) return null;
+
+    return { lat, lon };
+  }
+
   function componentTypeLabel(component) {
     return `${component.component_type_code || "—"} — ${component.component_type_name || ""}`;
   }
 
-  function operationTypeLabel(key) {
-    const t = state.operationTypes.find((x) => x.operation_type_key === key);
-    return t?.operation_type_label || key || "—";
+  async function rpc(name, args = {}) {
+    const { data, error } = await state.sb.rpc(name, args);
+    if (error) throw error;
+    return data;
   }
 
   async function loadBaseData() {
-    const [vesselRes, typeRes, componentRes] = await Promise.all([
+    const [vesselRes, typeRes, componentRes, portRes, facilityRes] = await Promise.all([
       state.sb.from("vessels").select("id, name, hull_number, imo_number, company_id, is_active").eq("is_active", true).order("name"),
       state.sb.from("mai_v_operation_type_definitions").select("*").order("sort_order"),
-      state.sb.from("mai_v_components_list").select("*").order("unique_id")
+      state.sb.from("mai_v_components_list").select("*").order("unique_id"),
+      state.sb.from("mai_v_ports_list").select("*").order("country_name").order("port_name"),
+      state.sb.from("mai_v_port_facilities_list").select("*").order("port_name").order("facility_name")
     ]);
 
-    for (const res of [vesselRes, typeRes, componentRes]) {
+    for (const res of [vesselRes, typeRes, componentRes, portRes, facilityRes]) {
       if (res.error) throw res.error;
     }
 
     state.vessels = vesselRes.data || [];
     state.operationTypes = typeRes.data || [];
     state.components = componentRes.data || [];
-
-    if (state.isVesselViewer && state.profile?.vessel_id) {
-      el.operationVessel.value = state.profile.vessel_id;
-    }
+    state.ports = portRes.data || [];
+    state.facilities = facilityRes.data || [];
   }
 
   async function loadOperationHistory() {
@@ -157,7 +189,7 @@
       .select("*")
       .eq("vessel_id", vesselId)
       .order("operation_start_at", { ascending: false })
-      .limit(100);
+      .limit(500);
 
     if (error) throw error;
 
@@ -196,16 +228,87 @@
   }
 
   function renderOperationTypes() {
-    el.operationType.innerHTML = [`<option value="">Select operation type...</option>`]
+    const options = [`<option value="">Select operation type...</option>`]
       .concat(state.operationTypes.map((t) => `
         <option value="${esc(t.operation_type_key)}">${esc(t.operation_type_label || t.operation_type_key)}</option>
       `))
       .join("");
+
+    el.operationType.innerHTML = options;
+    el.historyOperationType.innerHTML = `<option value="">All operation types</option>` +
+      state.operationTypes.map((t) => `
+        <option value="${esc(t.operation_type_key)}">${esc(t.operation_type_label || t.operation_type_key)}</option>
+      `).join("");
+  }
+
+  function renderPorts() {
+    if (!state.ports.length) {
+      el.portSelect.innerHTML = `<option value="">No ports configured — use manual port field</option>`;
+      renderFacilities();
+      updateMapButton();
+      return;
+    }
+
+    el.portSelect.innerHTML = `<option value="">Select port or use manual port field...</option>` +
+      state.ports.map((p) => {
+        const code = p.unlocode ? ` / ${p.unlocode}` : "";
+        const country = p.country_name || p.country_code || "";
+        return `<option value="${esc(p.port_id)}">${esc(p.port_name)}${esc(code)}${country ? " / " + esc(country) : ""}</option>`;
+      }).join("");
+
+    renderFacilities();
+    updateMapButton();
+  }
+
+  function renderFacilities() {
+    const portId = el.portSelect.value || "";
+    const rows = state.facilities.filter((f) => f.port_id === portId);
+
+    if (!portId) {
+      el.facilitySelect.innerHTML = `<option value="">Select port first...</option>`;
+      return;
+    }
+
+    if (!rows.length) {
+      el.facilitySelect.innerHTML = `<option value="">No facilities configured for selected port</option>`;
+      return;
+    }
+
+    el.facilitySelect.innerHTML = `<option value="">No specific facility</option>` +
+      rows.map((f) => {
+        const code = f.preferred_facility_code ? ` / ${f.preferred_facility_code}` : "";
+        return `<option value="${esc(f.port_facility_id)}">${esc(f.facility_name)}${esc(code)}</option>`;
+      }).join("");
+  }
+
+  function updateManualPortFields() {
+    const port = selectedPort();
+    const facility = selectedFacility();
+
+    if (port && !el.portName.value) {
+      el.portName.value = port.port_name || "";
+    }
+
+    if (facility && !el.berthTerminal.value) {
+      el.berthTerminal.value = facility.berth_or_terminal_name || facility.facility_name || "";
+    }
+  }
+
+  function updateMapButton() {
+    const coords = selectedCoordinates();
+
+    if (!coords) {
+      el.openMapBtn.disabled = true;
+      el.mapHint.textContent = "Map opens when selected port/facility has coordinates.";
+      return;
+    }
+
+    el.openMapBtn.disabled = false;
+    el.mapHint.textContent = `Coordinates: ${coords.lat}, ${coords.lon}`;
   }
 
   function visibleComponentTypes() {
     const vesselId = selectedVesselId();
-
     const map = new Map();
 
     state.components
@@ -223,7 +326,6 @@
 
   function renderComponentTypeFilter() {
     const types = visibleComponentTypes();
-
     const current = el.componentTypeFilter.value || "";
 
     el.componentTypeFilter.innerHTML = [`<option value="">All component types</option>`]
@@ -308,6 +410,8 @@
   function renderSummary() {
     const vessel = state.vessels.find((v) => v.id === selectedVesselId());
     const opType = selectedOperationType();
+    const port = selectedPort();
+    const facility = selectedFacility();
     const duration = calculateDurationHours();
 
     el.durationPreview.value =
@@ -328,11 +432,12 @@
     el.operationSummaryBox.innerHTML = `
       <div><strong>Vessel:</strong> ${esc(vessel?.name || "—")}</div>
       <div><strong>Operation:</strong> ${esc(opType?.operation_type_label || "—")}</div>
+      <div><strong>Port:</strong> ${esc(port?.port_name || el.portName.value || "—")}</div>
+      <div><strong>UN/LOCODE:</strong> ${esc(port?.unlocode || "—")}</div>
+      <div><strong>Facility:</strong> ${esc(facility?.facility_name || el.berthTerminal.value || "—")}</div>
+      <div><strong>Facility/Security Code:</strong> ${esc(facility?.preferred_facility_code || "—")}</div>
       <div><strong>Duration:</strong> ${esc(duration === null ? "—" : `${asNumber(duration, 2)} hours`)}</div>
       <div><strong>Components credited:</strong> ${esc(state.selectedComponents.size)}</div>
-      <div><strong>Counts toward lifecycle:</strong> ${esc(opType?.default_counts_towards_lifecycle ? "Yes" : "No")}</div>
-      <div><strong>Default unusual event:</strong> ${esc(opType?.default_unusual_event ? "Yes" : "No")}</div>
-      <div><strong>Default requires inspection:</strong> ${esc(opType?.default_event_requires_inspection ? "Yes" : "No")}</div>
       ${
         warnings.length
           ? `<div style="margin-top:8px;"><span class="pill pill-warn">Check</span> ${warnings.map(esc).join(" / ")}</div>`
@@ -341,18 +446,57 @@
     `;
   }
 
-  function renderOperationHistory() {
-    const rows = state.operations;
+  function filteredOperations() {
+    const from = el.historyDateFrom.value ? new Date(el.historyDateFrom.value + "T00:00:00") : null;
+    const to = el.historyDateTo.value ? new Date(el.historyDateTo.value + "T23:59:59") : null;
+    const type = el.historyOperationType.value || "";
+    const q = String(el.historySearch.value || "").trim().toLowerCase();
 
-    el.historyMeta.textContent = `${rows.length} operation record(s) shown.`;
+    return state.operations.filter((op) => {
+      const start = op.operation_start_at ? new Date(op.operation_start_at) : null;
+
+      if (from && start && start < from) return false;
+      if (to && start && start > to) return false;
+      if (type && op.operation_type_key !== type) return false;
+
+      if (q) {
+        const comps = Array.isArray(op.components) ? op.components : [];
+        const haystack = [
+          op.operation_type_label,
+          op.port_name,
+          op.port_unlocode,
+          op.port_facility_code,
+          op.berth_or_terminal,
+          op.anchorage_name,
+          op.operation_reference,
+          op.remarks,
+          ...comps.map((c) => c.unique_id)
+        ].map((x) => String(x || "").toLowerCase()).join(" | ");
+
+        if (!haystack.includes(q)) return false;
+      }
+
+      return true;
+    });
+  }
+
+  function renderOperationHistory() {
+    const rows = filteredOperations();
+
+    el.historyMeta.textContent = `${rows.length} operation record(s) shown from ${state.operations.length} loaded.`;
 
     if (!rows.length) {
-      el.operationHistory.innerHTML = `<div class="hint-text">No vessel operations recorded yet.</div>`;
+      el.operationHistory.innerHTML = `<div class="hint-text">No vessel operations match current filters.</div>`;
       return;
     }
 
     el.operationHistory.innerHTML = rows.map((op) => {
       const comps = Array.isArray(op.components) ? op.components : [];
+      const mapLink =
+        op.port_latitude !== null && op.port_latitude !== undefined &&
+        op.port_longitude !== null && op.port_longitude !== undefined
+          ? `https://www.openstreetmap.org/?mlat=${encodeURIComponent(op.port_latitude)}&mlon=${encodeURIComponent(op.port_longitude)}#map=12/${encodeURIComponent(op.port_latitude)}/${encodeURIComponent(op.port_longitude)}`
+          : "";
 
       return `
         <div class="mini-item">
@@ -365,7 +509,8 @@
             / Duration: ${esc(asNumber(op.duration_hours, 2))} h
           </div>
           <div class="mini-meta">
-            Port/Berth/Anchorage: ${esc(op.port_name || "—")} / ${esc(op.berth_or_terminal || "—")} / ${esc(op.anchorage_name || "—")}
+            Port: ${esc(op.port_name || "—")} / UN/LOCODE: ${esc(op.port_unlocode || "—")}
+            / Facility: ${esc(op.berth_or_terminal || "—")} / Code: ${esc(op.port_facility_code || "—")}
           </div>
           <div class="mini-meta">
             Components: ${esc(op.component_count || 0)}
@@ -376,6 +521,7 @@
               ? `<div class="mini-meta">Credited: ${comps.map((c) => esc(c.unique_id)).join(", ")}</div>`
               : ""
           }
+          ${mapLink ? `<div class="mini-meta"><a href="${esc(mapLink)}" target="_blank" rel="noopener">Open map</a></div>` : ""}
           ${op.event_requires_inspection ? `<div class="mini-meta"><span class="pill pill-warn">Inspection trigger</span> ${esc(op.event_description || "")}</div>` : ""}
           ${op.remarks ? `<div class="mini-meta">${esc(op.remarks)}</div>` : ""}
         </div>
@@ -387,6 +533,9 @@
     const currentVessel = el.operationVessel.value;
 
     el.operationType.value = "";
+    el.portSelect.value = "";
+    renderFacilities();
+    el.facilitySelect.value = "";
     el.operationStart.value = "";
     el.operationEnd.value = "";
     el.durationPreview.value = "—";
@@ -406,6 +555,7 @@
       el.operationVessel.value = currentVessel;
     }
 
+    updateMapButton();
     renderComponentTypeFilter();
     renderComponents();
     renderSummary();
@@ -444,14 +594,12 @@
 
     if (!ok) return;
 
-    const componentIds = Array.from(state.selectedComponents);
-
     await rpc("mai_record_vessel_operation", {
       p_vessel_id: vesselId,
       p_operation_type_key: operationTypeKey,
       p_operation_start_at: new Date(el.operationStart.value).toISOString(),
       p_operation_end_at: new Date(el.operationEnd.value).toISOString(),
-      p_component_ids: componentIds,
+      p_component_ids: Array.from(state.selectedComponents),
       p_port_name: el.portName.value || null,
       p_berth_or_terminal: el.berthTerminal.value || null,
       p_anchorage_name: el.anchorageName.value || null,
@@ -459,19 +607,15 @@
       p_unusual_event: el.unusualEvent.checked,
       p_event_requires_inspection: el.requiresInspection.checked,
       p_event_description: el.eventDescription.value || null,
-      p_remarks: el.operationRemarks.value || null
+      p_remarks: el.operationRemarks.value || null,
+      p_port_id: el.portSelect.value || null,
+      p_port_facility_id: el.facilitySelect.value || null
     });
 
     toast("ok", "Vessel operation recorded and component working-hours credited.");
 
     resetForm();
     await reloadAfterVesselChange();
-  }
-
-  async function rpc(name, args = {}) {
-    const { data, error } = await state.sb.rpc(name, args);
-    if (error) throw error;
-    return data;
   }
 
   async function reloadAfterVesselChange() {
@@ -484,9 +628,11 @@
 
   async function reload() {
     await loadBaseData();
+
     renderViewerMode();
     renderVesselSelect();
     renderOperationTypes();
+    renderPorts();
 
     if (state.isVesselViewer && state.profile?.vessel_id) {
       el.operationVessel.value = state.profile.vessel_id;
@@ -498,7 +644,20 @@
     renderSummary();
     await loadOperationHistory();
 
-    toast("ok", "Operation recording page reloaded.");
+    toast("ok", "Vessel operations portal reloaded.");
+  }
+
+  function renderVesselSelect() {
+    el.operationVessel.innerHTML = [`<option value="">Select vessel...</option>`]
+      .concat(state.vessels.map((v) => `
+        <option value="${esc(v.id)}">${esc(v.name || "Unnamed Vessel")} / Hull ${esc(v.hull_number || "—")}</option>
+      `))
+      .join("");
+
+    if (state.isVesselViewer && state.profile?.vessel_id) {
+      el.operationVessel.value = state.profile.vessel_id;
+      el.operationVessel.disabled = true;
+    }
   }
 
   function bindEvents() {
@@ -511,10 +670,31 @@
       el.operationStart,
       el.operationEnd,
       el.unusualEvent,
-      el.requiresInspection
+      el.requiresInspection,
+      el.portName,
+      el.berthTerminal
     ].forEach((input) => {
       input.addEventListener("input", renderSummary);
       input.addEventListener("change", renderSummary);
+    });
+
+    el.portSelect.addEventListener("change", () => {
+      renderFacilities();
+      updateManualPortFields();
+      updateMapButton();
+      renderSummary();
+    });
+
+    el.facilitySelect.addEventListener("change", () => {
+      updateManualPortFields();
+      updateMapButton();
+      renderSummary();
+    });
+
+    el.openMapBtn.addEventListener("click", () => {
+      const coords = selectedCoordinates();
+      if (!coords) return;
+      window.open(`https://www.openstreetmap.org/?mlat=${encodeURIComponent(coords.lat)}&mlon=${encodeURIComponent(coords.lon)}#map=12/${encodeURIComponent(coords.lat)}/${encodeURIComponent(coords.lon)}`, "_blank", "noopener");
     });
 
     el.componentTypeFilter.addEventListener("change", () => {
@@ -541,6 +721,19 @@
 
     el.recordOperationSubmitBtn.addEventListener("click", () => recordOperation().catch(handleError));
     el.resetFormBtn.addEventListener("click", resetForm);
+
+    [el.historyDateFrom, el.historyDateTo, el.historyOperationType, el.historySearch].forEach((input) => {
+      input.addEventListener("input", renderOperationHistory);
+      input.addEventListener("change", renderOperationHistory);
+    });
+
+    el.clearHistoryFiltersBtn.addEventListener("click", () => {
+      el.historyDateFrom.value = "";
+      el.historyDateTo.value = "";
+      el.historyOperationType.value = "";
+      el.historySearch.value = "";
+      renderOperationHistory();
+    });
   }
 
   function handleError(error) {

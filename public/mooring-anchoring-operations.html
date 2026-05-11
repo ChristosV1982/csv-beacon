@@ -5,11 +5,11 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-  <title>C.S.V. BEACON – Mooring / Anchoring Operations</title>
+  <title>C.S.V. BEACON – Vessel Operations Portal</title>
 
   <link rel="stylesheet" href="./csv-beacon-theme.css?v=20260428_3" />
   <link rel="stylesheet" href="./style.css?v=20260428_3" />
-  <link rel="stylesheet" href="./mooring-anchoring-operations.css?v=20260511_1" />
+  <link rel="stylesheet" href="./mooring-anchoring-operations.css?v=20260511_2" />
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="./auth.js"></script>
@@ -42,9 +42,9 @@
 
     <section class="page-head">
       <div>
-        <h1>Mooring / Anchoring Operation Recording</h1>
+        <h1>Vessel Operations Portal</h1>
         <div class="subtitle">
-          Record vessel operations once. The system will credit the calculated duration to each selected mooring / anchoring component.
+          Record vessel operations and credit calculated hours to selected mooring / anchoring components.
         </div>
       </div>
 
@@ -65,7 +65,7 @@
     <section class="two-col">
       <section class="panel">
         <div class="panel-head">
-          <h2>Operation Details</h2>
+          <h2>Record Vessel Operation</h2>
         </div>
 
         <div class="form-grid two">
@@ -77,6 +77,36 @@
           <label class="field">
             <span>Operation Type *</span>
             <select id="operationType"></select>
+          </label>
+
+          <label class="field">
+            <span>Port Directory</span>
+            <select id="portSelect"></select>
+          </label>
+
+          <label class="field">
+            <span>Port Facility / Terminal</span>
+            <select id="facilitySelect"></select>
+          </label>
+
+          <label class="field">
+            <span>Manual Port Name</span>
+            <input id="portName" placeholder="Manual port name, if not in directory" />
+          </label>
+
+          <label class="field">
+            <span>Manual Berth / Terminal</span>
+            <input id="berthTerminal" placeholder="Manual berth / terminal, if not in directory" />
+          </label>
+
+          <label class="field">
+            <span>Anchorage</span>
+            <input id="anchorageName" placeholder="Anchorage name, if applicable" />
+          </label>
+
+          <label class="field">
+            <span>Operation Reference</span>
+            <input id="operationReference" placeholder="Port call / STS ref / voyage ref" />
           </label>
 
           <label class="field">
@@ -94,25 +124,10 @@
             <input id="durationPreview" disabled value="—" />
           </label>
 
-          <label class="field">
-            <span>Operation Reference</span>
-            <input id="operationReference" placeholder="e.g. Port call / STS ref / voyage ref" />
-          </label>
-
-          <label class="field">
-            <span>Port</span>
-            <input id="portName" placeholder="Port name" />
-          </label>
-
-          <label class="field">
-            <span>Berth / Terminal</span>
-            <input id="berthTerminal" placeholder="Berth / terminal" />
-          </label>
-
-          <label class="field">
-            <span>Anchorage</span>
-            <input id="anchorageName" placeholder="Anchorage name, if applicable" />
-          </label>
+          <div class="map-box">
+            <button id="openMapBtn" class="btn2 compact" type="button" disabled>Open Map</button>
+            <div id="mapHint" class="field-help">Map opens when selected port/facility has coordinates.</div>
+          </div>
 
           <label class="checkbox-line">
             <input id="unusualEvent" type="checkbox" />
@@ -138,11 +153,11 @@
 
       <section class="panel">
         <div class="panel-head">
-          <h2>Selected Operation Summary</h2>
+          <h2>Operation Summary</h2>
         </div>
 
         <div id="operationSummaryBox" class="summary-box">
-          Select vessel, operation type, start/end date-time and components.
+          Select vessel, operation type, port, start/end date-time and components.
         </div>
 
         <div class="actions-row">
@@ -184,9 +199,35 @@
     <section class="panel">
       <div class="panel-head">
         <div>
-          <h2>Vessel Operation History</h2>
+          <h2>Recorded Vessel Operations</h2>
           <div id="historyMeta" class="meta">No operation history loaded.</div>
         </div>
+      </div>
+
+      <div class="history-filter-row">
+        <label class="field">
+          <span>Date From</span>
+          <input id="historyDateFrom" type="date" />
+        </label>
+
+        <label class="field">
+          <span>Date To</span>
+          <input id="historyDateTo" type="date" />
+        </label>
+
+        <label class="field">
+          <span>Operation Type</span>
+          <select id="historyOperationType">
+            <option value="">All operation types</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span>Search</span>
+          <input id="historySearch" type="search" placeholder="Port, berth, component, reference..." />
+        </label>
+
+        <button id="clearHistoryFiltersBtn" class="btn2" type="button">Clear</button>
       </div>
 
       <div id="operationHistory" class="mini-list"></div>
@@ -194,6 +235,6 @@
   </main>
 
   <script src="./csvb-toast-messages.js?v=20260511_1"></script>
-  <script src="./mooring-anchoring-operations.js?v=20260511_1"></script>
+  <script src="./mooring-anchoring-operations.js?v=20260511_2"></script>
 </body>
 </html>

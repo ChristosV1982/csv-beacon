@@ -188,13 +188,26 @@ body {
   font-size: 1rem;
 }
 
-.form-grid {
+.form-grid,
+.history-filter-row,
+.component-filter-row {
   display: grid;
   gap: 8px;
 }
 
 .form-grid.two {
   grid-template-columns: repeat(2, minmax(180px, 1fr));
+}
+
+.history-filter-row {
+  grid-template-columns: 160px 160px 260px minmax(260px, 1fr) auto;
+  align-items: end;
+  margin-bottom: 8px;
+}
+
+.component-filter-row {
+  grid-template-columns: minmax(220px, .5fr) minmax(280px, 1fr);
+  margin-bottom: 8px;
 }
 
 .field-wide {
@@ -251,6 +264,13 @@ textarea {
   width: auto;
 }
 
+.map-box {
+  border: 1px dashed #b9c8df;
+  border-radius: 12px;
+  padding: 8px;
+  background: #f9fbfe;
+}
+
 .summary-box {
   border: 1px solid var(--mai-soft-border);
   border-radius: 12px;
@@ -258,14 +278,7 @@ textarea {
   padding: 10px;
   color: #213a5f;
   line-height: 1.4;
-  min-height: 160px;
-}
-
-.component-filter-row {
-  display: grid;
-  grid-template-columns: minmax(220px, .5fr) minmax(280px, 1fr);
-  gap: 8px;
-  margin-bottom: 8px;
+  min-height: 180px;
 }
 
 .component-checks {
@@ -305,7 +318,7 @@ textarea {
   display: flex;
   flex-direction: column;
   gap: 7px;
-  max-height: 460px;
+  max-height: 520px;
   overflow: auto;
 }
 
@@ -356,7 +369,8 @@ textarea {
 @media (max-width: 1100px) {
   .two-col,
   .form-grid.two,
-  .component-filter-row {
+  .component-filter-row,
+  .history-filter-row {
     grid-template-columns: 1fr;
   }
 }
