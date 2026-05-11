@@ -6,7 +6,7 @@
 // - Bump cache version + clean old caches on activate
 
 const CACHE_PREFIX = "sire-test-";
-const CACHE_VERSION = "v111-mai-component-detail-v4b";
+const CACHE_VERSION = "v112-mai-checklist-run-actions";
 const CACHE_NAME = `${CACHE_PREFIX}${CACHE_VERSION}`;
 
 const CORE_ASSETS = [
@@ -54,6 +54,7 @@ const CORE_ASSETS = [
   "./mooring-anchoring-component.html",
   "./mooring-anchoring-component.css",
   "./mooring-anchoring-component.js",
+  "./mooring-anchoring-checklist-run-actions-extension.js",
   "./assets/csv-beacon-icon.png",
   "./assets/csv-beacon-logo-full.png",
   "./icon-192.png",
