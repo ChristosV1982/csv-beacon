@@ -6,7 +6,7 @@
 // - Bump cache version + clean old caches on activate
 
 const CACHE_PREFIX = "sire-test-";
-const CACHE_VERSION = "v107-mai-event-workspace-evidence";
+const CACHE_VERSION = "v108-mai-evidence-upload-fix";
 const CACHE_NAME = `${CACHE_PREFIX}${CACHE_VERSION}`;
 
 const CORE_ASSETS = [
@@ -47,6 +47,7 @@ const CORE_ASSETS = [
   "./mooring-anchoring-void-run-extension.js",
   "./csvb-toast-messages.js",
   "./mooring-anchoring-event-workspace-extension.js",
+  "./mooring-anchoring-evidence-upload-fix.js",
   "./assets/csv-beacon-icon.png",
   "./assets/csv-beacon-logo-full.png",
   "./icon-192.png",
