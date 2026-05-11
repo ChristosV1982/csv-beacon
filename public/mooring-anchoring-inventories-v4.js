@@ -4,7 +4,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "MAI-INVENTORY-LIST-V4-20260511-1";
+  const BUILD = "MAI-INVENTORY-LIST-V4-20260511-2";
   const MODULE_KEY = "mooring_anchoring_inventories";
 
   const state = {
@@ -20,7 +20,8 @@
     usage: [],
     locks: [],
     selectedVessels: new Set(),
-    selectedTypes: new Set()
+    selectedTypes: new Set(),
+    selectedStatuses: new Set()
   };
 
   const el = {};
@@ -34,10 +35,12 @@
       "warnBox", "okBox", "reloadBtn", "recordOperationBtn", "registerComponentBtn",
       "viewerMode", "viewerHint",
       "statTotal", "statActive", "statDue", "statLocked",
-      "vesselChecks", "typeChecks",
+      "vesselChecks", "typeChecks", "statusChecks",
+      "vesselSummary", "typeSummary", "statusSummary",
       "selectAllVesselsBtn", "clearVesselsBtn",
       "selectAllTypesBtn", "clearTypesBtn",
-      "statusFilter", "searchInput", "clearSearchBtn",
+      "selectAllStatusesBtn", "clearStatusesBtn",
+      "searchInput", "clearSearchBtn",
       "listMeta", "componentsTbody"
     ].forEach((id) => {
       el[id] = $(id);
@@ -158,12 +161,6 @@
     return actionable || rows[0] || null;
   }
 
-  async function rpc(name, args = {}) {
-    const { data, error } = await state.sb.rpc(name, args);
-    if (error) throw error;
-    return data;
-  }
-
   async function loadBaseData() {
     const [
       vesselRes,
@@ -198,16 +195,29 @@
     initializeSelections();
   }
 
-  function initializeSelections() {
-    const visibleVesselIds = new Set(state.components.map((c) => c.vessel_id).filter(Boolean));
-    const visibleTypeIds = new Set(state.components.map((c) => c.component_type_id).filter(Boolean));
+  function visibleVesselIds() {
+    return [...new Set(state.components.map((c) => c.vessel_id).filter(Boolean))];
+  }
 
+  function visibleTypeIds() {
+    return [...new Set(state.components.map((c) => c.component_type_id).filter(Boolean))];
+  }
+
+  function visibleStatusKeys() {
+    return [...new Set(state.components.map((c) => c.current_status).filter(Boolean))];
+  }
+
+  function initializeSelections() {
     if (!state.selectedVessels.size) {
-      visibleVesselIds.forEach((id) => state.selectedVessels.add(id));
+      visibleVesselIds().forEach((id) => state.selectedVessels.add(id));
     }
 
     if (!state.selectedTypes.size) {
-      visibleTypeIds.forEach((id) => state.selectedTypes.add(id));
+      visibleTypeIds().forEach((id) => state.selectedTypes.add(id));
+    }
+
+    if (!state.selectedStatuses.size) {
+      visibleStatusKeys().forEach((key) => state.selectedStatuses.add(key));
     }
   }
 
@@ -216,7 +226,7 @@
 
     if (state.isOfficeViewer) {
       el.viewerMode.textContent = "Office Viewer";
-      el.viewerHint.textContent = "Office users can view all accessible vessel inventories and filter by vessel/component type.";
+      el.viewerHint.textContent = "Office users can view all accessible vessel inventories and filter by vessel/component type/status.";
       return;
     }
 
@@ -230,17 +240,22 @@
     el.viewerHint.textContent = "Viewer mode determined from current user role and RLS.";
   }
 
-  function renderStatusFilter() {
-    el.statusFilter.innerHTML = [`<option value="">All statuses</option>`]
-      .concat(state.statuses.map((s) => `<option value="${esc(s.status_key)}">${esc(s.status_label || s.status_key)}</option>`))
-      .join("");
+  function summaryText(selectedSet, total, allLabel) {
+    if (total <= 0) return "None";
+    if (selectedSet.size === 0) return "None";
+    if (selectedSet.size >= total) return allLabel;
+    return `${selectedSet.size} selected`;
+  }
+
+  function updateSummaries() {
+    el.vesselSummary.textContent = summaryText(state.selectedVessels, visibleVesselIds().length, "All");
+    el.typeSummary.textContent = summaryText(state.selectedTypes, visibleTypeIds().length, "All");
+    el.statusSummary.textContent = summaryText(state.selectedStatuses, visibleStatusKeys().length, "All");
   }
 
   function renderVesselChecks() {
     const byId = new Map(state.vessels.map((v) => [v.id, v]));
-    const vesselIds = [...new Set(state.components.map((c) => c.vessel_id).filter(Boolean))];
-
-    const rows = vesselIds
+    const rows = visibleVesselIds()
       .map((id) => byId.get(id))
       .filter(Boolean)
       .sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")));
@@ -269,6 +284,7 @@
         const id = input.getAttribute("data-vessel-check");
         if (input.checked) state.selectedVessels.add(id);
         else state.selectedVessels.delete(id);
+        updateSummaries();
         renderTable();
       });
     });
@@ -276,9 +292,7 @@
 
   function renderTypeChecks() {
     const byId = new Map(state.types.map((t) => [t.id, t]));
-    const typeIds = [...new Set(state.components.map((c) => c.component_type_id).filter(Boolean))];
-
-    const rows = typeIds
+    const rows = visibleTypeIds()
       .map((id) => byId.get(id))
       .filter(Boolean)
       .sort((a, b) => Number(a.sort_order || 0) - Number(b.sort_order || 0));
@@ -306,19 +320,55 @@
         const id = input.getAttribute("data-type-check");
         if (input.checked) state.selectedTypes.add(id);
         else state.selectedTypes.delete(id);
+        updateSummaries();
+        renderTable();
+      });
+    });
+  }
+
+  function renderStatusChecks() {
+    const visible = new Set(visibleStatusKeys());
+
+    const rows = state.statuses
+      .filter((s) => visible.has(s.status_key))
+      .sort((a, b) => Number(a.sort_order || 0) - Number(b.sort_order || 0));
+
+    if (!rows.length) {
+      el.statusChecks.innerHTML = `<div class="muted">No statuses found.</div>`;
+      return;
+    }
+
+    el.statusChecks.innerHTML = rows.map((s) => {
+      const checked = state.selectedStatuses.has(s.status_key) ? " checked" : "";
+      return `
+        <label class="check-line">
+          <input type="checkbox" data-status-check="${esc(s.status_key)}"${checked} />
+          <span>
+            <div class="check-title">${esc(s.status_label || s.status_key)}</div>
+            <div class="check-sub">${esc(s.status_key)}</div>
+          </span>
+        </label>
+      `;
+    }).join("");
+
+    el.statusChecks.querySelectorAll("[data-status-check]").forEach((input) => {
+      input.addEventListener("change", () => {
+        const key = input.getAttribute("data-status-check");
+        if (input.checked) state.selectedStatuses.add(key);
+        else state.selectedStatuses.delete(key);
+        updateSummaries();
         renderTable();
       });
     });
   }
 
   function filteredComponents() {
-    const status = el.statusFilter.value || "";
     const q = String(el.searchInput.value || "").trim().toLowerCase();
 
     return state.components.filter((c) => {
       if (!state.selectedVessels.has(c.vessel_id)) return false;
       if (!state.selectedTypes.has(c.component_type_id)) return false;
-      if (status && c.current_status !== status) return false;
+      if (!state.selectedStatuses.has(c.current_status)) return false;
 
       if (q) {
         const next = nextLifecycle(c.id);
@@ -364,6 +414,7 @@
   function renderTable() {
     const rows = filteredComponents();
     renderStats(rows);
+    updateSummaries();
 
     el.listMeta.textContent = `${rows.length} record(s) shown from ${state.components.length} accessible record(s).`;
 
@@ -423,6 +474,36 @@
     }).join("");
   }
 
+  function closeAllDropdowns(except = "") {
+    document.querySelectorAll(".dropdown-filter").forEach((box) => {
+      if (except && box.id === except) return;
+      box.classList.remove("open");
+    });
+  }
+
+  function bindDropdowns() {
+    document.querySelectorAll("[data-dropdown-toggle]").forEach((btn) => {
+      btn.addEventListener("click", (event) => {
+        event.stopPropagation();
+
+        const key = btn.getAttribute("data-dropdown-toggle");
+        const box = $(`${key}Dropdown`);
+
+        if (!box) return;
+
+        const wasOpen = box.classList.contains("open");
+        closeAllDropdowns();
+        box.classList.toggle("open", !wasOpen);
+      });
+    });
+
+    document.addEventListener("click", (event) => {
+      if (!event.target.closest(".dropdown-filter")) {
+        closeAllDropdowns();
+      }
+    });
+  }
+
   function bindEvents() {
     el.reloadBtn.addEventListener("click", () => reload().catch(handleError));
 
@@ -431,12 +512,12 @@
     });
 
     el.registerComponentBtn.addEventListener("click", () => {
-      location.href = "./mooring-anchoring-inventories.html";
+      toast("info", "Component registration will be moved into v4 next. The old MAI page has been retired from navigation.");
     });
 
     el.selectAllVesselsBtn.addEventListener("click", () => {
       if (state.isVesselViewer) return;
-      state.components.forEach((c) => state.selectedVessels.add(c.vessel_id));
+      visibleVesselIds().forEach((id) => state.selectedVessels.add(id));
       renderVesselChecks();
       renderTable();
     });
@@ -449,7 +530,7 @@
     });
 
     el.selectAllTypesBtn.addEventListener("click", () => {
-      state.components.forEach((c) => state.selectedTypes.add(c.component_type_id));
+      visibleTypeIds().forEach((id) => state.selectedTypes.add(id));
       renderTypeChecks();
       renderTable();
     });
@@ -460,14 +541,32 @@
       renderTable();
     });
 
-    el.statusFilter.addEventListener("change", renderTable);
+    el.selectAllStatusesBtn.addEventListener("click", () => {
+      visibleStatusKeys().forEach((key) => state.selectedStatuses.add(key));
+      renderStatusChecks();
+      renderTable();
+    });
+
+    el.clearStatusesBtn.addEventListener("click", () => {
+      state.selectedStatuses.clear();
+      renderStatusChecks();
+      renderTable();
+    });
+
     el.searchInput.addEventListener("input", renderTable);
 
     el.clearSearchBtn.addEventListener("click", () => {
-      el.statusFilter.value = "";
+      visibleVesselIds().forEach((id) => state.selectedVessels.add(id));
+      visibleTypeIds().forEach((id) => state.selectedTypes.add(id));
+      visibleStatusKeys().forEach((key) => state.selectedStatuses.add(key));
       el.searchInput.value = "";
+      renderVesselChecks();
+      renderTypeChecks();
+      renderStatusChecks();
       renderTable();
     });
+
+    bindDropdowns();
   }
 
   function handleError(error) {
@@ -478,9 +577,9 @@
   async function reload() {
     await loadBaseData();
     renderViewerMode();
-    renderStatusFilter();
     renderVesselChecks();
     renderTypeChecks();
+    renderStatusChecks();
     renderTable();
     toast("ok", "Inventory list reloaded.");
   }

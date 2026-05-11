@@ -6,7 +6,7 @@
 // - Bump cache version + clean old caches on activate
 
 const CACHE_PREFIX = "sire-test-";
-const CACHE_VERSION = "v113-mai-v4-active-dashboard-entry";
+const CACHE_VERSION = "v114-mai-v4-dropdown-filters-retire-old";
 const CACHE_NAME = `${CACHE_PREFIX}${CACHE_VERSION}`;
 
 const CORE_ASSETS = [
@@ -41,10 +41,6 @@ const CORE_ASSETS = [
   "./csvb-question-overrides-admin.js",
   "./csvb-dashboard-polish.js",
   "./csvb-dashboard-threads-badge.js",
-  "./mooring-anchoring-inventories.html",
-  "./mooring-anchoring-inventories.css",
-  "./mooring-anchoring-inventories.js",
-  "./mooring-anchoring-void-run-extension.js",
   "./csvb-toast-messages.js",
   "./mooring-anchoring-event-workspace-extension.js",
   "./mooring-anchoring-evidence-upload-fix.js",

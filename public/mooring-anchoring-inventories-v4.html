@@ -9,7 +9,7 @@
 
   <link rel="stylesheet" href="./csv-beacon-theme.css?v=20260428_3" />
   <link rel="stylesheet" href="./style.css?v=20260428_3" />
-  <link rel="stylesheet" href="./mooring-anchoring-inventories-v4.css?v=20260511_1" />
+  <link rel="stylesheet" href="./mooring-anchoring-inventories-v4.css?v=20260511_2" />
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="./auth.js"></script>
@@ -32,7 +32,6 @@
       <button class="btn2" id="switchUserBtn" type="button">Switch User</button>
       <button class="btn" id="logoutBtn" type="button" style="display:none;">Logout</button>
       <button class="btn2" type="button" onclick="location.href='./q-dashboard.html'">Dashboard</button>
-      <button class="btn2" type="button" onclick="location.href='./mooring-anchoring-inventories.html'">Old MAI Page</button>
     </div>
   </div>
 
@@ -44,7 +43,7 @@
       <div>
         <h1>Mooring and Anchoring Inventories</h1>
         <div class="subtitle">
-          Inventory list view for Office and Vessel users. Component detail page will be separated in the next step.
+          Inventory list view for Office and Vessel users. Select vessels, component types and statuses from dropdown checklist filters.
         </div>
       </div>
 
@@ -85,43 +84,58 @@
       </div>
     </section>
 
-    <section class="filters-layout">
-      <div class="filter-card">
-        <div class="filter-head">
-          <h2>Vessel Filter</h2>
-          <button id="selectAllVesselsBtn" class="btn2 compact" type="button">All</button>
-          <button id="clearVesselsBtn" class="btn2 compact" type="button">None</button>
+    <section class="filter-bar">
+      <div class="dropdown-filter" id="vesselDropdown">
+        <button class="dropdown-toggle" type="button" data-dropdown-toggle="vessel">
+          <span>Vessels</span>
+          <strong id="vesselSummary">All</strong>
+          <span>▾</span>
+        </button>
+        <div class="dropdown-panel" id="vesselPanel">
+          <div class="dropdown-actions">
+            <button id="selectAllVesselsBtn" class="btn2 compact" type="button">All</button>
+            <button id="clearVesselsBtn" class="btn2 compact" type="button">None</button>
+          </div>
+          <div id="vesselChecks" class="checks-list"></div>
         </div>
-        <div id="vesselChecks" class="checks-list"></div>
       </div>
 
-      <div class="filter-card">
-        <div class="filter-head">
-          <h2>Component Type Filter</h2>
-          <button id="selectAllTypesBtn" class="btn2 compact" type="button">All</button>
-          <button id="clearTypesBtn" class="btn2 compact" type="button">None</button>
+      <div class="dropdown-filter" id="typeDropdown">
+        <button class="dropdown-toggle" type="button" data-dropdown-toggle="type">
+          <span>Component Types</span>
+          <strong id="typeSummary">All</strong>
+          <span>▾</span>
+        </button>
+        <div class="dropdown-panel" id="typePanel">
+          <div class="dropdown-actions">
+            <button id="selectAllTypesBtn" class="btn2 compact" type="button">All</button>
+            <button id="clearTypesBtn" class="btn2 compact" type="button">None</button>
+          </div>
+          <div id="typeChecks" class="checks-list"></div>
         </div>
-        <div id="typeChecks" class="checks-list"></div>
       </div>
 
-      <div class="filter-card">
-        <div class="filter-head">
-          <h2>Status / Search</h2>
-          <button id="clearSearchBtn" class="btn2 compact" type="button">Clear</button>
-        </div>
-
-        <label class="field">
+      <div class="dropdown-filter" id="statusDropdown">
+        <button class="dropdown-toggle" type="button" data-dropdown-toggle="status">
           <span>Status</span>
-          <select id="statusFilter">
-            <option value="">All statuses</option>
-          </select>
-        </label>
-
-        <label class="field">
-          <span>Search</span>
-          <input id="searchInput" type="search" placeholder="Unique ID, vessel, order number, location..." />
-        </label>
+          <strong id="statusSummary">All</strong>
+          <span>▾</span>
+        </button>
+        <div class="dropdown-panel" id="statusPanel">
+          <div class="dropdown-actions">
+            <button id="selectAllStatusesBtn" class="btn2 compact" type="button">All</button>
+            <button id="clearStatusesBtn" class="btn2 compact" type="button">None</button>
+          </div>
+          <div id="statusChecks" class="checks-list"></div>
+        </div>
       </div>
+
+      <label class="search-field">
+        <span>Search</span>
+        <input id="searchInput" type="search" placeholder="Unique ID, vessel, order number, location..." />
+      </label>
+
+      <button id="clearSearchBtn" class="btn2" type="button">Clear</button>
     </section>
 
     <section class="panel">
@@ -158,6 +172,6 @@
   </main>
 
   <script src="./csvb-toast-messages.js?v=20260511_1"></script>
-  <script src="./mooring-anchoring-inventories-v4.js?v=20260511_1"></script>
+  <script src="./mooring-anchoring-inventories-v4.js?v=20260511_2"></script>
 </body>
 </html>

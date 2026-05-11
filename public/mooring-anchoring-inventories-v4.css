@@ -32,8 +32,8 @@ body {
 
 .topbar-actions,
 .page-actions,
-.filter-head,
-.panel-head {
+.panel-head,
+.dropdown-actions {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -81,8 +81,8 @@ body {
 .page-head,
 .viewer-panel,
 .stat-card,
-.filter-card,
-.panel {
+.panel,
+.filter-bar {
   background: var(--mai-card);
   border: 1px solid var(--mai-border);
   border-radius: 14px;
@@ -175,38 +175,75 @@ body {
   margin-top: 4px;
 }
 
-.filters-layout {
-  display: grid;
-  grid-template-columns: 1.2fr 1.2fr 1fr;
-  gap: 8px;
-  margin-bottom: 8px;
-}
-
-.filter-card,
-.panel {
+.filter-bar {
   padding: 10px;
+  margin-bottom: 8px;
+  display: grid;
+  grid-template-columns: minmax(230px, .9fr) minmax(230px, .9fr) minmax(210px, .8fr) minmax(280px, 1.3fr) auto;
+  gap: 8px;
+  align-items: end;
+  position: relative;
+  z-index: 5;
 }
 
-.filter-card h2,
-.panel h2 {
-  margin: 0;
+.dropdown-filter {
+  position: relative;
+}
+
+.dropdown-toggle {
+  width: 100%;
+  border: 1px solid #bfd5ee;
+  background: #fff;
   color: var(--mai-navy);
-  font-size: .98rem;
+  border-radius: 12px;
+  padding: 8px 10px;
+  cursor: pointer;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 8px;
+  align-items: center;
+  text-align: left;
+  font-weight: 800;
 }
 
-.filter-head,
-.panel-head {
-  justify-content: space-between;
+.dropdown-toggle strong {
+  color: #10233f;
+  font-weight: 700;
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dropdown-panel {
+  display: none;
+  position: absolute;
+  left: 0;
+  top: calc(100% + 4px);
+  width: min(520px, 90vw);
+  max-height: 360px;
+  overflow: auto;
+  background: #fff;
+  border: 1px solid var(--mai-border);
+  border-radius: 14px;
+  box-shadow: 0 20px 44px rgba(3,27,63,.18);
+  padding: 10px;
+  z-index: 100;
+}
+
+.dropdown-filter.open .dropdown-panel {
+  display: block;
+}
+
+.dropdown-actions {
+  justify-content: flex-end;
   margin-bottom: 8px;
 }
 
 .checks-list {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: 1fr;
   gap: 6px;
-  max-height: 220px;
-  overflow: auto;
-  padding-right: 4px;
 }
 
 .check-line {
@@ -235,14 +272,13 @@ body {
   margin-top: 2px;
 }
 
-.field {
+.search-field {
   display: flex;
   flex-direction: column;
   gap: 5px;
-  margin-bottom: 8px;
 }
 
-.field span {
+.search-field span {
   color: var(--mai-navy);
   font-weight: 800;
   font-size: .84rem;
@@ -259,6 +295,22 @@ select {
   color: #10233f;
   font-family: inherit;
   font-size: .88rem;
+}
+
+.panel {
+  padding: 10px;
+  margin-bottom: 8px;
+}
+
+.panel h2 {
+  margin: 0;
+  color: var(--mai-navy);
+  font-size: .98rem;
+}
+
+.panel-head {
+  justify-content: space-between;
+  margin-bottom: 8px;
 }
 
 .table-wrap {
@@ -341,7 +393,13 @@ select {
 
 @media (max-width: 1100px) {
   .stats-grid,
-  .filters-layout {
+  .filter-bar {
     grid-template-columns: 1fr;
+  }
+
+  .dropdown-panel {
+    position: static;
+    width: auto;
+    margin-top: 6px;
   }
 }
