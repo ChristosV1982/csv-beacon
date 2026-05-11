@@ -1,0 +1,199 @@
+<!-- public/mooring-anchoring-operations.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>C.S.V. BEACON – Mooring / Anchoring Operations</title>
+
+  <link rel="stylesheet" href="./csv-beacon-theme.css?v=20260428_3" />
+  <link rel="stylesheet" href="./style.css?v=20260428_3" />
+  <link rel="stylesheet" href="./mooring-anchoring-operations.css?v=20260511_1" />
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="./auth.js"></script>
+  <script src="./csvb-module-guard.js?v=20260507_2"></script>
+</head>
+
+<body>
+  <div class="topbar">
+    <div class="csvb-brand">
+      <img class="csvb-brand-logo" src="./assets/csv-beacon-icon.png" alt="C.S.V. BEACON logo" />
+      <div class="csvb-brand-text">
+        <div class="csvb-brand-title">C.S.V. BEACON</div>
+        <div class="csvb-brand-subtitle">Marine Assurance & Compliance Platform</div>
+      </div>
+    </div>
+
+    <div class="topbar-actions">
+      <div id="userBadge" class="user-badge"></div>
+      <button class="btn2" id="loginBtn" type="button" style="display:none;">Login</button>
+      <button class="btn2" id="switchUserBtn" type="button">Switch User</button>
+      <button class="btn" id="logoutBtn" type="button" style="display:none;">Logout</button>
+      <button class="btn2" type="button" onclick="location.href='./mooring-anchoring-inventories-v4.html'">Inventory List</button>
+      <button class="btn2" type="button" onclick="location.href='./q-dashboard.html'">Dashboard</button>
+    </div>
+  </div>
+
+  <main class="wrap">
+    <div id="warnBox" class="warn"></div>
+    <div id="okBox" class="ok"></div>
+
+    <section class="page-head">
+      <div>
+        <h1>Mooring / Anchoring Operation Recording</h1>
+        <div class="subtitle">
+          Record vessel operations once. The system will credit the calculated duration to each selected mooring / anchoring component.
+        </div>
+      </div>
+
+      <div class="page-actions">
+        <button id="reloadBtn" class="btn2" type="button">↻ Reload</button>
+        <button class="btn2" type="button" onclick="location.href='./mooring-anchoring-inventories-v4.html'">Back to Inventory</button>
+      </div>
+    </section>
+
+    <section class="viewer-panel">
+      <div>
+        <div class="section-label">Viewer Mode</div>
+        <div id="viewerMode" class="viewer-mode">Loading...</div>
+      </div>
+      <div id="viewerHint" class="viewer-hint"></div>
+    </section>
+
+    <section class="two-col">
+      <section class="panel">
+        <div class="panel-head">
+          <h2>Operation Details</h2>
+        </div>
+
+        <div class="form-grid two">
+          <label class="field">
+            <span>Vessel *</span>
+            <select id="operationVessel"></select>
+          </label>
+
+          <label class="field">
+            <span>Operation Type *</span>
+            <select id="operationType"></select>
+          </label>
+
+          <label class="field">
+            <span>Operation Start *</span>
+            <input id="operationStart" type="datetime-local" />
+          </label>
+
+          <label class="field">
+            <span>Operation End *</span>
+            <input id="operationEnd" type="datetime-local" />
+          </label>
+
+          <label class="field">
+            <span>Calculated Duration</span>
+            <input id="durationPreview" disabled value="—" />
+          </label>
+
+          <label class="field">
+            <span>Operation Reference</span>
+            <input id="operationReference" placeholder="e.g. Port call / STS ref / voyage ref" />
+          </label>
+
+          <label class="field">
+            <span>Port</span>
+            <input id="portName" placeholder="Port name" />
+          </label>
+
+          <label class="field">
+            <span>Berth / Terminal</span>
+            <input id="berthTerminal" placeholder="Berth / terminal" />
+          </label>
+
+          <label class="field">
+            <span>Anchorage</span>
+            <input id="anchorageName" placeholder="Anchorage name, if applicable" />
+          </label>
+
+          <label class="checkbox-line">
+            <input id="unusualEvent" type="checkbox" />
+            <span>Unusual event / abnormal load</span>
+          </label>
+
+          <label class="checkbox-line">
+            <input id="requiresInspection" type="checkbox" />
+            <span>Event requires inspection</span>
+          </label>
+
+          <label class="field field-wide">
+            <span>Event Description</span>
+            <input id="eventDescription" placeholder="Describe heavy weather, excessive swell, shock load or other abnormal event" />
+          </label>
+
+          <label class="field field-wide">
+            <span>Remarks</span>
+            <textarea id="operationRemarks" placeholder="Operation remarks"></textarea>
+          </label>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2>Selected Operation Summary</h2>
+        </div>
+
+        <div id="operationSummaryBox" class="summary-box">
+          Select vessel, operation type, start/end date-time and components.
+        </div>
+
+        <div class="actions-row">
+          <button id="recordOperationSubmitBtn" class="btn" type="button">Record Operation & Credit Hours</button>
+          <button id="resetFormBtn" class="btn2" type="button">Reset</button>
+        </div>
+      </section>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <div>
+          <h2>Components Used</h2>
+          <div id="componentSelectionMeta" class="meta">Select components that were actually used in the operation.</div>
+        </div>
+        <div class="panel-actions">
+          <button id="selectAllComponentsBtn" class="btn2 compact" type="button">Select All Visible</button>
+          <button id="clearComponentsBtn" class="btn2 compact" type="button">Clear</button>
+        </div>
+      </div>
+
+      <div class="component-filter-row">
+        <label class="field">
+          <span>Component Type</span>
+          <select id="componentTypeFilter">
+            <option value="">All component types</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span>Search Components</span>
+          <input id="componentSearch" type="search" placeholder="Unique ID, type, position, storage..." />
+        </label>
+      </div>
+
+      <div id="componentChecks" class="component-checks"></div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <div>
+          <h2>Vessel Operation History</h2>
+          <div id="historyMeta" class="meta">No operation history loaded.</div>
+        </div>
+      </div>
+
+      <div id="operationHistory" class="mini-list"></div>
+    </section>
+  </main>
+
+  <script src="./csvb-toast-messages.js?v=20260511_1"></script>
+  <script src="./mooring-anchoring-operations.js?v=20260511_1"></script>
+</body>
+</html>

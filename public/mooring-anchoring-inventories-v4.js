@@ -508,7 +508,7 @@
     el.reloadBtn.addEventListener("click", () => reload().catch(handleError));
 
     el.recordOperationBtn.addEventListener("click", () => {
-      toast("info", "Vessel operation recording UI will be added in Frontend 4-C.");
+      location.href = "./mooring-anchoring-operations.html";
     });
 
     el.registerComponentBtn.addEventListener("click", () => {

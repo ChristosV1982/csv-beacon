@@ -6,7 +6,7 @@
 // - Bump cache version + clean old caches on activate
 
 const CACHE_PREFIX = "sire-test-";
-const CACHE_VERSION = "v114-mai-v4-dropdown-filters-retire-old";
+const CACHE_VERSION = "v115-mai-vessel-operation-recording";
 const CACHE_NAME = `${CACHE_PREFIX}${CACHE_VERSION}`;
 
 const CORE_ASSETS = [
@@ -47,6 +47,9 @@ const CORE_ASSETS = [
   "./mooring-anchoring-inventories-v4.html",
   "./mooring-anchoring-inventories-v4.css",
   "./mooring-anchoring-inventories-v4.js",
+  "./mooring-anchoring-operations.html",
+  "./mooring-anchoring-operations.css",
+  "./mooring-anchoring-operations.js",
   "./mooring-anchoring-component.html",
   "./mooring-anchoring-component.css",
   "./mooring-anchoring-component.js",
