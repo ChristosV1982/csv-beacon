@@ -1,0 +1,324 @@
+<!-- public/mooring-anchoring-inventories.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>C.S.V. BEACON – Mooring and Anchoring Inventories</title>
+
+  <link rel="stylesheet" href="./csv-beacon-theme.css?v=20260428_3" />
+  <link rel="stylesheet" href="./style.css?v=20260428_3" />
+  <link rel="stylesheet" href="./mooring-anchoring-inventories.css?v=20260511_1" />
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="./auth.js"></script>
+  <script src="./csvb-module-guard.js?v=20260507_2"></script>
+
+  <link rel="stylesheet" href="./csvb-ui-polish.css?v=20260430_1" />
+  <link rel="stylesheet" href="./csvb-help-tooltips.css?v=20260430_1" />
+  <link rel="stylesheet" href="./csvb-100pct-fit.css?v=20260430_1" />
+</head>
+
+<body>
+  <div class="topbar">
+    <div class="csvb-brand">
+      <img class="csvb-brand-logo" src="./assets/csv-beacon-icon.png" alt="C.S.V. BEACON logo" />
+      <div class="csvb-brand-text">
+        <div class="csvb-brand-title">C.S.V. BEACON</div>
+        <div class="csvb-brand-subtitle">Marine Assurance & Compliance Platform</div>
+      </div>
+    </div>
+
+    <div class="topbar-actions">
+      <div id="userBadge" class="user-badge"></div>
+      <button class="btn2" id="loginBtn" type="button" style="display:none;">Login</button>
+      <button class="btn2" id="switchUserBtn" type="button">Switch User</button>
+      <button class="btn" id="logoutBtn" type="button" style="display:none;">Logout</button>
+      <button class="btn2" type="button" onclick="location.href='./q-dashboard.html'">Dashboard</button>
+    </div>
+  </div>
+
+  <main class="mai-wrap">
+    <div id="warnBox" class="msg msg-warn"></div>
+    <div id="okBox" class="msg msg-ok"></div>
+
+    <section class="page-head">
+      <div>
+        <h1 class="page-title">Mooring and Anchoring Inventories</h1>
+        <div class="page-subtitle">
+          Inventory control for mooring wires, soft ropes, soft tails, shackles, messengers, anchors and anchor-chain items.
+          Component fields are driven by Supabase field definitions so they can be corrected or expanded later.
+        </div>
+      </div>
+      <div class="head-actions">
+        <button id="reloadBtn" class="btn2" type="button">Reload</button>
+        <button id="newComponentBtn" class="btn" type="button">Register New Component</button>
+      </div>
+    </section>
+
+    <section class="summary-grid" aria-label="Module summary">
+      <div class="summary-card">
+        <div class="summary-label">Total visible components</div>
+        <div id="statTotal" class="summary-value">0</div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-label">Active / in service</div>
+        <div id="statActive" class="summary-value">0</div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-label">Due or overdue</div>
+        <div id="statDue" class="summary-value">0</div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-label">Retired / disposed</div>
+        <div id="statRetired" class="summary-value">0</div>
+      </div>
+    </section>
+
+    <section class="panel filters-panel">
+      <div class="panel-title-row">
+        <div class="panel-title">Filters</div>
+        <button id="clearFiltersBtn" class="btn2 compact" type="button">Clear</button>
+      </div>
+
+      <div class="filters-grid">
+        <label class="field">
+          <span>Company</span>
+          <select id="companyFilter"></select>
+        </label>
+
+        <label class="field">
+          <span>Vessel</span>
+          <select id="vesselFilter"></select>
+        </label>
+
+        <label class="field">
+          <span>Component Type</span>
+          <select id="typeFilter"></select>
+        </label>
+
+        <label class="field">
+          <span>Status</span>
+          <select id="statusFilter"></select>
+        </label>
+
+        <label class="field wide">
+          <span>Search</span>
+          <input id="searchInput" type="search" placeholder="Unique ID, vessel, type, order number, location..." />
+        </label>
+      </div>
+    </section>
+
+    <section class="panel inventory-panel">
+      <div class="panel-title-row">
+        <div>
+          <div class="panel-title">Inventory List</div>
+          <div id="listMeta" class="panel-subtitle">No records loaded.</div>
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <table class="mai-table">
+          <thead>
+            <tr>
+              <th>Unique ID</th>
+              <th>Vessel</th>
+              <th>Type</th>
+              <th>Status</th>
+              <th>Location</th>
+              <th>Last Inspection</th>
+              <th>Next Due</th>
+              <th>Updated</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="componentsTbody">
+            <tr>
+              <td colspan="9" class="empty-cell">Loading...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="registerPanel" class="panel register-panel hidden">
+      <div class="panel-title-row">
+        <div>
+          <div class="panel-title">Register New Component</div>
+          <div class="panel-subtitle">
+            Unique ID is generated as: Hull Number + Order Number + Component Type + Sequence.
+          </div>
+        </div>
+        <button id="closeRegisterBtn" class="btn2 compact" type="button">Close</button>
+      </div>
+
+      <form id="registerForm" class="form-grid">
+        <label class="field">
+          <span>Vessel <b>*</b></span>
+          <select id="registerVessel" required></select>
+        </label>
+
+        <label class="field">
+          <span>Component Type <b>*</b></span>
+          <select id="registerType" required></select>
+        </label>
+
+        <label class="field">
+          <span>Order Number <b>*</b></span>
+          <input id="registerOrderNumber" required placeholder="e.g. PO-2026-001" />
+        </label>
+
+        <label class="field">
+          <span>Status</span>
+          <select id="registerStatus"></select>
+        </label>
+
+        <label class="field">
+          <span>Location Mode</span>
+          <select id="registerLocationMode">
+            <option value="storage">Storage</option>
+            <option value="fitted">Fitted</option>
+            <option value="shore">Shore</option>
+            <option value="disposed">Disposed</option>
+          </select>
+        </label>
+
+        <label id="registerFittedWrap" class="field hidden">
+          <span>Fitted Position</span>
+          <select id="registerFittedPosition"></select>
+        </label>
+
+        <label id="registerStorageWrap" class="field">
+          <span>Storage Location</span>
+          <select id="registerStorageLocation"></select>
+        </label>
+
+        <label class="field wide2">
+          <span>Notes</span>
+          <textarea id="registerNotes" placeholder="Optional notes"></textarea>
+        </label>
+
+        <div class="dynamic-fields-block wide3">
+          <div class="block-title">Component Technical / Certificate Fields</div>
+          <div id="registerDynamicFields" class="dynamic-fields-grid"></div>
+        </div>
+
+        <div class="form-actions wide3">
+          <button id="submitRegisterBtn" class="btn" type="submit">Register Component</button>
+          <button id="resetRegisterBtn" class="btn2" type="button">Reset Form</button>
+        </div>
+      </form>
+    </section>
+
+    <section id="detailPanel" class="panel detail-panel hidden">
+      <div class="panel-title-row sticky-detail-head">
+        <div>
+          <div id="detailTitle" class="panel-title">Component Detail</div>
+          <div id="detailSubtitle" class="panel-subtitle">No component selected.</div>
+        </div>
+        <div class="detail-actions">
+          <button id="saveFieldsBtn" class="btn" type="button">Save Field Values</button>
+          <button id="closeDetailBtn" class="btn2 compact" type="button">Close</button>
+        </div>
+      </div>
+
+      <div class="detail-grid">
+        <div class="detail-card">
+          <div class="block-title">Identity</div>
+          <div id="identityBox" class="kv-list"></div>
+        </div>
+
+        <div class="detail-card">
+          <div class="block-title">Location Change</div>
+          <div class="form-grid small-grid">
+            <label class="field">
+              <span>Location Mode</span>
+              <select id="moveLocationMode">
+                <option value="storage">Storage</option>
+                <option value="fitted">Fitted</option>
+                <option value="shore">Shore</option>
+                <option value="disposed">Disposed</option>
+              </select>
+            </label>
+            <label id="moveFittedWrap" class="field hidden">
+              <span>Fitted Position</span>
+              <select id="moveFittedPosition"></select>
+            </label>
+            <label id="moveStorageWrap" class="field">
+              <span>Storage Location</span>
+              <select id="moveStorageLocation"></select>
+            </label>
+            <label class="field wide2">
+              <span>Reason / Remarks</span>
+              <textarea id="moveRemarks" placeholder="Reason for location change"></textarea>
+            </label>
+            <div class="form-actions wide2">
+              <button id="applyMoveBtn" class="btn2" type="button">Apply Location Change</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="detail-card wide2">
+          <div class="block-title">Editable Component Fields</div>
+          <div id="detailDynamicFields" class="dynamic-fields-grid"></div>
+        </div>
+
+        <div class="detail-card">
+          <div class="block-title">Record Inspection / Test</div>
+          <div class="form-grid small-grid">
+            <label class="field">
+              <span>Inspection Type</span>
+              <select id="inspectionType"></select>
+            </label>
+            <label class="field">
+              <span>Inspection Date</span>
+              <input id="inspectionDate" type="date" />
+            </label>
+            <label class="field">
+              <span>Result</span>
+              <select id="inspectionResult">
+                <option value="satisfactory">Satisfactory</option>
+                <option value="defect_observed">Defect Observed</option>
+                <option value="repair_required">Repair / Attention Required</option>
+                <option value="rejected">Rejected</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Inspected By</span>
+              <input id="inspectionBy" placeholder="Name / rank" />
+            </label>
+            <label class="field wide2">
+              <span>Remarks</span>
+              <textarea id="inspectionRemarks" placeholder="Inspection comments"></textarea>
+            </label>
+            <div class="form-actions wide2">
+              <button id="recordInspectionBtn" class="btn2" type="button">Record Inspection</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="detail-card">
+          <div class="block-title">Inspection History</div>
+          <div id="inspectionHistory" class="mini-list"></div>
+        </div>
+
+        <div class="detail-card">
+          <div class="block-title">Movement History</div>
+          <div id="movementHistory" class="mini-list"></div>
+        </div>
+
+        <div class="detail-card">
+          <div class="block-title">Attachments</div>
+          <div id="attachmentsBox" class="mini-list"></div>
+          <div class="hint-text">File upload will be connected after the inventory CRUD workflow is stable.</div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="./mooring-anchoring-inventories.js?v=20260511_1"></script>
+  <script src="./csvb-ui-polish.js?v=20260430_1"></script>
+  <script src="./csvb-help-tooltips.js?v=20260430_1"></script>
+  <script src="./csvb-100pct-fit.js?v=20260430_1"></script>
+</body>
+</html>
