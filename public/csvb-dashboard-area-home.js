@@ -150,19 +150,18 @@
     marine_applications_vessel_interaction: {
       title: "Marine Applications & Vessel Interaction Home",
       text:
-        "Reserved for vessel-facing operational applications, ship/office submissions and interaction workflows.",
+        "Vessel-facing operational applications, ship/office submissions and marine interaction workflows.",
       groups: [
         {
-          title: "Planned area",
+          title: "Mooring and anchoring",
           items: [
             {
-              label: "Future marine applications",
+              label: "Mooring and Anchoring Inventories",
               text:
-                "No modules have been assigned yet. This area is ready for vessel interaction workflows when the next module is built.",
-              href: "",
-              cardKey: "",
+                "Inventory, lifecycle, evidence, inspection and working-hours control for mooring and anchoring components.",
+              href: "./mooring-anchoring-inventories-v4.html",
+              cardKey: "mooring_anchoring_inventories",
               icon: "⚓",
-              disabled: true,
             },
           ],
         },

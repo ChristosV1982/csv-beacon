@@ -202,6 +202,15 @@
         </div>
       </div>
 
+
+      <div class="card" data-card="mooring_anchoring_inventories">
+        <div class="title">Mooring and Anchoring Inventories</div>
+        <div class="muted">Inventory, lifecycle, evidence, inspection and working-hours control for mooring and anchoring components.</div>
+        <div style="margin-top:12px;">
+          <button class="btn2" type="button" onclick="location.href='./mooring-anchoring-inventories-v4.html'">Open</button>
+        </div>
+      </div>
+
       <div class="card" data-card="company_policy">
         <div class="title">Company Policy</div>
         <div class="muted">Controlled policy book structure, future rich-text policy editing, change requests, manuals and AI source-based search.</div>
@@ -282,6 +291,7 @@
       qeditor: "questions_editor",
       threads: "threads",
       company_policy: "company_policy",
+      mooring_anchoring_inventories: "mooring_anchoring_inventories",
       suadmin: "platform_administration"
     };
 
@@ -475,6 +485,7 @@
           "qeditor",
           "threads",
           "company_policy",
+          "mooring_anchoring_inventories",
           "suadmin"
         ].forEach(k => setVisible(k, true, moduleAccess));
         return;
@@ -492,6 +503,7 @@
         setVisible("qeditor", false, moduleAccess);
         setVisible("threads", true, moduleAccess);
         setVisible("company_policy", true, moduleAccess);
+        setVisible("mooring_anchoring_inventories", true, moduleAccess);
         setVisible("suadmin", false, moduleAccess);
         return;
       }
@@ -508,7 +520,8 @@
           "inspector",
           "qeditor",
           "threads",
-          "company_policy"
+          "company_policy",
+          "mooring_anchoring_inventories"
         ].forEach(k => setVisible(k, true, moduleAccess));
         setVisible("suadmin", false, moduleAccess);
         return;
@@ -526,6 +539,7 @@
         setVisible("qeditor", true, moduleAccess);
         setVisible("threads", true, moduleAccess);
         setVisible("company_policy", true, moduleAccess);
+        setVisible("mooring_anchoring_inventories", true, moduleAccess);
         setVisible("suadmin", false, moduleAccess);
         return;
       }
