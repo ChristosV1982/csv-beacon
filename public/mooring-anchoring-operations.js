@@ -1,10 +1,12 @@
 // public/mooring-anchoring-operations.js
-// C.S.V. BEACON – MAI Vessel Operations Portal + Port Dropdown
+// C.S.V. BEACON – MAI Vessel Operations Portal + Country/Port/Facility Picker
 
 (() => {
   "use strict";
 
-  const BUILD = "MAI-OPERATIONS-20260511-2";
+  const BUILD = "MAI-OPERATIONS-20260511-3";
+  const PORT_OPTION_LIMIT = 350;
+  const FETCH_PAGE_SIZE = 1000;
 
   const state = {
     sb: null,
@@ -31,7 +33,7 @@
       "warnBox", "okBox", "reloadBtn",
       "viewerMode", "viewerHint",
       "operationVessel", "operationType", "operationStart", "operationEnd", "durationPreview",
-      "portSelect", "facilitySelect", "openMapBtn", "mapHint",
+      "portCountrySelect", "portSearch", "portSelect", "portPickerHint", "facilitySelect", "openMapBtn", "mapHint",
       "operationReference", "portName", "berthTerminal", "anchorageName",
       "unusualEvent", "requiresInspection", "eventDescription", "operationRemarks",
       "operationSummaryBox", "recordOperationSubmitBtn", "resetFormBtn",
@@ -74,14 +76,6 @@
     return role === "vessel";
   }
 
-  function asDate(value) {
-    if (!value) return "—";
-    const raw = String(value).slice(0, 10);
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return String(value);
-    const [y, m, d] = raw.split("-");
-    return `${d}.${m}.${y}`;
-  }
-
   function asDateTime(value) {
     if (!value) return "—";
     try {
@@ -98,6 +92,10 @@
       maximumFractionDigits: decimals,
       minimumFractionDigits: 0
     });
+  }
+
+  function norm(value) {
+    return String(value || "").trim().toLowerCase();
   }
 
   function nowLocalInput() {
@@ -140,7 +138,7 @@
     const lat = facility?.latitude ?? port?.latitude;
     const lon = facility?.longitude ?? port?.longitude;
 
-    if (lat === null || lat === undefined || lon === null || lon === undefined) return null;
+    if (lat === null || lat === undefined || lat === "" || lon === null || lon === undefined || lon === "") return null;
 
     return { lat, lon };
   }
@@ -155,24 +153,47 @@
     return data;
   }
 
+  async function fetchAll(queryFactory, pageSize = FETCH_PAGE_SIZE) {
+    const all = [];
+    let from = 0;
+
+    while (true) {
+      const to = from + pageSize - 1;
+      const { data, error } = await queryFactory().range(from, to);
+      if (error) throw error;
+
+      const rows = data || [];
+      all.push(...rows);
+
+      if (rows.length < pageSize) break;
+      from += pageSize;
+
+      if (from > 100000) {
+        throw new Error("Fetch stopped at 100,000 rows. Narrow the query or review the port directory size.");
+      }
+    }
+
+    return all;
+  }
+
   async function loadBaseData() {
-    const [vesselRes, typeRes, componentRes, portRes, facilityRes] = await Promise.all([
+    const [vesselRes, typeRes, componentRes, portRows, facilityRows] = await Promise.all([
       state.sb.from("vessels").select("id, name, hull_number, imo_number, company_id, is_active").eq("is_active", true).order("name"),
       state.sb.from("mai_v_operation_type_definitions").select("*").order("sort_order"),
       state.sb.from("mai_v_components_list").select("*").order("unique_id"),
-      state.sb.from("mai_v_ports_list").select("*").order("country_name").order("port_name"),
-      state.sb.from("mai_v_port_facilities_list").select("*").order("port_name").order("facility_name")
+      fetchAll(() => state.sb.from("mai_v_ports_list").select("*").order("country_name").order("port_name")),
+      fetchAll(() => state.sb.from("mai_v_port_facilities_list").select("*").order("port_name").order("facility_name"))
     ]);
 
-    for (const res of [vesselRes, typeRes, componentRes, portRes, facilityRes]) {
+    for (const res of [vesselRes, typeRes, componentRes]) {
       if (res.error) throw res.error;
     }
 
     state.vessels = vesselRes.data || [];
     state.operationTypes = typeRes.data || [];
     state.components = componentRes.data || [];
-    state.ports = portRes.data || [];
-    state.facilities = facilityRes.data || [];
+    state.ports = portRows || [];
+    state.facilities = facilityRows || [];
   }
 
   async function loadOperationHistory() {
@@ -241,23 +262,120 @@
       `).join("");
   }
 
-  function renderPorts() {
+  function countryKey(port) {
+    return port.country_code || port.country_name || "";
+  }
+
+  function countryLabel(port) {
+    const code = port.country_code || "";
+    const name = port.country_name || "";
+    if (code && name) return `${name} (${code})`;
+    return name || code || "Unknown";
+  }
+
+  function renderPortCountries() {
+    const current = el.portCountrySelect.value || "";
+    const countries = new Map();
+
+    state.ports.forEach((port) => {
+      const key = countryKey(port);
+      if (!key) return;
+      if (!countries.has(key)) {
+        countries.set(key, {
+          key,
+          label: countryLabel(port)
+        });
+      }
+    });
+
+    const rows = [...countries.values()].sort((a, b) => a.label.localeCompare(b.label));
+
+    el.portCountrySelect.innerHTML = `<option value="">All countries / areas</option>` +
+      rows.map((c) => `<option value="${esc(c.key)}">${esc(c.label)}</option>`).join("");
+
+    if (current && countries.has(current)) {
+      el.portCountrySelect.value = current;
+    }
+  }
+
+  function filteredPortsForPicker() {
+    const country = el.portCountrySelect.value || "";
+    const q = norm(el.portSearch.value);
+
+    return state.ports.filter((port) => {
+      if (country && countryKey(port) !== country) return false;
+
+      if (q) {
+        const haystack = [
+          port.port_name,
+          port.unlocode,
+          port.country_name,
+          port.country_code
+        ].map((x) => norm(x)).join(" | ");
+
+        if (!haystack.includes(q)) return false;
+      }
+
+      return true;
+    });
+  }
+
+  function renderPortOptions({ preserveSelection = true } = {}) {
+    const current = preserveSelection ? el.portSelect.value || "" : "";
+    const country = el.portCountrySelect.value || "";
+    const q = norm(el.portSearch.value);
+
     if (!state.ports.length) {
-      el.portSelect.innerHTML = `<option value="">No ports configured — use manual port field</option>`;
+      el.portSelect.innerHTML = `<option value="">No ports imported — use manual port field</option>`;
+      el.portPickerHint.textContent = "No imported UN/LOCODE port records were found. Manual port entry remains available.";
       renderFacilities();
       updateMapButton();
       return;
     }
 
-    el.portSelect.innerHTML = `<option value="">Select port or use manual port field...</option>` +
-      state.ports.map((p) => {
-        const code = p.unlocode ? ` / ${p.unlocode}` : "";
-        const country = p.country_name || p.country_code || "";
-        return `<option value="${esc(p.port_id)}">${esc(p.port_name)}${esc(code)}${country ? " / " + esc(country) : ""}</option>`;
-      }).join("");
+    if (!country && q.length < 2) {
+      el.portSelect.innerHTML = `<option value="">Select country or type at least 2 characters...</option>`;
+      el.portPickerHint.textContent = `${state.ports.length.toLocaleString()} imported port record(s). Select a country or search by port name / UN/LOCODE.`;
+      renderFacilities();
+      updateMapButton();
+      return;
+    }
+
+    const rows = filteredPortsForPicker();
+    const limited = rows.slice(0, PORT_OPTION_LIMIT);
+    const currentPort = current ? state.ports.find((p) => p.port_id === current) : null;
+    const includeCurrent = currentPort && !limited.some((p) => p.port_id === currentPort.port_id);
+
+    const options = [`<option value="">No selected port / use manual fields</option>`]
+      .concat(includeCurrent ? [portOption(currentPort)] : [])
+      .concat(limited.map(portOption));
+
+    el.portSelect.innerHTML = options.join("");
+
+    if (current && (includeCurrent || limited.some((p) => p.port_id === current))) {
+      el.portSelect.value = current;
+    }
+
+    const limitedText = rows.length > PORT_OPTION_LIMIT
+      ? ` Showing first ${PORT_OPTION_LIMIT.toLocaleString()}; narrow search for more.`
+      : "";
+
+    el.portPickerHint.textContent = `${rows.length.toLocaleString()} matching port record(s).${limitedText}`;
 
     renderFacilities();
     updateMapButton();
+  }
+
+  function portOption(port) {
+    const code = port.unlocode ? ` / ${port.unlocode}` : "";
+    const country = port.country_name || port.country_code || "";
+    const label = `${port.port_name || "Unnamed Port"}${code}${country ? " / " + country : ""}`;
+    return `<option value="${esc(port.port_id)}">${esc(label)}</option>`;
+  }
+
+  function renderPorts() {
+    renderPortCountries();
+    renderPortOptions({ preserveSelection: true });
   }
 
   function renderFacilities() {
@@ -270,13 +388,13 @@
     }
 
     if (!rows.length) {
-      el.facilitySelect.innerHTML = `<option value="">No facilities configured for selected port</option>`;
+      el.facilitySelect.innerHTML = `<option value="">No ISPS / Port Facility records for selected port</option>`;
       return;
     }
 
     el.facilitySelect.innerHTML = `<option value="">No specific facility</option>` +
       rows.map((f) => {
-        const code = f.preferred_facility_code ? ` / ${f.preferred_facility_code}` : "";
+        const code = f.preferred_facility_code || f.port_facility_code ? ` / ${f.preferred_facility_code || f.port_facility_code}` : "";
         return `<option value="${esc(f.port_facility_id)}">${esc(f.facility_name)}${esc(code)}</option>`;
       }).join("");
   }
@@ -340,7 +458,7 @@
   function filteredComponents() {
     const vesselId = selectedVesselId();
     const typeId = el.componentTypeFilter.value || "";
-    const q = String(el.componentSearch.value || "").trim().toLowerCase();
+    const q = norm(el.componentSearch.value);
 
     return state.components.filter((c) => {
       if (c.vessel_id !== vesselId) return false;
@@ -355,7 +473,7 @@
           c.location_mode,
           c.current_location_detail,
           c.order_number
-        ].map((x) => String(x || "").toLowerCase()).join(" | ");
+        ].map((x) => norm(x)).join(" | ");
 
         if (!haystack.includes(q)) return false;
       }
@@ -435,7 +553,7 @@
       <div><strong>Port:</strong> ${esc(port?.port_name || el.portName.value || "—")}</div>
       <div><strong>UN/LOCODE:</strong> ${esc(port?.unlocode || "—")}</div>
       <div><strong>Facility:</strong> ${esc(facility?.facility_name || el.berthTerminal.value || "—")}</div>
-      <div><strong>Facility/Security Code:</strong> ${esc(facility?.preferred_facility_code || "—")}</div>
+      <div><strong>Facility/Security Code:</strong> ${esc(facility?.preferred_facility_code || facility?.port_facility_code || "—")}</div>
       <div><strong>Duration:</strong> ${esc(duration === null ? "—" : `${asNumber(duration, 2)} hours`)}</div>
       <div><strong>Components credited:</strong> ${esc(state.selectedComponents.size)}</div>
       ${
@@ -450,7 +568,7 @@
     const from = el.historyDateFrom.value ? new Date(el.historyDateFrom.value + "T00:00:00") : null;
     const to = el.historyDateTo.value ? new Date(el.historyDateTo.value + "T23:59:59") : null;
     const type = el.historyOperationType.value || "";
-    const q = String(el.historySearch.value || "").trim().toLowerCase();
+    const q = norm(el.historySearch.value);
 
     return state.operations.filter((op) => {
       const start = op.operation_start_at ? new Date(op.operation_start_at) : null;
@@ -471,7 +589,7 @@
           op.operation_reference,
           op.remarks,
           ...comps.map((c) => c.unique_id)
-        ].map((x) => String(x || "").toLowerCase()).join(" | ");
+        ].map((x) => norm(x)).join(" | ");
 
         if (!haystack.includes(q)) return false;
       }
@@ -533,8 +651,10 @@
     const currentVessel = el.operationVessel.value;
 
     el.operationType.value = "";
+    el.portCountrySelect.value = "";
+    el.portSearch.value = "";
     el.portSelect.value = "";
-    renderFacilities();
+    renderPortOptions({ preserveSelection: false });
     el.facilitySelect.value = "";
     el.operationStart.value = "";
     el.operationEnd.value = "";
@@ -647,19 +767,6 @@
     toast("ok", "Vessel operations portal reloaded.");
   }
 
-  function renderVesselSelect() {
-    el.operationVessel.innerHTML = [`<option value="">Select vessel...</option>`]
-      .concat(state.vessels.map((v) => `
-        <option value="${esc(v.id)}">${esc(v.name || "Unnamed Vessel")} / Hull ${esc(v.hull_number || "—")}</option>
-      `))
-      .join("");
-
-    if (state.isVesselViewer && state.profile?.vessel_id) {
-      el.operationVessel.value = state.profile.vessel_id;
-      el.operationVessel.disabled = true;
-    }
-  }
-
   function bindEvents() {
     el.reloadBtn.addEventListener("click", () => reload().catch(handleError));
 
@@ -676,6 +783,18 @@
     ].forEach((input) => {
       input.addEventListener("input", renderSummary);
       input.addEventListener("change", renderSummary);
+    });
+
+    el.portCountrySelect.addEventListener("change", () => {
+      el.portSelect.value = "";
+      renderPortOptions({ preserveSelection: false });
+      renderSummary();
+    });
+
+    el.portSearch.addEventListener("input", () => {
+      el.portSelect.value = "";
+      renderPortOptions({ preserveSelection: false });
+      renderSummary();
     });
 
     el.portSelect.addEventListener("change", () => {

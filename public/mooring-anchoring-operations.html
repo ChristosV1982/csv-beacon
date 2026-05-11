@@ -9,7 +9,7 @@
 
   <link rel="stylesheet" href="./csv-beacon-theme.css?v=20260428_3" />
   <link rel="stylesheet" href="./style.css?v=20260428_3" />
-  <link rel="stylesheet" href="./mooring-anchoring-operations.css?v=20260511_2" />
+  <link rel="stylesheet" href="./mooring-anchoring-operations.css?v=20260511_3" />
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="./auth.js"></script>
@@ -80,13 +80,25 @@
           </label>
 
           <label class="field">
-            <span>Port Directory</span>
-            <select id="portSelect"></select>
+            <span>Country / Area</span>
+            <select id="portCountrySelect"></select>
           </label>
 
           <label class="field">
-            <span>Port Facility / Terminal</span>
+            <span>Port Search</span>
+            <input id="portSearch" type="search" placeholder="Type port name or UN/LOCODE..." />
+          </label>
+
+          <label class="field field-wide">
+            <span>Port Directory</span>
+            <select id="portSelect"></select>
+            <div id="portPickerHint" class="field-help">Select a country or type at least 2 characters to search imported UN/LOCODE ports.</div>
+          </label>
+
+          <label class="field field-wide">
+            <span>Port Facility / Terminal / ISPS Code</span>
             <select id="facilitySelect"></select>
+            <div class="field-help">Facilities appear after a selected port has linked ISPS / Port Facility records.</div>
           </label>
 
           <label class="field">
@@ -235,6 +247,6 @@
   </main>
 
   <script src="./csvb-toast-messages.js?v=20260511_1"></script>
-  <script src="./mooring-anchoring-operations.js?v=20260511_2"></script>
+  <script src="./mooring-anchoring-operations.js?v=20260511_3"></script>
 </body>
 </html>
