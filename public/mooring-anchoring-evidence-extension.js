@@ -1,12 +1,43 @@
 // public/mooring-anchoring-evidence-extension.js
 // C.S.V. BEACON – MAI Evidence Upload Extension
-// Adds photo evidence upload/list/delete for lifecycle events and checklist runs.
+// Supports images, PDF and Word files as evidence.
 
 (() => {
   "use strict";
 
-  const BUILD = "MAI-EVIDENCE-20260511-1";
+  const BUILD = "MAI-EVIDENCE-20260511-2";
   const BUCKET = "mai-evidence";
+
+  const ACCEPT_STRING = [
+    "image/*",
+    ".heic",
+    ".heif",
+    ".pdf",
+    ".doc",
+    ".docx",
+    "application/pdf",
+    "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+  ].join(",");
+
+  const ALLOWED_EXTENSIONS = new Set([
+    "jpg",
+    "jpeg",
+    "png",
+    "webp",
+    "gif",
+    "heic",
+    "heif",
+    "pdf",
+    "doc",
+    "docx"
+  ]);
+
+  const ALLOWED_MIMES = new Set([
+    "application/pdf",
+    "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+  ]);
 
   let componentCache = null;
   let attachmentsCache = [];
@@ -58,6 +89,52 @@
     if (n < 1024) return `${n} B`;
     if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
     return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+  }
+
+  function getFileExtension(fileName) {
+    const parts = String(fileName || "").toLowerCase().split(".");
+    return parts.length > 1 ? parts.pop() : "";
+  }
+
+  function isImageFile(file) {
+    const mime = String(file.type || "").toLowerCase();
+    const ext = getFileExtension(file.name);
+    return mime.startsWith("image/") || ["heic", "heif"].includes(ext);
+  }
+
+  function isAllowedEvidenceFile(file) {
+    const mime = String(file.type || "").toLowerCase();
+    const ext = getFileExtension(file.name);
+
+    if (mime.startsWith("image/")) return true;
+    if (ALLOWED_MIMES.has(mime)) return true;
+    if (ALLOWED_EXTENSIONS.has(ext)) return true;
+
+    return false;
+  }
+
+  function fileTypeLabel(fileOrRow) {
+    const mime = String(fileOrRow.mime_type || fileOrRow.type || "").toLowerCase();
+    const name = fileOrRow.file_name || fileOrRow.name || "";
+    const ext = getFileExtension(name);
+
+    if (mime.startsWith("image/") || ["heic", "heif", "jpg", "jpeg", "png", "webp", "gif"].includes(ext)) {
+      return "Image";
+    }
+
+    if (mime === "application/pdf" || ext === "pdf") {
+      return "PDF";
+    }
+
+    if (
+      mime === "application/msword" ||
+      mime === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+      ["doc", "docx"].includes(ext)
+    ) {
+      return "Word";
+    }
+
+    return ext ? ext.toUpperCase() : "File";
   }
 
   function getUniqueIdFromPage() {
@@ -182,20 +259,27 @@
     }
 
     if (!files || !files.length) {
-      showMessage("warn", "Select one or more image files first.");
+      showMessage("warn", "Select one or more evidence files first.");
       return;
+    }
+
+    const selectedFiles = Array.from(files);
+
+    for (const file of selectedFiles) {
+      if (!isAllowedEvidenceFile(file)) {
+        throw new Error(
+          `Unsupported file type: ${file.name}. Allowed: images, PDF, DOC, DOCX.`
+        );
+      }
     }
 
     const sb = window.AUTH.ensureSupabase();
 
     let uploaded = 0;
 
-    for (const file of Array.from(files)) {
-      if (!String(file.type || "").startsWith("image/")) {
-        throw new Error(`Only image files are accepted. Rejected: ${file.name}`);
-      }
-
+    for (const file of selectedFiles) {
       const filePath = makeObjectPath(component, file);
+      const imageEvidence = isImageFile(file);
 
       const { error: uploadError } = await sb
         .storage
@@ -214,12 +298,12 @@
         p_file_path: filePath,
         p_mime_type: file.type || null,
         p_file_size_bytes: file.size || null,
-        p_attachment_type: "photo_evidence",
+        p_attachment_type: imageEvidence ? "photo_evidence" : "document_evidence",
         p_lifecycle_event_id: lifecycleEventId,
         p_inspection_run_id: inspectionRunId,
         p_inspection_answer_id: inspectionAnswerId,
         p_evidence_context: evidenceContext,
-        p_is_photo_evidence: true,
+        p_is_photo_evidence: imageEvidence,
         p_remarks: remarks
       });
 
@@ -259,7 +343,7 @@
 
   function evidenceStatusLabel(required, min, count, status) {
     if (!required) return "Not required";
-    return `${count}/${min || 0} photo(s) — ${String(status || "required_missing").replaceAll("_", " ")}`;
+    return `${count}/${min || 0} file(s) — ${String(status || "required_missing").replaceAll("_", " ")}`;
   }
 
   function evidenceStatusClass(status) {
@@ -270,11 +354,13 @@
 
   async function renderAttachmentListItem(a) {
     const url = await signedUrl(a.file_path);
+    const typeLabel = fileTypeLabel(a);
 
     return `
       <div class="mini-item" data-mai-attachment-id="${esc(a.attachment_id)}">
         <div class="mini-title">
           ${esc(a.file_name || "Evidence file")}
+          <span class="lifecycle-pill lifecycle-event-based">${esc(typeLabel)}</span>
           <span class="lifecycle-pill lifecycle-event-based">${esc(a.evidence_context || a.attachment_type || "evidence")}</span>
         </div>
 
@@ -355,7 +441,7 @@
     const isLocked = selectedRunIsCompletedOrVoided();
 
     const filesHtml = runFiles.length
-      ? runFiles.map((a) => `<div class="mini-meta">• ${esc(a.file_name)} / ${esc(formatFileSize(a.file_size_bytes))}</div>`).join("")
+      ? runFiles.map((a) => `<div class="mini-meta">• ${esc(a.file_name)} / ${esc(fileTypeLabel(a))} / ${esc(formatFileSize(a.file_size_bytes))}</div>`).join("")
       : `<div class="hint-text">No checklist evidence uploaded yet.</div>`;
 
     box.innerHTML = `
@@ -368,11 +454,13 @@
       ${filesHtml}
 
       <div class="actions-row" style="margin-top:8px;">
-        <input id="maiRunEvidenceFiles" type="file" accept="image/*" multiple ${isLocked ? "disabled" : ""} />
+        <input id="maiRunEvidenceFiles" type="file" accept="${esc(ACCEPT_STRING)}" multiple ${isLocked ? "disabled" : ""} />
         <button id="maiUploadRunEvidenceBtn" class="btn2 compact" type="button" ${isLocked ? "disabled" : ""}>
-          Upload Checklist Photos
+          Upload Checklist Evidence
         </button>
       </div>
+
+      <div class="hint-text">Allowed evidence files: images, PDF, DOC, DOCX.</div>
     `;
 
     $("maiUploadRunEvidenceBtn")?.addEventListener("click", () => {
@@ -416,7 +504,7 @@
       );
 
       const filesHtml = files.length
-        ? files.map((a) => `<div class="mini-meta">• ${esc(a.file_name)} / ${esc(formatFileSize(a.file_size_bytes))}</div>`).join("")
+        ? files.map((a) => `<div class="mini-meta">• ${esc(a.file_name)} / ${esc(fileTypeLabel(a))} / ${esc(formatFileSize(a.file_size_bytes))}</div>`).join("")
         : `<div class="hint-text">No event evidence uploaded yet.</div>`;
 
       host.innerHTML = `
@@ -428,12 +516,13 @@
         ${filesHtml}
 
         <div class="actions-row" style="margin-top:8px;">
-          <input id="maiEventEvidenceFiles_${esc(eventId)}" type="file" accept="image/*" multiple ${locked ? "disabled" : ""} />
+          <input id="maiEventEvidenceFiles_${esc(eventId)}" type="file" accept="${esc(ACCEPT_STRING)}" multiple ${locked ? "disabled" : ""} />
           <button class="btn2 compact" type="button" data-mai-upload-event-evidence="${esc(eventId)}" ${locked ? "disabled" : ""}>
-            Upload Event Photos
+            Upload Event Evidence
           </button>
         </div>
 
+        <div class="hint-text">Allowed evidence files: images, PDF, DOC, DOCX.</div>
         ${locked ? `<div class="hint-text">Reviewed event: vessel-side evidence changes are locked.</div>` : ""}
       `;
 
@@ -481,7 +570,7 @@
         border-radius: 10px;
         padding: 7px;
         background: #fff;
-        max-width: 420px;
+        max-width: 520px;
       }
 
       #attachmentsBox a {
