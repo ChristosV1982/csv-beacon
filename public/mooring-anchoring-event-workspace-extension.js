@@ -5,7 +5,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "MAI-EVENT-WORKSPACE-20260511-1";
+  const BUILD = "MAI-EVENT-WORKSPACE-20260511-2";
   const BUCKET = "mai-evidence";
 
   const ACCEPT_STRING = [
@@ -651,6 +651,8 @@
 
     const eventDetail = await renderEventDetail();
 
+    host.setAttribute("data-mai-event-workspace-rendered-for", getUniqueIdFromPage());
+
     host.innerHTML = `
       <div class="mai-workspace">
         <div class="mai-workspace-head">
@@ -903,8 +905,21 @@
       softenIdentityFields();
 
       const hasDetail = !!$("detailPanel") && !$("detailPanel").classList.contains("hidden");
+      const host = $("lifecycleEventHistory");
+      const currentUniqueId = getUniqueIdFromPage();
 
-      if (hasDetail) {
+      // Important:
+      // Do not re-render continuously. Re-rendering destroys selected files in file inputs.
+      // Only initialize the workspace when it is missing or when another component is opened.
+      const alreadyRenderedFor = host?.getAttribute("data-mai-event-workspace-rendered-for") || "";
+      const needsInitialRender =
+        hasDetail &&
+        host &&
+        currentUniqueId &&
+        currentUniqueId !== "Component Detail" &&
+        alreadyRenderedFor !== currentUniqueId;
+
+      if (needsInitialRender) {
         window.setTimeout(refreshWorkspace, 350);
       }
     });
@@ -939,9 +954,10 @@
     softenIdentityFields();
     startObserver();
 
+    // Keep auto-actor field softening, but do not auto-refresh the event workspace.
+    // Auto-refresh destroys selected files in browser file inputs.
     window.setInterval(() => {
-      const hasDetail = !!$("detailPanel") && !$("detailPanel").classList.contains("hidden");
-      if (hasDetail) refreshWorkspace();
+      softenIdentityFields();
     }, 4500);
 
     window.setTimeout(refreshWorkspace, 1200);
