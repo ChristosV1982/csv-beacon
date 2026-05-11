@@ -6,7 +6,7 @@
 // - Bump cache version + clean old caches on activate
 
 const CACHE_PREFIX = "sire-test-";
-const CACHE_VERSION = "v109-mai-event-workspace-no-input-reset";
+const CACHE_VERSION = "v110-mai-inventory-list-v4";
 const CACHE_NAME = `${CACHE_PREFIX}${CACHE_VERSION}`;
 
 const CORE_ASSETS = [
@@ -48,6 +48,10 @@ const CORE_ASSETS = [
   "./csvb-toast-messages.js",
   "./mooring-anchoring-event-workspace-extension.js",
   "./mooring-anchoring-evidence-upload-fix.js",
+  "./mooring-anchoring-inventories-v4.html",
+  "./mooring-anchoring-inventories-v4.css",
+  "./mooring-anchoring-inventories-v4.js",
+  "./mooring-anchoring-component.html",
   "./assets/csv-beacon-icon.png",
   "./assets/csv-beacon-logo-full.png",
   "./icon-192.png",

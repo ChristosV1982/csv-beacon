@@ -1,0 +1,42 @@
+<!-- public/mooring-anchoring-component.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>C.S.V. BEACON – Mooring Component Detail</title>
+  <link rel="stylesheet" href="./csv-beacon-theme.css?v=20260428_3" />
+  <link rel="stylesheet" href="./style.css?v=20260428_3" />
+  <style>
+    body{margin:0;font-family:var(--font-sans,"Segoe UI",Arial,sans-serif);background:#f4f8fc;color:#10233f;}
+    .topbar{background:linear-gradient(90deg,#061d3d,#1a4170);color:#fff;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;}
+    .wrap{padding:10px;}
+    .panel{background:#fff;border:1px solid #cbdff5;border-radius:14px;padding:14px;box-shadow:0 10px 28px rgba(3,27,63,.05);}
+    h1{margin:0;color:#062a5e;font-size:1.2rem;}
+    .muted{color:#4d6283;margin-top:8px;line-height:1.4;}
+    .btn2{background:#eaf6fb;color:#062a5e;border:1px solid #9fd8ec;border-radius:10px;padding:8px 12px;font-weight:800;cursor:pointer;}
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <div><strong>C.S.V. BEACON</strong> – Mooring Component Detail</div>
+    <button class="btn2" onclick="location.href='./mooring-anchoring-inventories-v4.html'">Back to Inventory List</button>
+  </div>
+  <main class="wrap">
+    <section class="panel">
+      <h1>Component Detail Page</h1>
+      <div class="muted">
+        This page is reserved for Frontend 4-B. The selected component ID is:
+      </div>
+      <pre id="componentIdBox"></pre>
+      <div class="muted">
+        Next step will move component particulars, lifecycle status, events, inspections and evidence here.
+      </div>
+    </section>
+  </main>
+  <script>
+    const id = new URLSearchParams(location.search).get("id") || "No component id supplied";
+    document.getElementById("componentIdBox").textContent = id;
+  </script>
+</body>
+</html>

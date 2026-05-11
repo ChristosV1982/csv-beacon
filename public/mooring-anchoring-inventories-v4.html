@@ -1,0 +1,163 @@
+<!-- public/mooring-anchoring-inventories-v4.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>C.S.V. BEACON – Mooring & Anchoring Inventory List</title>
+
+  <link rel="stylesheet" href="./csv-beacon-theme.css?v=20260428_3" />
+  <link rel="stylesheet" href="./style.css?v=20260428_3" />
+  <link rel="stylesheet" href="./mooring-anchoring-inventories-v4.css?v=20260511_1" />
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="./auth.js"></script>
+  <script src="./csvb-module-guard.js?v=20260507_2"></script>
+</head>
+
+<body>
+  <div class="topbar">
+    <div class="csvb-brand">
+      <img class="csvb-brand-logo" src="./assets/csv-beacon-icon.png" alt="C.S.V. BEACON logo" />
+      <div class="csvb-brand-text">
+        <div class="csvb-brand-title">C.S.V. BEACON</div>
+        <div class="csvb-brand-subtitle">Marine Assurance & Compliance Platform</div>
+      </div>
+    </div>
+
+    <div class="topbar-actions">
+      <div id="userBadge" class="user-badge"></div>
+      <button class="btn2" id="loginBtn" type="button" style="display:none;">Login</button>
+      <button class="btn2" id="switchUserBtn" type="button">Switch User</button>
+      <button class="btn" id="logoutBtn" type="button" style="display:none;">Logout</button>
+      <button class="btn2" type="button" onclick="location.href='./q-dashboard.html'">Dashboard</button>
+      <button class="btn2" type="button" onclick="location.href='./mooring-anchoring-inventories.html'">Old MAI Page</button>
+    </div>
+  </div>
+
+  <main class="wrap">
+    <div id="warnBox" class="warn"></div>
+    <div id="okBox" class="ok"></div>
+
+    <section class="page-head">
+      <div>
+        <h1>Mooring and Anchoring Inventories</h1>
+        <div class="subtitle">
+          Inventory list view for Office and Vessel users. Component detail page will be separated in the next step.
+        </div>
+      </div>
+
+      <div class="page-actions">
+        <button id="reloadBtn" class="btn2" type="button">↻ Reload</button>
+        <button id="recordOperationBtn" class="btn" type="button">+ Record Vessel Operation</button>
+        <button id="registerComponentBtn" class="btn2" type="button">+ Register Component</button>
+      </div>
+    </section>
+
+    <section class="viewer-panel">
+      <div>
+        <div class="section-label">Viewer Mode</div>
+        <div id="viewerMode" class="viewer-mode">Loading...</div>
+      </div>
+      <div id="viewerHint" class="viewer-hint"></div>
+    </section>
+
+    <section class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-label">Visible components</div>
+        <div id="statTotal" class="stat-value">0</div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-label">Active / in service</div>
+        <div id="statActive" class="stat-value">0</div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-label">Due / overdue action</div>
+        <div id="statDue" class="stat-value">0</div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-label">Locked particulars</div>
+        <div id="statLocked" class="stat-value">0</div>
+      </div>
+    </section>
+
+    <section class="filters-layout">
+      <div class="filter-card">
+        <div class="filter-head">
+          <h2>Vessel Filter</h2>
+          <button id="selectAllVesselsBtn" class="btn2 compact" type="button">All</button>
+          <button id="clearVesselsBtn" class="btn2 compact" type="button">None</button>
+        </div>
+        <div id="vesselChecks" class="checks-list"></div>
+      </div>
+
+      <div class="filter-card">
+        <div class="filter-head">
+          <h2>Component Type Filter</h2>
+          <button id="selectAllTypesBtn" class="btn2 compact" type="button">All</button>
+          <button id="clearTypesBtn" class="btn2 compact" type="button">None</button>
+        </div>
+        <div id="typeChecks" class="checks-list"></div>
+      </div>
+
+      <div class="filter-card">
+        <div class="filter-head">
+          <h2>Status / Search</h2>
+          <button id="clearSearchBtn" class="btn2 compact" type="button">Clear</button>
+        </div>
+
+        <label class="field">
+          <span>Status</span>
+          <select id="statusFilter">
+            <option value="">All statuses</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span>Search</span>
+          <input id="searchInput" type="search" placeholder="Unique ID, vessel, order number, location..." />
+        </label>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <div>
+          <h2>Inventory List</h2>
+          <div id="listMeta" class="meta">0 record(s).</div>
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Unique ID</th>
+              <th>Vessel</th>
+              <th>Type</th>
+              <th>Status</th>
+              <th>Particulars</th>
+              <th>Location</th>
+              <th>Total Hours</th>
+              <th>Next Lifecycle Action</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="componentsTbody">
+            <tr>
+              <td colspan="9" class="empty-cell">Loading...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <script src="./csvb-toast-messages.js?v=20260511_1"></script>
+  <script src="./mooring-anchoring-inventories-v4.js?v=20260511_1"></script>
+</body>
+</html>
