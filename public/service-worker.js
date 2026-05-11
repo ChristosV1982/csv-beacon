@@ -6,7 +6,7 @@
 // - Bump cache version + clean old caches on activate
 
 const CACHE_PREFIX = "sire-test-";
-const CACHE_VERSION = "v105-dashboard-area-home-symmetrical-cards";
+const CACHE_VERSION = "v106-mai-event-workspace";
 const CACHE_NAME = `${CACHE_PREFIX}${CACHE_VERSION}`;
 
 const CORE_ASSETS = [
@@ -41,6 +41,12 @@ const CORE_ASSETS = [
   "./csvb-question-overrides-admin.js",
   "./csvb-dashboard-polish.js",
   "./csvb-dashboard-threads-badge.js",
+  "./mooring-anchoring-inventories.html",
+  "./mooring-anchoring-inventories.css",
+  "./mooring-anchoring-inventories.js",
+  "./mooring-anchoring-void-run-extension.js",
+  "./csvb-toast-messages.js",
+  "./mooring-anchoring-event-workspace-extension.js",
   "./assets/csv-beacon-icon.png",
   "./assets/csv-beacon-logo-full.png",
   "./icon-192.png",
