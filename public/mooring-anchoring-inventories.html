@@ -9,7 +9,7 @@
 
   <link rel="stylesheet" href="./csv-beacon-theme.css?v=20260428_3" />
   <link rel="stylesheet" href="./style.css?v=20260428_3" />
-  <link rel="stylesheet" href="./mooring-anchoring-inventories.css?v=20260511_2" />
+  <link rel="stylesheet" href="./mooring-anchoring-inventories.css?v=20260511_3" />
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="./auth.js"></script>
@@ -43,8 +43,8 @@
       <div>
         <h1 class="page-title">Mooring and Anchoring Inventories</h1>
         <div class="page-subtitle">
-          Inventory, lifecycle, working-hours and inspection control for mooring wires, soft ropes, soft tails,
-          shackles, messengers, anchors and anchor-chain items.
+          Inventory, lifecycle, working-hours and MSMP checklist inspection control for mooring wires, soft ropes,
+          soft tails, shackles, messengers, anchors and anchor-chain items.
         </div>
       </div>
 
@@ -260,6 +260,88 @@
 
       <section class="subpanel">
         <div class="subpanel-head">
+          <h3>MSMP Checklist Inspection</h3>
+          <div class="hint-text">Point-by-point MSMP 01a / 01b / 01c inspection workflow.</div>
+        </div>
+
+        <div class="checklist-start-grid">
+          <label class="field">
+            <span>Available Checklist Template</span>
+            <select id="checklistTemplateSelect"></select>
+          </label>
+
+          <label class="field">
+            <span>Inspection Date</span>
+            <input id="checklistInspectionDate" type="date" />
+          </label>
+
+          <label class="field">
+            <span>Inspected By</span>
+            <input id="checklistInspectedBy" placeholder="Name / rank" />
+          </label>
+
+          <label class="field">
+            <span>Template Run</span>
+            <select id="checklistRunSelect"></select>
+          </label>
+
+          <label class="field field-wide">
+            <span>Start Remarks</span>
+            <input id="checklistRemarks" placeholder="Optional start remarks" />
+          </label>
+        </div>
+
+        <div class="actions-row">
+          <button id="startChecklistBtn" class="btn" type="button">Start New Checklist</button>
+          <button id="loadChecklistRunBtn" class="btn2" type="button">Load Selected Run</button>
+          <button id="reloadChecklistRunsBtn" class="btn2" type="button">Reload Checklist Runs</button>
+        </div>
+
+        <div id="checklistRunSummary" class="checklist-summary hidden"></div>
+
+        <div id="checklistWorkArea" class="hidden">
+          <div class="table-wrap checklist-table-wrap">
+            <table class="data-table checklist-table">
+              <thead>
+                <tr>
+                  <th>No.</th>
+                  <th>Checkpoint</th>
+                  <th>Score / Evaluation</th>
+                  <th>Remarks</th>
+                </tr>
+              </thead>
+              <tbody id="checklistItemsTbody">
+                <tr>
+                  <td colspan="4" class="empty-cell">No checklist loaded.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="form-grid two-col checklist-complete-grid">
+            <label class="field">
+              <span>Final Decision</span>
+              <input id="checklistFinalDecision" placeholder="e.g. Continue / Monitor / Discard / Review" />
+            </label>
+
+            <label class="field field-wide">
+              <span>Final Decision Remarks</span>
+              <textarea id="checklistFinalRemarks" placeholder="Final decision remarks"></textarea>
+            </label>
+          </div>
+
+          <div class="actions-row">
+            <button id="saveChecklistAnswersBtn" class="btn2" type="button">Save Checklist Answers</button>
+            <button id="completeChecklistRunBtn" class="btn" type="button">Complete Checklist</button>
+          </div>
+        </div>
+
+        <h3 class="subhead">Checklist Run History</h3>
+        <div id="checklistRunsHistory" class="mini-list"></div>
+      </section>
+
+      <section class="subpanel">
+        <div class="subpanel-head">
           <h3>Editable Component Fields</h3>
           <button id="saveFieldsBtn" class="btn2 compact" type="button">Save Fields</button>
         </div>
@@ -425,7 +507,7 @@
         <section class="subpanel">
           <h3>Inspection Summary Record</h3>
           <div class="hint-box">
-            This is the summary record. The next development step will replace this with point-by-point MSMP 01a / 01b / 01c checklist workflows.
+            Manual summary record. Prefer MSMP Checklist Inspection above for formal MSMP 01a / 01b / 01c inspections.
           </div>
 
           <div class="form-grid two-col">
@@ -511,6 +593,6 @@
     </section>
   </main>
 
-  <script src="./mooring-anchoring-inventories.js?v=20260511_2"></script>
+  <script src="./mooring-anchoring-inventories.js?v=20260511_3"></script>
 </body>
 </html>

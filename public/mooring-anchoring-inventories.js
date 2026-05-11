@@ -1,11 +1,11 @@
 // public/mooring-anchoring-inventories.js
 // C.S.V. BEACON – Mooring and Anchoring Inventories
-// v2: lifecycle status, usage hours, lifecycle events, spare minimums
+// v3: lifecycle status, usage hours, lifecycle events, spare minimums, MSMP checklist inspection workflow
 
 (() => {
   "use strict";
 
-  const BUILD = "MAI-FE-20260511-2";
+  const BUILD = "MAI-FE-20260511-3";
   const MODULE_KEY = "mooring_anchoring_inventories";
 
   const state = {
@@ -31,7 +31,13 @@
     selectedEffectiveFields: [],
     selectedFieldValues: {},
     selectedUsageRows: [],
-    selectedLifecycleEvents: []
+    selectedLifecycleEvents: [],
+
+    selectedTemplates: [],
+    selectedChecklistRuns: [],
+    activeChecklistRun: null,
+    activeChecklistItems: [],
+    activeChecklistAnswers: []
   };
 
   const el = {};
@@ -57,6 +63,13 @@
       "detailPanel", "detailTitle", "detailSubtitle", "identityBox",
       "lifecycleOverviewBox", "lifecycleStatusTbody",
       "closeDetailBtn", "saveFieldsBtn", "detailDynamicFields",
+
+      "checklistTemplateSelect", "checklistInspectionDate", "checklistInspectedBy",
+      "checklistRunSelect", "checklistRemarks", "startChecklistBtn",
+      "loadChecklistRunBtn", "reloadChecklistRunsBtn", "checklistRunSummary",
+      "checklistWorkArea", "checklistItemsTbody", "checklistFinalDecision",
+      "checklistFinalRemarks", "saveChecklistAnswersBtn", "completeChecklistRunBtn",
+      "checklistRunsHistory",
 
       "usageOperationDate", "usageOperationType", "usagePort", "usageBerth",
       "usageHours", "usageUnusualEvent", "usageRequiresInspection",
@@ -246,6 +259,19 @@
     return map[status] || String(status || "—").replaceAll("_", " ");
   }
 
+  function runStatusClass(status) {
+    return `run-${String(status || "draft").replaceAll("_", "-")}`;
+  }
+
+  function runStatusLabel(status) {
+    const map = {
+      draft: "Draft",
+      completed: "Completed",
+      voided: "Voided"
+    };
+    return map[status] || String(status || "—");
+  }
+
   function lifecycleRowsForComponent(componentId) {
     return state.lifecycleRows
       .filter((r) => r.component_id === componentId)
@@ -319,6 +345,12 @@
 
     el.closeDetailBtn?.addEventListener("click", closeDetailPanel);
     el.saveFieldsBtn?.addEventListener("click", () => saveSelectedFields().catch(handleError));
+
+    el.startChecklistBtn?.addEventListener("click", () => startChecklistRun().catch(handleError));
+    el.loadChecklistRunBtn?.addEventListener("click", () => loadSelectedChecklistRun().catch(handleError));
+    el.reloadChecklistRunsBtn?.addEventListener("click", () => reloadChecklistArea().catch(handleError));
+    el.saveChecklistAnswersBtn?.addEventListener("click", () => saveChecklistAnswers().catch(handleError));
+    el.completeChecklistRunBtn?.addEventListener("click", () => completeChecklistRun().catch(handleError));
 
     el.recordUsageBtn?.addEventListener("click", () => recordUsage().catch(handleError));
     el.recordLifecycleEventBtn?.addEventListener("click", () => recordLifecycleEvent().catch(handleError));
@@ -515,6 +547,7 @@
     el.usageOperationDate.value = todayIso();
     el.lifecycleEventDate.value = todayIso();
     el.inspectionDate.value = todayIso();
+    el.checklistInspectionDate.value = todayIso();
 
     fillLocationSelects();
   }
@@ -936,6 +969,11 @@
     state.selectedFieldValues = {};
     state.selectedUsageRows = [];
     state.selectedLifecycleEvents = [];
+    state.selectedTemplates = [];
+    state.selectedChecklistRuns = [];
+    state.activeChecklistRun = null;
+    state.activeChecklistItems = [];
+    state.activeChecklistAnswers = [];
     el.detailPanel.classList.add("hidden");
   }
 
@@ -969,10 +1007,13 @@
     el.usageOperationDate.value = todayIso();
     el.lifecycleEventDate.value = todayIso();
     el.inspectionDate.value = todayIso();
+    el.checklistInspectionDate.value = todayIso();
 
     await Promise.all([
       loadSelectedUsageRows(component.id),
       loadSelectedLifecycleEvents(component.id),
+      loadChecklistTemplates(component.id),
+      loadChecklistRuns(component.id),
       renderInspectionHistory(component.id),
       renderMovementHistory(component.id),
       renderAttachments(component.id)
@@ -980,6 +1021,10 @@
 
     renderUsageHistory();
     renderLifecycleEventHistory();
+    renderChecklistTemplateSelect();
+    renderChecklistRunSelect();
+    renderChecklistRunsHistory();
+    clearChecklistWorkArea();
 
     el.detailPanel.classList.remove("hidden");
     el.detailPanel.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -1129,6 +1174,343 @@
     const id = state.selectedComponent.id;
     await reloadComponentsOnly();
     await openDetail(id);
+  }
+
+  async function loadChecklistTemplates(componentId) {
+    const data = await rpc("mai_get_available_inspection_templates", {
+      p_component_id: componentId
+    });
+
+    state.selectedTemplates = data || [];
+  }
+
+  function renderChecklistTemplateSelect() {
+    if (!state.selectedTemplates.length) {
+      el.checklistTemplateSelect.innerHTML = `<option value="">No templates available</option>`;
+      el.startChecklistBtn.disabled = true;
+      return;
+    }
+
+    el.checklistTemplateSelect.innerHTML = state.selectedTemplates
+      .map((t) => {
+        const label = `${t.form_code || ""} — ${t.template_title || t.template_key} (${t.score_item_count || 0} items)`;
+        return optionHtml(t.template_id, label);
+      })
+      .join("");
+
+    el.startChecklistBtn.disabled = false;
+  }
+
+  async function loadChecklistRuns(componentId) {
+    const { data, error } = await state.sb
+      .from("mai_v_inspection_runs_list")
+      .select("*")
+      .eq("component_id", componentId)
+      .order("inspection_date", { ascending: false })
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+
+    state.selectedChecklistRuns = data || [];
+  }
+
+  function renderChecklistRunSelect() {
+    if (!state.selectedChecklistRuns.length) {
+      el.checklistRunSelect.innerHTML = `<option value="">No checklist runs</option>`;
+      el.loadChecklistRunBtn.disabled = true;
+      return;
+    }
+
+    el.checklistRunSelect.innerHTML = state.selectedChecklistRuns
+      .map((r) => {
+        const score = r.average_score === null || r.average_score === undefined ? "" : ` / Avg ${asNumber(r.average_score, 2)}`;
+        const label = `${asDateText(r.inspection_date)} — ${r.form_code || ""} — ${runStatusLabel(r.run_status)}${score}`;
+        return optionHtml(r.run_id, label);
+      })
+      .join("");
+
+    el.loadChecklistRunBtn.disabled = false;
+  }
+
+  function renderChecklistRunsHistory() {
+    const rows = state.selectedChecklistRuns;
+
+    if (!rows.length) {
+      el.checklistRunsHistory.innerHTML = `<div class="hint-text">No checklist runs yet.</div>`;
+      return;
+    }
+
+    el.checklistRunsHistory.innerHTML = rows
+      .map((r) => `
+        <div class="mini-item">
+          <div class="mini-title">
+            ${esc(r.form_code || "")} — ${esc(r.template_title || "")}
+            <span class="run-pill ${runStatusClass(r.run_status)}">${esc(runStatusLabel(r.run_status))}</span>
+          </div>
+          <div class="mini-meta">Inspection date: ${esc(asDateText(r.inspection_date))} / Inspected by: ${esc(r.inspected_by || "—")}</div>
+          <div class="mini-meta">Answered: ${esc(r.answered_items_count || 0)} / ${esc(r.total_score_items_count || 0)} / Average: ${esc(r.average_score === null || r.average_score === undefined ? "—" : asNumber(r.average_score, 2))}</div>
+          ${r.calculated_condition ? `<div class="mini-meta">Condition: ${esc(r.calculated_condition)}</div>` : ""}
+          ${r.calculated_recommendation ? `<div class="mini-meta">Recommendation: ${esc(r.calculated_recommendation)}</div>` : ""}
+        </div>
+      `)
+      .join("");
+  }
+
+  async function startChecklistRun() {
+    if (!state.selectedComponent) return;
+
+    const templateId = el.checklistTemplateSelect.value;
+    if (!templateId) {
+      showWarn("Select an inspection checklist template first.");
+      return;
+    }
+
+    const runId = await rpc("mai_start_inspection_run", {
+      p_component_id: state.selectedComponent.id,
+      p_template_id: templateId,
+      p_inspection_date: el.checklistInspectionDate.value || todayIso(),
+      p_inspected_by: el.checklistInspectedBy.value || null,
+      p_remarks: el.checklistRemarks.value || null
+    });
+
+    showOk("Checklist inspection run started.");
+
+    await reloadChecklistArea();
+    el.checklistRunSelect.value = runId;
+    await loadSelectedChecklistRun();
+  }
+
+  async function reloadChecklistArea() {
+    if (!state.selectedComponent) return;
+
+    await loadChecklistTemplates(state.selectedComponent.id);
+    await loadChecklistRuns(state.selectedComponent.id);
+
+    renderChecklistTemplateSelect();
+    renderChecklistRunSelect();
+    renderChecklistRunsHistory();
+  }
+
+  async function loadSelectedChecklistRun() {
+    const runId = el.checklistRunSelect.value;
+    if (!runId) {
+      showWarn("Select a checklist run first.");
+      return;
+    }
+
+    const run = state.selectedChecklistRuns.find((r) => r.run_id === runId);
+
+    if (!run) {
+      showWarn("Checklist run was not found in loaded run list.");
+      return;
+    }
+
+    state.activeChecklistRun = run;
+
+    await Promise.all([
+      loadActiveChecklistItems(run.template_id),
+      loadActiveChecklistAnswers(run.run_id)
+    ]);
+
+    renderChecklistWorkArea();
+  }
+
+  async function loadActiveChecklistItems(templateId) {
+    const { data, error } = await state.sb
+      .from("mai_v_inspection_template_items_detail")
+      .select("*")
+      .eq("template_id", templateId)
+      .order("sort_order", { ascending: true });
+
+    if (error) throw error;
+
+    state.activeChecklistItems = data || [];
+  }
+
+  async function loadActiveChecklistAnswers(runId) {
+    const { data, error } = await state.sb
+      .from("mai_v_inspection_run_answers_detail")
+      .select("*")
+      .eq("run_id", runId);
+
+    if (error) throw error;
+
+    state.activeChecklistAnswers = data || [];
+  }
+
+  function answerForItem(itemId) {
+    return state.activeChecklistAnswers.find((a) => a.item_id === itemId) || null;
+  }
+
+  function clearChecklistWorkArea() {
+    state.activeChecklistRun = null;
+    state.activeChecklistItems = [];
+    state.activeChecklistAnswers = [];
+
+    el.checklistRunSummary.classList.add("hidden");
+    el.checklistRunSummary.innerHTML = "";
+    el.checklistWorkArea.classList.add("hidden");
+    el.checklistItemsTbody.innerHTML = `<tr><td colspan="4" class="empty-cell">No checklist loaded.</td></tr>`;
+    el.checklistFinalDecision.value = "";
+    el.checklistFinalRemarks.value = "";
+  }
+
+  function renderChecklistWorkArea() {
+    const run = state.activeChecklistRun;
+
+    if (!run) {
+      clearChecklistWorkArea();
+      return;
+    }
+
+    const completed = run.run_status === "completed" || run.run_status === "voided";
+
+    el.checklistRunSummary.classList.remove("hidden");
+    el.checklistRunSummary.innerHTML = `
+      <strong>${esc(run.form_code || "")} — ${esc(run.template_title || "")}</strong><br />
+      Status: <span class="run-pill ${runStatusClass(run.run_status)}">${esc(runStatusLabel(run.run_status))}</span>
+      / Date: ${esc(asDateText(run.inspection_date))}
+      / Inspected by: ${esc(run.inspected_by || "—")}
+      <br />
+      Score: ${esc(run.average_score === null || run.average_score === undefined ? "Draft" : asNumber(run.average_score, 2))}
+      ${run.calculated_condition ? " / Condition: " + esc(run.calculated_condition) : ""}
+      ${run.calculated_recommendation ? "<br />Recommendation: " + esc(run.calculated_recommendation) : ""}
+    `;
+
+    if (!state.activeChecklistItems.length) {
+      el.checklistItemsTbody.innerHTML = `<tr><td colspan="4" class="empty-cell">No checklist items found.</td></tr>`;
+    } else {
+      el.checklistItemsTbody.innerHTML = state.activeChecklistItems
+        .map((item) => {
+          const answer = answerForItem(item.item_id);
+          const options = normalizeOptions(item.options);
+
+          const selectHtml = `
+            <select data-checklist-option="${esc(item.item_id)}" ${completed ? "disabled" : ""}>
+              <option value="">Select evaluation...</option>
+              ${options.map((o) => {
+                const label = `Score ${o.score_value} — ${o.option_label}`;
+                return optionHtml(o.option_id, label, answer?.selected_option_id || "");
+              }).join("")}
+            </select>
+          `;
+
+          const optionHelpHtml = options
+            .map((o) => `<div class="score-help"><span class="score-label">${esc(o.score_value)}:</span> ${esc(o.option_description || "")}</div>`)
+            .join("");
+
+          return `
+            <tr data-checklist-item-id="${esc(item.item_id)}">
+              <td>${esc(item.item_no)}</td>
+              <td>
+                <div class="checkpoint-title">${esc(item.item_title)}</div>
+                <div class="checkpoint-question">${esc(item.question_text)}</div>
+                <div class="muted-small">${esc(item.item_group || "")}</div>
+              </td>
+              <td>
+                ${selectHtml}
+                ${optionHelpHtml}
+              </td>
+              <td>
+                <textarea class="checklist-answer-remarks" data-checklist-remarks="${esc(item.item_id)}" ${completed ? "disabled" : ""}>${esc(answer?.answer_remarks || "")}</textarea>
+              </td>
+            </tr>
+          `;
+        })
+        .join("");
+    }
+
+    el.checklistWorkArea.classList.remove("hidden");
+    el.saveChecklistAnswersBtn.disabled = completed;
+    el.completeChecklistRunBtn.disabled = completed;
+    el.checklistFinalDecision.disabled = completed;
+    el.checklistFinalRemarks.disabled = completed;
+
+    if (completed) {
+      el.checklistFinalDecision.value = run.final_decision || "";
+      el.checklistFinalRemarks.value = run.final_decision_remarks || "";
+    } else {
+      el.checklistFinalDecision.value = "";
+      el.checklistFinalRemarks.value = "";
+    }
+  }
+
+  async function saveChecklistAnswers() {
+    const run = state.activeChecklistRun;
+
+    if (!run) {
+      showWarn("Load or start a checklist run first.");
+      return;
+    }
+
+    if (run.run_status !== "draft") {
+      showWarn("Only draft checklist runs can be edited.");
+      return;
+    }
+
+    const rows = Array.from(el.checklistItemsTbody.querySelectorAll("[data-checklist-item-id]"));
+
+    if (!rows.length) {
+      showWarn("No checklist items found to save.");
+      return;
+    }
+
+    let saved = 0;
+
+    for (const row of rows) {
+      const itemId = row.getAttribute("data-checklist-item-id");
+      const optionSelect = row.querySelector(`[data-checklist-option="${CSS.escape(itemId)}"]`);
+      const remarksInput = row.querySelector(`[data-checklist-remarks="${CSS.escape(itemId)}"]`);
+
+      const selectedOptionId = optionSelect?.value || null;
+      const remarks = remarksInput?.value || null;
+
+      if (!selectedOptionId && !remarks) continue;
+
+      await rpc("mai_save_inspection_run_answer", {
+        p_run_id: run.run_id,
+        p_item_id: itemId,
+        p_selected_option_id: selectedOptionId,
+        p_answer_remarks: remarks
+      });
+
+      saved += 1;
+    }
+
+    showOk(`Checklist answers saved. ${saved} item(s) updated.`);
+
+    await loadActiveChecklistAnswers(run.run_id);
+    renderChecklistWorkArea();
+  }
+
+  async function completeChecklistRun() {
+    const run = state.activeChecklistRun;
+
+    if (!run) {
+      showWarn("Load or start a checklist run first.");
+      return;
+    }
+
+    await saveChecklistAnswers();
+
+    await rpc("mai_complete_inspection_run", {
+      p_run_id: run.run_id,
+      p_final_decision: el.checklistFinalDecision.value || null,
+      p_final_decision_remarks: el.checklistFinalRemarks.value || null
+    });
+
+    showOk("Checklist inspection completed and linked to inspection/lifecycle history.");
+
+    const componentId = state.selectedComponent.id;
+
+    await reloadComponentsOnly();
+    await openDetail(componentId);
+
+    const freshRun = state.selectedChecklistRuns.find((r) => r.run_id === run.run_id);
+    if (freshRun) {
+      el.checklistRunSelect.value = freshRun.run_id;
+      await loadSelectedChecklistRun();
+    }
   }
 
   async function recordUsage() {
@@ -1380,7 +1762,7 @@
     if (!rows.length) {
       el.attachmentsBox.innerHTML = `
         <div class="hint-text">No attachments recorded yet.</div>
-        <div class="hint-text">File upload will be connected after the lifecycle and inspection workflow is stable.</div>
+        <div class="hint-text">File upload will be connected after the checklist workflow is stable.</div>
       `;
       return;
     }
