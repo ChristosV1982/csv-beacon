@@ -1,12 +1,12 @@
 // public/mooring-anchoring-inventories.js
 // C.S.V. BEACON – Mooring and Anchoring Inventories
+// v2: lifecycle status, usage hours, lifecycle events, spare minimums
 
 (() => {
   "use strict";
 
-  const BUILD = "MAI-FE-20260511-1";
+  const BUILD = "MAI-FE-20260511-2";
   const MODULE_KEY = "mooring_anchoring_inventories";
-  const PERM_PREFIX = "MOORING_ANCHORING_INVENTORIES";
 
   const state = {
     sb: null,
@@ -14,22 +14,70 @@
     profile: null,
     isPlatform: false,
     moduleAllowed: false,
+
     companies: [],
     vessels: [],
     componentTypes: [],
     statusOptions: [],
     locationOptions: [],
     inspectionTypes: [],
+
     components: [],
+    lifecycleRows: [],
+    usageSummaryRows: [],
+    spareStatusRows: [],
+
     selectedComponent: null,
     selectedEffectiveFields: [],
     selectedFieldValues: {},
+    selectedUsageRows: [],
+    selectedLifecycleEvents: []
   };
 
   const el = {};
 
   function $(id) {
     return document.getElementById(id);
+  }
+
+  function cacheDom() {
+    [
+      "warnBox", "okBox",
+      "reloadBtn", "spareStatusBtn", "newComponentBtn", "clearFiltersBtn",
+      "companyFilter", "vesselFilter", "typeFilter", "statusFilter", "searchInput",
+      "statTotal", "statActive", "statDue", "statRetired",
+      "listMeta", "componentsTbody",
+
+      "registerPanel", "closeRegisterBtn", "registerForm",
+      "registerVessel", "registerType", "registerOrderNumber", "registerStatus",
+      "registerLocationMode", "registerFittedWrap", "registerFittedPosition",
+      "registerStorageWrap", "registerStorageLocation", "registerNotes",
+      "registerDynamicFields", "submitRegisterBtn", "resetRegisterBtn",
+
+      "detailPanel", "detailTitle", "detailSubtitle", "identityBox",
+      "lifecycleOverviewBox", "lifecycleStatusTbody",
+      "closeDetailBtn", "saveFieldsBtn", "detailDynamicFields",
+
+      "usageOperationDate", "usageOperationType", "usagePort", "usageBerth",
+      "usageHours", "usageUnusualEvent", "usageRequiresInspection",
+      "usageEventDescription", "usageRemarks", "recordUsageBtn", "usageHistory",
+
+      "lifecycleEventType", "lifecycleEventDate", "lifecyclePerformedBy",
+      "lifecycleRemarks", "recordLifecycleEventBtn", "lifecycleEventHistory",
+
+      "moveLocationMode", "moveFittedWrap", "moveFittedPosition",
+      "moveStorageWrap", "moveStorageLocation", "moveRemarks", "applyMoveBtn",
+      "movementHistory",
+
+      "inspectionType", "inspectionDate", "inspectionResult", "inspectionBy",
+      "inspectionRemarks", "recordInspectionBtn", "inspectionHistory",
+
+      "attachmentsBox",
+
+      "sparePanel", "closeSpareBtn", "spareStatusTbody"
+    ].forEach((id) => {
+      el[id] = $(id);
+    });
   }
 
   function esc(value) {
@@ -63,16 +111,30 @@
     showOk("");
   }
 
-  function asDateText(value) {
-    if (!value) return "—";
-    const raw = String(value).slice(0, 10);
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return esc(value);
-    const [y, m, d] = raw.split("-");
-    return `${d}.${m}.${y}`;
+  function handleError(error) {
+    console.error("MAI error:", error);
+    showWarn(String(error?.message || error || "Unknown error"));
   }
 
   function todayIso() {
     return new Date().toISOString().slice(0, 10);
+  }
+
+  function asDateText(value) {
+    if (!value) return "—";
+    const raw = String(value).slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return String(value);
+    const [y, m, d] = raw.split("-");
+    return `${d}.${m}.${y}`;
+  }
+
+  function asNumber(value, decimals = 1) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return "—";
+    return n.toLocaleString(undefined, {
+      maximumFractionDigits: decimals,
+      minimumFractionDigits: 0
+    });
   }
 
   function daysBetweenToday(dateText) {
@@ -81,14 +143,6 @@
     if (Number.isNaN(due.getTime())) return null;
     const now = new Date(todayIso() + "T00:00:00Z");
     return Math.round((due.getTime() - now.getTime()) / 86400000);
-  }
-
-  function dueClass(dateText) {
-    const days = daysBetweenToday(dateText);
-    if (days === null) return "";
-    if (days < 0) return "due-overdue";
-    if (days <= 30) return "due-soon";
-    return "due-ok";
   }
 
   function dueLabel(dateText) {
@@ -101,19 +155,6 @@
     return `${base} / ${days}d`;
   }
 
-  function isTerminalStatus(statusKey) {
-    const row = state.statusOptions.find((x) => x.status_key === statusKey);
-    return row?.is_terminal === true;
-  }
-
-  function statusClass(statusKey) {
-    if (isTerminalStatus(statusKey)) return "status-terminal";
-    if (["under_inspection", "repair_required", "removed_from_service"].includes(statusKey)) {
-      return "status-attention";
-    }
-    return "";
-  }
-
   function roleIsPlatform(role) {
     return role === "super_admin" || role === "platform_owner";
   }
@@ -121,30 +162,6 @@
   function optionHtml(value, label, selectedValue = "") {
     const selected = String(value) === String(selectedValue) ? " selected" : "";
     return `<option value="${esc(value)}"${selected}>${esc(label)}</option>`;
-  }
-
-  function getCompanyName(companyId) {
-    const c = state.companies.find((x) => x.id === companyId);
-    return c?.company_name || c?.short_name || c?.company_code || companyId || "";
-  }
-
-  function getVessel(vesselId) {
-    return state.vessels.find((x) => x.id === vesselId) || null;
-  }
-
-  function getTypeLabel(typeId) {
-    const t = state.componentTypes.find((x) => x.id === typeId);
-    if (!t) return "";
-    return `${t.code} — ${t.name}`;
-  }
-
-  function componentTypesForCompany(companyId = "") {
-    return state.componentTypes.filter((t) => !t.company_id || !companyId || t.company_id === companyId);
-  }
-
-  function getStatusLabel(statusKey) {
-    const s = state.statusOptions.find((x) => x.status_key === statusKey);
-    return s?.status_label || statusKey || "—";
   }
 
   function normalizeOptions(raw) {
@@ -172,32 +189,119 @@
     return data || [];
   }
 
-  function cacheDom() {
-    [
-      "warnBox", "okBox", "reloadBtn", "newComponentBtn", "clearFiltersBtn",
-      "companyFilter", "vesselFilter", "typeFilter", "statusFilter", "searchInput",
-      "statTotal", "statActive", "statDue", "statRetired", "listMeta", "componentsTbody",
-      "registerPanel", "closeRegisterBtn", "registerForm", "registerVessel", "registerType",
-      "registerOrderNumber", "registerStatus", "registerLocationMode", "registerFittedWrap",
-      "registerFittedPosition", "registerStorageWrap", "registerStorageLocation", "registerNotes",
-      "registerDynamicFields", "submitRegisterBtn", "resetRegisterBtn",
-      "detailPanel", "detailTitle", "detailSubtitle", "identityBox", "closeDetailBtn", "saveFieldsBtn",
-      "detailDynamicFields", "moveLocationMode", "moveFittedWrap", "moveFittedPosition",
-      "moveStorageWrap", "moveStorageLocation", "moveRemarks", "applyMoveBtn",
-      "inspectionType", "inspectionDate", "inspectionResult", "inspectionBy", "inspectionRemarks",
-      "recordInspectionBtn", "inspectionHistory", "movementHistory", "attachmentsBox"
-    ].forEach((id) => {
-      el[id] = $(id);
-    });
+  function getCompanyName(companyId) {
+    const c = state.companies.find((x) => x.id === companyId);
+    return c?.company_name || c?.short_name || c?.company_code || companyId || "";
+  }
+
+  function getVessel(vesselId) {
+    return state.vessels.find((x) => x.id === vesselId) || null;
+  }
+
+  function getStatusLabel(statusKey) {
+    const s = state.statusOptions.find((x) => x.status_key === statusKey);
+    return s?.status_label || statusKey || "—";
+  }
+
+  function isTerminalStatus(statusKey) {
+    const row = state.statusOptions.find((x) => x.status_key === statusKey);
+    return row?.is_terminal === true;
+  }
+
+  function statusClass(statusKey) {
+    if (isTerminalStatus(statusKey)) return "status-terminal";
+    if (["under_inspection", "repair_required", "removed_from_service"].includes(statusKey)) {
+      return "status-attention";
+    }
+    return "";
+  }
+
+  function lifecyclePriority(status) {
+    const s = String(status || "");
+    if (s === "retire_now") return 60;
+    if (s === "overdue") return 50;
+    if (s === "action_required") return 45;
+    if (s === "due_soon") return 40;
+    if (s === "ok") return 20;
+    if (s === "event_based") return 10;
+    if (s === "completed") return 0;
+    return 5;
+  }
+
+  function lifecycleClass(status) {
+    const s = String(status || "").replaceAll("_", "-");
+    return `lifecycle-${s}`;
+  }
+
+  function lifecycleLabel(status) {
+    const map = {
+      ok: "OK",
+      due_soon: "Due Soon",
+      overdue: "Overdue",
+      retire_now: "Retire Now",
+      action_required: "Action Required",
+      completed: "Completed",
+      event_based: "Event Based"
+    };
+    return map[status] || String(status || "—").replaceAll("_", " ");
+  }
+
+  function lifecycleRowsForComponent(componentId) {
+    return state.lifecycleRows
+      .filter((r) => r.component_id === componentId)
+      .sort((a, b) => {
+        const p = lifecyclePriority(b.lifecycle_status) - lifecyclePriority(a.lifecycle_status);
+        if (p !== 0) return p;
+        return Number(a.sort_order || 0) - Number(b.sort_order || 0);
+      });
+  }
+
+  function usageSummaryForComponent(componentId) {
+    return state.usageSummaryRows.find((r) => r.component_id === componentId) || null;
+  }
+
+  function worstLifecycleForComponent(componentId) {
+    const rows = lifecycleRowsForComponent(componentId);
+    if (!rows.length) return null;
+    return rows[0];
+  }
+
+  function nextLifecycleActionForComponent(componentId) {
+    const rows = lifecycleRowsForComponent(componentId);
+
+    const actionable = rows.find((r) =>
+      ["retire_now", "overdue", "action_required", "due_soon"].includes(r.lifecycle_status)
+    );
+
+    if (actionable) return actionable;
+
+    const future = rows
+      .filter((r) => r.due_date || r.hours_remaining !== null)
+      .sort((a, b) => {
+        const ad = a.due_date ? new Date(a.due_date).getTime() : Number.POSITIVE_INFINITY;
+        const bd = b.due_date ? new Date(b.due_date).getTime() : Number.POSITIVE_INFINITY;
+        if (ad !== bd) return ad - bd;
+        return Number(a.hours_remaining ?? 999999999) - Number(b.hours_remaining ?? 999999999);
+      })[0];
+
+    return future || rows[0] || null;
   }
 
   function bindEvents() {
     el.reloadBtn?.addEventListener("click", () => reloadAll().catch(handleError));
+    el.spareStatusBtn?.addEventListener("click", () => openSparePanel());
+    el.closeSpareBtn?.addEventListener("click", () => closeSparePanel());
+
     el.newComponentBtn?.addEventListener("click", () => openRegisterPanel());
     el.closeRegisterBtn?.addEventListener("click", () => closeRegisterPanel());
     el.clearFiltersBtn?.addEventListener("click", clearFilters);
 
-    [el.companyFilter, el.vesselFilter, el.typeFilter, el.statusFilter, el.searchInput].forEach((input) => {
+    el.companyFilter?.addEventListener("change", () => {
+      fillVesselFilter();
+      renderComponents();
+    });
+
+    [el.vesselFilter, el.typeFilter, el.statusFilter, el.searchInput].forEach((input) => {
       input?.addEventListener("input", renderComponents);
       input?.addEventListener("change", renderComponents);
     });
@@ -205,16 +309,23 @@
     el.registerVessel?.addEventListener("change", () => onRegisterContextChanged().catch(handleError));
     el.registerType?.addEventListener("change", () => onRegisterContextChanged().catch(handleError));
     el.registerLocationMode?.addEventListener("change", () => updateRegisterLocationUi());
+
     el.registerForm?.addEventListener("submit", (event) => {
       event.preventDefault();
       registerComponent().catch(handleError);
     });
+
     el.resetRegisterBtn?.addEventListener("click", () => resetRegisterForm());
 
     el.closeDetailBtn?.addEventListener("click", closeDetailPanel);
     el.saveFieldsBtn?.addEventListener("click", () => saveSelectedFields().catch(handleError));
+
+    el.recordUsageBtn?.addEventListener("click", () => recordUsage().catch(handleError));
+    el.recordLifecycleEventBtn?.addEventListener("click", () => recordLifecycleEvent().catch(handleError));
+
     el.moveLocationMode?.addEventListener("change", () => updateMoveLocationUi());
     el.applyMoveBtn?.addEventListener("click", () => applyLocationChange().catch(handleError));
+
     el.recordInspectionBtn?.addEventListener("click", () => recordInspection().catch(handleError));
   }
 
@@ -229,9 +340,7 @@
     state.moduleAllowed = allowed;
 
     if (!allowed) {
-      showWarn(
-        "This module is not enabled for your company yet. It has been created safely but remains hidden until final activation."
-      );
+      showWarn("This module is not enabled for your company yet.");
     }
 
     return allowed;
@@ -243,9 +352,7 @@
         const data = await rpc("csvb_admin_list_companies");
         state.companies = (data || []).filter((c) => c.is_active !== false);
         return;
-      } catch (_) {
-        // Fall back to companies visible through normal RLS.
-      }
+      } catch (_) {}
     }
 
     try {
@@ -273,6 +380,7 @@
 
     const { data, error } = await query;
     if (error) throw error;
+
     state.vessels = (data || []).filter((v) => v.is_active !== false);
   }
 
@@ -331,10 +439,51 @@
     state.components = data || [];
   }
 
+  async function loadLifecycleStatus() {
+    const { data, error } = await state.sb
+      .from("mai_v_component_lifecycle_status")
+      .select("*")
+      .order("unique_id", { ascending: true })
+      .order("sort_order", { ascending: true });
+
+    if (error) throw error;
+    state.lifecycleRows = data || [];
+  }
+
+  async function loadUsageSummary() {
+    const { data, error } = await state.sb
+      .from("mai_v_component_usage_summary")
+      .select("*");
+
+    if (error) throw error;
+    state.usageSummaryRows = data || [];
+  }
+
+  async function loadSpareStatus() {
+    const { data, error } = await state.sb
+      .from("mai_v_spare_minimum_status")
+      .select("*")
+      .order("company_name", { ascending: true })
+      .order("vessel_name", { ascending: true })
+      .order("component_type_code", { ascending: true });
+
+    if (error) throw error;
+    state.spareStatusRows = data || [];
+  }
+
+  function visibleVesselsForCompany(companyId = "") {
+    return state.vessels.filter((v) => !companyId || v.company_id === companyId);
+  }
+
+  function componentTypesForCompany(companyId = "") {
+    return state.componentTypes.filter((t) => !t.company_id || !companyId || t.company_id === companyId);
+  }
+
   function fillStaticSelects() {
     const companyOptions = [optionHtml("", "All visible companies")].concat(
       state.companies.map((c) => optionHtml(c.id, c.company_name || c.short_name || c.company_code || c.id))
     );
+
     el.companyFilter.innerHTML = companyOptions.join("");
 
     if (!state.isPlatform && state.profile?.company_id) {
@@ -352,6 +501,7 @@
       .concat(state.statusOptions.map((s) => optionHtml(s.status_key, s.status_label)))
       .join("");
 
+    fillRegisterVessels();
     fillRegisterTypes();
 
     el.registerStatus.innerHTML = state.statusOptions
@@ -362,25 +512,27 @@
       .map((i) => optionHtml(i.inspection_type_key, i.inspection_type_label))
       .join("");
 
+    el.usageOperationDate.value = todayIso();
+    el.lifecycleEventDate.value = todayIso();
     el.inspectionDate.value = todayIso();
 
-    fillRegisterVessels();
     fillLocationSelects();
-  }
-
-  function visibleVesselsForCompany(companyId = "") {
-    return state.vessels.filter((v) => !companyId || v.company_id === companyId);
   }
 
   function fillVesselFilter() {
     const companyId = el.companyFilter?.value || (!state.isPlatform ? state.profile?.company_id || "" : "");
     const vessels = visibleVesselsForCompany(companyId);
     const current = el.vesselFilter?.value || "";
-    const stillValid = current && vessels.some((v) => v.id === current);
-    const selected = stillValid ? current : "";
+    const selected = current && vessels.some((v) => v.id === current) ? current : "";
 
     el.vesselFilter.innerHTML = [optionHtml("", "All visible vessels", selected)]
-      .concat(vessels.map((v) => optionHtml(v.id, `${v.name || "Unnamed Vessel"}${v.hull_number ? " / Hull " + v.hull_number : ""}`, selected)))
+      .concat(vessels.map((v) =>
+        optionHtml(
+          v.id,
+          `${v.name || "Unnamed Vessel"}${v.hull_number ? " / Hull " + v.hull_number : ""}`,
+          selected
+        )
+      ))
       .join("");
 
     el.vesselFilter.value = selected;
@@ -393,15 +545,19 @@
     const selected = current && vessels.some((v) => v.id === current) ? current : "";
 
     el.registerVessel.innerHTML = [optionHtml("", "Select vessel", selected)]
-      .concat(vessels.map((v) => optionHtml(v.id, `${v.name || "Unnamed Vessel"}${v.hull_number ? " / Hull " + v.hull_number : ""}`, selected)))
+      .concat(vessels.map((v) =>
+        optionHtml(
+          v.id,
+          `${v.name || "Unnamed Vessel"}${v.hull_number ? " / Hull " + v.hull_number : ""}`,
+          selected
+        )
+      ))
       .join("");
 
     if (state.profile?.role === "vessel" && state.profile?.vessel_id) {
       el.registerVessel.value = state.profile.vessel_id;
       el.registerVessel.disabled = true;
     }
-
-    fillRegisterTypes();
   }
 
   function fillRegisterTypes() {
@@ -433,10 +589,11 @@
   }
 
   function fillOneLocationSelect(selectEl, mode, vesselId, componentTypeId, selected = "") {
+    if (!selectEl) return;
     const options = filteredLocationOptions(mode, vesselId, componentTypeId);
     selectEl.innerHTML = options.length
       ? options.map((x) => optionHtml(x.location_key, x.location_label, selected)).join("")
-      : optionHtml("", "No configured options");
+      : optionHtml("", "No configured options", selected);
   }
 
   function fillLocationSelects() {
@@ -479,7 +636,7 @@
 
     const data = await rpc("mai_get_effective_fields", {
       p_company_id: vessel.company_id,
-      p_component_type_id: componentTypeId,
+      p_component_type_id: componentTypeId
     });
 
     return data || [];
@@ -488,7 +645,6 @@
   function inputTypeForField(field) {
     if (field.value_type === "date") return "date";
     if (field.value_type === "number") return "number";
-    if (field.value_type === "boolean") return "checkbox";
     return "text";
   }
 
@@ -518,7 +674,7 @@
         if (field.value_type === "textarea") {
           return `
             <label class="field" data-field-key="${esc(key)}" data-value-type="${esc(field.value_type)}">
-              <span>${esc(label)}${field.is_required ? " <b>*</b>" : ""}</span>
+              <span>${esc(label)}${field.is_required ? " *" : ""}</span>
               <textarea id="${esc(id)}" data-dynamic-input="${esc(key)}"${required}>${esc(current)}</textarea>
               ${help}
             </label>
@@ -529,7 +685,7 @@
           const opts = normalizeOptions(field.options);
           return `
             <label class="field" data-field-key="${esc(key)}" data-value-type="${esc(field.value_type)}">
-              <span>${esc(label)}${field.is_required ? " <b>*</b>" : ""}</span>
+              <span>${esc(label)}${field.is_required ? " *" : ""}</span>
               <select id="${esc(id)}" data-dynamic-input="${esc(key)}"${required}>
                 <option value="">Select...</option>
                 ${opts.map((o) => optionHtml(o.value, o.label, current)).join("")}
@@ -540,13 +696,12 @@
         }
 
         if (field.value_type === "boolean") {
-          const checked = current === true || current === "true" ? " checked" : "";
           return `
             <label class="field" data-field-key="${esc(key)}" data-value-type="${esc(field.value_type)}">
-              <span>${esc(label)}${field.is_required ? " <b>*</b>" : ""}</span>
+              <span>${esc(label)}${field.is_required ? " *" : ""}</span>
               <select id="${esc(id)}" data-dynamic-input="${esc(key)}"${required}>
                 <option value="">Not set</option>
-                <option value="true"${checked ? " selected" : ""}>Yes</option>
+                <option value="true"${current === true || current === "true" ? " selected" : ""}>Yes</option>
                 <option value="false"${current === false || current === "false" ? " selected" : ""}>No</option>
               </select>
               ${help}
@@ -556,7 +711,7 @@
 
         return `
           <label class="field" data-field-key="${esc(key)}" data-value-type="${esc(field.value_type)}">
-            <span>${esc(label)}${field.is_required ? " <b>*</b>" : ""}</span>
+            <span>${esc(label)}${field.is_required ? " *" : ""}</span>
             <input id="${esc(id)}" type="${esc(inputTypeForField(field))}" data-dynamic-input="${esc(key)}" value="${esc(valueToString(current))}"${required} />
             ${help}
           </label>
@@ -602,6 +757,7 @@
       if (status && c.current_status !== status) return false;
 
       if (q) {
+        const next = nextLifecycleActionForComponent(c.id);
         const haystack = [
           c.unique_id,
           c.company_name,
@@ -613,10 +769,10 @@
           c.current_status_label,
           c.location_mode,
           c.current_location_detail,
-          c.notes,
-        ]
-          .map((x) => String(x || "").toLowerCase())
-          .join(" | ");
+          next?.rule_label,
+          next?.lifecycle_status,
+          c.notes
+        ].map((x) => String(x || "").toLowerCase()).join(" | ");
 
         if (!haystack.includes(q)) return false;
       }
@@ -628,20 +784,23 @@
   function renderStats(rows) {
     const active = rows.filter((c) => !isTerminalStatus(c.current_status)).length;
     const retired = rows.filter((c) => isTerminalStatus(c.current_status)).length;
-    const due = rows.filter((c) => {
-      const days = daysBetweenToday(c.next_inspection_due_date);
-      return days !== null && days <= 30;
-    }).length;
+
+    const dueComponents = new Set();
+
+    rows.forEach((c) => {
+      const worst = worstLifecycleForComponent(c.id);
+      if (worst && lifecyclePriority(worst.lifecycle_status) >= lifecyclePriority("due_soon")) {
+        dueComponents.add(c.id);
+      }
+    });
 
     el.statTotal.textContent = String(rows.length);
     el.statActive.textContent = String(active);
-    el.statDue.textContent = String(due);
+    el.statDue.textContent = String(dueComponents.size);
     el.statRetired.textContent = String(retired);
   }
 
   function renderComponents() {
-    fillVesselFilter();
-
     const rows = filteredComponents();
     renderStats(rows);
     el.listMeta.textContent = `${rows.length} record(s) shown from ${state.components.length} visible record(s).`;
@@ -655,7 +814,17 @@
       .map((c) => {
         const statusLabel = c.current_status_label || getStatusLabel(c.current_status);
         const location = c.current_location_detail || c.location_mode || "—";
-        const dueCls = dueClass(c.next_inspection_due_date);
+        const usage = usageSummaryForComponent(c.id);
+        const next = nextLifecycleActionForComponent(c.id);
+
+        const nextHtml = next
+          ? `
+            <div><span class="lifecycle-pill ${lifecycleClass(next.lifecycle_status)}">${esc(lifecycleLabel(next.lifecycle_status))}</span></div>
+            <div class="muted-small">${esc(next.rule_label || next.rule_key || "—")}</div>
+            <div class="muted-small">Due: ${esc(dueLabel(next.due_date))} / Hours left: ${esc(next.hours_remaining === null || next.hours_remaining === undefined ? "—" : asNumber(next.hours_remaining, 1))}</div>
+          `
+          : "—";
+
         return `
           <tr data-component-id="${esc(c.id)}">
             <td>
@@ -675,8 +844,11 @@
               <div>${esc(c.location_mode || "—")}</div>
               <div class="muted-small">${esc(location)}</div>
             </td>
-            <td>${esc(asDateText(c.last_inspection_date))}<div class="muted-small">${esc(c.last_inspection_result || "")}</div></td>
-            <td><span class="due-pill ${dueCls}">${esc(dueLabel(c.next_inspection_due_date))}</span></td>
+            <td>
+              <div>${esc(asNumber(usage?.total_lifecycle_hours || 0, 1))}</div>
+              <div class="muted-small">${esc(usage?.usage_log_count || 0)} usage record(s)</div>
+            </td>
+            <td>${nextHtml}</td>
             <td>${esc(asDateText(c.updated_at))}</td>
             <td class="actions-cell">
               <button class="btn2 compact" type="button" data-action="view" data-id="${esc(c.id)}">View</button>
@@ -703,9 +875,11 @@
 
   function resetRegisterForm() {
     el.registerForm.reset();
+
     if (state.profile?.role === "vessel" && state.profile?.vessel_id) {
       el.registerVessel.value = state.profile.vessel_id;
     }
+
     el.registerStatus.value = "active";
     el.registerLocationMode.value = "storage";
     updateRegisterLocationUi();
@@ -740,11 +914,13 @@
         p_fitted_position: locationMode === "fitted" ? el.registerFittedPosition.value || null : null,
         p_storage_location: locationMode === "storage" ? el.registerStorageLocation.value || null : null,
         p_notes: el.registerNotes.value || null,
-        p_field_values: fieldValues,
+        p_field_values: fieldValues
       });
 
       const row = Array.isArray(data) ? data[0] : data;
+
       showOk(`Component registered successfully. Unique ID: ${row?.unique_id || "generated"}`);
+
       resetRegisterForm();
       closeRegisterPanel();
       await reloadComponentsOnly();
@@ -758,6 +934,8 @@
     state.selectedComponent = null;
     state.selectedEffectiveFields = [];
     state.selectedFieldValues = {};
+    state.selectedUsageRows = [];
+    state.selectedLifecycleEvents = [];
     el.detailPanel.classList.add("hidden");
   }
 
@@ -776,6 +954,8 @@
     el.detailSubtitle.textContent = `${component.vessel_name || "Vessel"} / ${component.component_type_code || "Type"} — ${component.component_type_name || ""}`;
 
     renderIdentity(component);
+    renderLifecycleOverview(component);
+    renderLifecycleStatus(component);
 
     state.selectedEffectiveFields = await getEffectiveFieldsFor(component.vessel_id, component.component_type_id);
     state.selectedFieldValues = await loadFieldValues(component.id, state.selectedEffectiveFields);
@@ -786,17 +966,28 @@
     updateMoveLocationUi();
     el.moveRemarks.value = "";
 
+    el.usageOperationDate.value = todayIso();
+    el.lifecycleEventDate.value = todayIso();
+    el.inspectionDate.value = todayIso();
+
     await Promise.all([
+      loadSelectedUsageRows(component.id),
+      loadSelectedLifecycleEvents(component.id),
       renderInspectionHistory(component.id),
       renderMovementHistory(component.id),
-      renderAttachments(component.id),
+      renderAttachments(component.id)
     ]);
+
+    renderUsageHistory();
+    renderLifecycleEventHistory();
 
     el.detailPanel.classList.remove("hidden");
     el.detailPanel.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
   function renderIdentity(c) {
+    const usage = usageSummaryForComponent(c.id);
+
     const rows = [
       ["Unique ID", c.unique_id],
       ["Company", c.company_name || getCompanyName(c.company_id)],
@@ -808,13 +999,93 @@
       ["Status", c.current_status_label || getStatusLabel(c.current_status)],
       ["Location Mode", c.location_mode],
       ["Location Detail", c.current_location_detail],
-      ["Last Inspection", asDateText(c.last_inspection_date)],
-      ["Next Due", dueLabel(c.next_inspection_due_date)],
-      ["Notes", c.notes || "—"],
+      ["Total Lifecycle Hours", asNumber(usage?.total_lifecycle_hours || 0, 1)],
+      ["Last Usage", asDateText(usage?.last_usage_date)],
+      ["Last Abnormal Event", asDateText(usage?.last_abnormal_event_date)],
+      ["Notes", c.notes || "—"]
     ];
 
     el.identityBox.innerHTML = rows
       .map(([k, v]) => `<div class="kv-key">${esc(k)}</div><div class="kv-value">${esc(v || "—")}</div>`)
+      .join("");
+  }
+
+  function renderLifecycleOverview(c) {
+    const rows = lifecycleRowsForComponent(c.id);
+    const usage = usageSummaryForComponent(c.id);
+    const worst = worstLifecycleForComponent(c.id);
+    const next = nextLifecycleActionForComponent(c.id);
+
+    const overdueCount = rows.filter((r) => r.lifecycle_status === "overdue" || r.lifecycle_status === "retire_now").length;
+    const dueSoonCount = rows.filter((r) => r.lifecycle_status === "due_soon" || r.lifecycle_status === "action_required").length;
+
+    el.lifecycleOverviewBox.innerHTML = `
+      <div class="overview-card">
+        <div class="overview-label">Total Hours</div>
+        <div class="overview-value">${esc(asNumber(usage?.total_lifecycle_hours || 0, 1))}</div>
+      </div>
+      <div class="overview-card">
+        <div class="overview-label">Worst Status</div>
+        <div class="overview-value"><span class="lifecycle-pill ${lifecycleClass(worst?.lifecycle_status)}">${esc(lifecycleLabel(worst?.lifecycle_status || "ok"))}</span></div>
+      </div>
+      <div class="overview-card">
+        <div class="overview-label">Overdue / Retire</div>
+        <div class="overview-value">${esc(overdueCount)}</div>
+      </div>
+      <div class="overview-card">
+        <div class="overview-label">Due Soon / Action</div>
+        <div class="overview-value">${esc(dueSoonCount)}</div>
+      </div>
+      <div class="overview-card">
+        <div class="overview-label">Next Action</div>
+        <div class="overview-value">${esc(next?.rule_label || "—")}</div>
+      </div>
+      <div class="overview-card">
+        <div class="overview-label">Next Due</div>
+        <div class="overview-value">${esc(dueLabel(next?.due_date))}</div>
+      </div>
+    `;
+  }
+
+  function renderLifecycleStatus(c) {
+    const rows = lifecycleRowsForComponent(c.id);
+
+    if (!rows.length) {
+      el.lifecycleStatusTbody.innerHTML = `<tr><td colspan="6" class="empty-cell">No lifecycle criteria found for this component type.</td></tr>`;
+      return;
+    }
+
+    el.lifecycleStatusTbody.innerHTML = rows
+      .map((r) => {
+        const base = [
+          `Start: ${asDateText(r.service_start_date)}`,
+          r.reset_event_date ? `Reset: ${asDateText(r.reset_event_date)}` : ""
+        ].filter(Boolean).join(" / ");
+
+        const limits = [
+          r.date_limit_months !== null && r.date_limit_months !== undefined ? `${r.date_limit_months} months` : "",
+          r.hours_limit !== null && r.hours_limit !== undefined ? `${asNumber(r.hours_limit, 0)} hours` : ""
+        ].filter(Boolean).join(" / ") || "—";
+
+        const hours = [
+          `Used: ${asNumber(r.hours_since_base || 0, 1)}`,
+          r.hours_remaining !== null && r.hours_remaining !== undefined ? `Left: ${asNumber(r.hours_remaining, 1)}` : ""
+        ].filter(Boolean).join(" / ");
+
+        return `
+          <tr>
+            <td>
+              <div class="id-strong">${esc(r.rule_label || r.rule_key)}</div>
+              <div class="muted-small">${esc(r.rule_group || "")} / ${esc(limits)}</div>
+            </td>
+            <td><span class="lifecycle-pill ${lifecycleClass(r.lifecycle_status)}">${esc(lifecycleLabel(r.lifecycle_status))}</span></td>
+            <td>${esc(base || "—")}</td>
+            <td>${esc(dueLabel(r.due_date))}</td>
+            <td>${esc(hours || "—")}</td>
+            <td>${esc(r.recommended_action || "—")}</td>
+          </tr>
+        `;
+      })
       .join("");
   }
 
@@ -850,11 +1121,75 @@
 
     await rpc("mai_save_component_field_values", {
       p_component_id: state.selectedComponent.id,
-      p_values: values,
+      p_values: values
     });
 
     showOk("Field values saved.");
-    await openDetail(state.selectedComponent.id);
+
+    const id = state.selectedComponent.id;
+    await reloadComponentsOnly();
+    await openDetail(id);
+  }
+
+  async function recordUsage() {
+    if (!state.selectedComponent) return;
+
+    const hours = Number(el.usageHours.value || 0);
+    if (!Number.isFinite(hours) || hours < 0) {
+      showWarn("Hours under tension must be zero or higher.");
+      return;
+    }
+
+    await rpc("mai_record_component_usage", {
+      p_component_id: state.selectedComponent.id,
+      p_operation_date: el.usageOperationDate.value || todayIso(),
+      p_operation_type: el.usageOperationType.value || "mooring",
+      p_hours_under_tension: hours,
+      p_port_name: el.usagePort.value || null,
+      p_berth_or_terminal: el.usageBerth.value || null,
+      p_unusual_event: el.usageUnusualEvent.checked,
+      p_event_requires_inspection: el.usageRequiresInspection.checked,
+      p_event_description: el.usageEventDescription.value || null,
+      p_remarks: el.usageRemarks.value || null
+    });
+
+    showOk("Usage / working-hours record saved.");
+
+    el.usageHours.value = "";
+    el.usagePort.value = "";
+    el.usageBerth.value = "";
+    el.usageUnusualEvent.checked = false;
+    el.usageRequiresInspection.checked = false;
+    el.usageEventDescription.value = "";
+    el.usageRemarks.value = "";
+
+    const id = state.selectedComponent.id;
+    await reloadComponentsOnly();
+    await openDetail(id);
+  }
+
+  async function recordLifecycleEvent() {
+    if (!state.selectedComponent) return;
+
+    await rpc("mai_record_lifecycle_event", {
+      p_component_id: state.selectedComponent.id,
+      p_event_type: el.lifecycleEventType.value,
+      p_event_date: el.lifecycleEventDate.value || todayIso(),
+      p_performed_by: el.lifecyclePerformedBy.value || null,
+      p_source_type: "manual",
+      p_related_inspection_id: null,
+      p_related_usage_log_id: null,
+      p_remarks: el.lifecycleRemarks.value || null
+    });
+
+    showOk("Lifecycle event recorded.");
+
+    el.lifecyclePerformedBy.value = "";
+    el.lifecycleRemarks.value = "";
+
+    const id = state.selectedComponent.id;
+    await reloadComponentsOnly();
+    await openDetail(id);
   }
 
   async function applyLocationChange() {
@@ -868,12 +1203,14 @@
       p_fitted_position: mode === "fitted" ? el.moveFittedPosition.value || null : null,
       p_storage_location: mode === "storage" ? el.moveStorageLocation.value || null : null,
       p_reason: el.moveRemarks.value || null,
-      p_remarks: el.moveRemarks.value || null,
+      p_remarks: el.moveRemarks.value || null
     });
 
     showOk("Location changed and movement history recorded.");
+
+    const id = state.selectedComponent.id;
     await reloadComponentsOnly();
-    await openDetail(state.selectedComponent.id);
+    await openDetail(id);
   }
 
   async function recordInspection() {
@@ -890,22 +1227,91 @@
       p_inspection_date: el.inspectionDate.value,
       p_result: el.inspectionResult.value || "satisfactory",
       p_inspected_by: el.inspectionBy.value || null,
-      p_remarks: el.inspectionRemarks.value || null,
+      p_remarks: el.inspectionRemarks.value || null
     });
 
-    showOk("Inspection recorded.");
+    showOk("Inspection summary recorded.");
+
     el.inspectionDate.value = todayIso();
     el.inspectionResult.value = "satisfactory";
     el.inspectionBy.value = "";
     el.inspectionRemarks.value = "";
+
+    const id = state.selectedComponent.id;
     await reloadComponentsOnly();
-    await openDetail(state.selectedComponent.id);
+    await openDetail(id);
+  }
+
+  async function loadSelectedUsageRows(componentId) {
+    const { data, error } = await state.sb
+      .from("mai_component_usage_logs")
+      .select("*")
+      .eq("component_id", componentId)
+      .order("operation_date", { ascending: false })
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+    state.selectedUsageRows = data || [];
+  }
+
+  function renderUsageHistory() {
+    const rows = state.selectedUsageRows;
+
+    if (!rows.length) {
+      el.usageHistory.innerHTML = `<div class="hint-text">No usage / working-hours records yet.</div>`;
+      return;
+    }
+
+    el.usageHistory.innerHTML = rows
+      .map((r) => `
+        <div class="mini-item">
+          <div class="mini-title">${esc(r.operation_type || "usage")} — ${esc(asDateText(r.operation_date))}</div>
+          <div class="mini-meta">Hours under tension: ${esc(asNumber(r.hours_under_tension || 0, 1))}</div>
+          <div class="mini-meta">Port: ${esc(r.port_name || "—")} / Berth: ${esc(r.berth_or_terminal || "—")}</div>
+          ${r.unusual_event || r.event_requires_inspection ? `<div class="mini-meta"><span class="lifecycle-pill lifecycle-overdue">Event / inspection trigger</span></div>` : ""}
+          ${r.event_description ? `<div class="mini-meta">${esc(r.event_description)}</div>` : ""}
+          ${r.remarks ? `<div class="mini-meta">${esc(r.remarks)}</div>` : ""}
+        </div>
+      `)
+      .join("");
+  }
+
+  async function loadSelectedLifecycleEvents(componentId) {
+    const { data, error } = await state.sb
+      .from("mai_component_lifecycle_events")
+      .select("*")
+      .eq("component_id", componentId)
+      .order("event_date", { ascending: false })
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+    state.selectedLifecycleEvents = data || [];
+  }
+
+  function renderLifecycleEventHistory() {
+    const rows = state.selectedLifecycleEvents;
+
+    if (!rows.length) {
+      el.lifecycleEventHistory.innerHTML = `<div class="hint-text">No lifecycle events yet.</div>`;
+      return;
+    }
+
+    el.lifecycleEventHistory.innerHTML = rows
+      .map((r) => `
+        <div class="mini-item">
+          <div class="mini-title">${esc(r.event_type || "event")} — ${esc(asDateText(r.event_date))}</div>
+          <div class="mini-meta">Hours at event: ${esc(r.hours_at_event === null || r.hours_at_event === undefined ? "—" : asNumber(r.hours_at_event, 1))}</div>
+          <div class="mini-meta">Performed by: ${esc(r.performed_by || "—")} / Source: ${esc(r.source_type || "—")}</div>
+          ${r.remarks ? `<div class="mini-meta">${esc(r.remarks)}</div>` : ""}
+        </div>
+      `)
+      .join("");
   }
 
   async function renderInspectionHistory(componentId) {
     const { data, error } = await state.sb
       .from("mai_component_inspections")
-      .select("id, inspection_type, inspection_date, next_due_date, result, inspected_by, remarks, created_at")
+      .select("id, inspection_type, inspection_date, next_due_date, result, inspected_by, remarks, hours_at_inspection, created_at")
       .eq("component_id", componentId)
       .order("inspection_date", { ascending: false });
 
@@ -924,6 +1330,7 @@
           <div class="mini-item">
             <div class="mini-title">${esc(type?.inspection_type_label || r.inspection_type)} — ${esc(r.result || "")}</div>
             <div class="mini-meta">Date: ${esc(asDateText(r.inspection_date))} / Next due: ${esc(dueLabel(r.next_due_date))}</div>
+            <div class="mini-meta">Hours at inspection: ${esc(r.hours_at_inspection === null || r.hours_at_inspection === undefined ? "—" : asNumber(r.hours_at_inspection, 1))}</div>
             <div class="mini-meta">Inspected by: ${esc(r.inspected_by || "—")}</div>
             ${r.remarks ? `<div class="mini-meta">${esc(r.remarks)}</div>` : ""}
           </div>
@@ -971,7 +1378,10 @@
 
     const rows = data || [];
     if (!rows.length) {
-      el.attachmentsBox.innerHTML = `<div class="hint-text">No attachments recorded yet.</div>`;
+      el.attachmentsBox.innerHTML = `
+        <div class="hint-text">No attachments recorded yet.</div>
+        <div class="hint-text">File upload will be connected after the lifecycle and inspection workflow is stable.</div>
+      `;
       return;
     }
 
@@ -986,8 +1396,66 @@
       .join("");
   }
 
+  function openSparePanel() {
+    renderSpareStatus();
+    el.sparePanel.classList.remove("hidden");
+    el.sparePanel.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  function closeSparePanel() {
+    el.sparePanel.classList.add("hidden");
+  }
+
+  function renderSpareStatus() {
+    const companyId = el.companyFilter?.value || "";
+    const vesselId = el.vesselFilter?.value || "";
+
+    let rows = state.spareStatusRows.slice();
+
+    if (companyId) rows = rows.filter((r) => r.company_id === companyId);
+    if (vesselId) rows = rows.filter((r) => r.vessel_id === vesselId);
+
+    rows.sort((a, b) => {
+      const shortageDiff = Number(b.shortage_quantity || 0) - Number(a.shortage_quantity || 0);
+      if (shortageDiff !== 0) return shortageDiff;
+      return String(a.vessel_name || "").localeCompare(String(b.vessel_name || ""));
+    });
+
+    if (!rows.length) {
+      el.spareStatusTbody.innerHTML = `<tr><td colspan="7" class="empty-cell">No spare minimum status records found.</td></tr>`;
+      return;
+    }
+
+    el.spareStatusTbody.innerHTML = rows
+      .map((r) => {
+        const shortage = Number(r.shortage_quantity || 0);
+        const statusClassName = shortage > 0 ? "spare-shortage" : "spare-ok";
+        const statusLabel = shortage > 0 ? "Shortage" : "OK";
+
+        return `
+          <tr>
+            <td>${esc(r.company_name || "—")}</td>
+            <td>
+              <div>${esc(r.vessel_name || "—")}</div>
+              <div class="muted-small">Hull: ${esc(r.hull_number || "—")}</div>
+            </td>
+            <td>
+              <div>${esc(r.component_type_code || "—")}</div>
+              <div class="muted-small">${esc(r.component_type_name || "")}</div>
+            </td>
+            <td>${esc(r.minimum_quantity)}</td>
+            <td>${esc(r.actual_quantity)}</td>
+            <td>${esc(r.shortage_quantity)}</td>
+            <td><span class="spare-pill ${statusClassName}">${esc(statusLabel)}</span></td>
+          </tr>
+        `;
+      })
+      .join("");
+  }
+
   function clearFilters() {
     if (state.isPlatform) el.companyFilter.value = "";
+    fillVesselFilter();
     el.vesselFilter.value = "";
     el.typeFilter.value = "";
     el.statusFilter.value = "";
@@ -996,32 +1464,41 @@
   }
 
   async function reloadComponentsOnly() {
-    await loadComponents();
+    await Promise.all([
+      loadComponents(),
+      loadLifecycleStatus(),
+      loadUsageSummary(),
+      loadSpareStatus()
+    ]);
+
     renderComponents();
+
+    if (!el.sparePanel.classList.contains("hidden")) {
+      renderSpareStatus();
+    }
   }
 
   async function reloadAll() {
     clearMessages();
+
     await Promise.all([
       loadCompanies(),
       loadVessels(),
       loadComponentTypes(),
       loadStatusOptions(),
       loadLocationOptions(),
-      loadInspectionTypes(),
+      loadInspectionTypes()
     ]);
-    await loadComponents();
+
+    await reloadComponentsOnly();
+
     fillStaticSelects();
     updateRegisterLocationUi();
     updateMoveLocationUi();
     renderComponents();
     await renderRegisterDynamicFields();
-    showOk("Mooring and Anchoring Inventories reloaded.");
-  }
 
-  function handleError(error) {
-    console.error("MAI error:", error);
-    showWarn(String(error?.message || error || "Unknown error"));
+    showOk("Mooring and Anchoring Inventories reloaded.");
   }
 
   async function init() {
@@ -1036,7 +1513,7 @@
       badgeId: "userBadge",
       loginBtnId: "loginBtn",
       logoutBtnId: "logoutBtn",
-      switchBtnId: "switchUserBtn",
+      switchBtnId: "switchUserBtn"
     });
 
     if (!bundle?.session?.user) {
@@ -1049,9 +1526,11 @@
     state.isPlatform = roleIsPlatform(state.profile.role);
 
     const allowed = await checkModuleEnabled();
+
     if (!allowed && !state.isPlatform) {
       el.newComponentBtn.disabled = true;
       el.reloadBtn.disabled = true;
+      el.spareStatusBtn.disabled = true;
       return;
     }
 
