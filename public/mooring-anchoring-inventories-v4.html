@@ -9,7 +9,7 @@
 
   <link rel="stylesheet" href="./csv-beacon-theme.css?v=20260428_3" />
   <link rel="stylesheet" href="./style.css?v=20260428_3" />
-  <link rel="stylesheet" href="./mooring-anchoring-inventories-v4.css?v=20260511_2" />
+  <link rel="stylesheet" href="./mooring-anchoring-inventories-v4.css?v=20260512_1" />
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="./auth.js"></script>
@@ -35,15 +35,21 @@
     </div>
   </div>
 
-  <main class="wrap">
+  <main class="wrap mai-inventory-page">
     <div id="warnBox" class="warn"></div>
     <div id="okBox" class="ok"></div>
 
     <section class="page-head">
-      <div>
+      <div class="page-head-main">
+        <div class="page-kicker">Marine Applications & Vessel Interaction</div>
         <h1>Mooring and Anchoring Inventories</h1>
         <div class="subtitle">
-          Inventory list view for Office and Vessel users. Select vessels, component types and statuses from dropdown checklist filters.
+          Controlled inventory, lifecycle status, working-hours overview and component access for mooring and anchoring equipment.
+        </div>
+        <div class="page-tags" aria-label="Module scope">
+          <span class="module-chip">Inventory Control</span>
+          <span class="module-chip">Lifecycle Monitoring</span>
+          <span class="module-chip">MSMP Records</span>
         </div>
       </div>
 
@@ -64,27 +70,31 @@
 
     <section class="stats-grid">
       <div class="stat-card">
-        <div class="stat-label">Visible components</div>
+        <div class="stat-label">Visible Components</div>
         <div id="statTotal" class="stat-value">0</div>
       </div>
 
       <div class="stat-card">
-        <div class="stat-label">Active / in service</div>
+        <div class="stat-label">Active / In Service</div>
         <div id="statActive" class="stat-value">0</div>
       </div>
 
       <div class="stat-card">
-        <div class="stat-label">Due / overdue action</div>
+        <div class="stat-label">Due / Overdue Action</div>
         <div id="statDue" class="stat-value">0</div>
       </div>
 
       <div class="stat-card">
-        <div class="stat-label">Locked particulars</div>
+        <div class="stat-label">Locked Particulars</div>
         <div id="statLocked" class="stat-value">0</div>
       </div>
     </section>
 
-    <section class="filter-bar">
+    <section class="filter-bar" aria-label="Inventory filters">
+      <div class="filter-bar-title">
+        <span>Filter Controls</span>
+      </div>
+
       <div class="dropdown-filter" id="vesselDropdown">
         <button class="dropdown-toggle" type="button" data-dropdown-toggle="vessel">
           <span>Vessels</span>
@@ -135,10 +145,10 @@
         <input id="searchInput" type="search" placeholder="Unique ID, vessel, order number, location..." />
       </label>
 
-      <button id="clearSearchBtn" class="btn2" type="button">Clear</button>
+      <button id="clearSearchBtn" class="btn2 clear-filter-btn" type="button">Clear</button>
     </section>
 
-    <section class="panel">
+    <section class="panel inventory-list-panel">
       <div class="panel-head">
         <div>
           <h2>Inventory List</h2>
