@@ -6,7 +6,7 @@
 // - Bump cache version + clean old caches on activate
 
 const CACHE_PREFIX = "sire-test-";
-const CACHE_VERSION = "v121-onboard-personnel-company-vessel-fix";
+const CACHE_VERSION = "v122-onboard-personnel-create-verify-fix";
 const CACHE_NAME = `${CACHE_PREFIX}${CACHE_VERSION}`;
 
 const CORE_ASSETS = [
@@ -16,6 +16,7 @@ const CORE_ASSETS = [
   "./su-admin.html",
   "./su-admin.js",
   "./csvb-onboard-personnel-admin.js",
+  "./csvb-onboard-personnel-admin-u02d-fix.js",
   "./company_policy.html",
   "./company_policy.js",
   "./company_policy_change_requests.js",
