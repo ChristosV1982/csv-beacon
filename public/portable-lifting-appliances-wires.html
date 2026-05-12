@@ -553,6 +553,41 @@
       }
     }
 
+  
+    /* ============================================================
+       PLA-04C CENTERED CONFIRMATION MESSAGES
+       C.S.V. BEACON standard:
+       green/red operational messages appear centered on screen.
+    ============================================================ */
+
+    .warn,
+    .ok {
+      position: fixed;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 9999;
+      width: min(620px, calc(100vw - 32px));
+      margin: 0;
+      padding: 14px 18px;
+      border-radius: 14px;
+      box-shadow: 0 22px 70px rgba(3, 27, 63, .22);
+      text-align: left;
+      line-height: 1.4;
+    }
+
+    .warn::after,
+    .ok::after {
+      content: "×";
+      position: absolute;
+      top: 8px;
+      right: 12px;
+      font-size: 1.2rem;
+      line-height: 1;
+      font-weight: 950;
+      opacity: .72;
+    }
+
   </style>
 </head>
 
