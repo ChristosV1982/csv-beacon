@@ -5,11 +5,13 @@
 (() => {
   "use strict";
 
-  const BUILD = "CSVBEACON-ONBOARD-PERSONNEL-U02-20260512-1";
+  const BUILD = "CSVBEACON-ONBOARD-PERSONNEL-U02B-20260512-1";
 
   const stateLocal = {
     sb: null,
     ranks: [],
+    companies: [],
+    vessels: [],
     installed: false
   };
 
@@ -62,6 +64,109 @@
 
   function vesselId() {
     return $("cu_vessel")?.value || "";
+  }
+
+  async function loadCompaniesAndVesselsForUsersTab() {
+    const sb = stateLocal.sb || window.AUTH.ensureSupabase();
+    stateLocal.sb = sb;
+
+    // Try existing Superuser Administration loaders first, if available.
+    if (typeof ensureCompaniesLoaded === "function") {
+      try {
+        await ensureCompaniesLoaded();
+      } catch (_) {}
+    }
+
+    const globalCompanies = Array.isArray(window.state?.companies)
+      ? window.state.companies
+      : (typeof state !== "undefined" && Array.isArray(state.companies) ? state.companies : []);
+
+    const globalVessels = Array.isArray(window.state?.vessels)
+      ? window.state.vessels
+      : (typeof state !== "undefined" && Array.isArray(state.vessels) ? state.vessels : []);
+
+    stateLocal.companies = globalCompanies.filter((c) => c && c.is_active !== false);
+    stateLocal.vessels = globalVessels.filter((v) => v && v.is_active !== false);
+
+    // Fallback direct reads. These are read-only and used only to populate dropdowns.
+    if (!stateLocal.companies.length) {
+      const { data, error } = await sb
+        .from("companies")
+        .select("id, company_name, short_name, company_code, is_active")
+        .eq("is_active", true)
+        .order("company_name", { ascending: true });
+
+      if (!error) stateLocal.companies = data || [];
+    }
+
+    if (!stateLocal.vessels.length) {
+      const { data, error } = await sb
+        .from("vessels")
+        .select("id, name, hull_number, imo_number, company_id, is_active")
+        .eq("is_active", true)
+        .order("name", { ascending: true });
+
+      if (!error) stateLocal.vessels = data || [];
+    }
+
+    renderCompanyDropdownFallback();
+    renderVesselDropdownFallback();
+  }
+
+  function renderCompanyDropdownFallback() {
+    const sel = $("cu_company");
+    if (!sel) return;
+
+    const companies = stateLocal.companies || [];
+    const current = sel.value || "";
+
+    if (!companies.length) {
+      sel.innerHTML = '<option value="">No companies available</option>';
+      renderVesselDropdownFallback();
+      return;
+    }
+
+    sel.innerHTML = [
+      '<option value="">Select company...</option>',
+      ...companies.map((c) => {
+        const label = c.company_name || c.short_name || c.company_code || c.id;
+        return '<option value="' + esc(c.id) + '">' + esc(label) + '</option>';
+      })
+    ].join("");
+
+    if (current && companies.some((c) => String(c.id) === String(current))) {
+      sel.value = current;
+    }
+
+    renderVesselDropdownFallback();
+  }
+
+  function renderVesselDropdownFallback() {
+    const sel = $("cu_vessel");
+    if (!sel) return;
+
+    const cid = companyId();
+    const current = sel.value || "";
+
+    let vessels = stateLocal.vessels || [];
+
+    if (cid) {
+      vessels = vessels.filter((v) => String(v.company_id || "") === String(cid));
+    }
+
+    sel.innerHTML = [
+      '<option value="">Select vessel...</option>',
+      ...vessels.map((v) => {
+        const hull = v.hull_number ? " / Hull " + v.hull_number : "";
+        const imo = v.imo_number ? " / IMO " + v.imo_number : "";
+        const label = (v.name || "Unnamed Vessel") + hull + imo;
+        return '<option value="' + esc(v.id) + '">' + esc(label) + '</option>';
+      })
+    ].join("");
+
+    if (current && vessels.some((v) => String(v.id) === String(current))) {
+      sel.value = current;
+    }
   }
 
   function selectedCreationMode() {
@@ -275,6 +380,7 @@
 
     $("cu_creation_mode").addEventListener("change", applyModeUi);
     $("cu_company")?.addEventListener("change", () => {
+      renderVesselDropdownFallback();
       window.setTimeout(() => {
         renderRankDropdown();
       }, 150);
@@ -709,6 +815,7 @@
 
     observeUsersTable();
 
+    await loadCompaniesAndVesselsForUsersTab();
     await loadRanks();
 
     stateLocal.installed = true;
