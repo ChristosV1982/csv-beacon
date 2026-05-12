@@ -498,6 +498,7 @@
           "threads",
           "company_policy",
           "mooring_anchoring_inventories",
+          "portable_lifting_appliances_wires",
           "suadmin"
         ].forEach(k => setVisible(k, true, moduleAccess));
         return;
@@ -534,7 +535,8 @@
           "qeditor",
           "threads",
           "company_policy",
-          "mooring_anchoring_inventories"
+          "mooring_anchoring_inventories",
+          "portable_lifting_appliances_wires"
         ].forEach(k => setVisible(k, true, moduleAccess));
         setVisible("suadmin", false, moduleAccess);
         return;
@@ -553,6 +555,7 @@
         setVisible("threads", true, moduleAccess);
         setVisible("company_policy", true, moduleAccess);
         setVisible("mooring_anchoring_inventories", true, moduleAccess);
+        setVisible("portable_lifting_appliances_wires", true, moduleAccess);
         setVisible("suadmin", false, moduleAccess);
         return;
       }
