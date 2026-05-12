@@ -4,7 +4,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "PLA-REGISTER-U05-20260512-1";
+  const BUILD = "PLA-REGISTER-U05B-FORCE-BIND-20260512-1";
 
   const state = {
     sb: null,
@@ -604,6 +604,13 @@
     }
   }
 
+  window.CSVB_PLA_REGISTER_OPEN_MODAL = () => {
+    openModal().catch((error) => {
+      console.error(error);
+      toast("warn", String(error?.message || error || "Could not open registration form."));
+    });
+  };
+
   async function openModal() {
     if (!state.canEdit) {
       toast("warn", "You do not have edit permission for Portable Lifting Appliances & Wires.");
@@ -664,12 +671,14 @@
 
     btn.parentNode.replaceChild(clone, btn);
 
-    clone.addEventListener("click", () => {
+    clone.onclick = (event) => {
+      event.preventDefault();
+      event.stopPropagation();
       openModal().catch((error) => {
         console.error(error);
         toast("warn", String(error?.message || error || "Could not open registration form."));
       });
-    });
+    };
 
     if (!state.canEdit) {
       clone.style.display = "none";

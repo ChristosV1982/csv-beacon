@@ -4,7 +4,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "PLA-INVENTORY-LIST-04-20260512-1";
+  const BUILD = "PLA-INVENTORY-LIST-05B-MULTIFILTER-REGISTER";
 
   const state = {
     sb: null,
@@ -176,40 +176,63 @@
     }
   }
 
+
+  function selectedMultiValues(id) {
+    const select = $(id);
+    if (!select) return new Set();
+
+    return new Set(
+      Array.from(select.selectedOptions || [])
+        .map((o) => String(o.value || ""))
+        .filter(Boolean)
+    );
+  }
+
+  function selectAllOptions(select) {
+    Array.from(select.options || []).forEach((option) => {
+      if (option.value) option.selected = true;
+    });
+  }
+
+  function clearMultiSelect(select) {
+    Array.from(select.options || []).forEach((option) => {
+      option.selected = false;
+    });
+  }
+
   function option(value, label, selected = "") {
     const sel = String(value) === String(selected) ? " selected" : "";
     return `<option value="${esc(value)}"${sel}>${esc(label)}</option>`;
   }
 
   function renderFilters() {
-    const currentVessel = el.filterVessel.value || "";
-    const currentSection = el.filterSection.value || "";
-    const currentCategory = el.filterCategory.value || "";
-    const currentType = el.filterType.value || "";
+    const currentVessels = selectedMultiValues("filterVessel");
+    const currentSections = selectedMultiValues("filterSection");
+    const currentCategories = selectedMultiValues("filterCategory");
+    const currentTypes = selectedMultiValues("filterType");
 
     el.filterVessel.innerHTML =
       `<option value="">All vessels</option>` +
       state.vessels.map((v) => {
         const label = `${v.name || "Unnamed Vessel"}${v.hull_number ? " / Hull " + v.hull_number : ""}`;
-        return option(v.id, label, currentVessel);
+        return option(v.id, label, currentVessels.has(String(v.id)) ? v.id : "");
       }).join("");
 
     if (state.profile?.role === "vessel" && state.profile?.vessel_id) {
-      el.filterVessel.value = state.profile.vessel_id;
+      Array.from(el.filterVessel.options || []).forEach((option) => {
+        option.selected = String(option.value) === String(state.profile.vessel_id);
+      });
       el.filterVessel.disabled = true;
     }
 
     el.filterSection.innerHTML =
-      `<option value="">All sections</option>` +
-      state.sections.map((s) => option(s.id, `${s.section_code} — ${s.section_name}`, currentSection)).join("");
+      state.sections.map((section) => option(section.id, `${section.section_code} — ${section.section_name}`, currentSections.has(String(section.id)) ? section.id : "")).join("");
 
     el.filterCategory.innerHTML =
-      `<option value="">All categories</option>` +
-      state.categories.map((c) => option(c.id, c.category_name || c.category_code, currentCategory)).join("");
+      state.categories.map((cat) => option(cat.id, cat.category_name || cat.category_code, currentCategories.has(String(cat.id)) ? cat.id : "")).join("");
 
     el.filterType.innerHTML =
-      `<option value="">All types</option>` +
-      state.types.map((t) => option(t.id, `${t.component_type_code} — ${t.component_type_name}`, currentType)).join("");
+      state.types.map((type) => option(type.id, `${type.component_type_code} — ${type.component_type_name}`, currentTypes.has(String(type.id)) ? type.id : "")).join("");
   }
 
   function renderViewerMode() {
@@ -233,18 +256,18 @@
   }
 
   function filteredComponents() {
-    const vesselId = el.filterVessel.value || "";
-    const sectionId = el.filterSection.value || "";
-    const categoryId = el.filterCategory.value || "";
-    const typeId = el.filterType.value || "";
+    const vesselIds = selectedMultiValues("filterVessel");
+    const sectionIds = selectedMultiValues("filterSection");
+    const categoryIds = selectedMultiValues("filterCategory");
+    const typeIds = selectedMultiValues("filterType");
     const status = el.filterStatus.value || "";
     const q = norm(el.searchInput.value);
 
     return state.components.filter((c) => {
-      if (vesselId && String(c.vessel_id) !== String(vesselId)) return false;
-      if (sectionId && String(c.section_id) !== String(sectionId)) return false;
-      if (categoryId && String(c.equipment_category_id) !== String(categoryId)) return false;
-      if (typeId && String(c.component_type_id) !== String(typeId)) return false;
+      if (vesselIds.size && !vesselIds.has(String(c.vessel_id))) return false;
+      if (sectionIds.size && !sectionIds.has(String(c.section_id))) return false;
+      if (categoryIds.size && !categoryIds.has(String(c.equipment_category_id))) return false;
+      if (typeIds.size && !typeIds.has(String(c.component_type_id))) return false;
 
       if (status === "replacement_due" && !isDueStatus(c.calculated_replacement_due_status)) return false;
       if (status === "inspection_due" && !isDueStatus(c.calculated_inspection_due_status)) return false;
@@ -410,12 +433,12 @@
 
   function clearFilters() {
     if (!(state.profile?.role === "vessel" && state.profile?.vessel_id)) {
-      el.filterVessel.value = "";
+      clearMultiSelect(el.filterVessel);
     }
 
-    el.filterSection.value = "";
-    el.filterCategory.value = "";
-    el.filterType.value = "";
+    clearMultiSelect(el.filterSection);
+    clearMultiSelect(el.filterCategory);
+    clearMultiSelect(el.filterType);
     el.filterStatus.value = "";
     el.searchInput.value = "";
 
@@ -492,10 +515,6 @@
   function bindEvents() {
     el.reloadBtn.addEventListener("click", () => reload().catch(handleError));
     el.exportBtn.addEventListener("click", exportCsv);
-
-    el.registerBtn.addEventListener("click", () => {
-      toast("warn", "PLA registration workflow will be built in PLA-05. Backend RPC is already ready.");
-    });
 
     [
       el.filterVessel,

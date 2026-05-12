@@ -588,6 +588,42 @@
       opacity: .72;
     }
 
+  
+    /* ============================================================
+       PLA-05B MULTI FILTER POLISH
+    ============================================================ */
+
+    select[multiple] {
+      min-height: 122px;
+      padding: 6px;
+      line-height: 1.35;
+    }
+
+    select[multiple] option {
+      padding: 5px 7px;
+      border-radius: 7px;
+      margin-bottom: 2px;
+    }
+
+    select[multiple] option:checked {
+      background: #062a5e linear-gradient(0deg, #062a5e 0%, #062a5e 100%);
+      color: #fff;
+    }
+
+    .filter-help {
+      padding: 0 10px 9px 146px;
+      color: #52677f;
+      font-size: .78rem;
+      font-weight: 700;
+      line-height: 1.3;
+    }
+
+    @media (max-width: 1350px) {
+      .filter-help {
+        padding-left: 10px;
+      }
+    }
+
   </style>
 </head>
 
@@ -683,22 +719,22 @@
 
           <label class="field">
             <span>Vessel</span>
-            <select id="filterVessel"></select>
+            <select id="filterVessel" multiple size="5"></select>
           </label>
 
           <label class="field">
             <span>Section</span>
-            <select id="filterSection"></select>
+            <select id="filterSection" multiple size="5"></select>
           </label>
 
           <label class="field">
             <span>Category</span>
-            <select id="filterCategory"></select>
+            <select id="filterCategory" multiple size="5"></select>
           </label>
 
           <label class="field">
             <span>Component Type</span>
-            <select id="filterType"></select>
+            <select id="filterType" multiple size="5"></select>
           </label>
 
           <label class="field">
@@ -721,6 +757,7 @@
 
           <button id="clearFiltersBtn" class="btn2" type="button">Clear</button>
         </div>
+        <div class="filter-help">Hold Ctrl to select multiple values, or use click/drag inside each list.</div>
       </section>
 
       <section class="table-panel">
@@ -759,6 +796,6 @@
   </main>
 
   <script src="./portable-lifting-appliances-wires.js?v=20260512_pla04"></script>
-  <script src="./portable-lifting-appliances-register-u05.js?v=20260512_1"></script>
+  <script src="./portable-lifting-appliances-register-u05.js?v=20260512_2"></script>
 </body>
 </html>
