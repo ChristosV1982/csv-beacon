@@ -54,6 +54,7 @@ const CORE_ASSETS = [
   "./mooring-anchoring-inventories-v4.html",
   "./mooring-anchoring-inventories-v4.css",
   "./mooring-anchoring-inventories-v4.js",
+  "./mooring-anchoring-register-component-v4.js",
   "./mooring-anchoring-component-delete-extension.js",
   "./mooring-anchoring-operations.html",
   "./mooring-anchoring-operations.css",
