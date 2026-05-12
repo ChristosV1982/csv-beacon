@@ -62,6 +62,7 @@ const CORE_ASSETS = [
   "./mooring-anchoring-component.html",
   "./mooring-anchoring-component.css",
   "./mooring-anchoring-component.js",
+  "./mooring-anchoring-office-lock-guard-u09d.js",
   "./mooring-anchoring-checklist-run-actions-extension.js",
   "./assets/csv-beacon-icon.png",
   "./assets/csv-beacon-logo-full.png",
