@@ -5,7 +5,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "CP8C-2026-05-07";
+  const BUILD = "U07B-2026-05-12-ONBOARD-MODULE-GUARD";
 
   const CSVB_COMPANY_VIEW_ID_KEY = "csvb_superuser_company_view_id";
   const CSVB_COMPANY_VIEW_NAME_KEY = "csvb_superuser_company_view_name";
@@ -45,6 +45,10 @@
     "threads.html": "threads",
 
     "company_policy.html": "company_policy",
+
+    "mooring-anchoring-inventories-v4.html": "mooring_anchoring_inventories",
+    "mooring-anchoring-component.html": "mooring_anchoring_inventories",
+    "mooring-anchoring-operations.html": "mooring_anchoring_inventories",
 
     "su-admin.html": "platform_administration"
   };
@@ -89,6 +93,36 @@
     return role === "super_admin" || role === "platform_owner";
   }
 
+  function onboardAccessBlockReason(profile) {
+    if (!profile || profile.role !== "vessel") return "";
+
+    if (profile.onboard_access_enabled === false) {
+      return "Access denied. Your onboard application access is currently disabled.";
+    }
+
+    if (profile.onboard_status === "inactive") {
+      return "Access denied. Your onboard personnel status is inactive.";
+    }
+
+    if (
+      profile.onboard_status === "disembarked" &&
+      profile.read_only_after_disembarkation !== true
+    ) {
+      return "Access denied. Your onboard assignment is disembarked and read-only access is not enabled.";
+    }
+
+    return "";
+  }
+
+  function onboardReadOnlyMode(profile) {
+    return !!(
+      profile &&
+      profile.role === "vessel" &&
+      profile.onboard_status === "disembarked" &&
+      profile.read_only_after_disembarkation === true
+    );
+  }
+
   async function simulatedCompanyAllowsModule(sb, companyId, moduleKey) {
     const { data, error } = await sb.rpc("csvb_admin_list_company_modules", {
       p_company_id: companyId
@@ -120,6 +154,30 @@
 
     const role = bundle?.profile?.role;
     const sb = window.AUTH.ensureSupabase();
+
+    const onboardBlockReason = onboardAccessBlockReason(bundle?.profile);
+
+    if (onboardBlockReason) {
+      window.CSVB_MODULE_GUARD = {
+        page,
+        moduleKey,
+        allowed: false,
+        onboardBlocked: true,
+        reason: onboardBlockReason
+      };
+
+      showAccessDenied(onboardBlockReason + " Redirecting to Dashboard…");
+
+      setTimeout(() => {
+        window.location.href = "./q-dashboard.html";
+      }, 1000);
+
+      return;
+    }
+
+    if (onboardReadOnlyMode(bundle?.profile)) {
+      window.CSVB_READ_ONLY_ACCESS = true;
+    }
 
     if (isPlatformRole(role)) {
       const simulatedCompanyId = getSimulatedCompanyId();

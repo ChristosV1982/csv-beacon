@@ -3,7 +3,7 @@
   "use strict";
 
   // Bump when you change auth behavior (helps confirm cache is cleared)
-  const AUTH_BUILD = "AUTH-2026-04-29-KEY-REPAIR";
+  const AUTH_BUILD = "AUTH-2026-05-12-ONBOARD-CONTEXT-U07B";
 
   const SUPABASE_URL = "https://bdidrcyufazskpuwmfca.supabase.co";
   const SUPABASE_ANON_KEY =
@@ -30,10 +30,20 @@
   const PROFILE_SELECT = [
     "id",
     "username",
+    "first_name",
+    "last_name",
     "role",
     "company_id",
     "vessel_id",
     "position",
+    "danaos_credential",
+    "onboard_rank_id",
+    "onboard_status",
+    "onboard_access_enabled",
+    "read_only_after_disembarkation",
+    "embarkation_date",
+    "disembarkation_date",
+    "onboard_access_notes",
     "is_active",
     "is_disabled",
     "disabled_at",

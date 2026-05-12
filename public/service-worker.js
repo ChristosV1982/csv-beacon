@@ -47,6 +47,7 @@ const CORE_ASSETS = [
   "./csvb-question-overrides-admin.js",
   "./csvb-dashboard-polish.js",
   "./csvb-dashboard-threads-badge.js",
+  "./csvb-dashboard-rank-access-u07.js",
   "./csvb-toast-messages.js",
   "./mooring-anchoring-event-workspace-extension.js",
   "./mooring-anchoring-evidence-upload-fix.js",
