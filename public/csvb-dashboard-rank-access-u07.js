@@ -4,7 +4,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "CSVBEACON-DASHBOARD-RANK-ACCESS-U08E-20260512-1";
+  const BUILD = "CSVBEACON-DASHBOARD-RANK-ACCESS-PLA03B-20260512-1";
 
   const CARD_TO_APP_MODULE_CODE = {
     library: "QUESTION_LIBRARY",
@@ -23,6 +23,7 @@
     threads: "THREADS",
     company_policy: "COMPANY_POLICY",
     mooring_anchoring_inventories: "MOORING_ANCHORING_INVENTORIES",
+    portable_lifting_appliances_wires: "PORTABLE_LIFTING_APPLIANCES_WIRES",
     suadmin: "SU_ADMIN"
   };
 

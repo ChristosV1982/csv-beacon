@@ -1,0 +1,214 @@
+<!-- public/portable-lifting-appliances-wires.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>C.S.V. BEACON – Portable Lifting Appliances & Wires</title>
+
+  <link rel="stylesheet" href="./csv-beacon-theme.css?v=20260428_3" />
+  <link rel="stylesheet" href="./style.css?v=20260428_3" />
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="./auth.js"></script>
+  <script src="./csvb-module-guard.js?v=20260512_pla03"></script>
+
+  <style>
+    body {
+      margin: 0;
+      font-family: var(--font-sans, "Segoe UI", Arial, sans-serif);
+      background: var(--bg-main, #f4f8fc);
+      color: var(--text-main, #10233f);
+    }
+
+    .topbar {
+      background: linear-gradient(90deg, var(--brand-navy-dark, #031b3f), var(--brand-navy, #062a5e));
+      color: #fff;
+      padding: 12px 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      box-shadow: 0 8px 24px rgba(3,27,63,.16);
+    }
+
+    .wrap {
+      width: 100%;
+      max-width: none;
+      padding: 12px;
+      box-sizing: border-box;
+    }
+
+    .panel {
+      background: #fff;
+      border: 1px solid #c9d9ec;
+      border-radius: 14px;
+      box-shadow: 0 10px 28px rgba(3,27,63,.07);
+      padding: 14px;
+    }
+
+    .page-kicker {
+      color: #0097a7;
+      font-size: .78rem;
+      font-weight: 900;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+
+    h1 {
+      margin: 0;
+      color: #062a5e;
+      font-size: 1.28rem;
+      line-height: 1.2;
+    }
+
+    .muted {
+      color: #52677f;
+      font-weight: 700;
+      line-height: 1.4;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .mini-card {
+      border: 1px solid #dce8f6;
+      border-radius: 12px;
+      background: #f8fbff;
+      padding: 12px;
+    }
+
+    .mini-title {
+      color: #062a5e;
+      font-weight: 950;
+      margin-bottom: 4px;
+    }
+
+    .btn,
+    .btn2 {
+      border-radius: 10px;
+      padding: 8px 12px;
+      font-weight: 900;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .btn {
+      background: #062a5e;
+      color: #fff;
+      border: 1px solid #062a5e;
+    }
+
+    .btn2 {
+      background: #f2f9fd;
+      color: #062a5e;
+      border: 1px solid #a8d8e8;
+    }
+
+    .topbar-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .warn {
+      display: none;
+      margin-bottom: 12px;
+      border-radius: 12px;
+      padding: 10px 12px;
+      color: #8b1d1d;
+      background: #fff4f4;
+      border: 1px solid #f1b9b9;
+      font-weight: 850;
+      white-space: pre-wrap;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="topbar">
+    <div class="csvb-brand">
+      <img class="csvb-brand-logo" src="./assets/csv-beacon-icon.png" alt="C.S.V. BEACON logo" />
+      <div class="csvb-brand-text">
+        <div class="csvb-brand-title">C.S.V. BEACON</div>
+        <div class="csvb-brand-subtitle">Marine Assurance & Compliance Platform</div>
+      </div>
+    </div>
+
+    <div class="topbar-actions">
+      <div id="userBadge" class="user-badge"></div>
+      <button class="btn2" id="loginBtn" type="button" style="display:none;">Login</button>
+      <button class="btn2" id="switchUserBtn" type="button">Switch User</button>
+      <button class="btn" id="logoutBtn" type="button" style="display:none;">Logout</button>
+      <button class="btn2" type="button" onclick="location.href='./q-dashboard.html'">Dashboard</button>
+    </div>
+  </div>
+
+  <main class="wrap">
+    <div id="warnBox" class="warn"></div>
+
+    <section class="panel">
+      <div class="page-kicker">Marine Applications & Vessel Interaction</div>
+      <h1>Portable Lifting Appliances, Running, Remote Control and Standing Wires</h1>
+      <p class="muted">
+        Module foundation is installed. Inventory screens will be built in the next phase.
+      </p>
+
+      <div class="grid">
+        <div class="mini-card">
+          <div class="mini-title">Backend Foundation</div>
+          <div class="muted">
+            Setup lists, operational tables, registration RPC and KPI views have been created.
+          </div>
+        </div>
+
+        <div class="mini-card">
+          <div class="mini-title">Editable / KPI-ready Setup</div>
+          <div class="muted">
+            Sections, component types, equipment locations, categories, conditions, storage locations,
+            status options, policy rules and KPI definitions are database-driven.
+          </div>
+        </div>
+
+        <div class="mini-card">
+          <div class="mini-title">Next Phase</div>
+          <div class="muted">
+            PLA-04 will create the inventory list page with filters, KPI status cards and component access.
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    (async () => {
+      const bundle = await AUTH.setupAuthButtons({
+        badgeId: "userBadge",
+        loginBtnId: "loginBtn",
+        logoutBtnId: "logoutBtn",
+        switchBtnId: "switchUserBtn"
+      });
+
+      if (!bundle?.session?.user) {
+        const w = document.getElementById("warnBox");
+        w.textContent = "You are logged out. Please login.";
+        w.style.display = "block";
+      }
+
+      window.CSVB_PLA_PLACEHOLDER_BUILD = "PLA-PLACEHOLDER-20260512-1";
+    })().catch((error) => {
+      const w = document.getElementById("warnBox");
+      w.textContent = String(error?.message || error);
+      w.style.display = "block";
+    });
+  </script>
+</body>
+</html>

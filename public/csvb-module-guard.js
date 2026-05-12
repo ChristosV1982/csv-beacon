@@ -5,7 +5,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "U08F-2026-05-12-RANK-AWARE-GUARD";
+  const BUILD = "PLA03B-2026-05-12-MODULE-GUARD";
 
   const CSVB_COMPANY_VIEW_ID_KEY = "csvb_superuser_company_view_id";
   const CSVB_COMPANY_VIEW_NAME_KEY = "csvb_superuser_company_view_name";
@@ -49,6 +49,8 @@
     "mooring-anchoring-inventories-v4.html": "mooring_anchoring_inventories",
     "mooring-anchoring-component.html": "mooring_anchoring_inventories",
     "mooring-anchoring-operations.html": "mooring_anchoring_inventories",
+
+    "portable-lifting-appliances-wires.html": "portable_lifting_appliances_wires",
 
     "su-admin.html": "platform_administration"
   };
@@ -137,6 +139,7 @@
       threads: "THREADS",
       company_policy: "COMPANY_POLICY",
       mooring_anchoring_inventories: "MOORING_ANCHORING_INVENTORIES",
+      portable_lifting_appliances_wires: "PORTABLE_LIFTING_APPLIANCES_WIRES",
       platform_administration: "SU_ADMIN"
     };
 
