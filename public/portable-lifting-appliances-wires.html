@@ -404,6 +404,155 @@
         grid-template-columns: 1fr;
       }
     }
+  
+    /* ============================================================
+       PLA-04B CSVB VISUAL POLISH
+       C.S.V. BEACON visual alignment pass.
+       CSS-only. No logic changes.
+    ============================================================ */
+
+    .wrap {
+      background: linear-gradient(180deg, #f4f8fc 0%, #eef4fb 100%);
+    }
+
+    .page-head {
+      margin: 8px 8px 0;
+      border-radius: 14px;
+      border-left-width: 6px;
+      padding: 12px 14px;
+    }
+
+    .content-pad {
+      padding: 0 8px 18px;
+    }
+
+    .viewer-bar {
+      margin: 8px 0;
+      padding: 8px 12px;
+    }
+
+    .stats-grid {
+      margin: 8px 0;
+      gap: 8px;
+    }
+
+    .stat-card {
+      min-height: 66px;
+      padding: 9px 10px;
+      border-radius: 12px;
+    }
+
+    .stat-label {
+      font-size: .74rem;
+      line-height: 1.2;
+    }
+
+    .stat-value {
+      font-size: 1.35rem;
+      line-height: 1;
+      margin-top: 5px;
+    }
+
+    .stat-help {
+      font-size: .76rem;
+      line-height: 1.2;
+    }
+
+    .filter-panel {
+      border-radius: 12px;
+      margin-top: 8px;
+    }
+
+    .filter-grid {
+      padding: 9px 10px;
+      grid-template-columns: 136px repeat(5, minmax(155px, 1fr)) 1.25fr auto;
+      gap: 8px;
+    }
+
+    .filter-title {
+      border-right: 1px solid #dce8f6;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      padding-right: 10px;
+    }
+
+    label.field span {
+      font-size: .78rem;
+      letter-spacing: .01em;
+    }
+
+    select,
+    input {
+      min-height: 36px;
+      padding: 7px 10px;
+      border-radius: 9px;
+    }
+
+    .table-panel {
+      border-radius: 12px;
+      margin-top: 8px;
+    }
+
+    .table-head {
+      padding: 9px 10px;
+      background: linear-gradient(180deg, #ffffff, #f8fbff);
+    }
+
+    .table-title {
+      font-size: .98rem;
+    }
+
+    .table-meta {
+      font-size: .8rem;
+    }
+
+    th {
+      font-size: .78rem;
+      padding: 8px 7px;
+      background: #eaf4fb;
+    }
+
+    td {
+      padding: 7px;
+      font-size: .82rem;
+    }
+
+    .id-strong {
+      font-size: .86rem;
+      letter-spacing: .01em;
+    }
+
+    .mini {
+      font-size: .74rem;
+    }
+
+    .pill {
+      min-height: 20px;
+      padding: 2px 7px;
+      font-size: .7rem;
+    }
+
+    .btn,
+    .btn2 {
+      min-height: 34px;
+      padding: 7px 11px;
+      border-radius: 9px;
+      font-size: .86rem;
+    }
+
+    .btnSmall {
+      min-height: 28px;
+      padding: 5px 8px;
+      font-size: .76rem;
+    }
+
+    @media (min-width: 1500px) {
+      .stats-grid {
+        grid-template-columns: repeat(6, minmax(145px, 1fr));
+      }
+    }
+
   </style>
 </head>
 
