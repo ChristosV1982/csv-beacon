@@ -5,7 +5,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "PA7C-2026-05-10";
+  const BUILD = "PA7D-2026-05-12-PLA-MARINE-HOME";
 
   const AREA_HOME = {
     company_policy: {
@@ -162,6 +162,19 @@
               href: "./mooring-anchoring-inventories-v4.html",
               cardKey: "mooring_anchoring_inventories",
               icon: "⚓",
+            },
+          ],
+        },
+        {
+          title: "Portable lifting appliances and wires",
+          items: [
+            {
+              label: "Portable Lifting Appliances & Wires",
+              text:
+                "Inventory and inspection control for portable lifting appliances, running wires, remote control wires, standing wires and mast stays.",
+              href: "./portable-lifting-appliances-wires.html",
+              cardKey: "portable_lifting_appliances_wires",
+              icon: "🏗️",
             },
           ],
         },

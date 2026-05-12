@@ -5,7 +5,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "MAI-DASH-U08E-20260512-1";
+  const BUILD = "MAI-DASH-PLA-AWARE-20260512-1";
 
   const CARD_KEY = "mooring_anchoring_inventories";
   const COMPANY_MODULE_KEY = "mooring_anchoring_inventories";
@@ -151,26 +151,49 @@
 
     if (!config || !config[TARGET_AREA_KEY]) return false;
 
-    config[TARGET_AREA_KEY] = {
-      title: "Marine Applications & Vessel Interaction Home",
-      text:
-        "Vessel-facing operational applications, ship/office submissions and interaction workflows.",
-      groups: [
-        {
-          title: "Mooring and anchoring",
-          items: [
-            {
-              label: "Mooring and Anchoring Inventories",
-              text:
-                "Register, track, inspect and manage mooring wires, soft mooring ropes, mooring tails, shackles, messengers, anchors and anchoring equipment.",
-              href: TARGET_HREF,
-              cardKey: CARD_KEY,
-              icon: "⚓",
-            },
-          ],
-        },
-      ],
-    };
+    const area = config[TARGET_AREA_KEY];
+
+    area.title = "Marine Applications & Vessel Interaction Home";
+    area.text =
+      "Vessel-facing operational applications, ship/office submissions and interaction workflows.";
+
+    if (!Array.isArray(area.groups)) area.groups = [];
+
+    function ensureGroup(title) {
+      let group = area.groups.find((g) => g.title === title);
+      if (!group) {
+        group = { title, items: [] };
+        area.groups.push(group);
+      }
+      if (!Array.isArray(group.items)) group.items = [];
+      return group;
+    }
+
+    const mooringGroup = ensureGroup("Mooring and anchoring");
+
+    if (!mooringGroup.items.some((item) => item.cardKey === CARD_KEY)) {
+      mooringGroup.items.push({
+        label: "Mooring and Anchoring Inventories",
+        text:
+          "Register, track, inspect and manage mooring wires, soft mooring ropes, mooring tails, shackles, messengers, anchors and anchoring equipment.",
+        href: "./mooring-anchoring-inventories-v4.html",
+        cardKey: CARD_KEY,
+        icon: "⚓",
+      });
+    }
+
+    const plaGroup = ensureGroup("Portable lifting appliances and wires");
+
+    if (!plaGroup.items.some((item) => item.cardKey === "portable_lifting_appliances_wires")) {
+      plaGroup.items.push({
+        label: "Portable Lifting Appliances & Wires",
+        text:
+          "Inventory and inspection control for portable lifting appliances, running wires, remote control wires, standing wires and mast stays.",
+        href: "./portable-lifting-appliances-wires.html",
+        cardKey: "portable_lifting_appliances_wires",
+        icon: "🏗️",
+      });
+    }
 
     if (typeof home.render === "function") {
       home.render();
