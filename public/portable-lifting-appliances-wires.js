@@ -4,7 +4,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "PLA-INVENTORY-LIST-05B-MULTIFILTER-REGISTER";
+  const BUILD = "PLA-INVENTORY-LIST-05C-CHECKDROP-REGISTER";
 
   const state = {
     sb: null,

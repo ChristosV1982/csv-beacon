@@ -4,7 +4,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "PLA-REGISTER-U05B-FORCE-BIND-20260512-1";
+  const BUILD = "PLA-REGISTER-U05C-FORCE-BIND-20260512-1";
 
   const state = {
     sb: null,
