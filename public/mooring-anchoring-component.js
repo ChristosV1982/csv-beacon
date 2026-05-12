@@ -4,7 +4,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "MAI-COMPONENT-DETAIL-20260511-1";
+  const BUILD = "MAI-COMPONENT-DETAIL-U09C-OFFICE-LOCK-ONLY";
 
   const state = {
     sb: null,
@@ -243,10 +243,20 @@
       <div class="mini-meta">Unlock reason: ${esc(lock.particulars_unlock_reason || "—")}</div>
     `;
 
+    const isOffice = roleIsOffice(state.profile?.role);
+
     el.saveFieldsBtn.disabled = !canEdit;
-    el.completeLockBtn.disabled = status === "locked";
-    el.lockBtn.disabled = status === "locked";
-    el.unlockBtn.disabled = !roleIsOffice(state.profile?.role);
+
+    // U-09C governance:
+    // Vessel / onboard personnel may save particulars when allowed,
+    // but only Office users may complete/lock/unlock component particulars.
+    el.completeLockBtn.disabled = !isOffice || status === "locked";
+    el.lockBtn.disabled = !isOffice || status === "locked";
+    el.unlockBtn.disabled = !isOffice;
+
+    el.completeLockBtn.style.display = isOffice ? "" : "none";
+    el.lockBtn.style.display = isOffice ? "" : "none";
+    el.unlockBtn.style.display = isOffice ? "" : "none";
   }
 
   function inputTypeForField(field) {
@@ -468,6 +478,11 @@
   }
 
   async function completeAndLock() {
+    if (!roleIsOffice(state.profile?.role)) {
+      toast("warn", "Only Office users can complete and lock component particulars.");
+      return;
+    }
+
     const reason = prompt("Lock reason:", "Initial component particulars completed and locked.");
     if (reason === null) return;
 
@@ -481,6 +496,11 @@
   }
 
   async function lockParticulars() {
+    if (!roleIsOffice(state.profile?.role)) {
+      toast("warn", "Only Office users can lock component particulars.");
+      return;
+    }
+
     const reason = prompt("Lock reason:", "Component particulars locked.");
     if (reason === null) return;
 
@@ -494,6 +514,11 @@
   }
 
   async function unlockParticulars() {
+    if (!roleIsOffice(state.profile?.role)) {
+      toast("warn", "Only Office users can unlock component particulars.");
+      return;
+    }
+
     const reason = prompt("Unlock reason:", "Component particulars unlocked by Office for correction.");
     if (reason === null) return;
 
