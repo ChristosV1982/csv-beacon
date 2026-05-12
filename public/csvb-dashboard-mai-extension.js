@@ -4,7 +4,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "MAI-DASH-U08C-20260512-1";
+  const BUILD = "MAI-DASH-U08D-20260512-1";
   const CARD_KEY = "mooring_anchoring_inventories";
   const MODULE_KEY = "mooring_anchoring_inventories";
   const TARGET_AREA_KEY = "marine_applications_vessel_interaction";
