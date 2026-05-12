@@ -20,6 +20,7 @@ const CORE_ASSETS = [
   "./csvb-onboard-personnel-terminology-u04.js",
   "./csvb-user-edit-u05.js",
   "./csvb-hide-apply-onboard-setup-u05c.js",
+  "./csvb-rights-matrix-ranks-u06.js",
   "./company_policy.html",
   "./company_policy.js",
   "./company_policy_change_requests.js",
