@@ -50,6 +50,7 @@ const CORE_ASSETS = [
   "./csvb-dashboard-pla-extension.js",
   "./csvb-dashboard-marine-area-stabilizer.js",
   "./portable-lifting-appliances-wires.html",
+  "./portable-lifting-appliances-wires.js",
   "./csvb-dashboard-rank-access-u07.js",
   "./csvb-toast-messages.js",
   "./mooring-anchoring-event-workspace-extension.js",

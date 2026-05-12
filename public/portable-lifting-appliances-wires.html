@@ -12,7 +12,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="./auth.js"></script>
-  <script src="./csvb-module-guard.js?v=20260512_pla03"></script>
+  <script src="./csvb-module-guard.js?v=20260512_pla04"></script>
 
   <style>
     body {
@@ -25,7 +25,7 @@
     .topbar {
       background: linear-gradient(90deg, var(--brand-navy-dark, #031b3f), var(--brand-navy, #062a5e));
       color: #fff;
-      padding: 12px 16px;
+      padding: 10px 14px;
       display: flex;
       justify-content: space-between;
       align-items: center;
@@ -34,25 +34,38 @@
       box-shadow: 0 8px 24px rgba(3,27,63,.16);
     }
 
+    .topbar-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
     .wrap {
       width: 100%;
       max-width: none;
-      padding: 12px;
+      padding: 0;
       box-sizing: border-box;
     }
 
-    .panel {
+    .page-head {
       background: #fff;
       border: 1px solid #c9d9ec;
-      border-radius: 14px;
-      box-shadow: 0 10px 28px rgba(3,27,63,.07);
-      padding: 14px;
+      border-left: 5px solid #0097a7;
+      border-radius: 0 0 14px 14px;
+      padding: 12px 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+      flex-wrap: wrap;
+      box-shadow: 0 8px 22px rgba(3,27,63,.05);
     }
 
     .page-kicker {
       color: #0097a7;
       font-size: .78rem;
-      font-weight: 900;
+      font-weight: 950;
       letter-spacing: .08em;
       text-transform: uppercase;
       margin-bottom: 4px;
@@ -65,30 +78,11 @@
       line-height: 1.2;
     }
 
-    .muted {
+    .subtitle {
       color: #52677f;
       font-weight: 700;
-      line-height: 1.4;
-    }
-
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-      gap: 10px;
-      margin-top: 12px;
-    }
-
-    .mini-card {
-      border: 1px solid #dce8f6;
-      border-radius: 12px;
-      background: #f8fbff;
-      padding: 12px;
-    }
-
-    .mini-title {
-      color: #062a5e;
-      font-weight: 950;
-      margin-bottom: 4px;
+      line-height: 1.35;
+      margin-top: 4px;
     }
 
     .btn,
@@ -112,23 +106,303 @@
       border: 1px solid #a8d8e8;
     }
 
-    .topbar-actions {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      flex-wrap: wrap;
+    .btn:disabled,
+    .btn2:disabled {
+      opacity: .55;
+      cursor: not-allowed;
+    }
+
+    .btnSmall {
+      padding: 6px 9px;
+      font-size: .82rem;
+    }
+
+    .warn,
+    .ok {
+      display: none;
+      margin: 8px 10px;
+      border-radius: 12px;
+      padding: 10px 12px;
+      font-weight: 850;
+      white-space: pre-wrap;
     }
 
     .warn {
-      display: none;
-      margin-bottom: 12px;
-      border-radius: 12px;
-      padding: 10px 12px;
       color: #8b1d1d;
       background: #fff4f4;
       border: 1px solid #f1b9b9;
-      font-weight: 850;
-      white-space: pre-wrap;
+    }
+
+    .ok {
+      color: #0d5c2c;
+      background: #effaf3;
+      border: 1px solid #b8e6c8;
+    }
+
+    .viewer-bar {
+      background: #fff;
+      border: 1px solid #c9d9ec;
+      border-left: 5px solid #f4a000;
+      border-radius: 12px;
+      margin: 8px 0;
+      padding: 9px 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .viewer-title {
+      color: #3d5677;
+      font-size: .78rem;
+      font-weight: 950;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+
+    .viewer-value {
+      color: #062a5e;
+      font-size: 1rem;
+      font-weight: 950;
+      margin-top: 2px;
+    }
+
+    .content-pad {
+      padding: 0 0 18px;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(160px, 1fr));
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .stat-card {
+      background: #fff;
+      border: 1px solid #c9d9ec;
+      border-left: 5px solid #0a4275;
+      border-radius: 12px;
+      padding: 10px;
+      box-shadow: 0 8px 22px rgba(3,27,63,.05);
+      min-height: 74px;
+    }
+
+    .stat-label {
+      color: #3d5677;
+      font-size: .78rem;
+      font-weight: 950;
+      text-transform: uppercase;
+      letter-spacing: .03em;
+    }
+
+    .stat-value {
+      color: #062a5e;
+      font-size: 1.3rem;
+      font-weight: 950;
+      margin-top: 4px;
+    }
+
+    .stat-help {
+      color: #52677f;
+      font-size: .78rem;
+      font-weight: 700;
+      margin-top: 2px;
+      line-height: 1.25;
+    }
+
+    .filter-panel,
+    .table-panel {
+      background: #fff;
+      border: 1px solid #c9d9ec;
+      border-radius: 12px;
+      margin-top: 8px;
+      box-shadow: 0 8px 22px rgba(3,27,63,.05);
+      overflow: hidden;
+    }
+
+    .filter-grid {
+      display: grid;
+      grid-template-columns: 150px repeat(5, minmax(170px, 1fr)) 1.2fr auto;
+      gap: 8px;
+      align-items: end;
+      padding: 10px;
+    }
+
+    .filter-title {
+      color: #062a5e;
+      font-weight: 950;
+      align-self: center;
+      padding-left: 4px;
+      text-transform: uppercase;
+      font-size: .82rem;
+      letter-spacing: .04em;
+    }
+
+    label.field {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    label.field span {
+      color: #062a5e;
+      font-weight: 900;
+      font-size: .82rem;
+    }
+
+    select,
+    input {
+      width: 100%;
+      min-height: 38px;
+      box-sizing: border-box;
+      border: 1px solid #bfd5ee;
+      border-radius: 10px;
+      padding: 8px 10px;
+      font-family: inherit;
+      font-size: .88rem;
+      color: #10233f;
+      background: #fff;
+    }
+
+    .table-head {
+      padding: 10px;
+      border-bottom: 1px solid #dce8f6;
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .table-title {
+      color: #062a5e;
+      font-weight: 950;
+      font-size: 1rem;
+    }
+
+    .table-meta {
+      color: #52677f;
+      font-weight: 700;
+      font-size: .84rem;
+      margin-top: 2px;
+    }
+
+    .table-wrap {
+      overflow: auto;
+      max-height: 620px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 1450px;
+      background: #fff;
+    }
+
+    th {
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      background: #eaf4fb;
+      color: #062a5e;
+      text-align: left;
+      font-size: .82rem;
+      padding: 9px 8px;
+      border-bottom: 1px solid #c9d9ec;
+      white-space: nowrap;
+    }
+
+    td {
+      padding: 8px;
+      border-bottom: 1px solid #dce8f6;
+      vertical-align: top;
+      font-size: .86rem;
+      color: #10233f;
+    }
+
+    tr:hover td {
+      background: #f8fbff;
+    }
+
+    .id-strong {
+      color: #062a5e;
+      font-weight: 950;
+    }
+
+    .mini {
+      color: #52677f;
+      font-size: .78rem;
+      font-weight: 700;
+      line-height: 1.25;
+      margin-top: 2px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      min-height: 22px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: .74rem;
+      font-weight: 950;
+      white-space: nowrap;
+      border: 1px solid #b7d4ee;
+      background: #eef7ff;
+      color: #062a5e;
+    }
+
+    .pill-ok {
+      border-color: #b8e6c8;
+      background: #effaf3;
+      color: #0d5c2c;
+    }
+
+    .pill-warn {
+      border-color: #f6d58f;
+      background: #fff6e0;
+      color: #8a5a00;
+    }
+
+    .pill-danger {
+      border-color: #f1b9b9;
+      background: #fff1f1;
+      color: #9b1c1c;
+    }
+
+    .pill-muted {
+      border-color: #d6dbe5;
+      background: #f4f6f9;
+      color: #52677f;
+    }
+
+    .empty-cell {
+      text-align: center;
+      padding: 18px;
+      color: #52677f;
+      font-weight: 800;
+    }
+
+    @media (max-width: 1350px) {
+      .stats-grid {
+        grid-template-columns: repeat(3, minmax(160px, 1fr));
+      }
+
+      .filter-grid {
+        grid-template-columns: repeat(3, 1fr);
+      }
+
+      .filter-title {
+        grid-column: 1 / -1;
+      }
+    }
+
+    @media (max-width: 760px) {
+      .stats-grid,
+      .filter-grid {
+        grid-template-columns: 1fr;
+      }
     }
   </style>
 </head>
@@ -153,62 +427,153 @@
   </div>
 
   <main class="wrap">
-    <div id="warnBox" class="warn"></div>
-
-    <section class="panel">
-      <div class="page-kicker">Marine Applications & Vessel Interaction</div>
-      <h1>Portable Lifting Appliances, Running, Remote Control and Standing Wires</h1>
-      <p class="muted">
-        Module foundation is installed. Inventory screens will be built in the next phase.
-      </p>
-
-      <div class="grid">
-        <div class="mini-card">
-          <div class="mini-title">Backend Foundation</div>
-          <div class="muted">
-            Setup lists, operational tables, registration RPC and KPI views have been created.
-          </div>
-        </div>
-
-        <div class="mini-card">
-          <div class="mini-title">Editable / KPI-ready Setup</div>
-          <div class="muted">
-            Sections, component types, equipment locations, categories, conditions, storage locations,
-            status options, policy rules and KPI definitions are database-driven.
-          </div>
-        </div>
-
-        <div class="mini-card">
-          <div class="mini-title">Next Phase</div>
-          <div class="muted">
-            PLA-04 will create the inventory list page with filters, KPI status cards and component access.
-          </div>
+    <div class="page-head">
+      <div>
+        <div class="page-kicker">Marine Applications & Vessel Interaction</div>
+        <h1>Portable Lifting Appliances, Running, Remote Control and Standing Wires</h1>
+        <div class="subtitle">
+          Form M-22 based inventory, replacement, routine inspection and 5-year testing control.
         </div>
       </div>
-    </section>
+
+      <div class="topbar-actions">
+        <button id="reloadBtn" class="btn2" type="button">↻ Reload</button>
+        <button id="exportBtn" class="btn2" type="button">Export CSV</button>
+        <button id="registerBtn" class="btn" type="button">+ Register Component</button>
+      </div>
+    </div>
+
+    <div id="warnBox" class="warn"></div>
+    <div id="okBox" class="ok"></div>
+
+    <div class="content-pad">
+      <section class="viewer-bar">
+        <div>
+          <div class="viewer-title">Viewer Mode</div>
+          <div id="viewerMode" class="viewer-value">Loading...</div>
+        </div>
+        <div id="viewerHint" class="subtitle">Permissions are based on company, vessel, role/rank and module enablement.</div>
+      </section>
+
+      <section class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-label">Visible Components</div>
+          <div id="statTotal" class="stat-value">0</div>
+          <div class="stat-help">Accessible inventory records.</div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-label">Replacement Due / Overdue</div>
+          <div id="statReplacementDue" class="stat-value">0</div>
+          <div class="stat-help">Due soon or overdue.</div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-label">Inspection Due / Overdue</div>
+          <div id="statInspectionDue" class="stat-value">0</div>
+          <div class="stat-help">Routine inspection control.</div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-label">5Y Test Due / Overdue</div>
+          <div id="statFiveYearDue" class="stat-value">0</div>
+          <div class="stat-help">For applicable items.</div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-label">Missing Certificates</div>
+          <div id="statMissingCert" class="stat-value">0</div>
+          <div class="stat-help">Certificate number not recorded.</div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-label">Locked Particulars</div>
+          <div id="statLocked" class="stat-value">0</div>
+          <div class="stat-help">Office controlled lock status.</div>
+        </div>
+      </section>
+
+      <section class="filter-panel">
+        <div class="filter-grid">
+          <div class="filter-title">Filter Controls</div>
+
+          <label class="field">
+            <span>Vessel</span>
+            <select id="filterVessel"></select>
+          </label>
+
+          <label class="field">
+            <span>Section</span>
+            <select id="filterSection"></select>
+          </label>
+
+          <label class="field">
+            <span>Category</span>
+            <select id="filterCategory"></select>
+          </label>
+
+          <label class="field">
+            <span>Component Type</span>
+            <select id="filterType"></select>
+          </label>
+
+          <label class="field">
+            <span>Status</span>
+            <select id="filterStatus">
+              <option value="">All statuses</option>
+              <option value="replacement_due">Replacement due/overdue</option>
+              <option value="inspection_due">Inspection due/overdue</option>
+              <option value="five_year_due">5Y test due/overdue</option>
+              <option value="missing_certificate">Missing certificate</option>
+              <option value="locked">Locked particulars</option>
+              <option value="unlocked">Unlocked particulars</option>
+            </select>
+          </label>
+
+          <label class="field">
+            <span>Search</span>
+            <input id="searchInput" placeholder="Unique ID, vessel, certificate, location, remarks..." />
+          </label>
+
+          <button id="clearFiltersBtn" class="btn2" type="button">Clear</button>
+        </div>
+      </section>
+
+      <section class="table-panel">
+        <div class="table-head">
+          <div>
+            <div class="table-title">Inventory List</div>
+            <div id="tableMeta" class="table-meta">0 record(s).</div>
+          </div>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Unique ID</th>
+                <th>Vessel</th>
+                <th>Section</th>
+                <th>Category / Location</th>
+                <th>Type</th>
+                <th>Certificate</th>
+                <th>Condition</th>
+                <th>Replacement</th>
+                <th>Inspection</th>
+                <th>5Y Test</th>
+                <th>Particulars</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="componentsTbody">
+              <tr><td colspan="12" class="empty-cell">Loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
   </main>
 
-  <script>
-    (async () => {
-      const bundle = await AUTH.setupAuthButtons({
-        badgeId: "userBadge",
-        loginBtnId: "loginBtn",
-        logoutBtnId: "logoutBtn",
-        switchBtnId: "switchUserBtn"
-      });
-
-      if (!bundle?.session?.user) {
-        const w = document.getElementById("warnBox");
-        w.textContent = "You are logged out. Please login.";
-        w.style.display = "block";
-      }
-
-      window.CSVB_PLA_PLACEHOLDER_BUILD = "PLA-PLACEHOLDER-20260512-1";
-    })().catch((error) => {
-      const w = document.getElementById("warnBox");
-      w.textContent = String(error?.message || error);
-      w.style.display = "block";
-    });
-  </script>
+  <script src="./portable-lifting-appliances-wires.js?v=20260512_pla04"></script>
 </body>
 </html>
