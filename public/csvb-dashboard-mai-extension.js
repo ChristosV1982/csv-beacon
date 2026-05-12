@@ -4,7 +4,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "MAI-DASH-20260511-1";
+  const BUILD = "MAI-DASH-U08C-20260512-1";
   const CARD_KEY = "mooring_anchoring_inventories";
   const MODULE_KEY = "mooring_anchoring_inventories";
   const TARGET_AREA_KEY = "marine_applications_vessel_interaction";
@@ -39,7 +39,7 @@
         shackles, messengers, anchors and anchoring equipment.
       </div>
       <div style="margin-top:12px;">
-        <button class="btn2" type="button" onclick="location.href='./mooring-anchoring-inventories.html'">Open</button>
+        <button class="btn2" type="button" onclick="location.href='./mooring-anchoring-inventories-v4.html'">Open</button>
       </div>
     `;
 
@@ -113,7 +113,7 @@
               label: "Mooring and Anchoring Inventories",
               text:
                 "Register, track, inspect and manage mooring wires, soft mooring ropes, mooring tails, shackles, messengers, anchors and anchoring equipment.",
-              href: "./mooring-anchoring-inventories.html",
+              href: "./mooring-anchoring-inventories-v4.html",
               cardKey: CARD_KEY,
               icon: "⚓",
             },
@@ -127,6 +127,41 @@
     }
 
     return true;
+  }
+
+  function ensureMaiInPlatformAreas() {
+    const platform = window.CSVB_DASHBOARD_PLATFORM_AREAS;
+
+    if (!platform || !Array.isArray(platform.areas)) return false;
+
+    const target = platform.areas.find((area) => area.key === TARGET_AREA_KEY);
+    if (!target) return false;
+
+    if (!Array.isArray(target.cards)) target.cards = [];
+
+    if (!target.cards.includes(CARD_KEY)) {
+      target.cards.push(CARD_KEY);
+    }
+
+    if (typeof platform.refresh === "function") {
+      platform.refresh();
+    }
+
+    return true;
+  }
+
+  function retryPlatformAreaConfig() {
+    let attempts = 0;
+
+    const timer = window.setInterval(() => {
+      attempts += 1;
+
+      const ok = ensureMaiInPlatformAreas();
+
+      if (ok || attempts >= 20) {
+        window.clearInterval(timer);
+      }
+    }, 250);
   }
 
   function retryAreaHomeConfig() {
@@ -146,6 +181,7 @@
   async function refreshAll() {
     await applyCardVisibility();
     retryAreaHomeConfig();
+    retryPlatformAreaConfig();
 
     if (window.CSVB_DASHBOARD_PLATFORM_AREAS?.refresh) {
       window.CSVB_DASHBOARD_PLATFORM_AREAS.refresh();
