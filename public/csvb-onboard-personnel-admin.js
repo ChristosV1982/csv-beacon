@@ -5,7 +5,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "CSVBEACON-ONBOARD-PERSONNEL-U02B-20260512-1";
+  const BUILD = "CSVBEACON-ONBOARD-PERSONNEL-U02C-20260512-1";
 
   const stateLocal = {
     sb: null,
@@ -66,6 +66,89 @@
     return $("cu_vessel")?.value || "";
   }
 
+  function normalizeCompanyRows(rows) {
+    return (Array.isArray(rows) ? rows : [])
+      .map((c) => ({
+        id: c.id || c.company_id,
+        company_name: c.company_name || c.name || c.short_name || c.company_code || c.id || c.company_id,
+        short_name: c.short_name || null,
+        company_code: c.company_code || null,
+        is_active: c.is_active !== false
+      }))
+      .filter((c) => c.id && c.is_active !== false);
+  }
+
+  function normalizeVesselRows(rows) {
+    return (Array.isArray(rows) ? rows : [])
+      .map((v) => ({
+        id: v.id || v.vessel_id,
+        name: v.name || v.vessel_name || v.title || v.id || v.vessel_id,
+        hull_number: v.hull_number || null,
+        imo_number: v.imo_number || null,
+        company_id: v.company_id || null,
+        is_active: v.is_active !== false
+      }))
+      .filter((v) => v.id && v.is_active !== false);
+  }
+
+  function extractRowsFromAnyResponse(resp, preferredKeys = []) {
+    if (Array.isArray(resp)) return resp;
+
+    if (!resp || typeof resp !== "object") return [];
+
+    for (const key of preferredKeys) {
+      if (Array.isArray(resp[key])) return resp[key];
+    }
+
+    const commonKeys = ["data", "rows", "items", "companies", "vessels", "users", "result"];
+    for (const key of commonKeys) {
+      if (Array.isArray(resp[key])) return resp[key];
+    }
+
+    if (resp.data && typeof resp.data === "object") {
+      for (const key of commonKeys) {
+        if (Array.isArray(resp.data[key])) return resp.data[key];
+      }
+    }
+
+    return [];
+  }
+
+  async function tryCsvbRpc(functionName, args = {}, preferredKeys = []) {
+    if (typeof csvbRpc !== "function") return [];
+
+    try {
+      const resp = await csvbRpc(functionName, args);
+      return extractRowsFromAnyResponse(resp, preferredKeys);
+    } catch (_) {
+      return [];
+    }
+  }
+
+  async function trySupabaseRpc(functionName, args = {}, preferredKeys = []) {
+    const sb = stateLocal.sb || window.AUTH.ensureSupabase();
+    stateLocal.sb = sb;
+
+    try {
+      const { data, error } = await sb.rpc(functionName, args);
+      if (error) return [];
+      return extractRowsFromAnyResponse(data, preferredKeys);
+    } catch (_) {
+      return [];
+    }
+  }
+
+  async function trySuAdminAction(action, payload = {}, preferredKeys = []) {
+    if (typeof callSuAdmin !== "function") return [];
+
+    try {
+      const resp = await callSuAdmin({ action, ...payload });
+      return extractRowsFromAnyResponse(resp, preferredKeys);
+    } catch (_) {
+      return [];
+    }
+  }
+
   async function loadCompaniesAndVesselsForUsersTab() {
     const sb = stateLocal.sb || window.AUTH.ensureSupabase();
     stateLocal.sb = sb;
@@ -88,34 +171,78 @@
     stateLocal.companies = globalCompanies.filter((c) => c && c.is_active !== false);
     stateLocal.vessels = globalVessels.filter((v) => v && v.is_active !== false);
 
-    // Fallback direct reads. These are read-only and used only to populate dropdowns.
+    // Fallbacks for companies.
     if (!stateLocal.companies.length) {
-      const { data, error } = await sb
-        .from("companies")
-        .select("id, company_name, short_name, company_code, is_active")
-        .eq("is_active", true)
-        .order("company_name", { ascending: true });
+      stateLocal.companies = normalizeCompanyRows(
+        await tryCsvbRpc("csvb_admin_list_companies", {}, ["companies"])
+      );
+    }
 
-      if (!error) stateLocal.companies = data || [];
+    if (!stateLocal.companies.length) {
+      stateLocal.companies = normalizeCompanyRows(
+        await trySupabaseRpc("csvb_admin_list_companies", {}, ["companies"])
+      );
+    }
+
+    if (!stateLocal.companies.length) {
+      stateLocal.companies = normalizeCompanyRows(
+        await trySuAdminAction("list_companies", {}, ["companies"])
+      );
+    }
+
+    if (!stateLocal.companies.length) {
+      try {
+        const { data, error } = await sb
+          .from("companies")
+          .select("id, company_name, short_name, company_code, is_active")
+          .eq("is_active", true)
+          .order("company_name", { ascending: true });
+
+        if (!error) stateLocal.companies = normalizeCompanyRows(data || []);
+      } catch (_) {}
+    }
+
+    // Fallbacks for vessels.
+    if (!stateLocal.vessels.length) {
+      stateLocal.vessels = normalizeVesselRows(
+        await tryCsvbRpc("csvb_admin_list_vessels_by_company", { p_company_id: null }, ["vessels"])
+      );
     }
 
     if (!stateLocal.vessels.length) {
-      const { data, error } = await sb
-        .from("vessels")
-        .select("id, name, hull_number, imo_number, company_id, is_active")
-        .eq("is_active", true)
-        .order("name", { ascending: true });
+      stateLocal.vessels = normalizeVesselRows(
+        await trySupabaseRpc("csvb_admin_list_vessels_by_company", { p_company_id: null }, ["vessels"])
+      );
+    }
 
-      if (!error) stateLocal.vessels = data || [];
+    if (!stateLocal.vessels.length) {
+      stateLocal.vessels = normalizeVesselRows(
+        await trySuAdminAction("list_vessels", {}, ["vessels"])
+      );
+    }
+
+    if (!stateLocal.vessels.length) {
+      try {
+        const { data, error } = await sb
+          .from("vessels")
+          .select("id, name, hull_number, imo_number, company_id, is_active")
+          .eq("is_active", true)
+          .order("name", { ascending: true });
+
+        if (!error) stateLocal.vessels = normalizeVesselRows(data || []);
+      } catch (_) {}
     }
 
     renderCompanyDropdownFallback();
     renderVesselDropdownFallback();
+    forceEnableCompanyVesselControls();
   }
 
   function renderCompanyDropdownFallback() {
     const sel = $("cu_company");
     if (!sel) return;
+
+    sel.disabled = false;
 
     const companies = stateLocal.companies || [];
     const current = sel.value || "";
@@ -144,6 +271,8 @@
   function renderVesselDropdownFallback() {
     const sel = $("cu_vessel");
     if (!sel) return;
+
+    sel.disabled = false;
 
     const cid = companyId();
     const current = sel.value || "";
@@ -380,9 +509,11 @@
 
     $("cu_creation_mode").addEventListener("change", applyModeUi);
     $("cu_company")?.addEventListener("change", () => {
+      forceEnableCompanyVesselControls();
       renderVesselDropdownFallback();
       window.setTimeout(() => {
         renderRankDropdown();
+        forceEnableCompanyVesselControls();
       }, 150);
     });
 
@@ -397,6 +528,21 @@
     });
 
     applyModeUi();
+  }
+
+  function forceEnableCompanyVesselControls() {
+    const companySel = $("cu_company");
+    const vesselSel = $("cu_vessel");
+
+    if (companySel && isOnboardMode()) {
+      companySel.disabled = false;
+      companySel.removeAttribute("disabled");
+    }
+
+    if (vesselSel && isOnboardMode()) {
+      vesselSel.disabled = false;
+      vesselSel.removeAttribute("disabled");
+    }
   }
 
   function applyModeUi() {
@@ -425,6 +571,11 @@
 
       const roleSel = $("cu_role");
       if (roleSel) roleSel.value = "vessel";
+
+      forceEnableCompanyVesselControls();
+
+      window.setTimeout(forceEnableCompanyVesselControls, 100);
+      window.setTimeout(forceEnableCompanyVesselControls, 500);
 
       if (positionPick) positionPick.value = "";
       if (positionInput) positionInput.value = selectedRankName() || "";
@@ -825,6 +976,13 @@
   function start() {
     window.setTimeout(() => install().catch((error) => showWarnSafe(String(error?.message || error))), 900);
     window.setTimeout(() => install().catch(() => {}), 1800);
+    window.setTimeout(() => {
+      loadCompaniesAndVesselsForUsersTab().catch(() => {});
+      forceEnableCompanyVesselControls();
+    }, 2600);
+    window.setTimeout(() => {
+      forceEnableCompanyVesselControls();
+    }, 3600);
     window.setTimeout(() => {
       patchUserListHeaders();
       enhanceUserRows();
