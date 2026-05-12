@@ -5,7 +5,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "PA6B-2026-05-10";
+  const BUILD = "PA6C-2026-05-12-MARINE-MODULES-STABLE";
   const SELECTED_KEY = "csvb_dashboard_selected_platform_area_v6";
 
   /*

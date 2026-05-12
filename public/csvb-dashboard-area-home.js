@@ -5,7 +5,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "PA7D-2026-05-12-PLA-MARINE-HOME";
+  const BUILD = "PA7E-2026-05-12-MARINE-HOME-STABLE";
 
   const AREA_HOME = {
     company_policy: {
