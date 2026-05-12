@@ -4,7 +4,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "CSVBEACON-ONBOARD-PERSONNEL-U02D-FIX-20260512-1";
+  const BUILD = "CSVBEACON-U05B-HIDE-APPLY-ONBOARD-SETUP";
 
   const local = {
     sb: null,
@@ -337,18 +337,10 @@
       const actions = tr.querySelector(".actions");
       if (!actions) return;
 
-      const btn = document.createElement("button");
-      btn.className = "btnSmall btn2";
-      btn.type = "button";
-      btn.textContent = "Apply Onboard Setup";
-      btn.addEventListener("click", () => {
-        applyCurrentOnboardSetupToProfile(profileId).catch((error) => {
-          console.error(error);
-          showWarnSafe(String(error?.message || error || "Could not apply onboard setup."));
-        });
-      });
-
-      actions.appendChild(btn);
+      // U-05B:
+      // The Apply Onboard Setup button was a temporary migration/repair control.
+      // Normal user editing is now handled by the U-05 Edit button.
+      // Do not add this button to normal user rows.
       tr.setAttribute("data-u02d-row-enhanced", "1");
     });
   }
