@@ -757,6 +757,46 @@
       text-align: center;
     }
 
+  
+    /* ============================================================
+       PLA-05D CHECKBOX DROPDOWN OVERLAY FIX
+       Dropdown checkbox filters must appear above KPI/table panels.
+    ============================================================ */
+
+    .filter-panel {
+      position: relative;
+      z-index: 3000;
+      overflow: visible !important;
+    }
+
+    .filter-grid {
+      overflow: visible !important;
+    }
+
+    .csvb-checkdrop {
+      position: relative;
+      z-index: 3100;
+    }
+
+    .csvb-checkdrop.open {
+      z-index: 9000;
+    }
+
+    .csvb-checkdrop-panel {
+      z-index: 99999 !important;
+    }
+
+    .stats-grid,
+    .table-panel {
+      position: relative;
+      z-index: 1;
+    }
+
+    .table-wrap {
+      position: relative;
+      z-index: 1;
+    }
+
   </style>
 </head>
 
