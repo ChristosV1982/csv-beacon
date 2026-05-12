@@ -6,7 +6,7 @@
 // - Bump cache version + clean old caches on activate
 
 const CACHE_PREFIX = "sire-test-";
-const CACHE_VERSION = "v119-mai-component-soft-delete";
+const CACHE_VERSION = "v119-onboard-personnel-admin";
 const CACHE_NAME = `${CACHE_PREFIX}${CACHE_VERSION}`;
 
 const CORE_ASSETS = [
@@ -15,6 +15,7 @@ const CORE_ASSETS = [
   "./q-dashboard.html",
   "./su-admin.html",
   "./su-admin.js",
+  "./csvb-onboard-personnel-admin.js",
   "./company_policy.html",
   "./company_policy.js",
   "./company_policy_change_requests.js",
