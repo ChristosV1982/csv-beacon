@@ -211,6 +211,17 @@
         </div>
       </div>
 
+      <div class="card" data-card="portable_lifting_appliances_wires">
+        <div class="title">Portable Lifting Appliances & Wires</div>
+        <div class="muted">
+          Inventory and inspection control for portable lifting appliances, running wires,
+          remote control wires, standing wires and mast stays.
+        </div>
+        <div style="margin-top:12px;">
+          <button class="btn2" type="button" onclick="location.href='./portable-lifting-appliances-wires.html'">Open</button>
+        </div>
+      </div>
+
       <div class="card" data-card="company_policy">
         <div class="title">Company Policy</div>
         <div class="muted">Controlled policy book structure, future rich-text policy editing, change requests, manuals and AI source-based search.</div>
@@ -292,6 +303,7 @@
       threads: "threads",
       company_policy: "company_policy",
       mooring_anchoring_inventories: "mooring_anchoring_inventories",
+      portable_lifting_appliances_wires: "portable_lifting_appliances_wires",
       suadmin: "platform_administration"
     };
 
@@ -504,6 +516,7 @@
         setVisible("threads", true, moduleAccess);
         setVisible("company_policy", true, moduleAccess);
         setVisible("mooring_anchoring_inventories", true, moduleAccess);
+        setVisible("portable_lifting_appliances_wires", true, moduleAccess);
         setVisible("suadmin", false, moduleAccess);
         return;
       }
@@ -552,6 +565,7 @@
         setVisible("audit_observations", false, moduleAccess);
         setVisible("qeditor", false, moduleAccess);
         setVisible("company_policy", true, moduleAccess);
+        setVisible("portable_lifting_appliances_wires", false, moduleAccess);
         setVisible("suadmin", false, moduleAccess);
         return;
       }
