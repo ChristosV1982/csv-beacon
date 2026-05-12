@@ -5,7 +5,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "U07B-2026-05-12-ONBOARD-MODULE-GUARD";
+  const BUILD = "U08F-2026-05-12-RANK-AWARE-GUARD";
 
   const CSVB_COMPANY_VIEW_ID_KEY = "csvb_superuser_company_view_id";
   const CSVB_COMPANY_VIEW_NAME_KEY = "csvb_superuser_company_view_name";
@@ -123,6 +123,56 @@
     );
   }
 
+  function moduleKeyToAppModuleCode(moduleKey) {
+    const map = {
+      read_only_library: "QUESTION_LIBRARY",
+      self_assessment: "VESSEL_QUESTIONNAIRES",
+      post_inspection: "POST_INSPECTION",
+      post_inspection_stats: "POST_INSPECTION_STATS",
+      inspector_intelligence: "INSPECTOR_INTELLIGENCE",
+      audit_observations: "AUDIT_OBSERVATIONS",
+      fleet_reports: "REPORTS",
+      sire_2_vetting: "INSPECTOR_THIRD_PARTY",
+      questions_editor: "QUESTIONS_EDITOR",
+      threads: "THREADS",
+      company_policy: "COMPANY_POLICY",
+      mooring_anchoring_inventories: "MOORING_ANCHORING_INVENTORIES",
+      platform_administration: "SU_ADMIN"
+    };
+
+    return map[moduleKey] || "";
+  }
+
+  async function rankAllowsModuleView(sb, moduleKey) {
+    const appModuleCode = moduleKeyToAppModuleCode(moduleKey);
+
+    if (!appModuleCode) {
+      return { allowed: false, appModuleCode: "", rows: [] };
+    }
+
+    try {
+      const { data, error } = await sb.rpc("csvb_my_effective_app_permissions");
+
+      if (error) {
+        console.warn("Rank-based module guard check failed:", error);
+        return { allowed: false, appModuleCode, rows: [], error };
+      }
+
+      const rows = data || [];
+
+      const allowed = rows.some((row) => {
+        return row.module_code === appModuleCode &&
+          row.permission_action === "view" &&
+          row.is_granted === true;
+      });
+
+      return { allowed, appModuleCode, rows };
+    } catch (error) {
+      console.warn("Rank-based module guard exception:", error);
+      return { allowed: false, appModuleCode, rows: [], error };
+    }
+  }
+
   async function simulatedCompanyAllowsModule(sb, companyId, moduleKey) {
     const { data, error } = await sb.rpc("csvb_admin_list_company_modules", {
       p_company_id: companyId
@@ -218,27 +268,46 @@
       return;
     }
 
-    const { data, error } = await sb.rpc("csvb_my_company_modules");
+    let companyModules = [];
+    let companyAllowed = false;
+    let companyError = null;
 
-    if (error) {
-      throw new Error("Could not verify module access: " + error.message);
+    try {
+      const { data, error } = await sb.rpc("csvb_my_company_modules");
+
+      if (error) {
+        companyError = error;
+      } else {
+        companyModules = data || [];
+        companyAllowed = companyModules.some((m) => {
+          return m.module_key === moduleKey && m.is_enabled === true;
+        });
+      }
+    } catch (error) {
+      companyError = error;
     }
 
-    const allowed = (data || []).some((m) => {
-      return m.module_key === moduleKey && m.is_enabled === true;
-    });
+    const rankCheck = await rankAllowsModuleView(sb, moduleKey);
+    const rankAllowed = rankCheck.allowed === true;
+
+    const allowed = companyAllowed || rankAllowed;
 
     window.CSVB_MODULE_GUARD = {
       page,
       moduleKey,
+      appModuleCode: rankCheck.appModuleCode,
       allowed,
-      modules: data || []
+      companyAllowed,
+      rankAllowed,
+      companyError: companyError ? String(companyError?.message || companyError) : null,
+      modules: companyModules,
+      effectivePermissionRows: rankCheck.rows || []
     };
 
     if (allowed) return;
 
     showAccessDenied(
-      "Access denied. This module is not enabled for your company: " + moduleKey + ". Redirecting to Dashboard…"
+      "Access denied. This module is not enabled for your company or rank: " + moduleKey + ". Redirecting to Dashboard…"
     );
 
     setTimeout(() => {
