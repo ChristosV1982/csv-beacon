@@ -6,7 +6,7 @@
 // - Bump cache version + clean old caches on activate
 
 const CACHE_PREFIX = "sire-test-";
-const CACHE_VERSION = "v118-mai-inventory-visual-harmonization";
+const CACHE_VERSION = "v119-mai-component-soft-delete";
 const CACHE_NAME = `${CACHE_PREFIX}${CACHE_VERSION}`;
 
 const CORE_ASSETS = [
@@ -47,6 +47,7 @@ const CORE_ASSETS = [
   "./mooring-anchoring-inventories-v4.html",
   "./mooring-anchoring-inventories-v4.css",
   "./mooring-anchoring-inventories-v4.js",
+  "./mooring-anchoring-component-delete-extension.js",
   "./mooring-anchoring-operations.html",
   "./mooring-anchoring-operations.css",
   "./mooring-anchoring-operations.js",
