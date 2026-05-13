@@ -4,7 +4,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "PLA-COMPONENT-DETAIL-RESTORE-08B-20260513-1";
+  const BUILD = "PLA-COMPONENT-DETAIL-POLISH-09A-20260513-1";
 
   const state = {
     sb: null,
@@ -173,6 +173,88 @@
 
   function pill(label, raw) {
     return `<span class="pill ${statusClass(raw)}">${esc(label || statusLabel(raw))}</span>`;
+  }
+
+  function kpiFlagPill(label, status, detail = "") {
+    const cls =
+      status === "critical" ? "pill-danger" :
+      status === "warning" ? "pill-warn" :
+      status === "muted" ? "pill-muted" :
+      "pill-ok";
+
+    return `
+      <span class="pill ${cls}" title="${esc(detail)}">
+        ${esc(label)}
+      </span>
+    `;
+  }
+
+  function dueFlag(label, rawStatus, dueDate) {
+    const status = String(rawStatus || "");
+
+    if (status === "overdue") {
+      return kpiFlagPill(`${label}: Overdue`, "critical", `Due: ${asDate(dueDate)}`);
+    }
+
+    if (status === "due_soon") {
+      return kpiFlagPill(`${label}: Due Soon`, "warning", `Due: ${asDate(dueDate)}`);
+    }
+
+    if (status === "not_recorded" || status === "missing") {
+      return kpiFlagPill(`${label}: Not Recorded`, "warning", "");
+    }
+
+    if (status === "not_applicable") {
+      return kpiFlagPill(`${label}: N/A`, "muted", "");
+    }
+
+    return kpiFlagPill(`${label}: OK`, "ok", dueDate ? `Due: ${asDate(dueDate)}` : "");
+  }
+
+  function renderComponentKpiSummary(c) {
+    const openFindings = state.inspections.filter((i) => i.corrective_action_required === true && i.is_voided !== true).length;
+
+    const flags = [
+      isDeleted()
+        ? kpiFlagPill("Component: Discarded", "critical", c.delete_reason || "")
+        : kpiFlagPill("Component: Active", "ok", ""),
+
+      c.certificate_missing
+        ? kpiFlagPill("Certificate: Missing", "critical", "")
+        : kpiFlagPill("Certificate: Recorded", "ok", c.certificate_no || ""),
+
+      dueFlag("Replacement", c.calculated_replacement_due_status, c.replacement_due_date),
+      dueFlag("Annual Inspection", c.calculated_inspection_due_status, c.next_inspection_due),
+      dueFlag("5Y Test", c.calculated_five_year_test_status, c.next_five_year_test_due),
+
+      c.particulars_lock_status === "locked"
+        ? kpiFlagPill("Particulars: Locked", "muted", "")
+        : kpiFlagPill("Particulars: Unlocked", "warning", ""),
+
+      openFindings > 0
+        ? kpiFlagPill(`Open Findings: ${openFindings}`, "critical", "Corrective action required")
+        : kpiFlagPill("Open Findings: 0", "ok", "")
+    ];
+
+    let panel = document.getElementById("plaKpiSummaryPanel");
+
+    if (!panel) {
+      panel = document.createElement("section");
+      panel.id = "plaKpiSummaryPanel";
+      panel.className = "panel pla-kpi-summary";
+      panel.innerHTML = `
+        <div class="panel-head">
+          <div class="panel-title">Component KPI Summary</div>
+          <div class="panel-meta">Operational flags used for monitoring, follow-up and fleet KPI reporting.</div>
+        </div>
+        <div id="plaKpiSummaryBody" class="panel-body"></div>
+      `;
+
+      el.statsGrid.insertAdjacentElement("afterend", panel);
+    }
+
+    const body = document.getElementById("plaKpiSummaryBody");
+    body.innerHTML = `<div class="pill-row pla-kpi-pill-row">${flags.join("")}</div>`;
   }
 
   function firstNonEmpty(obj, keys) {
@@ -408,6 +490,22 @@
     ]);
   }
 
+  function actionTypeLabel(type) {
+    const map = {
+      component_particulars_updated: "Component Edited",
+      "inspection_recorded:routine_annual": "Annual Inspection",
+      "inspection_recorded:five_year_test": "5Y Test",
+      maintenance_repair: "Maintenance / Repair",
+      certificate_condition_update: "Certificate / Condition Update",
+      location_transfer: "Location Transfer",
+      discarded: "Discarded",
+      reactivated: "Reactivated",
+      manual_action: "Manual Action"
+    };
+
+    return map[type] || String(type || "—").replaceAll("_", " ");
+  }
+
   function renderHistory() {
     const panel = el.rawSnapshot.closest(".panel");
     if (panel) {
@@ -462,7 +560,7 @@
             ${state.events.map((e) => `
               <tr>
                 <td>${esc(asDate(e.event_date))}</td>
-                <td>${esc(e.event_type || "—")}</td>
+                <td>${esc(actionTypeLabel(e.event_type))}</td>
                 <td>${esc(e.performed_by || "—")}</td>
                 <td>${esc(e.remarks || "—")}</td>
                 <td>${esc(e.created_by_username || "—")}</td>
@@ -521,9 +619,12 @@
 
     if (isDeleted()) {
       target.innerHTML = `
-        <span class="pill pill-danger">Component discarded. Editing and new actions are blocked until restored.</span>
-        <button id="restoreComponentBtn" class="btn" type="button">Restore / Reactivate</button>
-        ${state.canAdmin ? `<button id="advancedSnapshotBtn" class="btn2" type="button">Advanced Snapshot</button>` : ""}
+        <div class="pla-action-group pla-action-danger">
+          <div class="pla-action-group-title">Discarded Component</div>
+          <span class="pill pill-danger">Component discarded. Editing and new actions are blocked until restored.</span>
+          <button id="restoreComponentBtn" class="btn" type="button">Restore / Reactivate</button>
+          ${state.canAdmin ? `<button id="advancedSnapshotBtn" class="btn2" type="button">Advanced Snapshot</button>` : ""}
+        </div>
       `;
 
       $("restoreComponentBtn")?.addEventListener("click", openRestoreModal);
@@ -532,14 +633,25 @@
     }
 
     target.innerHTML = `
-      <button id="editComponentBtn" class="btn2" type="button">Edit Component</button>
-      <button id="annualInspectionBtn" class="btn2" type="button">Record Annual Inspection</button>
-      <button id="fiveYearTestBtn" class="btn2" type="button">Record 5Y Test</button>
-      <button id="maintenanceBtn" class="btn2" type="button">Maintenance / Repair</button>
-      <button id="certificateBtn" class="btn2" type="button">Certificate / Condition Update</button>
-      <button id="transferBtn" class="btn2" type="button">Transfer Location</button>
-      <button id="discardBtn" class="btn" type="button">Discard Component</button>
-      ${state.canAdmin ? `<button id="advancedSnapshotBtn" class="btn2" type="button">Advanced Snapshot</button>` : ""}
+      <div class="pla-action-group">
+        <div class="pla-action-group-title">Particulars</div>
+        <button id="editComponentBtn" class="btn2" type="button">Edit Component</button>
+        <button id="certificateBtn" class="btn2" type="button">Certificate / Condition Update</button>
+        <button id="transferBtn" class="btn2" type="button">Transfer Location</button>
+      </div>
+
+      <div class="pla-action-group">
+        <div class="pla-action-group-title">Inspections / Tests</div>
+        <button id="annualInspectionBtn" class="btn2" type="button">Record Annual Inspection</button>
+        <button id="fiveYearTestBtn" class="btn2" type="button">Record 5Y Test</button>
+        <button id="maintenanceBtn" class="btn2" type="button">Maintenance / Repair</button>
+      </div>
+
+      <div class="pla-action-group pla-action-danger">
+        <div class="pla-action-group-title">Lifecycle</div>
+        <button id="discardBtn" class="btn" type="button">Discard Component</button>
+        ${state.canAdmin ? `<button id="advancedSnapshotBtn" class="btn2" type="button">Advanced Snapshot</button>` : ""}
+      </div>
     `;
 
     $("editComponentBtn")?.addEventListener("click", openEditModal);
@@ -568,6 +680,7 @@
     }
 
     renderHeader(c);
+    renderComponentKpiSummary(c);
     renderActions();
     renderMain(c);
     renderTechnical(c);

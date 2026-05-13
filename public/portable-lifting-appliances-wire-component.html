@@ -347,6 +347,115 @@
         grid-template-columns: 1fr;
       }
     }
+  
+    /* ============================================================
+       PLA-09 COMPONENT DETAIL POLISH
+       C.S.V. BEACON compact operational layout
+    ============================================================ */
+
+    .pla-kpi-summary {
+      margin-top: 8px;
+    }
+
+    .pla-kpi-pill-row {
+      gap: 8px;
+      align-items: center;
+    }
+
+    #plaActionBar {
+      margin-top: 8px;
+    }
+
+    #plaActionButtons {
+      display: grid;
+      grid-template-columns: 1.2fr 1.2fr .8fr;
+      gap: 10px;
+      align-items: stretch;
+    }
+
+    .pla-action-group {
+      border: 1px solid #dce8f6;
+      border-radius: 12px;
+      background: #fbfdff;
+      padding: 9px;
+      display: flex;
+      gap: 7px;
+      flex-wrap: wrap;
+      align-content: flex-start;
+    }
+
+    .pla-action-group-title {
+      width: 100%;
+      color: #062a5e;
+      font-size: .76rem;
+      font-weight: 950;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+      border-bottom: 1px solid #dce8f6;
+      padding-bottom: 5px;
+      margin-bottom: 2px;
+    }
+
+    .pla-action-danger {
+      border-color: #f1b9b9;
+      background: #fffafa;
+    }
+
+    .field-box {
+      min-height: 48px;
+      padding: 7px 8px;
+    }
+
+    .field-label {
+      font-size: .7rem;
+    }
+
+    .field-value {
+      font-size: .86rem;
+      line-height: 1.28;
+    }
+
+    .panel-head {
+      padding: 9px 10px;
+    }
+
+    .panel-body {
+      padding: 9px 10px;
+    }
+
+    .panel-title {
+      font-size: .96rem;
+    }
+
+    .panel-meta {
+      font-size: .78rem;
+    }
+
+    .raw-table th,
+    .raw-table td {
+      padding: 6px 7px;
+      font-size: .78rem;
+    }
+
+    .stat-card {
+      min-height: 58px;
+      padding: 8px 9px;
+    }
+
+    .stat-value {
+      font-size: .98rem;
+    }
+
+    .stat-help {
+      font-size: .72rem;
+    }
+
+    @media (max-width: 1200px) {
+      #plaActionButtons {
+        grid-template-columns: 1fr;
+      }
+    }
+
   </style>
 </head>
 
