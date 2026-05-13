@@ -4,7 +4,10 @@
     "start": "node server.js",
     "import:unlocode": "node scripts/import-unlocode-ports.mjs",
     "import:isps-facilities": "node scripts/import-isps-port-facilities.mjs",
-    "extract:risq-preview": "node scripts/extract-risq-v32-preview.mjs"
+    "extract:risq-preview": "node scripts/extract-risq-v32-preview.mjs",
+    "build:risq-import-sql": "node scripts/build-risq-v32-import-sql.mjs",
+    "build:risq-import-chunks": "node scripts/build-risq-v32-import-sql-chunks.mjs && node scripts/patch-risq-import-chunks-no-temp.mjs",
+    "patch:risq-import-chunks-no-temp": "node scripts/patch-risq-import-chunks-no-temp.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",
