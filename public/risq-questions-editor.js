@@ -1,10 +1,10 @@
 /* public/risq-questions-editor.js */
-/* C.S.V. BEACON – RISQ-07B RISQ Questions Editor with edit controls */
+/* C.S.V. BEACON – RISQ-08A Editor hardened frontend */
 
 (() => {
   "use strict";
 
-  const BUILD = "RISQ-QEDITOR-DELETE-07C-FIX2-20260513-1";
+  const BUILD = "RISQ-QEDITOR-HARDENED-08A-20260513-1";
 
   const state = {
     sb: null,
@@ -58,8 +58,14 @@
       setTimeout(() => {
         box.textContent = "";
         box.style.display = "none";
-      }, type === "ok" ? 2500 : 5000);
+      }, type === "ok" ? 2600 : 5200);
     }
+  }
+
+  async function rpc(name, args = {}) {
+    const { data, error } = await state.sb.rpc(name, args);
+    if (error) throw error;
+    return data;
   }
 
   function selectedMultiValues(id) {
@@ -74,9 +80,12 @@
   }
 
   function clearMultiSelect(select) {
+    if (!select) return;
+
     Array.from(select.options || []).forEach((option) => {
       option.selected = false;
     });
+
     select.dispatchEvent(new Event("change", { bubbles: true }));
   }
 
@@ -85,16 +94,17 @@
   }
 
   function displayMarker(row) {
-    return row.inspection_marker || "Blank";
+    return row?.inspection_marker || "Blank";
   }
 
   function statusKey(row) {
-    if (row.is_deleted === true || row.deleted_at) return "deleted";
-    return row.is_removed_question ? "removed" : "active";
+    if (row?.is_deleted === true || row?.deleted_at) return "deleted";
+    if (row?.is_removed_question) return "removed";
+    return "active";
   }
 
   function markerKey(row) {
-    return row.inspection_marker || "blank";
+    return row?.inspection_marker || "blank";
   }
 
   function sectionLabel(row) {
@@ -107,10 +117,8 @@
       : "Standard RISQ";
   }
 
-  async function rpc(name, args = {}) {
-    const { data, error } = await state.sb.rpc(name, args);
-    if (error) throw error;
-    return data;
+  function isDeleted(row) {
+    return row?.is_deleted === true || !!row?.deleted_at;
   }
 
   async function loadActorContext() {
@@ -138,8 +146,9 @@
 
     if (document.getElementById("newCompanyQuestionBtn")) return;
 
-    const allowed = state.rows.some((row) => row.can_create_company_question === true)
-      || ["super_admin", "platform_owner", "company_admin", "company_superintendent"].includes(state.profile?.role);
+    const allowed =
+      state.rows.some((row) => row.can_create_company_question === true) ||
+      ["super_admin", "platform_owner", "company_admin", "company_superintendent"].includes(state.profile?.role);
 
     if (!allowed) return;
 
@@ -162,14 +171,21 @@
       ).entries()
     ).sort((a, b) => a[0].localeCompare(b[0]));
 
-    el.filterSection.innerHTML = sections
-      .map(([code, label]) => option(code, label, selectedSections.has(code)))
-      .join("");
+    if (el.filterSection) {
+      el.filterSection.innerHTML = sections
+        .map(([code, label]) => option(code, label, selectedSections.has(code)))
+        .join("");
+    }
 
-    el.filterSection.dispatchEvent(new Event("change", { bubbles: true }));
-    el.filterStatus.dispatchEvent(new Event("change", { bubbles: true }));
-    el.filterMarker.dispatchEvent(new Event("change", { bubbles: true }));
-    el.filterGuide.dispatchEvent(new Event("change", { bubbles: true }));
+    [
+      el.filterSection,
+      el.filterOrigin,
+      el.filterStatus,
+      el.filterMarker,
+      el.filterGuide
+    ].forEach((select) => {
+      if (select) select.dispatchEvent(new Event("change", { bubbles: true }));
+    });
   }
 
   function rowMatches(row) {
@@ -178,7 +194,7 @@
     const statuses = selectedMultiValues("filterStatus");
     const markers = selectedMultiValues("filterMarker");
     const guides = selectedMultiValues("filterGuide");
-    const q = norm(el.searchInput.value);
+    const q = norm(el.searchInput?.value);
 
     if (sections.size && !sections.has(row.section_code)) return false;
     if (origins.size && !origins.has(row.question_origin || "standard")) return false;
@@ -200,7 +216,8 @@
         row.company_name,
         row.esms_references,
         row.esms_forms,
-        row.remarks
+        row.remarks,
+        row.delete_reason
       ].map(norm).join(" | ");
 
       if (!haystack.includes(q)) return false;
@@ -227,10 +244,14 @@
     const all = state.rows;
 
     el.statVisible.textContent = String(rows.length);
-    el.statActive.textContent = String(all.filter((r) => !r.is_removed_question && r.is_active !== false && !r.is_deleted && !r.deleted_at).length);
+    el.statActive.textContent = String(
+      all.filter((r) => !r.is_removed_question && r.is_active !== false && !isDeleted(r)).length
+    );
     el.statRemoved.textContent = String(all.filter((r) => r.is_removed_question).length);
     el.statSections.textContent = String(new Set(all.map((r) => r.section_code)).size);
-    el.statNoGuide.textContent = String(all.filter((r) => !r.is_removed_question && r.guide_status === "not_provided").length);
+    el.statNoGuide.textContent = String(
+      all.filter((r) => !r.is_removed_question && r.guide_status === "not_provided").length
+    );
     el.statInferred.textContent = String(all.filter((r) => r.answer_options_inferred === true).length);
   }
 
@@ -252,10 +273,16 @@
     el.questionList.innerHTML = rows.map((row) => {
       const active = row.id === state.selectedId ? " active" : "";
       const removed = row.is_removed_question ? `<span class="pill pill-danger">Removed</span>` : "";
-      const deleted = row.is_deleted || row.deleted_at ? `<span class="pill pill-danger">Deleted</span>` : "";
-      const noGuide = !row.is_removed_question && row.guide_status === "not_provided" ? `<span class="pill pill-warn">No Guide</span>` : "";
-      const inferred = row.answer_options_inferred ? `<span class="pill pill-warn">Inferred Answers</span>` : "";
-      const companySpecific = row.question_origin === "company_specific" ? `<span class="pill">Company</span>` : "";
+      const deleted = isDeleted(row) ? `<span class="pill pill-danger">Deleted</span>` : "";
+      const noGuide = !row.is_removed_question && row.guide_status === "not_provided"
+        ? `<span class="pill pill-warn">No Guide</span>`
+        : "";
+      const inferred = row.answer_options_inferred
+        ? `<span class="pill pill-warn">Inferred Answers</span>`
+        : "";
+      const companySpecific = row.question_origin === "company_specific"
+        ? `<span class="pill">Company</span>`
+        : "";
 
       return `
         <div class="q-item${active}" data-risq-id="${esc(row.id)}">
@@ -286,6 +313,14 @@
 
     el.detailMeta.textContent = `${row.section_code} / ${row.section_title}`;
 
+    const originPill = row.question_origin === "company_specific"
+      ? `<span class="pill">Company-specific</span>`
+      : `<span class="pill pill-muted">Standard RISQ</span>`;
+
+    const deletedPill = isDeleted(row)
+      ? `<span class="pill pill-danger">Deleted</span>`
+      : "";
+
     const removedPill = row.is_removed_question
       ? `<span class="pill pill-danger">Removed Question</span>`
       : `<span class="pill">Active Question</span>`;
@@ -300,18 +335,6 @@
       ? `<span class="pill pill-warn">Answer Options Inferred</span>`
       : "";
 
-    const originPill = row.question_origin === "company_specific"
-      ? `<span class="pill">Company-specific</span>`
-      : `<span class="pill pill-muted">Standard RISQ</span>`;
-
-    const deletedPill = row.is_deleted || row.deleted_at
-      ? `<span class="pill pill-danger">Deleted</span>`
-      : "";
-
-    const deletedPill = row.is_deleted || row.deleted_at
-      ? `<span class="pill pill-danger">Deleted</span>`
-      : "";
-
     const guideText = row.guide_to_inspection
       ? esc(row.guide_to_inspection)
       : row.is_removed_question
@@ -319,13 +342,16 @@
         : "No Guide to Inspection text is provided for this question in the extracted RISQ source.";
 
     const buttons = [];
-    if (row.can_edit_mapping) {
+
+    if (row.can_edit_mapping && !isDeleted(row)) {
       buttons.push(`<button class="btn2" type="button" id="editMappingBtn">Edit eSMS Mapping</button>`);
     }
-    if (row.can_edit_standard_question) {
+
+    if (row.can_edit_standard_question && !isDeleted(row)) {
       buttons.push(`<button class="btn2" type="button" id="editStandardQuestionBtn">Edit Standard Question</button>`);
     }
-    if (row.can_edit_company_question) {
+
+    if (row.can_edit_company_question && !isDeleted(row)) {
       buttons.push(`<button class="btn2" type="button" id="editCompanyQuestionBtn">Edit Company Question</button>`);
       buttons.push(`<button class="btn2" type="button" id="deleteCompanyQuestionBtn">Delete Company Question</button>`);
     }
@@ -383,6 +409,15 @@
         </div>
       </div>
 
+      ${
+        isDeleted(row)
+          ? `<div class="content-section">
+              <div class="content-section-title">Delete Reason</div>
+              <div class="content-section-body">${esc(row.delete_reason || "—")}</div>
+            </div>`
+          : ""
+      }
+
       <div class="content-section">
         <div class="content-section-title">Guide to Inspection</div>
         <div class="content-section-body">${guideText}</div>
@@ -407,7 +442,6 @@
     $("editMappingBtn")?.addEventListener("click", () => openMappingModal(row));
     $("editStandardQuestionBtn")?.addEventListener("click", () => openStandardQuestionModal(row));
     $("editCompanyQuestionBtn")?.addEventListener("click", () => openCompanyQuestionEditModal(row));
-    $("deleteCompanyQuestionBtn")?.addEventListener("click", () => openCompanyQuestionDeleteModal(row));
     $("deleteCompanyQuestionBtn")?.addEventListener("click", () => openCompanyQuestionDeleteModal(row));
   }
 
@@ -436,7 +470,9 @@
     clearMultiSelect(el.filterStatus);
     clearMultiSelect(el.filterMarker);
     clearMultiSelect(el.filterGuide);
-    el.searchInput.value = "";
+
+    if (el.searchInput) el.searchInput.value = "";
+
     renderAll();
   }
 
@@ -477,7 +513,7 @@
         row.printed_question_no,
         row.question_origin,
         row.company_name,
-        row.is_deleted || row.deleted_at ? "Yes" : "No",
+        isDeleted(row) ? "Yes" : "No",
         row.delete_reason,
         row.section_code,
         row.section_title,
@@ -510,15 +546,17 @@
   }
 
   function bindEvents() {
-    el.reloadBtn.addEventListener("click", () => reload().catch(handleError));
-    el.exportBtn.addEventListener("click", exportCsv);
-    el.clearFiltersBtn.addEventListener("click", clearFilters);
+    el.reloadBtn?.addEventListener("click", () => reload().catch(handleError));
+    el.exportBtn?.addEventListener("click", exportCsv);
+    el.clearFiltersBtn?.addEventListener("click", clearFilters);
 
-    [el.filterSection, el.filterOrigin, el.filterStatus, el.filterMarker, el.filterGuide].forEach((select) => {
-      select.addEventListener("change", renderAll);
-    });
+    [el.filterSection, el.filterOrigin, el.filterStatus, el.filterMarker, el.filterGuide]
+      .filter(Boolean)
+      .forEach((select) => {
+        select.addEventListener("change", renderAll);
+      });
 
-    el.searchInput.addEventListener("input", renderAll);
+    el.searchInput?.addEventListener("input", renderAll);
   }
 
   async function reload() {
@@ -667,6 +705,7 @@
         }
       }
     `;
+
     document.head.appendChild(style);
   }
 
@@ -695,10 +734,6 @@
     `);
 
     $("risqModalCloseBtn")?.addEventListener("click", closeModal);
-  }
-
-  function currentRow() {
-    return state.rows.find((row) => row.id === state.selectedId) || null;
   }
 
   function mappingTargetCompanyId(row) {
@@ -741,6 +776,7 @@
     );
 
     $("mapCancelBtn").addEventListener("click", closeModal);
+
     $("mapSaveBtn").addEventListener("click", async () => {
       try {
         $("mapSaveBtn").disabled = true;
@@ -820,6 +856,7 @@
     );
 
     $("stdCancelBtn").addEventListener("click", closeModal);
+
     $("stdSaveBtn").addEventListener("click", async () => {
       try {
         const reason = $("stdReason").value.trim();
@@ -942,6 +979,7 @@
     );
 
     $("newCancelBtn").addEventListener("click", closeModal);
+
     $("newSaveBtn").addEventListener("click", async () => {
       try {
         const companyId = $("newCompanyId").value || null;
@@ -1038,6 +1076,7 @@
     );
 
     $("cmpCancelBtn").addEventListener("click", closeModal);
+
     $("cmpSaveBtn").addEventListener("click", async () => {
       try {
         const questionText = $("cmpQuestionText").value.trim();
