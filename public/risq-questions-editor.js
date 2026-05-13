@@ -4,7 +4,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "RISQ-QEDITOR-DELETE-07C-20260513-1";
+  const BUILD = "RISQ-QEDITOR-DELETE-07C-FIX-20260513-1";
 
   const state = {
     sb: null,
@@ -308,6 +308,10 @@
       ? `<span class="pill pill-danger">Deleted</span>`
       : "";
 
+    const deletedPill = row.is_deleted || row.deleted_at
+      ? `<span class="pill pill-danger">Deleted</span>`
+      : "";
+
     const guideText = row.guide_to_inspection
       ? esc(row.guide_to_inspection)
       : row.is_removed_question
@@ -403,6 +407,7 @@
     $("editMappingBtn")?.addEventListener("click", () => openMappingModal(row));
     $("editStandardQuestionBtn")?.addEventListener("click", () => openStandardQuestionModal(row));
     $("editCompanyQuestionBtn")?.addEventListener("click", () => openCompanyQuestionEditModal(row));
+    $("deleteCompanyQuestionBtn")?.addEventListener("click", () => openCompanyQuestionDeleteModal(row));
     $("deleteCompanyQuestionBtn")?.addEventListener("click", () => openCompanyQuestionDeleteModal(row));
   }
 
