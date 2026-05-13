@@ -4,7 +4,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "RISQ-QEDITOR-DELETE-07C-FIX-20260513-1";
+  const BUILD = "RISQ-QEDITOR-DELETE-07C-FIX2-20260513-1";
 
   const state = {
     sb: null,
