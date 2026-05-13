@@ -5,7 +5,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "IV01-2026-05-13-RISQ-QEDITOR-GUARD";
+  const BUILD = "PLA06-2026-05-13-COMPONENT-DETAIL-GUARD";
 
   const CSVB_COMPANY_VIEW_ID_KEY = "csvb_superuser_company_view_id";
   const CSVB_COMPANY_VIEW_NAME_KEY = "csvb_superuser_company_view_name";
@@ -52,6 +52,7 @@
     "mooring-anchoring-operations.html": "mooring_anchoring_inventories",
 
     "portable-lifting-appliances-wires.html": "portable_lifting_appliances_wires",
+    "portable-lifting-appliances-wire-component.html": "portable_lifting_appliances_wires",
 
     "su-admin.html": "platform_administration"
   };

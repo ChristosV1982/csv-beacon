@@ -4,7 +4,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "PLA-INVENTORY-LIST-05C-CHECKDROP-REGISTER";
+  const BUILD = "PLA-INVENTORY-LIST-PLA06-DETAIL-LINK";
 
   const state = {
     sb: null,
@@ -417,7 +417,8 @@
 
     el.componentsTbody.querySelectorAll("[data-pla-detail]").forEach((btn) => {
       btn.addEventListener("click", () => {
-        toast("warn", "PLA component detail page will be built in PLA-06.");
+        const href = btn.getAttribute("data-pla-detail");
+        if (href) window.location.href = href;
       });
     });
   }

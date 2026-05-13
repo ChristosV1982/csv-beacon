@@ -1,0 +1,437 @@
+<!-- public/portable-lifting-appliances-wire-component.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>C.S.V. BEACON – PLA Component Detail</title>
+
+  <link rel="stylesheet" href="./csv-beacon-theme.css?v=20260428_3" />
+  <link rel="stylesheet" href="./style.css?v=20260428_3" />
+  <link rel="stylesheet" href="./csvb-ui-polish.css?v=20260430_1" />
+  <link rel="stylesheet" href="./csvb-100pct-fit.css?v=20260430_1" />
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="./auth.js"></script>
+  <script src="./csvb-module-guard.js?v=20260513_pla06"></script>
+
+  <style>
+    body {
+      margin: 0;
+      font-family: var(--font-sans, "Segoe UI", Arial, sans-serif);
+      background: var(--bg-main, #f4f8fc);
+      color: var(--text-main, #10233f);
+    }
+
+    .topbar {
+      background: linear-gradient(90deg, var(--brand-navy-dark, #031b3f), var(--brand-navy, #062a5e));
+      color: #fff;
+      padding: 10px 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      box-shadow: 0 8px 24px rgba(3,27,63,.16);
+    }
+
+    .topbar-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .wrap {
+      width: 100%;
+      max-width: none;
+      padding: 0 8px 18px;
+      box-sizing: border-box;
+      background: linear-gradient(180deg, #f4f8fc 0%, #eef4fb 100%);
+      min-height: calc(100vh - 70px);
+    }
+
+    .page-head {
+      background: #fff;
+      border: 1px solid #c9d9ec;
+      border-left: 6px solid #0097a7;
+      border-radius: 14px;
+      padding: 12px 14px;
+      margin: 8px 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+      flex-wrap: wrap;
+      box-shadow: 0 8px 22px rgba(3,27,63,.05);
+    }
+
+    .page-kicker {
+      color: #0097a7;
+      font-size: .78rem;
+      font-weight: 950;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+
+    h1 {
+      margin: 0;
+      color: #062a5e;
+      font-size: 1.28rem;
+      line-height: 1.2;
+    }
+
+    .subtitle {
+      color: #52677f;
+      font-weight: 700;
+      line-height: 1.35;
+      margin-top: 4px;
+    }
+
+    .btn,
+    .btn2 {
+      border-radius: 10px;
+      padding: 8px 12px;
+      font-weight: 900;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .btn {
+      background: #062a5e;
+      color: #fff;
+      border: 1px solid #062a5e;
+    }
+
+    .btn2 {
+      background: #f2f9fd;
+      color: #062a5e;
+      border: 1px solid #a8d8e8;
+    }
+
+    .msg {
+      display: none;
+      position: fixed;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 9999;
+      width: min(650px, calc(100vw - 32px));
+      margin: 0;
+      padding: 14px 18px;
+      border-radius: 14px;
+      box-shadow: 0 22px 70px rgba(3,27,63,.22);
+      line-height: 1.4;
+      font-weight: 850;
+      white-space: pre-wrap;
+    }
+
+    .msg.warn {
+      color: #8b1d1d;
+      background: #fff4f4;
+      border: 1px solid #f1b9b9;
+    }
+
+    .msg.ok {
+      color: #0d5c2c;
+      background: #effaf3;
+      border: 1px solid #b8e6c8;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(145px, 1fr));
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .stat-card {
+      background: #fff;
+      border: 1px solid #c9d9ec;
+      border-left: 5px solid #0a4275;
+      border-radius: 12px;
+      padding: 9px 10px;
+      min-height: 66px;
+      box-shadow: 0 8px 22px rgba(3,27,63,.05);
+    }
+
+    .stat-label {
+      color: #3d5677;
+      font-size: .74rem;
+      font-weight: 950;
+      text-transform: uppercase;
+      letter-spacing: .03em;
+      line-height: 1.2;
+    }
+
+    .stat-value {
+      color: #062a5e;
+      font-size: 1.05rem;
+      font-weight: 950;
+      line-height: 1.15;
+      margin-top: 5px;
+      word-break: break-word;
+    }
+
+    .stat-help {
+      color: #52677f;
+      font-size: .76rem;
+      font-weight: 700;
+      line-height: 1.2;
+      margin-top: 4px;
+    }
+
+    .grid-two {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 8px;
+      align-items: start;
+    }
+
+    .panel {
+      background: #fff;
+      border: 1px solid #c9d9ec;
+      border-radius: 12px;
+      box-shadow: 0 8px 22px rgba(3,27,63,.05);
+      overflow: hidden;
+    }
+
+    .panel-head {
+      padding: 10px;
+      background: linear-gradient(180deg, #ffffff, #f8fbff);
+      border-bottom: 1px solid #dce8f6;
+    }
+
+    .panel-title {
+      color: #062a5e;
+      font-weight: 950;
+      font-size: 1rem;
+    }
+
+    .panel-meta {
+      color: #52677f;
+      font-weight: 700;
+      font-size: .8rem;
+      margin-top: 3px;
+    }
+
+    .panel-body {
+      padding: 10px;
+    }
+
+    .field-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(220px, 1fr));
+      gap: 8px;
+    }
+
+    .field-box {
+      border: 1px solid #dce8f6;
+      border-radius: 12px;
+      background: #fbfdff;
+      padding: 8px;
+      min-height: 58px;
+    }
+
+    .field-label {
+      color: #52677f;
+      font-size: .72rem;
+      font-weight: 950;
+      text-transform: uppercase;
+      letter-spacing: .03em;
+      line-height: 1.2;
+    }
+
+    .field-value {
+      color: #10233f;
+      font-weight: 850;
+      margin-top: 4px;
+      line-height: 1.35;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .pill-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 8px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      min-height: 22px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: .72rem;
+      font-weight: 950;
+      white-space: nowrap;
+      border: 1px solid #b7d4ee;
+      background: #eef7ff;
+      color: #062a5e;
+    }
+
+    .pill-ok {
+      border-color: #b8e6c8;
+      background: #effaf3;
+      color: #0d5c2c;
+    }
+
+    .pill-warn {
+      border-color: #f6d58f;
+      background: #fff6e0;
+      color: #8a5a00;
+    }
+
+    .pill-danger {
+      border-color: #f1b9b9;
+      background: #fff1f1;
+      color: #9b1c1c;
+    }
+
+    .pill-muted {
+      border-color: #d6dbe5;
+      background: #f4f6f9;
+      color: #52677f;
+    }
+
+    .full-width {
+      grid-column: 1 / -1;
+    }
+
+    .raw-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: .8rem;
+    }
+
+    .raw-table th,
+    .raw-table td {
+      border-bottom: 1px solid #dce8f6;
+      padding: 6px 7px;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    .raw-table th {
+      background: #eaf4fb;
+      color: #062a5e;
+      font-weight: 950;
+      white-space: nowrap;
+    }
+
+    .empty {
+      padding: 18px;
+      color: #52677f;
+      font-weight: 850;
+      text-align: center;
+    }
+
+    @media (max-width: 1200px) {
+      .stats-grid {
+        grid-template-columns: repeat(3, minmax(145px, 1fr));
+      }
+
+      .grid-two {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 760px) {
+      .stats-grid,
+      .field-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="topbar">
+    <div class="csvb-brand">
+      <img class="csvb-brand-logo" src="./assets/csv-beacon-icon.png" alt="C.S.V. BEACON logo" />
+      <div class="csvb-brand-text">
+        <div class="csvb-brand-title">C.S.V. BEACON</div>
+        <div class="csvb-brand-subtitle">Marine Assurance & Compliance Platform</div>
+      </div>
+    </div>
+
+    <div class="topbar-actions">
+      <div id="userBadge" class="user-badge"></div>
+      <button class="btn2" id="loginBtn" type="button" style="display:none;">Login</button>
+      <button class="btn2" id="switchUserBtn" type="button">Switch User</button>
+      <button class="btn" id="logoutBtn" type="button" style="display:none;">Logout</button>
+      <button class="btn2" type="button" onclick="location.href='./portable-lifting-appliances-wires.html'">Inventory List</button>
+      <button class="btn2" type="button" onclick="location.href='./q-dashboard.html'">Dashboard</button>
+    </div>
+  </div>
+
+  <main class="wrap">
+    <div id="warnBox" class="msg warn"></div>
+    <div id="okBox" class="msg ok"></div>
+
+    <section class="page-head">
+      <div>
+        <div class="page-kicker">Marine Applications & Vessel Interaction</div>
+        <h1 id="detailTitle">PLA Component Detail</h1>
+        <div id="detailSubtitle" class="subtitle">Loading component...</div>
+      </div>
+
+      <div class="topbar-actions">
+        <button id="reloadBtn" class="btn2" type="button">↻ Reload</button>
+        <button class="btn2" type="button" onclick="location.href='./portable-lifting-appliances-wires.html'">Back to Inventory</button>
+      </div>
+    </section>
+
+    <section id="statsGrid" class="stats-grid"></section>
+
+    <section class="grid-two">
+      <div class="panel">
+        <div class="panel-head">
+          <div class="panel-title">Main Particulars</div>
+          <div class="panel-meta">Component identity, vessel assignment and location.</div>
+        </div>
+        <div id="mainParticulars" class="panel-body"></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <div class="panel-title">Technical Particulars</div>
+          <div class="panel-meta">Certificate, condition and component-specific fields.</div>
+        </div>
+        <div id="technicalParticulars" class="panel-body"></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <div class="panel-title">Inspection / Replacement / 5Y Testing</div>
+          <div class="panel-meta">Current lifecycle control fields.</div>
+        </div>
+        <div id="lifecycleParticulars" class="panel-body"></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <div class="panel-title">Governance / Notes</div>
+          <div class="panel-meta">Lock status, remarks and record timestamps.</div>
+        </div>
+        <div id="governanceParticulars" class="panel-body"></div>
+      </div>
+
+      <div class="panel full-width">
+        <div class="panel-head">
+          <div class="panel-title">Complete Data Snapshot</div>
+          <div class="panel-meta">Read-only database view fields for verification.</div>
+        </div>
+        <div id="rawSnapshot" class="panel-body"></div>
+      </div>
+    </section>
+  </main>
+
+  <script src="./portable-lifting-appliances-wire-component.js?v=20260513_pla06"></script>
+</body>
+</html>
