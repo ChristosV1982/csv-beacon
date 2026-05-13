@@ -3,13 +3,15 @@
     "dev": "node server.js",
     "start": "node server.js",
     "import:unlocode": "node scripts/import-unlocode-ports.mjs",
-    "import:isps-facilities": "node scripts/import-isps-port-facilities.mjs"
+    "import:isps-facilities": "node scripts/import-isps-port-facilities.mjs",
+    "extract:risq-preview": "node scripts/extract-risq-v32-preview.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",
     "adm-zip": "^0.5.16",
     "csv-parse": "^5.5.6",
     "dotenv": "^16.4.5",
+    "pdfjs-dist": "^4.2.67",
     "serve": "^14.2.5",
     "ws": "^8.20.0"
   }
