@@ -4,7 +4,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "PLA-COMPONENT-DETAIL-ACTIONS-07C-20260513-1";
+  const BUILD = "PLA-COMPONENT-DETAIL-RESTORE-08B-20260513-1";
 
   const state = {
     sb: null,
@@ -514,10 +514,20 @@
     const bar = ensureActionBar();
     const target = $("plaActionButtons");
 
-    if (!state.canEdit || isDeleted()) {
-      target.innerHTML = isDeleted()
-        ? `<span class="pill pill-danger">Component discarded. Editing and new actions are blocked.</span>`
-        : `<span class="pill pill-muted">No edit permission for this component.</span>`;
+    if (!state.canEdit) {
+      target.innerHTML = `<span class="pill pill-muted">No edit permission for this component.</span>`;
+      return;
+    }
+
+    if (isDeleted()) {
+      target.innerHTML = `
+        <span class="pill pill-danger">Component discarded. Editing and new actions are blocked until restored.</span>
+        <button id="restoreComponentBtn" class="btn" type="button">Restore / Reactivate</button>
+        ${state.canAdmin ? `<button id="advancedSnapshotBtn" class="btn2" type="button">Advanced Snapshot</button>` : ""}
+      `;
+
+      $("restoreComponentBtn")?.addEventListener("click", openRestoreModal);
+      $("advancedSnapshotBtn")?.addEventListener("click", openRawSnapshotModal);
       return;
     }
 
@@ -1159,6 +1169,64 @@
         handleError(error);
         $("discardSaveBtn").disabled = false;
         $("discardSaveBtn").textContent = "Discard Component";
+      }
+    });
+  }
+
+  function openRestoreModal() {
+    const c = state.component;
+
+    modalShell(
+      "Restore / Reactivate Component",
+      `${c.unique_id} / restore previously discarded component`,
+      `
+        <div class="pla-modal-grid">
+          <label>
+            <span>Restore Date</span>
+            <input id="restoreDate" type="date" value="${esc(todayIso())}" />
+          </label>
+
+          <label>
+            <span>Performed By</span>
+            <input id="restoreBy" placeholder="Name / rank / company" />
+          </label>
+
+          <label class="pla-modal-wide">
+            <span>Restore Reason</span>
+            <textarea id="restoreReason" class="large" placeholder="Required."></textarea>
+          </label>
+        </div>
+      `,
+      `
+        <button id="restoreCancelBtn" class="btn2" type="button">Cancel</button>
+        <button id="restoreSaveBtn" class="btn" type="button">Restore Component</button>
+      `
+    );
+
+    $("restoreCancelBtn").addEventListener("click", closeModal);
+
+    $("restoreSaveBtn").addEventListener("click", async () => {
+      try {
+        const reason = $("restoreReason").value.trim();
+        if (!reason) throw new Error("Restore reason is required.");
+
+        $("restoreSaveBtn").disabled = true;
+        $("restoreSaveBtn").textContent = "Restoring...";
+
+        await rpc("pla_restore_component", {
+          p_component_id: c.id,
+          p_restore_date: isoOrNull($("restoreDate").value),
+          p_restore_reason: reason,
+          p_performed_by: textOrNull($("restoreBy").value)
+        });
+
+        closeModal();
+        await reload();
+        showMsg("ok", "Component restored / reactivated.");
+      } catch (error) {
+        handleError(error);
+        $("restoreSaveBtn").disabled = false;
+        $("restoreSaveBtn").textContent = "Restore Component";
       }
     });
   }
