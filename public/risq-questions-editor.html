@@ -14,24 +14,609 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="./auth.js"></script>
-  <script src="./csvb-module-guard.js?v=20260513_1"></script>
+  <script src="./csvb-module-guard.js?v=20260513_2"></script>
 
   <style>
-    body{margin:0;font-family:var(--font-sans,"Segoe UI",Arial,sans-serif);background:var(--bg-main,#f4f8fc);color:var(--text-main,#10233f);}
-    .topbar{background:linear-gradient(90deg,var(--brand-navy-dark,#031b3f),var(--brand-navy,#062a5e));color:#fff;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;box-shadow:0 8px 24px rgba(3,27,63,.16);}
-    .topbar-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
-    .wrap{width:100%;max-width:none;padding:10px;box-sizing:border-box;}
-    .page-head{background:#fff;border:1px solid #c9d9ec;border-left:6px solid #0097a7;border-radius:14px;padding:12px 14px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;box-shadow:0 8px 22px rgba(3,27,63,.05);}
-    .page-kicker{color:#0097a7;font-size:.78rem;font-weight:950;letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px;}
-    h1{margin:0;color:#062a5e;font-size:1.28rem;line-height:1.2;}
-    .subtitle{color:#52677f;font-weight:700;line-height:1.35;margin-top:4px;}
-    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px;margin-top:10px;}
-    .panel{background:#fff;border:1px solid #c9d9ec;border-radius:14px;padding:14px;box-shadow:0 8px 22px rgba(3,27,63,.05);}
-    .panel-title{color:#062a5e;font-weight:950;margin-bottom:6px;}
-    .btn,.btn2{border-radius:10px;padding:8px 12px;font-weight:900;cursor:pointer;white-space:nowrap;}
-    .btn{background:#062a5e;color:#fff;border:1px solid #062a5e;}
-    .btn2{background:#f2f9fd;color:#062a5e;border:1px solid #a8d8e8;}
-    .warn{display:none;margin:10px;border-radius:12px;padding:10px 12px;color:#8b1d1d;background:#fff4f4;border:1px solid #f1b9b9;font-weight:850;white-space:pre-wrap;}
+    body {
+      margin: 0;
+      font-family: var(--font-sans, "Segoe UI", Arial, sans-serif);
+      background: var(--bg-main, #f4f8fc);
+      color: var(--text-main, #10233f);
+    }
+
+    .topbar {
+      background: linear-gradient(90deg, var(--brand-navy-dark, #031b3f), var(--brand-navy, #062a5e));
+      color: #fff;
+      padding: 10px 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      box-shadow: 0 8px 24px rgba(3,27,63,.16);
+    }
+
+    .topbar-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .wrap {
+      width: 100%;
+      max-width: none;
+      padding: 0 8px 18px;
+      box-sizing: border-box;
+      background: linear-gradient(180deg, #f4f8fc 0%, #eef4fb 100%);
+      min-height: calc(100vh - 70px);
+    }
+
+    .page-head {
+      background: #fff;
+      border: 1px solid #c9d9ec;
+      border-left: 6px solid #0097a7;
+      border-radius: 14px;
+      padding: 12px 14px;
+      margin: 8px 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+      flex-wrap: wrap;
+      box-shadow: 0 8px 22px rgba(3,27,63,.05);
+    }
+
+    .page-kicker {
+      color: #0097a7;
+      font-size: .78rem;
+      font-weight: 950;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+
+    h1 {
+      margin: 0;
+      color: #062a5e;
+      font-size: 1.28rem;
+      line-height: 1.2;
+    }
+
+    .subtitle {
+      color: #52677f;
+      font-weight: 700;
+      line-height: 1.35;
+      margin-top: 4px;
+    }
+
+    .btn,
+    .btn2 {
+      border-radius: 10px;
+      padding: 8px 12px;
+      font-weight: 900;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .btn {
+      background: #062a5e;
+      color: #fff;
+      border: 1px solid #062a5e;
+    }
+
+    .btn2 {
+      background: #f2f9fd;
+      color: #062a5e;
+      border: 1px solid #a8d8e8;
+    }
+
+    .btn:disabled,
+    .btn2:disabled {
+      opacity: .55;
+      cursor: not-allowed;
+    }
+
+    .msg {
+      display: none;
+      position: fixed;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 9999;
+      width: min(650px, calc(100vw - 32px));
+      margin: 0;
+      padding: 14px 18px;
+      border-radius: 14px;
+      box-shadow: 0 22px 70px rgba(3,27,63,.22);
+      line-height: 1.4;
+      font-weight: 850;
+      white-space: pre-wrap;
+    }
+
+    .msg.warn {
+      color: #8b1d1d;
+      background: #fff4f4;
+      border: 1px solid #f1b9b9;
+    }
+
+    .msg.ok {
+      color: #0d5c2c;
+      background: #effaf3;
+      border: 1px solid #b8e6c8;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(145px, 1fr));
+      gap: 8px;
+      margin: 8px 0;
+    }
+
+    .stat-card {
+      background: #fff;
+      border: 1px solid #c9d9ec;
+      border-left: 5px solid #0a4275;
+      border-radius: 12px;
+      padding: 9px 10px;
+      min-height: 66px;
+      box-shadow: 0 8px 22px rgba(3,27,63,.05);
+    }
+
+    .stat-label {
+      color: #3d5677;
+      font-size: .74rem;
+      font-weight: 950;
+      text-transform: uppercase;
+      letter-spacing: .03em;
+      line-height: 1.2;
+    }
+
+    .stat-value {
+      color: #062a5e;
+      font-size: 1.35rem;
+      font-weight: 950;
+      line-height: 1;
+      margin-top: 5px;
+    }
+
+    .stat-help {
+      color: #52677f;
+      font-size: .76rem;
+      font-weight: 700;
+      line-height: 1.2;
+      margin-top: 4px;
+    }
+
+    .filter-panel,
+    .main-grid,
+    .detail-card,
+    .list-card {
+      background: #fff;
+      border: 1px solid #c9d9ec;
+      border-radius: 12px;
+      box-shadow: 0 8px 22px rgba(3,27,63,.05);
+    }
+
+    .filter-panel {
+      position: relative;
+      z-index: 3000;
+      overflow: visible !important;
+      margin-top: 8px;
+      padding: 9px 10px;
+    }
+
+    .filter-grid {
+      display: grid;
+      grid-template-columns: 150px repeat(4, minmax(180px, 1fr)) minmax(260px, 1.2fr) auto;
+      gap: 8px;
+      align-items: end;
+      overflow: visible !important;
+    }
+
+    .filter-title {
+      color: #062a5e;
+      font-weight: 950;
+      align-self: center;
+      padding-left: 4px;
+      padding-right: 10px;
+      text-transform: uppercase;
+      font-size: .82rem;
+      letter-spacing: .04em;
+      border-right: 1px solid #dce8f6;
+      height: 100%;
+      display: flex;
+      align-items: center;
+    }
+
+    label.field {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    label.field span {
+      color: #062a5e;
+      font-weight: 900;
+      font-size: .78rem;
+    }
+
+    input,
+    select {
+      width: 100%;
+      min-height: 36px;
+      box-sizing: border-box;
+      border: 1px solid #bfd5ee;
+      border-radius: 9px;
+      padding: 7px 10px;
+      font-family: inherit;
+      font-size: .88rem;
+      color: #10233f;
+      background: #fff;
+    }
+
+    .main-grid {
+      display: grid;
+      grid-template-columns: minmax(360px, 480px) 1fr;
+      gap: 10px;
+      margin-top: 8px;
+      padding: 10px;
+      align-items: start;
+      position: relative;
+      z-index: 1;
+    }
+
+    .list-card,
+    .detail-card {
+      overflow: hidden;
+    }
+
+    .list-head,
+    .detail-head {
+      padding: 10px;
+      border-bottom: 1px solid #dce8f6;
+      background: linear-gradient(180deg, #ffffff, #f8fbff);
+    }
+
+    .section-title {
+      color: #062a5e;
+      font-weight: 950;
+      font-size: 1rem;
+    }
+
+    .section-meta {
+      color: #52677f;
+      font-size: .8rem;
+      font-weight: 700;
+      margin-top: 3px;
+    }
+
+    .q-list {
+      max-height: calc(100vh - 365px);
+      overflow: auto;
+      padding: 8px;
+      min-height: 360px;
+    }
+
+    .q-item {
+      border: 1px solid #dce8f6;
+      border-radius: 12px;
+      padding: 8px 9px;
+      margin-bottom: 7px;
+      background: #fff;
+      cursor: pointer;
+    }
+
+    .q-item:hover {
+      border-color: #a8d8e8;
+      background: #f8fbff;
+    }
+
+    .q-item.active {
+      border-color: #062a5e;
+      box-shadow: inset 0 0 0 2px rgba(6, 42, 94, .15);
+      background: #f2f8ff;
+    }
+
+    .q-no {
+      color: #062a5e;
+      font-weight: 950;
+      font-size: .88rem;
+    }
+
+    .q-sub {
+      color: #10233f;
+      font-size: .82rem;
+      font-weight: 700;
+      line-height: 1.3;
+      margin-top: 4px;
+    }
+
+    .q-mini {
+      color: #52677f;
+      font-size: .74rem;
+      font-weight: 700;
+      margin-top: 4px;
+    }
+
+    .detail-body {
+      padding: 12px;
+      max-height: calc(100vh - 325px);
+      overflow: auto;
+      min-height: 500px;
+    }
+
+    .detail-number {
+      color: #062a5e;
+      font-size: 1.22rem;
+      font-weight: 950;
+    }
+
+    .detail-question {
+      margin-top: 10px;
+      color: #000;
+      font-size: 1rem;
+      font-weight: 850;
+      line-height: 1.45;
+      white-space: pre-wrap;
+    }
+
+    .pill-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 8px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      min-height: 22px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: .72rem;
+      font-weight: 950;
+      white-space: nowrap;
+      border: 1px solid #b7d4ee;
+      background: #eef7ff;
+      color: #062a5e;
+    }
+
+    .pill-muted {
+      border-color: #d6dbe5;
+      background: #f4f6f9;
+      color: #52677f;
+    }
+
+    .pill-warn {
+      border-color: #f6d58f;
+      background: #fff6e0;
+      color: #8a5a00;
+    }
+
+    .pill-danger {
+      border-color: #f1b9b9;
+      background: #fff1f1;
+      color: #9b1c1c;
+    }
+
+    .info-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(180px, 1fr));
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .info-box {
+      border: 1px solid #dce8f6;
+      border-radius: 12px;
+      padding: 8px;
+      background: #fbfdff;
+    }
+
+    .info-label {
+      color: #52677f;
+      font-size: .72rem;
+      font-weight: 950;
+      text-transform: uppercase;
+      letter-spacing: .03em;
+    }
+
+    .info-value {
+      color: #10233f;
+      font-weight: 800;
+      margin-top: 3px;
+      line-height: 1.3;
+      white-space: pre-wrap;
+    }
+
+    .content-section {
+      margin-top: 12px;
+      border: 1px solid #dce8f6;
+      border-radius: 12px;
+      background: #fff;
+      overflow: hidden;
+    }
+
+    .content-section-title {
+      padding: 9px 10px;
+      background: #eaf4fb;
+      color: #062a5e;
+      font-weight: 950;
+      border-bottom: 1px solid #dce8f6;
+    }
+
+    .content-section-body {
+      padding: 10px;
+      color: #000;
+      line-height: 1.45;
+      white-space: pre-wrap;
+      font-size: .92rem;
+    }
+
+    .empty {
+      padding: 18px;
+      color: #52677f;
+      font-weight: 800;
+      text-align: center;
+    }
+
+    /* C.S.V. BEACON checkbox dropdown standard */
+    .csvb-checkdrop {
+      position: relative;
+      z-index: 3100;
+      width: 100%;
+    }
+
+    .csvb-checkdrop.open {
+      z-index: 9000;
+    }
+
+    .csvb-checkdrop-button {
+      width: 100%;
+      min-height: 36px;
+      border: 1px solid #bfd5ee;
+      background: #fff;
+      color: #10233f;
+      border-radius: 9px;
+      padding: 7px 32px 7px 10px;
+      text-align: left;
+      font-family: inherit;
+      font-size: .88rem;
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+
+    .csvb-checkdrop-button::after {
+      content: "▾";
+      position: absolute;
+      right: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #062a5e;
+      font-weight: 950;
+    }
+
+    .csvb-checkdrop.open .csvb-checkdrop-button {
+      border-color: #0097a7;
+      box-shadow: 0 0 0 3px rgba(0,151,167,.16);
+    }
+
+    .csvb-checkdrop-panel {
+      display: none;
+      position: absolute;
+      z-index: 99999 !important;
+      top: calc(100% + 5px);
+      left: 0;
+      min-width: 100%;
+      width: max(100%, 320px);
+      max-width: 460px;
+      background: #fff;
+      border: 1px solid #bfd5ee;
+      border-radius: 12px;
+      box-shadow: 0 18px 46px rgba(3,27,63,.20);
+      padding: 8px;
+    }
+
+    .csvb-checkdrop.open .csvb-checkdrop-panel {
+      display: block;
+    }
+
+    .csvb-checkdrop-search {
+      width: 100%;
+      min-height: 34px;
+      border: 1px solid #d4e2f2;
+      border-radius: 9px;
+      padding: 7px 9px;
+      margin-bottom: 7px;
+      box-sizing: border-box;
+    }
+
+    .csvb-checkdrop-actions {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 7px;
+    }
+
+    .csvb-checkdrop-actions button {
+      border: 1px solid #a8d8e8;
+      background: #f2f9fd;
+      color: #062a5e;
+      border-radius: 8px;
+      padding: 5px 8px;
+      font-size: .76rem;
+      font-weight: 900;
+      cursor: pointer;
+    }
+
+    .csvb-checkdrop-list {
+      max-height: 260px;
+      overflow: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .csvb-checkdrop-option {
+      display: grid;
+      grid-template-columns: 18px 1fr;
+      gap: 8px;
+      align-items: center;
+      padding: 6px 7px;
+      border-radius: 8px;
+      cursor: pointer;
+      color: #10233f;
+      font-weight: 750;
+      font-size: .84rem;
+      line-height: 1.25;
+    }
+
+    .csvb-checkdrop-option:hover {
+      background: #f4f8fc;
+    }
+
+    .csvb-checkdrop-option input {
+      width: 15px;
+      height: 15px;
+      min-height: unset;
+      padding: 0;
+      margin: 0;
+    }
+
+    @media (max-width: 1200px) {
+      .stats-grid {
+        grid-template-columns: repeat(3, minmax(145px, 1fr));
+      }
+
+      .filter-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .filter-title {
+        grid-column: 1 / -1;
+        border-right: none;
+      }
+
+      .main-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .detail-body,
+      .q-list {
+        max-height: none;
+      }
+    }
+
+    @media (max-width: 760px) {
+      .stats-grid,
+      .filter-grid,
+      .info-grid {
+        grid-template-columns: 1fr;
+      }
+    }
   </style>
 </head>
 
@@ -55,57 +640,131 @@
   </div>
 
   <main class="wrap">
-    <div id="warnBox" class="warn"></div>
+    <div id="warnBox" class="msg warn"></div>
+    <div id="okBox" class="msg ok"></div>
 
     <section class="page-head">
       <div>
         <div class="page-kicker">Inspection Libraries & Vetting</div>
         <h1>RISQ Questions Editor</h1>
         <div class="subtitle">
-          Separate RightShip RISQ 3.2 question library. SIRE 2.0 data and structure remain untouched.
+          RightShip RISQ 3.2 question library. Separate from SIRE 2.0.
         </div>
+      </div>
+
+      <div class="topbar-actions">
+        <button id="reloadBtn" class="btn2" type="button">↻ Reload</button>
+        <button id="exportBtn" class="btn2" type="button">Export CSV</button>
       </div>
     </section>
 
-    <section class="grid">
-      <div class="panel">
-        <div class="panel-title">Current Status</div>
-        <div class="subtitle">Module shell is active. RISQ extraction preview and RISQ-specific database tables will be created next.</div>
+    <section class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-label">Visible Records</div>
+        <div id="statVisible" class="stat-value">0</div>
+        <div class="stat-help">Current filtered records.</div>
       </div>
 
-      <div class="panel">
-        <div class="panel-title">RISQ Design Rule</div>
-        <div class="subtitle">RISQ 3.2 will use its own data structure, numbering, Guide to Inspection field, response model and eSMS mapping fields.</div>
+      <div class="stat-card">
+        <div class="stat-label">Active Questions</div>
+        <div id="statActive" class="stat-value">0</div>
+        <div class="stat-help">Operational active questions.</div>
       </div>
 
-      <div class="panel">
-        <div class="panel-title">Next Phase</div>
-        <div class="subtitle">RISQ-02 will extract the PDF into a local preview file before any database import.</div>
+      <div class="stat-card">
+        <div class="stat-label">Removed Questions</div>
+        <div id="statRemoved" class="stat-value">0</div>
+        <div class="stat-help">Officially removed items retained for numbering.</div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-label">Sections</div>
+        <div id="statSections" class="stat-value">0</div>
+        <div class="stat-help">Detected RISQ sections.</div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-label">Without Guide</div>
+        <div id="statNoGuide" class="stat-value">0</div>
+        <div class="stat-help">Active questions with no Guide to Inspection.</div>
+      </div>
+
+      <div class="stat-card">
+        <div class="stat-label">Inferred Answers</div>
+        <div id="statInferred" class="stat-value">0</div>
+        <div class="stat-help">Answer options inferred from RISQ rules.</div>
+      </div>
+    </section>
+
+    <section class="filter-panel">
+      <div class="filter-grid">
+        <div class="filter-title">Filter Controls</div>
+
+        <label class="field">
+          <span>Section</span>
+          <select id="filterSection" multiple data-csvb-checkdrop data-csvb-checkdrop-label="Sections"></select>
+        </label>
+
+        <label class="field">
+          <span>Status</span>
+          <select id="filterStatus" multiple data-csvb-checkdrop data-csvb-checkdrop-label="Statuses">
+            <option value="active">Active</option>
+            <option value="removed">Removed</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span>Inspection Marker</span>
+          <select id="filterMarker" multiple data-csvb-checkdrop data-csvb-checkdrop-label="Markers">
+            <option value="M">M</option>
+            <option value="V">V</option>
+            <option value="V & M">V & M</option>
+            <option value="blank">Blank</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span>Guide Status</span>
+          <select id="filterGuide" multiple data-csvb-checkdrop data-csvb-checkdrop-label="Guide Statuses">
+            <option value="provided">Provided</option>
+            <option value="not_provided">Not Provided</option>
+            <option value="removed">Removed</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span>Search</span>
+          <input id="searchInput" placeholder="Question no, text, guide, eSMS refs, forms, remarks..." />
+        </label>
+
+        <button id="clearFiltersBtn" class="btn2" type="button">Clear</button>
+      </div>
+    </section>
+
+    <section class="main-grid">
+      <div class="list-card">
+        <div class="list-head">
+          <div class="section-title">RISQ Question List</div>
+          <div id="listMeta" class="section-meta">Loading...</div>
+        </div>
+        <div id="questionList" class="q-list">
+          <div class="empty">Loading RISQ questions...</div>
+        </div>
+      </div>
+
+      <div class="detail-card">
+        <div class="detail-head">
+          <div class="section-title">Question Detail</div>
+          <div id="detailMeta" class="section-meta">Select a question.</div>
+        </div>
+        <div id="detailBody" class="detail-body">
+          <div class="empty">Select a RISQ question from the list.</div>
+        </div>
       </div>
     </section>
   </main>
 
-  <script>
-    (async () => {
-      const bundle = await AUTH.setupAuthButtons({
-        badgeId: "userBadge",
-        loginBtnId: "loginBtn",
-        logoutBtnId: "logoutBtn",
-        switchBtnId: "switchUserBtn"
-      });
-
-      if (!bundle?.session?.user) {
-        const w = document.getElementById("warnBox");
-        w.textContent = "You are logged out. Please login.";
-        w.style.display = "block";
-      }
-
-      window.CSVB_RISQ_QEDITOR_PLACEHOLDER_BUILD = "RISQ-QEDITOR-PLACEHOLDER-20260513-1";
-    })().catch((error) => {
-      const w = document.getElementById("warnBox");
-      w.textContent = String(error?.message || error);
-      w.style.display = "block";
-    });
-  </script>
+  <script src="./csvb-checkbox-dropdown-filters.js?v=20260513_1"></script>
+  <script src="./risq-questions-editor.js?v=20260513_1"></script>
 </body>
 </html>
