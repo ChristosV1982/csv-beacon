@@ -5,7 +5,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "PA6C-2026-05-12-MARINE-MODULES-STABLE";
+  const BUILD = "PA6D-2026-05-13-INSPECTION-LIBRARIES-VETTING";
   const SELECTED_KEY = "csvb_dashboard_selected_platform_area_v6";
 
   /*
@@ -34,10 +34,10 @@
 
     {
       key: "sire_inspections",
-      title: "SIRE Inspections",
+      title: "Inspection Libraries & Vetting",
       icon: "🛳️",
       description:
-        "SIRE 2.0 library, pre-inspection/self-assessment, post-inspection, inspection statistics, inspector intelligence, reports and related discussion threads.",
+        "Question libraries, vetting inspection preparation, post-inspection handling, statistics, inspector intelligence, reporting and related discussion threads.",
       cards: [
         "library",
         "company",
@@ -51,9 +51,10 @@
         "reports",
         "inspector",
         "qeditor",
+        "risq_questions_editor",
         "threads",
       ],
-      placeholder: "No SIRE Inspection modules are currently available to this user.",
+      placeholder: "No Inspection Libraries & Vetting modules are currently available to this user.",
     },
 
     {

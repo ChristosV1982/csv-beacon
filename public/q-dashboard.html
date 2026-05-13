@@ -232,10 +232,19 @@
 
       <!-- Questions Editor (role-based) -->
       <div class="card" data-card="qeditor">
-        <div class="title">Questions Editor</div>
-        <div class="muted">Edit or review the question library (as permitted by your role).</div>
+        <div class="title">SIRE Questions Editor</div>
+        <div class="muted">Edit or review the SIRE 2.0 question library, PGNOs and Expected Evidence.</div>
         <div style="margin-top:12px;">
           <button class="btn2" type="button" onclick="location.href='./q-questions-editor.html'">Open</button>
+        </div>
+      </div>
+
+
+      <div class="card" data-card="risq_questions_editor">
+        <div class="title">RISQ Questions Editor</div>
+        <div class="muted">Separate RightShip RISQ 3.2 question library for dry cargo / bulk carrier vetting.</div>
+        <div style="margin-top:12px;">
+          <button class="btn2" type="button" onclick="location.href='./risq-questions-editor.html'">Open</button>
         </div>
       </div>
 
@@ -300,6 +309,7 @@
       reports: "fleet_reports",
       inspector: "sire_2_vetting",
       qeditor: "questions_editor",
+      risq_questions_editor: "risq_questions_editor",
       threads: "threads",
       company_policy: "company_policy",
       mooring_anchoring_inventories: "mooring_anchoring_inventories",
@@ -495,6 +505,7 @@
           "reports",
           "inspector",
           "qeditor",
+          "risq_questions_editor",
           "threads",
           "company_policy",
           "mooring_anchoring_inventories",
@@ -514,6 +525,7 @@
         setVisible("reports", false, moduleAccess);
         setVisible("inspector", false, moduleAccess);
         setVisible("qeditor", false, moduleAccess);
+        setVisible("risq_questions_editor", false, moduleAccess);
         setVisible("threads", true, moduleAccess);
         setVisible("company_policy", true, moduleAccess);
         setVisible("mooring_anchoring_inventories", true, moduleAccess);
@@ -533,6 +545,7 @@
           "reports",
           "inspector",
           "qeditor",
+          "risq_questions_editor",
           "threads",
           "company_policy",
           "mooring_anchoring_inventories",
@@ -552,6 +565,7 @@
         setVisible("reports", true, moduleAccess);
         setVisible("inspector", true, moduleAccess);
         setVisible("qeditor", true, moduleAccess);
+        setVisible("risq_questions_editor", true, moduleAccess);
         setVisible("threads", true, moduleAccess);
         setVisible("company_policy", true, moduleAccess);
         setVisible("mooring_anchoring_inventories", true, moduleAccess);
@@ -567,6 +581,7 @@
         setVisible("inspector_intelligence", false, moduleAccess);
         setVisible("audit_observations", false, moduleAccess);
         setVisible("qeditor", false, moduleAccess);
+        setVisible("risq_questions_editor", false, moduleAccess);
         setVisible("company_policy", true, moduleAccess);
         setVisible("portable_lifting_appliances_wires", false, moduleAccess);
         setVisible("suadmin", false, moduleAccess);

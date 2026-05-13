@@ -1,0 +1,111 @@
+<!-- public/risq-questions-editor.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>C.S.V. BEACON – RISQ Questions Editor</title>
+
+  <link rel="stylesheet" href="./csv-beacon-theme.css?v=20260428_3" />
+  <link rel="stylesheet" href="./style.css?v=20260428_3" />
+  <link rel="stylesheet" href="./csvb-ui-polish.css?v=20260430_1" />
+  <link rel="stylesheet" href="./csvb-100pct-fit.css?v=20260430_1" />
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="./auth.js"></script>
+  <script src="./csvb-module-guard.js?v=20260513_1"></script>
+
+  <style>
+    body{margin:0;font-family:var(--font-sans,"Segoe UI",Arial,sans-serif);background:var(--bg-main,#f4f8fc);color:var(--text-main,#10233f);}
+    .topbar{background:linear-gradient(90deg,var(--brand-navy-dark,#031b3f),var(--brand-navy,#062a5e));color:#fff;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;box-shadow:0 8px 24px rgba(3,27,63,.16);}
+    .topbar-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+    .wrap{width:100%;max-width:none;padding:10px;box-sizing:border-box;}
+    .page-head{background:#fff;border:1px solid #c9d9ec;border-left:6px solid #0097a7;border-radius:14px;padding:12px 14px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;box-shadow:0 8px 22px rgba(3,27,63,.05);}
+    .page-kicker{color:#0097a7;font-size:.78rem;font-weight:950;letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px;}
+    h1{margin:0;color:#062a5e;font-size:1.28rem;line-height:1.2;}
+    .subtitle{color:#52677f;font-weight:700;line-height:1.35;margin-top:4px;}
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px;margin-top:10px;}
+    .panel{background:#fff;border:1px solid #c9d9ec;border-radius:14px;padding:14px;box-shadow:0 8px 22px rgba(3,27,63,.05);}
+    .panel-title{color:#062a5e;font-weight:950;margin-bottom:6px;}
+    .btn,.btn2{border-radius:10px;padding:8px 12px;font-weight:900;cursor:pointer;white-space:nowrap;}
+    .btn{background:#062a5e;color:#fff;border:1px solid #062a5e;}
+    .btn2{background:#f2f9fd;color:#062a5e;border:1px solid #a8d8e8;}
+    .warn{display:none;margin:10px;border-radius:12px;padding:10px 12px;color:#8b1d1d;background:#fff4f4;border:1px solid #f1b9b9;font-weight:850;white-space:pre-wrap;}
+  </style>
+</head>
+
+<body>
+  <div class="topbar">
+    <div class="csvb-brand">
+      <img class="csvb-brand-logo" src="./assets/csv-beacon-icon.png" alt="C.S.V. BEACON logo" />
+      <div class="csvb-brand-text">
+        <div class="csvb-brand-title">C.S.V. BEACON</div>
+        <div class="csvb-brand-subtitle">Marine Assurance & Compliance Platform</div>
+      </div>
+    </div>
+
+    <div class="topbar-actions">
+      <div id="userBadge" class="user-badge"></div>
+      <button class="btn2" id="loginBtn" type="button" style="display:none;">Login</button>
+      <button class="btn2" id="switchUserBtn" type="button">Switch User</button>
+      <button class="btn" id="logoutBtn" type="button" style="display:none;">Logout</button>
+      <button class="btn2" type="button" onclick="location.href='./q-dashboard.html'">Dashboard</button>
+    </div>
+  </div>
+
+  <main class="wrap">
+    <div id="warnBox" class="warn"></div>
+
+    <section class="page-head">
+      <div>
+        <div class="page-kicker">Inspection Libraries & Vetting</div>
+        <h1>RISQ Questions Editor</h1>
+        <div class="subtitle">
+          Separate RightShip RISQ 3.2 question library. SIRE 2.0 data and structure remain untouched.
+        </div>
+      </div>
+    </section>
+
+    <section class="grid">
+      <div class="panel">
+        <div class="panel-title">Current Status</div>
+        <div class="subtitle">Module shell is active. RISQ extraction preview and RISQ-specific database tables will be created next.</div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">RISQ Design Rule</div>
+        <div class="subtitle">RISQ 3.2 will use its own data structure, numbering, Guide to Inspection field, response model and eSMS mapping fields.</div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">Next Phase</div>
+        <div class="subtitle">RISQ-02 will extract the PDF into a local preview file before any database import.</div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    (async () => {
+      const bundle = await AUTH.setupAuthButtons({
+        badgeId: "userBadge",
+        loginBtnId: "loginBtn",
+        logoutBtnId: "logoutBtn",
+        switchBtnId: "switchUserBtn"
+      });
+
+      if (!bundle?.session?.user) {
+        const w = document.getElementById("warnBox");
+        w.textContent = "You are logged out. Please login.";
+        w.style.display = "block";
+      }
+
+      window.CSVB_RISQ_QEDITOR_PLACEHOLDER_BUILD = "RISQ-QEDITOR-PLACEHOLDER-20260513-1";
+    })().catch((error) => {
+      const w = document.getElementById("warnBox");
+      w.textContent = String(error?.message || error);
+      w.style.display = "block";
+    });
+  </script>
+</body>
+</html>

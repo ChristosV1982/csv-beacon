@@ -5,7 +5,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "PLA03B-2026-05-12-MODULE-GUARD";
+  const BUILD = "IV01-2026-05-13-RISQ-QEDITOR-GUARD";
 
   const CSVB_COMPANY_VIEW_ID_KEY = "csvb_superuser_company_view_id";
   const CSVB_COMPANY_VIEW_NAME_KEY = "csvb_superuser_company_view_name";
@@ -40,6 +40,7 @@
     "q-inspector.html": "sire_2_vetting",
 
     "q-questions-editor.html": "questions_editor",
+    "risq-questions-editor.html": "risq_questions_editor",
     "q-company-overrides.html": "questions_editor",
 
     "threads.html": "threads",
@@ -136,6 +137,7 @@
       fleet_reports: "REPORTS",
       sire_2_vetting: "INSPECTOR_THIRD_PARTY",
       questions_editor: "QUESTIONS_EDITOR",
+      risq_questions_editor: "RISQ_QUESTIONS_EDITOR",
       threads: "THREADS",
       company_policy: "COMPANY_POLICY",
       mooring_anchoring_inventories: "MOORING_ANCHORING_INVENTORIES",

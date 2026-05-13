@@ -5,7 +5,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "PA7E-2026-05-12-MARINE-HOME-STABLE";
+  const BUILD = "PA7F-2026-05-13-INSPECTION-LIBRARIES-VETTING";
 
   const AREA_HOME = {
     company_policy: {
@@ -29,12 +29,12 @@
     },
 
     sire_inspections: {
-      title: "SIRE Inspections Home",
+      title: "Inspection Libraries & Vetting Home",
       text:
-        "SIRE 2.0 preparation, self-assessment, post-inspection handling, inspector intelligence, reporting and related discussions.",
+        "Question libraries, vetting inspection preparation, post-inspection handling, inspector intelligence, reporting and related discussions.",
       groups: [
         {
-          title: "Question library and preparation",
+          title: "Inspection question libraries and preparation",
           items: [
             {
               label: "Read-Only Library",
@@ -44,11 +44,18 @@
               icon: "📚",
             },
             {
-              label: "Questions Editor",
-              text: "Question library, PGNOs and expected evidence management.",
+              label: "SIRE Questions Editor",
+              text: "SIRE 2.0 question library, PGNOs and expected evidence management.",
               href: "./q-questions-editor.html",
               cardKey: "qeditor",
               icon: "🖊️",
+            },
+            {
+              label: "RISQ Questions Editor",
+              text: "RightShip RISQ 3.2 question library for dry cargo / bulk carrier vetting.",
+              href: "./risq-questions-editor.html",
+              cardKey: "risq_questions_editor",
+              icon: "📙",
             },
           ],
         },
