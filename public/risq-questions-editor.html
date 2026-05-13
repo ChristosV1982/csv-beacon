@@ -706,10 +706,19 @@
         </label>
 
         <label class="field">
+          <span>Origin</span>
+          <select id="filterOrigin" multiple data-csvb-checkdrop data-csvb-checkdrop-label="Origins">
+            <option value="standard">Standard RISQ</option>
+            <option value="company_specific">Company-specific Questions</option>
+          </select>
+        </label>
+
+        <label class="field">
           <span>Status</span>
           <select id="filterStatus" multiple data-csvb-checkdrop data-csvb-checkdrop-label="Statuses">
             <option value="active">Active</option>
             <option value="removed">Removed</option>
+            <option value="deleted">Deleted</option>
           </select>
         </label>
 

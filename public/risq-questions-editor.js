@@ -4,7 +4,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "RISQ-QEDITOR-EDIT-07B-20260513-1";
+  const BUILD = "RISQ-QEDITOR-DELETE-07C-20260513-1";
 
   const state = {
     sb: null,
@@ -27,7 +27,7 @@
     [
       "warnBox", "okBox", "reloadBtn", "exportBtn",
       "statVisible", "statActive", "statRemoved", "statSections", "statNoGuide", "statInferred",
-      "filterSection", "filterStatus", "filterMarker", "filterGuide", "searchInput", "clearFiltersBtn",
+      "filterSection", "filterOrigin", "filterStatus", "filterMarker", "filterGuide", "searchInput", "clearFiltersBtn",
       "listMeta", "questionList", "detailMeta", "detailBody"
     ].forEach((id) => {
       el[id] = $(id);
@@ -89,6 +89,7 @@
   }
 
   function statusKey(row) {
+    if (row.is_deleted === true || row.deleted_at) return "deleted";
     return row.is_removed_question ? "removed" : "active";
   }
 
@@ -173,12 +174,14 @@
 
   function rowMatches(row) {
     const sections = selectedMultiValues("filterSection");
+    const origins = selectedMultiValues("filterOrigin");
     const statuses = selectedMultiValues("filterStatus");
     const markers = selectedMultiValues("filterMarker");
     const guides = selectedMultiValues("filterGuide");
     const q = norm(el.searchInput.value);
 
     if (sections.size && !sections.has(row.section_code)) return false;
+    if (origins.size && !origins.has(row.question_origin || "standard")) return false;
     if (statuses.size && !statuses.has(statusKey(row))) return false;
     if (markers.size && !markers.has(markerKey(row))) return false;
     if (guides.size && !guides.has(row.guide_status || "provided")) return false;
@@ -224,7 +227,7 @@
     const all = state.rows;
 
     el.statVisible.textContent = String(rows.length);
-    el.statActive.textContent = String(all.filter((r) => !r.is_removed_question && r.is_active !== false).length);
+    el.statActive.textContent = String(all.filter((r) => !r.is_removed_question && r.is_active !== false && !r.is_deleted && !r.deleted_at).length);
     el.statRemoved.textContent = String(all.filter((r) => r.is_removed_question).length);
     el.statSections.textContent = String(new Set(all.map((r) => r.section_code)).size);
     el.statNoGuide.textContent = String(all.filter((r) => !r.is_removed_question && r.guide_status === "not_provided").length);
@@ -249,6 +252,7 @@
     el.questionList.innerHTML = rows.map((row) => {
       const active = row.id === state.selectedId ? " active" : "";
       const removed = row.is_removed_question ? `<span class="pill pill-danger">Removed</span>` : "";
+      const deleted = row.is_deleted || row.deleted_at ? `<span class="pill pill-danger">Deleted</span>` : "";
       const noGuide = !row.is_removed_question && row.guide_status === "not_provided" ? `<span class="pill pill-warn">No Guide</span>` : "";
       const inferred = row.answer_options_inferred ? `<span class="pill pill-warn">Inferred Answers</span>` : "";
       const companySpecific = row.question_origin === "company_specific" ? `<span class="pill">Company</span>` : "";
@@ -258,7 +262,7 @@
           <div class="q-no">${esc(row.internal_question_no)} <span class="q-mini">(printed ${esc(row.printed_question_no)})</span></div>
           <div class="q-sub">${esc(row.question_text || "—")}</div>
           <div class="q-mini">${esc(row.section_code)} / ${esc(row.section_title)} / Marker: ${esc(displayMarker(row))}</div>
-          <div class="pill-row">${companySpecific}${removed}${noGuide}${inferred}</div>
+          <div class="pill-row">${companySpecific}${removed}${deleted}${noGuide}${inferred}</div>
         </div>
       `;
     }).join("");
@@ -300,6 +304,10 @@
       ? `<span class="pill">Company-specific</span>`
       : `<span class="pill pill-muted">Standard RISQ</span>`;
 
+    const deletedPill = row.is_deleted || row.deleted_at
+      ? `<span class="pill pill-danger">Deleted</span>`
+      : "";
+
     const guideText = row.guide_to_inspection
       ? esc(row.guide_to_inspection)
       : row.is_removed_question
@@ -315,6 +323,7 @@
     }
     if (row.can_edit_company_question) {
       buttons.push(`<button class="btn2" type="button" id="editCompanyQuestionBtn">Edit Company Question</button>`);
+      buttons.push(`<button class="btn2" type="button" id="deleteCompanyQuestionBtn">Delete Company Question</button>`);
     }
 
     el.detailBody.innerHTML = `
@@ -328,6 +337,7 @@
 
       <div class="pill-row">
         ${originPill}
+        ${deletedPill}
         ${removedPill}
         ${guidePill}
         ${inferredPill}
@@ -393,6 +403,7 @@
     $("editMappingBtn")?.addEventListener("click", () => openMappingModal(row));
     $("editStandardQuestionBtn")?.addEventListener("click", () => openStandardQuestionModal(row));
     $("editCompanyQuestionBtn")?.addEventListener("click", () => openCompanyQuestionEditModal(row));
+    $("deleteCompanyQuestionBtn")?.addEventListener("click", () => openCompanyQuestionDeleteModal(row));
   }
 
   function renderAll() {
@@ -416,6 +427,7 @@
 
   function clearFilters() {
     clearMultiSelect(el.filterSection);
+    clearMultiSelect(el.filterOrigin);
     clearMultiSelect(el.filterStatus);
     clearMultiSelect(el.filterMarker);
     clearMultiSelect(el.filterGuide);
@@ -434,6 +446,8 @@
       "Printed Question No",
       "Origin",
       "Company",
+      "Deleted",
+      "Delete Reason",
       "Section Code",
       "Section Title",
       "Question Text",
@@ -458,6 +472,8 @@
         row.printed_question_no,
         row.question_origin,
         row.company_name,
+        row.is_deleted || row.deleted_at ? "Yes" : "No",
+        row.delete_reason,
         row.section_code,
         row.section_title,
         row.question_text,
@@ -493,7 +509,7 @@
     el.exportBtn.addEventListener("click", exportCsv);
     el.clearFiltersBtn.addEventListener("click", clearFilters);
 
-    [el.filterSection, el.filterStatus, el.filterMarker, el.filterGuide].forEach((select) => {
+    [el.filterSection, el.filterOrigin, el.filterStatus, el.filterMarker, el.filterGuide].forEach((select) => {
       select.addEventListener("change", renderAll);
     });
 
@@ -1046,6 +1062,59 @@
         handleError(error);
         $("cmpSaveBtn").disabled = false;
         $("cmpSaveBtn").textContent = "Save Company Question";
+      }
+    });
+  }
+
+  function openCompanyQuestionDeleteModal(row) {
+    modalShell(
+      "Delete Company-Specific RISQ Question",
+      `${row.internal_question_no} / Soft-delete with audit log`,
+      `
+        <div class="risq-modal-grid">
+          <div class="risq-modal-wide">
+            <div class="content-section">
+              <div class="content-section-title">Question to delete</div>
+              <div class="content-section-body">${esc(row.question_text || "—")}</div>
+            </div>
+          </div>
+
+          <label class="risq-modal-wide">
+            <span>Delete Reason / Audit Note</span>
+            <textarea id="deleteReason" placeholder="Required. Example: Test question created during setup."></textarea>
+          </label>
+        </div>
+      `,
+      `
+        <button id="deleteCancelBtn" class="btn2" type="button">Cancel</button>
+        <button id="deleteConfirmBtn" class="btn" type="button">Delete Company Question</button>
+      `
+    );
+
+    $("deleteCancelBtn").addEventListener("click", closeModal);
+
+    $("deleteConfirmBtn").addEventListener("click", async () => {
+      try {
+        const reason = $("deleteReason").value.trim();
+        if (!reason) throw new Error("Delete Reason is required.");
+
+        $("deleteConfirmBtn").disabled = true;
+        $("deleteConfirmBtn").textContent = "Deleting...";
+
+        await rpc("risq_soft_delete_company_question", {
+          p_question_id: row.id,
+          p_delete_reason: reason
+        });
+
+        closeModal();
+        await reload();
+        state.selectedId = row.id;
+        renderAll();
+        showMsg("ok", "Company-specific RISQ question deleted.");
+      } catch (error) {
+        handleError(error);
+        $("deleteConfirmBtn").disabled = false;
+        $("deleteConfirmBtn").textContent = "Delete Company Question";
       }
     });
   }
