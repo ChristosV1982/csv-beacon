@@ -1,0 +1,32 @@
+{
+  "generated_at": "2026-05-13T09:09:14.983Z",
+  "input": "./data/risq-v32-preview.json",
+  "output_dir": "./data/risq-import-sql-chunks",
+  "max_payload_chars": 140000,
+  "sections": 26,
+  "header_fields": 33,
+  "questions": 564,
+  "active_questions": 519,
+  "removed_questions": 45,
+  "question_chunks": 15,
+  "files": [
+    "00_sections_and_header_fields.sql",
+    "q01_questions.sql",
+    "q02_questions.sql",
+    "q03_questions.sql",
+    "q04_questions.sql",
+    "q05_questions.sql",
+    "q06_questions.sql",
+    "q07_questions.sql",
+    "q08_questions.sql",
+    "q09_questions.sql",
+    "q10_questions.sql",
+    "q11_questions.sql",
+    "q12_questions.sql",
+    "q13_questions.sql",
+    "q14_questions.sql",
+    "q15_questions.sql",
+    "98_global_mappings.sql",
+    "99_verify.sql"
+  ]
+}
