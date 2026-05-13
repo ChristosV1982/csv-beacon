@@ -5,7 +5,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "PA6D-2026-05-13-INSPECTION-LIBRARIES-VETTING";
+  const BUILD = "PA6E-2026-05-13-INSPECTION-LIBRARIES-KEY";
   const SELECTED_KEY = "csvb_dashboard_selected_platform_area_v6";
 
   /*
@@ -33,7 +33,7 @@
     },
 
     {
-      key: "sire_inspections",
+      key: "inspection_libraries_vetting",
       title: "Inspection Libraries & Vetting",
       icon: "🛳️",
       description:
@@ -202,9 +202,22 @@
     }, 0);
   }
 
+  function normalizeAreaKey(key) {
+    const raw = String(key || "");
+    if (raw === "sire_inspections") return "inspection_libraries_vetting";
+    return raw;
+  }
+
   function loadSelectedKey() {
     try {
-      return localStorage.getItem(SELECTED_KEY) || "";
+      const raw = localStorage.getItem(SELECTED_KEY) || "";
+      const normalized = normalizeAreaKey(raw);
+
+      if (raw && normalized !== raw) {
+        localStorage.setItem(SELECTED_KEY, normalized);
+      }
+
+      return normalized;
     } catch (_) {
       return "";
     }
@@ -212,7 +225,7 @@
 
   function saveSelectedKey(key) {
     try {
-      localStorage.setItem(SELECTED_KEY, key || "");
+      localStorage.setItem(SELECTED_KEY, normalizeAreaKey(key) || "");
     } catch (_) {}
   }
 

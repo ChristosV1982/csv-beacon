@@ -5,7 +5,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "PA7F-2026-05-13-INSPECTION-LIBRARIES-VETTING";
+  const BUILD = "PA7G-2026-05-13-INSPECTION-LIBRARIES-KEY";
 
   const AREA_HOME = {
     company_policy: {
@@ -28,7 +28,7 @@
       ],
     },
 
-    sire_inspections: {
+    inspection_libraries_vetting: {
       title: "Inspection Libraries & Vetting Home",
       text:
         "Question libraries, vetting inspection preparation, post-inspection handling, inspector intelligence, reporting and related discussions.",
