@@ -61,6 +61,7 @@ function refineReferenceTitle(text) {
     .replace("Classification societies – what why and how?", "Classification societies – what, why and how?")
     .replace("Classification societies - what why and how?", "Classification societies - what, why and how?")
     .replace(/^IMO:\s*MSC\.\/Circ\.1598/i, "IMO: MSC.1/Circ.1598")
+    .replace(/\s+’/g, "’")
     .replace(/Seafarers\s+’/g, "Seafarers’")
     .replace(/Ships\s+’/g, "Ships’");
 
@@ -123,19 +124,19 @@ function looksLikeWrappedSourceTitle(text, current) {
 
   if (/^\d+(?:\.\d+)*\b/.test(t)) return false;
   if (/^[•\-–—]/.test(t)) return false;
-  if (/^(The|This|These|Where|When|If|Shipowners|Operators|Crews|Each|A|An|In-service|Maintenance|Thickness|Guidance|Records|Chapter)\b/i.test(t)) return false;
+  if (/^(The|This|These|Where|When|If|Shipowners|Operators|Crews|Each|A|An|In-service|Maintenance|Thickness|Guidance|Chapter)\b/i.test(t)) return false;
 
   const currentTitle = refineReferenceTitle(current.title);
 
   if (isCompleteShortSourceTitle(currentTitle)) return false;
 
-  const titleFamily = /^(IMO:|IACS:|OCIMF|OCIMF\/ICS|ICS:|INTERTANKO:|UK MCA:|SIGTTO:|CDI:|ISO:)/i.test(currentTitle);
+  const titleFamily = /^(IMO:|IMO\/ILO:|IACS:|OCIMF|OCIMF\/ICS|ICS:|INTERTANKO:|UK MCA:|SIGTTO:|CDI:|ISO:|Nautical Institute:)/i.test(currentTitle);
 
   if (!titleFamily) return false;
 
   if (!titleLooksIncomplete(currentTitle)) return false;
 
-  const titleContinuationStart = /^(and|or|of|for|to|in|on|with|without|by|under|from|Types?|Ships?|Carriers?|Tanks?|Spaces?|Documents?|Guidelines?|Code|Regulation|Systems?|Equipment|Tankers?|Survey|Surveys|Rev|Edition|Standard|Standards|Procedures|Certificates?|Management|Programme|Program|January|February|March|April|May|June|July|August|September|October|November|December)\b/i;
+  const titleContinuationStart = /^(and|or|of|for|to|in|on|with|without|by|under|from|Types?|Ships?|Carriers?|Tanks?|Spaces?|Documents?|Guidelines?|Code|Regulation|Systems?|Equipment|Tankers?|Survey|Surveys|Rev|Edition|Standard|Standards|Procedures|Certificates?|Management|Programme|Program|Formats?|Records?|Arrangements?|January|February|March|April|May|June|July|August|September|October|November|December)\b/i;
 
   return titleContinuationStart.test(t);
 }
