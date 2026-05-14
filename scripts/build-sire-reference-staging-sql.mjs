@@ -1,6 +1,7 @@
 // scripts/build-sire-reference-staging-sql.mjs
 // C.S.V. BEACON — Build SQL to stage SIRE Applicable Publications / Industry Guidance preview rows.
 // Output SQL inserts into sire_reference_extraction_staging only.
+// Safer v2: embeds preview rows as base64 JSON, avoiding raw multiline SQL VALUES text.
 // Does not connect to Supabase. Does not import into final reference tables.
 
 import fs from "node:fs";
@@ -17,23 +18,13 @@ function sqlText(value) {
   return "'" + String(value).replaceAll("'", "''") + "'";
 }
 
-function sqlInt(value) {
-  const n = Number(value);
-  return Number.isFinite(n) ? String(Math.trunc(n)) : "NULL";
-}
-
-function sqlNumeric(value) {
-  const n = Number(value);
-  return Number.isFinite(n) ? n.toFixed(4) : "NULL";
-}
-
-function normalizeRows(rows) {
+function normalizeRows(rows, sourceDocument) {
   return rows
     .filter((r) => r && r.question_number && r.reference_type)
     .map((r, idx) => ({
       row_no: idx + 1,
-      question_number: String(r.question_number || "").trim(),
-      normalized_question_number: String(r.normalized_question_number || "").trim(),
+      extracted_question_number: String(r.question_number || "").trim(),
+      normalized_question_number_from_preview: String(r.normalized_question_number || "").trim(),
       reference_type: String(r.reference_type || "").trim(),
       sort_order: Number(r.sort_order || 1),
       extracted_title: String(r.extracted_title || "").trim(),
@@ -42,11 +33,19 @@ function normalizeRows(rows) {
       extracted_content: String(r.extracted_content || "").trim(),
       raw_text: String(r.raw_text || "").trim(),
       normalized_key: String(r.normalized_key || "").trim(),
-      source_page_start: r.source_page_start || null,
-      source_page_end: r.source_page_end || null,
-      confidence_score: r.confidence_score || "0.8500",
+      source_document: sourceDocument,
+      source_page_start: Number.isFinite(Number(r.source_page_start)) ? Number(r.source_page_start) : null,
+      source_page_end: Number.isFinite(Number(r.source_page_end)) ? Number(r.source_page_end) : null,
+      source_locator: `preview row ${idx + 1} / ${String(r.reference_type || "").trim()} / ${String(r.question_number || "").trim()}`,
+      confidence_score: Number.isFinite(Number(r.confidence_score)) ? Number(r.confidence_score) : 0.85,
       extraction_notes: String(r.extraction_notes || "Preview extraction. Manual review required before final import.").trim()
     }));
+}
+
+function splitString(s, size = 1000) {
+  const out = [];
+  for (let i = 0; i < s.length; i += size) out.push(s.slice(i, i + size));
+  return out;
 }
 
 function main() {
@@ -63,33 +62,20 @@ function main() {
   if (!batchId) throw new Error("Missing --batch-id UUID.");
   if (!fs.existsSync(input)) throw new Error(`Input JSON not found: ${input}`);
 
-  const rows = normalizeRows(JSON.parse(fs.readFileSync(input, "utf8")));
+  const inputRows = JSON.parse(fs.readFileSync(input, "utf8"));
+  const rows = normalizeRows(inputRows, sourceDocument);
 
   if (!rows.length) throw new Error("No rows found in input JSON.");
 
-  const values = rows.map((r) => `(
-    ${sqlInt(r.row_no)},
-    ${sqlText(r.question_number)},
-    ${sqlText(r.normalized_question_number)},
-    ${sqlText(r.reference_type)},
-    ${sqlInt(r.sort_order)},
-    ${sqlText(r.extracted_title)},
-    ${sqlText(r.extracted_section)},
-    ${sqlText(r.extracted_subsection)},
-    ${sqlText(r.extracted_content)},
-    ${sqlText(r.raw_text)},
-    ${sqlText(r.normalized_key)},
-    ${sqlText(sourceDocument)},
-    ${sqlInt(r.source_page_start)},
-    ${sqlInt(r.source_page_end)},
-    ${sqlText(`preview row ${r.row_no} / ${r.reference_type} / ${r.question_number}`)},
-    ${sqlNumeric(r.confidence_score)},
-    ${sqlText(r.extraction_notes)}
-  )`).join(",\n");
+  const jsonPayload = JSON.stringify(rows);
+  const base64Payload = Buffer.from(jsonPayload, "utf8").toString("base64");
+  const base64Sql = splitString(base64Payload)
+    .map((chunk) => sqlText(chunk))
+    .join(" ||\n    ");
 
   const sql = `/* ============================================================
    C.S.V. BEACON / SIRE 2.0 QUESTIONS EDITOR
-   GENERATED STAGING SQL
+   GENERATED STAGING SQL — BASE64 JSON VERSION
 
    Purpose:
    - Insert reviewed preview rows into sire_reference_extraction_staging only.
@@ -109,29 +95,55 @@ function main() {
    ${input}
 ============================================================ */
 
-WITH preview_rows AS (
-  SELECT *
-  FROM (
-    VALUES
-${values}
-  ) AS v(
-    row_no,
-    extracted_question_number,
-    normalized_question_number_from_preview,
-    reference_type,
-    sort_order,
-    extracted_title,
-    extracted_section,
-    extracted_subsection,
-    extracted_content,
-    raw_text,
-    normalized_key,
-    source_document,
-    source_page_start,
-    source_page_end,
-    source_locator,
-    confidence_score,
-    extraction_notes
+WITH payload AS (
+  SELECT
+    convert_from(
+      decode(
+        ${base64Sql},
+        'base64'
+      ),
+      'UTF8'
+    )::jsonb AS data
+),
+
+preview_rows AS (
+  SELECT
+    x.row_no,
+    x.extracted_question_number,
+    x.normalized_question_number_from_preview,
+    x.reference_type,
+    x.sort_order,
+    x.extracted_title,
+    x.extracted_section,
+    x.extracted_subsection,
+    x.extracted_content,
+    x.raw_text,
+    x.normalized_key,
+    x.source_document,
+    x.source_page_start,
+    x.source_page_end,
+    x.source_locator,
+    x.confidence_score,
+    x.extraction_notes
+  FROM payload p
+  CROSS JOIN LATERAL jsonb_to_recordset(p.data) AS x(
+    row_no integer,
+    extracted_question_number text,
+    normalized_question_number_from_preview text,
+    reference_type text,
+    sort_order integer,
+    extracted_title text,
+    extracted_section text,
+    extracted_subsection text,
+    extracted_content text,
+    raw_text text,
+    normalized_key text,
+    source_document text,
+    source_page_start integer,
+    source_page_end integer,
+    source_locator text,
+    confidence_score numeric,
+    extraction_notes text
   )
 ),
 
@@ -264,6 +276,8 @@ FROM inserted;
   fs.writeFileSync(out, sql, "utf8");
 
   console.log(`Input rows: ${rows.length}`);
+  console.log(`JSON payload bytes: ${Buffer.byteLength(jsonPayload, "utf8")}`);
+  console.log(`Base64 payload chars: ${base64Payload.length}`);
   console.log(`Generated SQL: ${out}`);
 }
 
