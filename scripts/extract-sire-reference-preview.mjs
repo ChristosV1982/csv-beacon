@@ -61,6 +61,7 @@ function refineReferenceTitle(text) {
     .replace("Classification societies – what why and how?", "Classification societies – what, why and how?")
     .replace("Classification societies - what why and how?", "Classification societies - what, why and how?");
 
+  t = t.replace(/^IMO\s+SOLAS$/i, "IMO: SOLAS");
   t = t.replace(/^IMO:\s+ISM Code(?:\s+Company\.?)?$/i, "IMO: ISM Code");
   t = t.replace(/^IMO:\s+SOLAS(?:\s+MSC\.47\(66\)\.?)?$/i, "IMO: SOLAS");
 
@@ -98,13 +99,19 @@ function isCompleteShortSourceTitle(title) {
   return /^(IMO:\s+ISM Code|IMO\s+SOLAS|IMO:\s+SOLAS|IMO:\s+MARPOL|IMO:\s+STCW Code|IMO:\s+FSS Code|IMO:\s+IGF Code)$/i.test(t);
 }
 
+function titleLooksIncomplete(title) {
+  const t = cleanLine(title);
+
+  return /\b(All|all|in|of|for|and|or|with|without|under|from|to|the|double-side|dedicated|protective|ballast|seawater)$/i.test(t);
+}
+
 function looksLikeWrappedSourceTitle(text, current) {
   const t = cleanLine(text);
   if (!t || !current) return false;
 
   if (/^\d+(?:\.\d+)*\b/.test(t)) return false;
   if (/^[•\-–—]/.test(t)) return false;
-  if (/^(The|This|These|Where|When|If|Shipowners|Operators|Crews|Each|A|An)\b/i.test(t)) return false;
+  if (/^(The|This|These|Where|When|If|Shipowners|Operators|Crews|Each|A|An|In-service|Maintenance|Thickness|Guidance|Records|Chapter)\b/i.test(t)) return false;
 
   const currentTitle = refineReferenceTitle(current.title);
 
@@ -114,16 +121,11 @@ function looksLikeWrappedSourceTitle(text, current) {
 
   if (!titleFamily) return false;
 
+  if (!titleLooksIncomplete(currentTitle)) return false;
+
   const titleContinuationStart = /^(and|or|of|for|to|in|on|with|without|by|under|from|Types?|Ships?|Carriers?|Tanks?|Spaces?|Documents?|Guidelines?|Code|Regulation|Systems?|Equipment|Tankers?|Survey|Surveys|Rev|Edition|Standard|Standards|Procedures|Certificates?|Management|Programme|Program)\b/i;
 
-  if (titleContinuationStart.test(t)) return true;
-
-  const shortLikelyTitleLine =
-    t.length <= 100 &&
-    /^[A-Z0-9][A-Za-z0-9.,:;()\/\-–' ]+$/.test(t) &&
-    !/[.!?]$/.test(currentTitle);
-
-  return shortLikelyTitleLine;
+  return titleContinuationStart.test(t);
 }
 
 function cleanExtractedBlock(text) {
