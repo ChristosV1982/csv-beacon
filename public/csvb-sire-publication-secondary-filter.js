@@ -5,7 +5,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "SIRE-PUB-SECONDARY-FILTER-20260514_3";
+  const BUILD = "SIRE-PUB-SECONDARY-FILTER-20260514_4";
   window.CSVB_SIRE_PUBLICATION_SECONDARY_FILTER_BUILD = BUILD;
 
   const LS_SELECTED = "csvb_sire_publication_secondary_filter_selected_v1";
@@ -72,20 +72,10 @@
       }
 
       .csvb-secondary-filter-btn {
-        background: #FFFFFF;
-        color: #062A5E;
-        border: 1px solid #C8DAEF;
-        border-radius: 999px;
-        padding: 8px 14px;
-        font-weight: 700;
         cursor: pointer;
-        box-shadow: none;
       }
 
       .csvb-secondary-filter-btn.active {
-        background: #EAF3FB;
-        color: #062A5E;
-        border-color: #B8D0E8;
       }
 
       .csvb-secondary-filter-panel {
@@ -181,6 +171,28 @@
         display: none !important;
       }
     `;
+    style.textContent += `
+      /* CSVB-SIRE-PUB-FILTER-SAME-SHAPE-20260514 */
+      .csvb-secondary-filter-shell {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        margin-left: 8px;
+        position: relative;
+      }
+
+      .csvb-secondary-filter-btn.facet {
+        appearance: none;
+        -webkit-appearance: none;
+      }
+
+      .csvb-secondary-filter-btn.facet.active {
+        background: #EAF3FB !important;
+        border-color: #B8D0E8 !important;
+        color: #062A5E !important;
+      }
+    `;
+
     document.head.appendChild(style);
   }
 
@@ -196,7 +208,7 @@
     shell.className = "csvb-secondary-filter-shell";
 
     shell.innerHTML = `
-      <button id="csvbSecondaryFiltersBtn" class="csvb-secondary-filter-btn" type="button">
+      <button id="csvbSecondaryFiltersBtn" class="facet csvb-secondary-filter-btn" type="button">
         Applicable Publications
       </button>
 
