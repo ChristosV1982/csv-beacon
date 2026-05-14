@@ -59,7 +59,10 @@ function refineReferenceTitle(text) {
 
   t = t
     .replace("Classification societies – what why and how?", "Classification societies – what, why and how?")
-    .replace("Classification societies - what why and how?", "Classification societies - what, why and how?");
+    .replace("Classification societies - what why and how?", "Classification societies - what, why and how?")
+    .replace(/^IMO:\s*MSC\.\/Circ\.1598/i, "IMO: MSC.1/Circ.1598")
+    .replace(/Seafarers\s+’/g, "Seafarers’")
+    .replace(/Ships\s+’/g, "Ships’");
 
   t = t.replace(/\s+\./g, ".");
   t = t.replace(/^IMO\s+SOLAS$/i, "IMO: SOLAS");
@@ -154,9 +157,53 @@ function isHardSection(line) {
   return /^(Short Question Text|Vessel Types|ROVIQ Sequence|Publications|Objective|Industry Guidance:?|Industry guidance:?|Industry Guidelines:?|Inspection Guidance\.?|Suggested Inspector Actions|Expected Evidence|Potential Grounds for a Negative Observation)$/i.test(cleanLine(line));
 }
 
+
+function isSourceStart(text) {
+  const s = cleanLine(text);
+
+  if (!s) return false;
+
+  if (/^(TMSA\s+KP[AI]\s+\d+[A-Z]?(?:\.\d+)*)\b/i.test(s)) return true;
+
+  if (/^(IMO\/ILO:|IMO:|ILO:|IACS:|OCIMF\/ICS:|OCIMF\/INTERTANKO:|OCIMF:|ICS:|INTERTANKO:|UK MCA:|SIGTTO:|CDI:|ISO:|Nautical Institute:)\b/i.test(s)) return true;
+
+  if (/^(IMO Model Course|IMO Resolution|OCIMF A Guide|OCIMF Anchoring|OCIMF Guidance|OCIMF Recommendations|IACS Information Paper|IACS Recommendation)\b/i.test(s)) return true;
+
+  return false;
+}
+
+function splitInlineSourceEntries(text) {
+  const t = cleanLine(text);
+  if (!t) return [];
+
+  const sourceStart = /(IMO\/ILO:|IMO:|ILO:|IACS:|OCIMF\/ICS:|OCIMF\/INTERTANKO:|OCIMF:|ICS:|INTERTANKO:|UK MCA:|SIGTTO:|CDI:|ISO:|Nautical Institute:|IMO Model Course\b|IMO Resolution\b|OCIMF A Guide\b|OCIMF Anchoring\b|OCIMF Guidance\b|OCIMF Recommendations\b|IACS Information Paper\b|IACS Recommendation\b)/ig;
+
+  const positions = [];
+  let m;
+
+  while ((m = sourceStart.exec(t)) !== null) {
+    const pos = m.index;
+    if (pos === 0 || /\s/.test(t[pos - 1])) positions.push(pos);
+  }
+
+  const unique = Array.from(new Set(positions)).sort((a, b) => a - b);
+
+  if (unique.length <= 1) return [t];
+
+  const parts = [];
+
+  for (let i = 0; i < unique.length; i++) {
+    const start = unique[i];
+    const end = unique[i + 1] ?? t.length;
+    const part = cleanLine(t.slice(start, end));
+    if (part) parts.push(part);
+  }
+
+  return parts;
+}
+
 function publicationStart(line) {
-  const s = cleanLine(line);
-  return /^(IMO|IACS|OCIMF|OCIMF\/ICS|ICS|INTERTANKO|UK MCA|SIGTTO|CDI|ISO|TMSA|MARPOL|SOLAS|USCG)\b[:\s]/i.test(s);
+  return isSourceStart(line);
 }
 
 function guidanceStart(line) {
@@ -166,8 +213,9 @@ function guidanceStart(line) {
   if (/^MARPOL\s+Annex\b/i.test(s)) return false;
   if (/^SOLAS\s+Chapter\b/i.test(s)) return false;
   if (/^Annex\s+[IVX]+\b/i.test(s)) return false;
+  if (/^OCIMF\s+recommends\b/i.test(s)) return false;
 
-  return /^(IMO|IACS|OCIMF|OCIMF\/ICS|ICS|INTERTANKO|UK MCA|SIGTTO|CDI|ISO|TMSA KPI|TMSA KPA|USCG)\b[:\s]/i.test(s);
+  return isSourceStart(s);
 }
 
 function sectionLines(question, startRx, endRxList) {
@@ -214,20 +262,27 @@ function mergeTitleEntries(lines, startDetector) {
   let current = null;
 
   for (const row of lines) {
-    const text = cleanLine(row.text);
-    if (!text) continue;
-    if (/^None$/i.test(text)) continue;
+    const baseText = cleanLine(row.text);
+    if (!baseText) continue;
+    if (/^None$/i.test(baseText)) continue;
 
-    if (startDetector(text) || !current) {
-      current = {
-        text,
-        pageStart: row.page,
-        pageEnd: row.page
-      };
-      entries.push(current);
-    } else {
-      current.text = `${current.text} ${text}`.trim();
-      current.pageEnd = row.page;
+    const parts = splitInlineSourceEntries(baseText);
+
+    for (const partRaw of parts) {
+      const text = refineReferenceTitle(partRaw);
+      if (!text) continue;
+
+      if (startDetector(text) || !current || parts.length > 1) {
+        current = {
+          text,
+          pageStart: row.page,
+          pageEnd: row.page
+        };
+        entries.push(current);
+      } else {
+        current.text = refineReferenceTitle(`${current.text} ${text}`);
+        current.pageEnd = row.page;
+      }
     }
   }
 
@@ -239,29 +294,36 @@ function splitGuidanceEntries(lines) {
   let current = null;
 
   for (const row of lines) {
-    const text = cleanLine(row.text);
-    if (!text || isPdfNoiseLine(text)) continue;
+    const baseText = cleanLine(row.text);
+    if (!baseText || isPdfNoiseLine(baseText)) continue;
 
-    if (guidanceStart(text) || !current) {
-      const parsed = parseGuidanceEntryStart(text);
+    const parts = splitInlineSourceEntries(baseText);
 
-      current = {
-        title: parsed.title,
-        content: parsed.content,
-        pageStart: row.page,
-        pageEnd: row.page
-      };
+    for (const partRaw of parts) {
+      const text = cleanLine(partRaw);
+      if (!text) continue;
 
-      entries.push(current);
-      continue;
+      if (guidanceStart(text) || !current || (parts.length > 1 && isSourceStart(text))) {
+        const parsed = parseGuidanceEntryStart(text);
+
+        current = {
+          title: parsed.title,
+          content: parsed.content,
+          pageStart: row.page,
+          pageEnd: row.page
+        };
+
+        entries.push(current);
+        continue;
+      }
+
+      if (looksLikeWrappedSourceTitle(text, current)) {
+        current.title = refineReferenceTitle(`${current.title} ${text}`);
+      }
+
+      current.content = cleanExtractedBlock(`${current.content}\n${text}`);
+      current.pageEnd = row.page;
     }
-
-    if (looksLikeWrappedSourceTitle(text, current)) {
-      current.title = refineReferenceTitle(`${current.title} ${text}`);
-    }
-
-    current.content = cleanExtractedBlock(`${current.content}\n${text}`);
-    current.pageEnd = row.page;
   }
 
   return entries.map((entry) => ({
