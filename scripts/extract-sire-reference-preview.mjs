@@ -46,8 +46,20 @@ function cleanLine(line) {
     .trim();
 }
 
+function stripPdfNoisePrefix(line) {
+  let t = cleanLine(line);
+
+  // If the parser merged the page header with the next question line, remove only the header prefix.
+  t = t.replace(
+    /^Page\s+\d+\s+of\s+\d+\s+[–-]\s+SIRE\s+2\.0\s+Question Library:\s+Part\s+\d+\s+Version\s+\d+(?:\.\d+)?\s+\([^)]*\)\s*/i,
+    ""
+  );
+
+  return cleanLine(t);
+}
+
 function isPdfNoiseLine(line) {
-  const t = cleanLine(line);
+  const t = stripPdfNoisePrefix(line);
   if (!t) return true;
   if (/^Page\s+\d+\s+of\s+\d+\s+[–-]\s+SIRE\s+2\.0\s+Question Library:/i.test(t)) return true;
   if (/^SIRE\s+2\.0\s+Question Library$/i.test(t)) return true;
@@ -373,7 +385,7 @@ async function pageToLines(pdf, pageNo) {
   }
 
   return lines
-    .map((line) => cleanLine(line.parts.join(" ")))
+    .map((line) => stripPdfNoisePrefix(cleanLine(line.parts.join(" "))))
     .filter((text) => text && !isPdfNoiseLine(text))
     .map((text) => ({ page: pageNo, text }));
 }
