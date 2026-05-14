@@ -5,7 +5,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "SIRE-PUB-SECONDARY-FILTER-20260514_1";
+  const BUILD = "SIRE-PUB-SECONDARY-FILTER-20260514_2";
   window.CSVB_SIRE_PUBLICATION_SECONDARY_FILTER_BUILD = BUILD;
 
   const LS_SELECTED = "csvb_sire_publication_secondary_filter_selected_v1";
@@ -196,7 +196,7 @@
 
     shell.innerHTML = `
       <button id="csvbSecondaryFiltersBtn" class="csvb-secondary-filter-btn" type="button">
-        Secondary Filters
+        Applicable Publications
       </button>
 
       <div id="csvbSecondaryFiltersPanel" class="csvb-secondary-filter-panel">
@@ -261,7 +261,7 @@
     const active = state.selected.size > 0;
     if (btn) {
       btn.classList.toggle("active", active);
-      btn.textContent = active ? `Secondary Filters (${state.selected.size})` : "Secondary Filters";
+      btn.textContent = active ? `Applicable Publications (${state.selected.size})` : "Applicable Publications";
     }
 
     host.innerHTML = [
