@@ -13,9 +13,16 @@ function arg(name, fallback = "") {
   return fallback;
 }
 
-function argInt(name, fallback = 0) {
-  const v = Number(arg(name, ""));
-  return Number.isFinite(v) && v > 0 ? Math.floor(v) : fallback;
+function argInt(name, fallback = 0, options = {}) {
+  const raw = arg(name, "");
+  if (raw === "") return fallback;
+
+  const v = Number(raw);
+  if (!Number.isFinite(v)) return fallback;
+
+  if (v === 0 && options.allowZero) return 0;
+
+  return v > 0 ? Math.floor(v) : fallback;
 }
 
 function csvCell(value) {
@@ -395,8 +402,8 @@ async function main() {
   const outBase = arg("out", "tmp/sire-reference-preview");
   const from = normalizeQuestionNumber(arg("from", ""));
   const to = normalizeQuestionNumber(arg("to", ""));
-  const limit = argInt("limit", 25);
-  const maxPages = argInt("max-pages", 0);
+  const limit = argInt("limit", 25, { allowZero: true });
+  const maxPages = argInt("max-pages", 0, { allowZero: true });
 
   if (!pdfPath) {
     throw new Error('Missing --pdf path. Example: --pdf "data/SIRE 2.0 Question Library.pdf"');
