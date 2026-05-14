@@ -5,7 +5,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "SIRE-PUB-SECONDARY-FILTER-20260514_2";
+  const BUILD = "SIRE-PUB-SECONDARY-FILTER-20260514_3";
   window.CSVB_SIRE_PUBLICATION_SECONDARY_FILTER_BUILD = BUILD;
 
   const LS_SELECTED = "csvb_sire_publication_secondary_filter_selected_v1";
@@ -72,19 +72,20 @@
       }
 
       .csvb-secondary-filter-btn {
-        background: #EAF3FB;
+        background: #FFFFFF;
         color: #062A5E;
         border: 1px solid #C8DAEF;
         border-radius: 999px;
-        padding: 8px 12px;
-        font-weight: 750;
+        padding: 8px 14px;
+        font-weight: 700;
         cursor: pointer;
+        box-shadow: none;
       }
 
       .csvb-secondary-filter-btn.active {
-        background: #062A5E;
-        color: #fff;
-        border-color: #062A5E;
+        background: #EAF3FB;
+        color: #062A5E;
+        border-color: #B8D0E8;
       }
 
       .csvb-secondary-filter-panel {
