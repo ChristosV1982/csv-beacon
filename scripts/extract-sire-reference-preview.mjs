@@ -61,9 +61,15 @@ function refineReferenceTitle(text) {
     .replace("Classification societies – what why and how?", "Classification societies – what, why and how?")
     .replace("Classification societies - what why and how?", "Classification societies - what, why and how?");
 
+  t = t.replace(/\s+\./g, ".");
   t = t.replace(/^IMO\s+SOLAS$/i, "IMO: SOLAS");
-  t = t.replace(/^IMO:\s+ISM Code(?:\s+Company\.?)?$/i, "IMO: ISM Code");
-  t = t.replace(/^IMO:\s+SOLAS(?:\s+MSC\.47\(66\)\.?)?$/i, "IMO: SOLAS");
+  t = t.replace(/^IMO\s*:\s*ISM Code(?:\s+Company\.?)?$/i, "IMO: ISM Code");
+  t = t.replace(/^IMO\s*:\s*SOLAS(?:\s+MSC\.47\(66\)\.?)?$/i, "IMO: SOLAS");
+  t = t.replace(/^IMO\s+Resolution\s+/i, "IMO: Resolution ");
+
+  if (/^IACS:\s*Rec\.\s*2001\/Rev\.2\s+2018\s+A guide to managing maintenance in accordance with the requirements of the/i.test(t)) {
+    t = "IACS: Rec. 2001/Rev.2 2018 A guide to managing maintenance in accordance with the requirements of the ISM Code";
+  }
 
   return t;
 }
@@ -152,7 +158,13 @@ function publicationStart(line) {
 
 function guidanceStart(line) {
   const s = cleanLine(line);
-  return /^(IMO|IACS|OCIMF|OCIMF\/ICS|ICS|INTERTANKO|UK MCA|SIGTTO|CDI|ISO|TMSA KPI|TMSA KPA|MARPOL|SOLAS|USCG)\b[:\s]/i.test(s);
+
+  // Do not treat body text as a new guidance source.
+  if (/^MARPOL\s+Annex\b/i.test(s)) return false;
+  if (/^SOLAS\s+Chapter\b/i.test(s)) return false;
+  if (/^Annex\s+[IVX]+\b/i.test(s)) return false;
+
+  return /^(IMO|IACS|OCIMF|OCIMF\/ICS|ICS|INTERTANKO|UK MCA|SIGTTO|CDI|ISO|TMSA KPI|TMSA KPA|USCG)\b[:\s]/i.test(s);
 }
 
 function sectionLines(question, startRx, endRxList) {
