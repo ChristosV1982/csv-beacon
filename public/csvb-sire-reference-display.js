@@ -1,17 +1,18 @@
 // public/csvb-sire-reference-display.js
-// C.S.V. BEACON — SIRE Questions Editor Reference Display
+// C.S.V. BEACON — SIRE Questions Editor Reference Display + View Layout Tuning
 // Read-only display for Applicable Publications and Industry Guidance.
-// No write actions. No edits to existing SIRE fields.
+// This file performs UI-only work. It does not write to Supabase.
 
 (() => {
   "use strict";
 
-  const BUILD = "SIRE-REF-DISPLAY-20260514_1";
+  const BUILD = "SIRE-REF-DISPLAY-20260514_2";
   window.CSVB_SIRE_REFERENCE_DISPLAY_BUILD = BUILD;
 
   const state = {
     lastQuestionNumber: "",
     lastQuestionId: "",
+    lastLayoutQuestionNumber: "",
     loading: false,
     scheduled: null
   };
@@ -48,33 +49,52 @@
     return [];
   }
 
-  function sourceLine(row) {
-    const doc = safeStr(row?.source_document).trim();
-    const start = row?.source_page_start;
-    const end = row?.source_page_end;
-    const locator = safeStr(row?.source_locator).trim();
-
-    const bits = [];
-
-    if (doc) bits.push(doc);
-
-    if (start && end && Number(start) !== Number(end)) {
-      bits.push(`pages ${start}-${end}`);
-    } else if (start) {
-      bits.push(`page ${start}`);
-    }
-
-    if (locator) bits.push(locator);
-
-    return bits.join(" • ");
-  }
-
   function injectStyles() {
     if ($("csvbSireReferenceDisplayStyles")) return;
 
     const style = document.createElement("style");
     style.id = "csvbSireReferenceDisplayStyles";
     style.textContent = `
+      html[data-csvb-page="q-questions-editor.html"] #viewPanel {
+        overflow: visible;
+      }
+
+      html[data-csvb-page="q-questions-editor.html"] #viewPanel details.coll {
+        margin: 6px 0;
+        border: 1px solid var(--line, #D6E4F5);
+        border-radius: 12px;
+        background: #fff;
+        padding: 0;
+      }
+
+      html[data-csvb-page="q-questions-editor.html"] #viewPanel details.coll > summary {
+        min-height: 34px;
+        padding: 7px 10px;
+        border-radius: 12px;
+        color: #062A5E;
+        background: #F7FAFE;
+        border-bottom: 1px solid transparent;
+        font-weight: 650;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+      }
+
+      html[data-csvb-page="q-questions-editor.html"] #viewPanel details.coll[open] > summary {
+        border-bottom-color: #D6E4F5;
+        border-radius: 12px 12px 0 0;
+      }
+
+      html[data-csvb-page="q-questions-editor.html"] #viewPanel .collTitle {
+        font-weight: 650;
+        color: #062A5E;
+      }
+
+      html[data-csvb-page="q-questions-editor.html"] #viewPanel .collBody {
+        padding: 8px 10px 10px;
+      }
+
       .csvb-sire-ref-display {
         margin-top: 8px;
       }
@@ -83,31 +103,31 @@
         margin: 6px 0 8px;
         color: #5E6F86;
         font-size: 12px;
-        font-weight: 750;
+        font-weight: 600;
       }
 
       .csvb-sire-ref-block {
         display: grid;
-        gap: 8px;
+        gap: 7px;
       }
 
       .csvb-sire-ref-item {
         border: 1px solid var(--line, #D6E4F5);
-        border-radius: 12px;
+        border-radius: 10px;
         background: #fff;
         padding: 8px 10px;
       }
 
       .csvb-sire-ref-title {
         color: #062A5E;
-        font-weight: 900;
+        font-weight: 650;
         line-height: 1.28;
       }
 
       .csvb-sire-ref-meta {
         color: #5E6F86;
         font-size: 12px;
-        font-weight: 750;
+        font-weight: 600;
         margin-top: 4px;
       }
 
@@ -117,35 +137,36 @@
         white-space: pre-wrap;
         line-height: 1.38;
         font-size: 13px;
+        font-weight: 400;
       }
 
       .csvb-sire-ref-empty {
         border: 1px dashed #C8DAEF;
-        border-radius: 12px;
+        border-radius: 10px;
         background: #F7FAFE;
         color: #5E6F86;
         padding: 8px 10px;
-        font-weight: 750;
+        font-weight: 600;
       }
 
       .csvb-sire-ref-count {
-        margin-left: 8px;
+        margin-left: auto;
         color: #5E6F86;
         font-size: 12px;
-        font-weight: 800;
+        font-weight: 650;
       }
 
       .csvb-sire-ref-readonly {
-        display: inline-flex;
-        align-items: center;
-        border: 1px solid #AEE3F1;
-        background: #E9F7FB;
-        color: #062A5E;
-        border-radius: 999px;
-        padding: 2px 7px;
-        font-size: 11px;
-        font-weight: 900;
-        margin-left: 8px;
+        display: none;
+      }
+
+      html[data-csvb-page="q-questions-editor.html"] #vCollAttrs {
+        margin-top: 8px;
+        margin-bottom: 8px;
+      }
+
+      html[data-csvb-page="q-questions-editor.html"] #vCollAttrs > summary {
+        background: #FFFDF6;
       }
     `;
 
@@ -179,7 +200,7 @@
         </div>
       </details>
 
-      <details class="coll" id="csvbSireIndustryGuidanceColl">
+      <details class="coll" id="csvbSireIndustryGuidanceColl" open>
         <summary>
           <span class="collTitle">Industry Guidance</span>
           <span class="csvb-sire-ref-count" id="csvbSireIndustryGuidanceCount">—</span>
@@ -226,6 +247,47 @@
     return "";
   }
 
+  function moveQuestionAttributesNearTop() {
+    const viewPanel = $("viewPanel");
+    const attrs = $("vCollAttrs");
+    if (!viewPanel || !attrs) return;
+
+    const firstQuestionSection = Array.from(viewPanel.querySelectorAll(":scope > .section"))
+      .find((section) => section.textContent && section.textContent.includes("Question"));
+
+    if (firstQuestionSection && attrs.previousElementSibling !== firstQuestionSection.previousElementSibling) {
+      firstQuestionSection.insertAdjacentElement("beforebegin", attrs);
+    }
+  }
+
+  function applyDefaultOpenState(questionNumber) {
+    if (!questionNumber) return;
+
+    moveQuestionAttributesNearTop();
+
+    if (state.lastLayoutQuestionNumber === questionNumber) return;
+    state.lastLayoutQuestionNumber = questionNumber;
+
+    const viewPanel = $("viewPanel");
+    if (!viewPanel) return;
+
+    const attrs = $("vCollAttrs");
+
+    viewPanel.querySelectorAll("details.coll").forEach((details) => {
+      if (details === attrs) {
+        details.open = false;
+      } else {
+        details.open = true;
+      }
+    });
+
+    const pubs = $("csvbSirePublicationsColl");
+    const guid = $("csvbSireIndustryGuidanceColl");
+
+    if (pubs) pubs.open = true;
+    if (guid) guid.open = true;
+  }
+
   function renderEmpty(publicationsMsg, guidanceMsg) {
     const pubBody = $("csvbSirePublicationsBody");
     const guidBody = $("csvbSireIndustryGuidanceBody");
@@ -264,13 +326,11 @@
         pubBody.innerHTML = publications.map((p, index) => {
           const title = p.display_name || p.raw_publication_text || "Publication";
           const raw = p.raw_publication_text && p.raw_publication_text !== title ? p.raw_publication_text : "";
-          const src = sourceLine(p);
 
           return `
             <div class="csvb-sire-ref-item">
               <div class="csvb-sire-ref-title">${index + 1}. ${esc(title)}</div>
               ${raw ? `<div class="csvb-sire-ref-content">${esc(raw)}</div>` : ""}
-              ${src ? `<div class="csvb-sire-ref-meta">${esc(src)}</div>` : ""}
             </div>
           `;
         }).join("");
@@ -290,14 +350,12 @@
             .join(" / ");
 
           const content = safeStr(g.guidance_content).trim();
-          const src = sourceLine(g);
 
           return `
             <div class="csvb-sire-ref-item">
               <div class="csvb-sire-ref-title">${index + 1}. ${esc(title)}</div>
               ${section ? `<div class="csvb-sire-ref-meta">Section: ${esc(section)}</div>` : ""}
               ${content ? `<div class="csvb-sire-ref-content">${esc(content)}</div>` : ""}
-              ${src ? `<div class="csvb-sire-ref-meta">${esc(src)}</div>` : ""}
             </div>
           `;
         }).join("");
@@ -305,9 +363,11 @@
     }
 
     setStatus(
-      `Read-only references loaded for ${matchRow?.number_full || matchRow?.number_base || questionNumber}. ` +
+      `References loaded for ${matchRow?.number_full || matchRow?.number_base || questionNumber}. ` +
       `Applicable Publications: ${publications.length}. Industry Guidance: ${guidance.length}.`
     );
+
+    applyDefaultOpenState(questionNumber);
   }
 
   async function getSupabase() {
@@ -334,6 +394,8 @@
       return;
     }
 
+    applyDefaultOpenState(questionNumber);
+
     if (state.loading) return;
 
     if (questionNumber === state.lastQuestionNumber && state.lastQuestionId) {
@@ -344,7 +406,7 @@
     state.lastQuestionNumber = questionNumber;
     state.lastQuestionId = "";
 
-    setStatus(`Loading read-only SIRE references for ${questionNumber}…`);
+    setStatus(`Loading SIRE references for ${questionNumber}…`);
 
     try {
       const sb = await getSupabase();
