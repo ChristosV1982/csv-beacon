@@ -6,7 +6,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "SIRE-REF-DISPLAY-20260514_4";
+  const BUILD = "SIRE-REF-DISPLAY-20260514_5";
   window.CSVB_SIRE_REFERENCE_DISPLAY_BUILD = BUILD;
 
   const state = {
@@ -190,6 +190,44 @@
       }
     `;
 
+    style.textContent += `
+      /* CSVB-SIRE-REF-FINAL-ORDER-20260514 */
+      html[data-csvb-page="q-questions-editor.html"] #viewPanel .vhdr-top {
+        display: flex !important;
+        flex-direction: row !important;
+        align-items: center !important;
+        gap: 10px !important;
+        flex-wrap: nowrap !important;
+      }
+
+      html[data-csvb-page="q-questions-editor.html"] #viewPanel .hnum {
+        flex: 0 0 auto !important;
+      }
+
+      html[data-csvb-page="q-questions-editor.html"] #viewPanel .vhdr-short {
+        flex: 0 1 420px !important;
+        min-width: 260px !important;
+        max-width: 460px !important;
+      }
+
+      html[data-csvb-page="q-questions-editor.html"] #viewPanel #vShortText {
+        background: #EAF3FB !important;
+        border-color: #C8DAEF !important;
+        color: #062A5E !important;
+        min-height: 30px !important;
+        padding: 6px 10px !important;
+        font-weight: 400 !important;
+      }
+
+      html[data-csvb-page="q-questions-editor.html"] .csvb-sire-ref-title {
+        font-weight: 400 !important;
+      }
+
+      html[data-csvb-page="q-questions-editor.html"] .csvb-sire-ref-content {
+        font-weight: 400 !important;
+      }
+`;
+
     document.head.appendChild(style);
   }
 
@@ -270,23 +308,29 @@
   function moveQuestionAttributesNearTop() {
     const viewPanel = $("viewPanel");
     const attrs = $("vCollAttrs");
-    if (!viewPanel || !attrs) return;
-
     const questionBox = $("vQuestion");
-    if (!questionBox) return;
 
-    const questionContainer = questionBox.closest("div");
+    if (!viewPanel || !attrs || !questionBox) return;
+
     const qstack = questionBox.closest(".qstack");
+    if (!qstack) return;
 
-    if (!questionContainer || !qstack) return;
+    let questionDirectChild = questionBox;
+    while (questionDirectChild && questionDirectChild.parentElement !== qstack) {
+      questionDirectChild = questionDirectChild.parentElement;
+    }
+
+    if (!questionDirectChild || questionDirectChild.parentElement !== qstack) return;
+
+    const wantedNext = questionDirectChild.nextSibling;
 
     if (attrs.parentElement !== qstack) {
-      qstack.insertBefore(attrs, questionContainer.nextSibling);
+      qstack.insertBefore(attrs, wantedNext);
       return;
     }
 
-    if (attrs.previousElementSibling !== questionContainer) {
-      qstack.insertBefore(attrs, questionContainer.nextSibling);
+    if (attrs.previousElementSibling !== questionDirectChild) {
+      qstack.insertBefore(attrs, wantedNext);
     }
   }
 
