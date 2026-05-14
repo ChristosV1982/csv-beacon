@@ -61,6 +61,10 @@ function refineReferenceTitle(text) {
     .replace("Classification societies – what why and how?", "Classification societies – what, why and how?")
     .replace("Classification societies - what why and how?", "Classification societies - what, why and how?")
     .replace(/^IMO:\s*MSC\.\/Circ\.1598/i, "IMO: MSC.1/Circ.1598")
+    .replace(/^IMO\s+MSC\./i, "IMO: MSC.")
+    .replace(/^IMO\s+Resolution\s+/i, "IMO: Resolution ")
+    .replace(/^ICS\s+Bridge Procedures Guide/i, "ICS: Bridge Procedures Guide")
+    .replace(/^ICS Bridge Procedures Guide/i, "ICS: Bridge Procedures Guide")
     .replace(/\s+’/g, "’")
     .replace(/Seafarers\s+’/g, "Seafarers’")
     .replace(/Ships\s+’/g, "Ships’");
@@ -69,7 +73,6 @@ function refineReferenceTitle(text) {
   t = t.replace(/^IMO\s+SOLAS$/i, "IMO: SOLAS");
   t = t.replace(/^IMO\s*:\s*ISM Code(?:\s+Company\.?)?$/i, "IMO: ISM Code");
   t = t.replace(/^IMO\s*:\s*SOLAS(?:\s+MSC\.47\(66\)\.?)?$/i, "IMO: SOLAS");
-  t = t.replace(/^IMO\s+Resolution\s+/i, "IMO: Resolution ");
 
   if (/^IACS:\s*Rec\.\s*2001\/Rev\.2\s+2018\s+A guide to managing maintenance in accordance with the requirements of the/i.test(t)) {
     t = "IACS: Rec. 2001/Rev.2 2018 A guide to managing maintenance in accordance with the requirements of the ISM Code";
@@ -113,7 +116,7 @@ function titleLooksIncomplete(title) {
   const t = cleanLine(title);
 
   return (
-    /\b(All|all|in|of|for|and|or|with|without|under|from|to|the|double-side|dedicated|protective|ballast|seawater)$/i.test(t)
+    /\b(All|all|in|of|for|and|or|with|without|under|from|to|the|double-side|dedicated|protective|ballast|seawater|Automatic|automatic|light|Light)$/i.test(t)
     || /\(revised edition$/i.test(t)
   );
 }
@@ -136,7 +139,7 @@ function looksLikeWrappedSourceTitle(text, current) {
 
   if (!titleLooksIncomplete(currentTitle)) return false;
 
-  const titleContinuationStart = /^(and|or|of|for|to|in|on|with|without|by|under|from|Types?|Ships?|Carriers?|Tanks?|Spaces?|Documents?|Guidelines?|Code|Regulation|Systems?|Equipment|Tankers?|Survey|Surveys|Rev|Edition|Standard|Standards|Procedures|Certificates?|Management|Programme|Program|Formats?|Records?|Arrangements?|January|February|March|April|May|June|July|August|September|October|November|December)\b/i;
+  const titleContinuationStart = /^(and|or|of|for|to|in|on|with|without|by|under|from|Types?|Ships?|Carriers?|Tanks?|Spaces?|Documents?|Guidelines?|Code|Regulation|Systems?|Equipment|Tankers?|Survey|Surveys|Rev|Edition|Standard|Standards|Procedures|Certificates?|Management|Programme|Program|Formats?|Records?|Arrangements?|Identification|Controllers?|Associated|January|February|March|April|May|June|July|August|September|October|November|December)\b/i;
 
   return titleContinuationStart.test(t);
 }
@@ -167,7 +170,7 @@ function isSourceStart(text) {
 
   if (/^(IMO\/ILO|IMO|ILO|IACS|OCIMF\/ICS|OCIMF\/INTERTANKO|OCIMF|ICS|INTERTANKO|UK MCA|SIGTTO|CDI|ISO|Nautical Institute)\s*:/i.test(s)) return true;
 
-  if (/^(IMO Model Course|IMO Resolution|OCIMF A Guide|OCIMF Anchoring|OCIMF Guidance|OCIMF Recommendations|IACS Information Paper|IACS Recommendation)\b/i.test(s)) return true;
+  if (/^(IMO\s+MSC\.|IMO\s+Resolution|IMO Model Course|OCIMF A Guide|OCIMF Anchoring|OCIMF Guidance|OCIMF Recommendations|IACS Information Paper|IACS Recommendation|ICS Bridge Procedures Guide)\b/i.test(s)) return true;
 
   return false;
 }
@@ -176,7 +179,7 @@ function splitInlineSourceEntries(text) {
   const t = cleanLine(text);
   if (!t) return [];
 
-  const sourceRx = /(TMSA\s+KP[AI]\s+\d+[A-Z]?(?:\.\d+)*\b|IMO\/ILO\s*:|IMO\s*:|ILO\s*:|IACS\s*:|OCIMF\/ICS\s*:|OCIMF\/INTERTANKO\s*:|OCIMF\s*:|ICS\s*:|INTERTANKO\s*:|UK MCA\s*:|SIGTTO\s*:|CDI\s*:|ISO\s*:|Nautical Institute\s*:|IMO Model Course\b|IMO Resolution\b|OCIMF A Guide\b|OCIMF Anchoring\b|OCIMF Guidance\b|OCIMF Recommendations\b|IACS Information Paper\b|IACS Recommendation\b)/ig;
+  const sourceRx = /(TMSA\s+KP[AI]\s+\d+[A-Z]?(?:\.\d+)*\b|IMO\/ILO\s*:|IMO\s+MSC\.|IMO\s+Resolution\b|IMO\s*:|ILO\s*:|IACS\s*:|OCIMF\/ICS\s*:|OCIMF\/INTERTANKO\s*:|OCIMF\s*:|ICS\s*:|INTERTANKO\s*:|UK MCA\s*:|SIGTTO\s*:|CDI\s*:|ISO\s*:|Nautical Institute\s*:|IMO Model Course\b|OCIMF A Guide\b|OCIMF Anchoring\b|OCIMF Guidance\b|OCIMF Recommendations\b|IACS Information Paper\b|IACS Recommendation\b|ICS Bridge Procedures Guide\b)/ig;
 
   const positions = [];
   let m;
