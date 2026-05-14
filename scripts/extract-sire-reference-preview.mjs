@@ -46,6 +46,72 @@ function cleanLine(line) {
     .trim();
 }
 
+function isPdfNoiseLine(line) {
+  const t = cleanLine(line);
+  if (!t) return true;
+  if (/^Page\s+\d+\s+of\s+\d+\s+[–-]\s+SIRE\s+2\.0\s+Question Library:/i.test(t)) return true;
+  if (/^SIRE\s+2\.0\s+Question Library$/i.test(t)) return true;
+  return false;
+}
+
+function refineReferenceTitle(text) {
+  return cleanLine(text)
+    .replace("Classification societies – what why and how?", "Classification societies – what, why and how?")
+    .replace("Classification societies - what why and how?", "Classification societies - what, why and how?");
+}
+
+function parseGuidanceEntryStart(text) {
+  const t = refineReferenceTitle(text);
+
+  let m = t.match(/^(TMSA\s+KP[AI]\s+\d+[A-Z]?(?:\.\d+)*)(?:\s+(.+))?$/i);
+  if (m) {
+    return {
+      title: cleanLine(m[1]),
+      content: t
+    };
+  }
+
+  m = t.match(/^(IMO:\s+ISM Code)\b(.*)$/i);
+  if (m) {
+    return {
+      title: cleanLine(m[1]),
+      content: t
+    };
+  }
+
+  return {
+    title: t,
+    content: t
+  };
+}
+
+function looksLikeWrappedSourceTitle(text, current) {
+  const t = cleanLine(text);
+  if (!t || !current) return false;
+
+  if (/^\d+(?:\.\d+)*\b/.test(t)) return false;
+  if (/^(The|This|These|Where|When|If|Shipowners|Operators|Crews|Each|A|An)\b/i.test(t)) return false;
+
+  const currentTitle = cleanLine(current.title);
+  const titleFamily = /^(IMO:|IACS:|OCIMF|OCIMF\/ICS|ICS:|INTERTANKO:|UK MCA:|SIGTTO:|CDI:|ISO:)/i.test(currentTitle);
+
+  if (!titleFamily) return false;
+
+  const hasLowercaseWord = /[a-z]{3,}/.test(t);
+  const mostlyUpper = t === t.toUpperCase();
+
+  return mostlyUpper && !hasLowercaseWord;
+}
+
+function cleanExtractedBlock(text) {
+  return String(text ?? "")
+    .split(/\r?\n/)
+    .map(cleanLine)
+    .filter((line) => line && !isPdfNoiseLine(line))
+    .join("\n")
+    .trim();
+}
+
 function isQuestionStart(line) {
   return cleanLine(line).match(/^(\d{1,2}\.\d{1,2}\.\d{1,3})\.\s+(.+)$/);
 }
@@ -112,23 +178,35 @@ function splitGuidanceEntries(lines) {
 
   for (const row of lines) {
     const text = cleanLine(row.text);
-    if (!text) continue;
+    if (!text || isPdfNoiseLine(text)) continue;
 
     if (guidanceStart(text) || !current) {
+      const parsed = parseGuidanceEntryStart(text);
+
       current = {
-        title: text,
-        content: text,
+        title: parsed.title,
+        content: parsed.content,
         pageStart: row.page,
         pageEnd: row.page
       };
+
       entries.push(current);
-    } else {
-      current.content = `${current.content}\n${text}`.trim();
-      current.pageEnd = row.page;
+      continue;
     }
+
+    if (looksLikeWrappedSourceTitle(text, current)) {
+      current.title = refineReferenceTitle(`${current.title} ${text}`);
+    }
+
+    current.content = cleanExtractedBlock(`${current.content}\n${text}`);
+    current.pageEnd = row.page;
   }
 
-  return entries;
+  return entries.map((entry) => ({
+    ...entry,
+    title: refineReferenceTitle(entry.title),
+    content: cleanExtractedBlock(entry.content)
+  }));
 }
 
 async function pageToLines(pdf, pageNo) {
@@ -166,7 +244,7 @@ async function pageToLines(pdf, pageNo) {
 
   return lines
     .map((line) => cleanLine(line.parts.join(" ")))
-    .filter(Boolean)
+    .filter((text) => text && !isPdfNoiseLine(text))
     .map((text) => ({ page: pageNo, text }));
 }
 
@@ -272,12 +350,12 @@ async function main() {
         normalized_question_number: q.normalizedNumber,
         reference_type: "applicable_publication",
         sort_order: idx + 1,
-        extracted_title: entry.text,
+        extracted_title: refineReferenceTitle(entry.text),
         extracted_section: "",
         extracted_subsection: "",
         extracted_content: "",
-        raw_text: entry.text,
-        normalized_key: normalizeKey(entry.text),
+        raw_text: refineReferenceTitle(entry.text),
+        normalized_key: normalizeKey(refineReferenceTitle(entry.text)),
         source_page_start: entry.pageStart,
         source_page_end: entry.pageEnd,
         confidence_score: "0.9000",
@@ -291,11 +369,11 @@ async function main() {
         normalized_question_number: q.normalizedNumber,
         reference_type: "industry_guidance",
         sort_order: idx + 1,
-        extracted_title: entry.title,
+        extracted_title: refineReferenceTitle(entry.title),
         extracted_section: "",
         extracted_subsection: "",
-        extracted_content: entry.content,
-        raw_text: entry.content,
+        extracted_content: cleanExtractedBlock(entry.content),
+        raw_text: cleanExtractedBlock(entry.content),
         normalized_key: normalizeKey(`industry_${entry.title}`),
         source_page_start: entry.pageStart,
         source_page_end: entry.pageEnd,
