@@ -160,12 +160,11 @@ function isHardSection(line) {
 
 function isSourceStart(text) {
   const s = cleanLine(text);
-
   if (!s) return false;
 
   if (/^(TMSA\s+KP[AI]\s+\d+[A-Z]?(?:\.\d+)*)\b/i.test(s)) return true;
 
-  if (/^(IMO\/ILO:|IMO:|ILO:|IACS:|OCIMF\/ICS:|OCIMF\/INTERTANKO:|OCIMF:|ICS:|INTERTANKO:|UK MCA:|SIGTTO:|CDI:|ISO:|Nautical Institute:)\b/i.test(s)) return true;
+  if (/^(IMO\/ILO|IMO|ILO|IACS|OCIMF\/ICS|OCIMF\/INTERTANKO|OCIMF|ICS|INTERTANKO|UK MCA|SIGTTO|CDI|ISO|Nautical Institute)\s*:/i.test(s)) return true;
 
   if (/^(IMO Model Course|IMO Resolution|OCIMF A Guide|OCIMF Anchoring|OCIMF Guidance|OCIMF Recommendations|IACS Information Paper|IACS Recommendation)\b/i.test(s)) return true;
 
@@ -176,14 +175,17 @@ function splitInlineSourceEntries(text) {
   const t = cleanLine(text);
   if (!t) return [];
 
-  const sourceStart = /(IMO\/ILO:|IMO:|ILO:|IACS:|OCIMF\/ICS:|OCIMF\/INTERTANKO:|OCIMF:|ICS:|INTERTANKO:|UK MCA:|SIGTTO:|CDI:|ISO:|Nautical Institute:|IMO Model Course\b|IMO Resolution\b|OCIMF A Guide\b|OCIMF Anchoring\b|OCIMF Guidance\b|OCIMF Recommendations\b|IACS Information Paper\b|IACS Recommendation\b)/ig;
+  const sourceRx = /(TMSA\s+KP[AI]\s+\d+[A-Z]?(?:\.\d+)*\b|IMO\/ILO\s*:|IMO\s*:|ILO\s*:|IACS\s*:|OCIMF\/ICS\s*:|OCIMF\/INTERTANKO\s*:|OCIMF\s*:|ICS\s*:|INTERTANKO\s*:|UK MCA\s*:|SIGTTO\s*:|CDI\s*:|ISO\s*:|Nautical Institute\s*:|IMO Model Course\b|IMO Resolution\b|OCIMF A Guide\b|OCIMF Anchoring\b|OCIMF Guidance\b|OCIMF Recommendations\b|IACS Information Paper\b|IACS Recommendation\b)/ig;
 
   const positions = [];
   let m;
 
-  while ((m = sourceStart.exec(t)) !== null) {
+  while ((m = sourceRx.exec(t)) !== null) {
     const pos = m.index;
-    if (pos === 0 || /\s/.test(t[pos - 1])) positions.push(pos);
+    const prev = pos > 0 ? t[pos - 1] : "";
+    if (pos === 0 || /\s|[;:,.()]/.test(prev)) {
+      positions.push(pos);
+    }
   }
 
   const unique = Array.from(new Set(positions)).sort((a, b) => a - b);
