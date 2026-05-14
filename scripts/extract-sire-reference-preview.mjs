@@ -77,7 +77,7 @@ function refineReferenceTitle(text) {
 function parseGuidanceEntryStart(text) {
   const t = refineReferenceTitle(text);
 
-  let m = t.match(/^(TMSA\s+KP[AI]\s+\d+[A-Z]?(?:\.\d+)*)(?:\s+(.+))?$/i);
+  let m = t.match(/^(TMSA\s+KP[AI]\s+\d+[A-Z]?(?:\.\d+)*)(?:\.)?(?:\s+(.+))?$/i);
   if (m) {
     return {
       title: cleanLine(m[1]),
@@ -108,7 +108,10 @@ function isCompleteShortSourceTitle(title) {
 function titleLooksIncomplete(title) {
   const t = cleanLine(title);
 
-  return /\b(All|all|in|of|for|and|or|with|without|under|from|to|the|double-side|dedicated|protective|ballast|seawater)$/i.test(t);
+  return (
+    /\b(All|all|in|of|for|and|or|with|without|under|from|to|the|double-side|dedicated|protective|ballast|seawater)$/i.test(t)
+    || /\(revised edition$/i.test(t)
+  );
 }
 
 function looksLikeWrappedSourceTitle(text, current) {
@@ -129,7 +132,7 @@ function looksLikeWrappedSourceTitle(text, current) {
 
   if (!titleLooksIncomplete(currentTitle)) return false;
 
-  const titleContinuationStart = /^(and|or|of|for|to|in|on|with|without|by|under|from|Types?|Ships?|Carriers?|Tanks?|Spaces?|Documents?|Guidelines?|Code|Regulation|Systems?|Equipment|Tankers?|Survey|Surveys|Rev|Edition|Standard|Standards|Procedures|Certificates?|Management|Programme|Program)\b/i;
+  const titleContinuationStart = /^(and|or|of|for|to|in|on|with|without|by|under|from|Types?|Ships?|Carriers?|Tanks?|Spaces?|Documents?|Guidelines?|Code|Regulation|Systems?|Equipment|Tankers?|Survey|Surveys|Rev|Edition|Standard|Standards|Procedures|Certificates?|Management|Programme|Program|January|February|March|April|May|June|July|August|September|October|November|December)\b/i;
 
   return titleContinuationStart.test(t);
 }
