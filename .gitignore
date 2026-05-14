@@ -28,3 +28,7 @@ public/POST_STATS_*.txt
 public/AUTH_KEY_REPAIR_APPLIED.txt
 public/CSV_BEACON_BRANDING_BATCH_3_APPLIED.txt
 _maintenance_archive*.tar.gz
+
+# Local source PDFs and generated extraction previews
+data/*.pdf
+tmp/
