@@ -6,7 +6,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "SIRE-REF-DISPLAY-20260514_2";
+  const BUILD = "SIRE-REF-DISPLAY-20260514_3";
   window.CSVB_SIRE_REFERENCE_DISPLAY_BUILD = BUILD;
 
   const state = {
@@ -120,7 +120,7 @@
 
       .csvb-sire-ref-title {
         color: #062A5E;
-        font-weight: 650;
+        font-weight: 400;
         line-height: 1.28;
       }
 
@@ -252,12 +252,28 @@
     const attrs = $("vCollAttrs");
     if (!viewPanel || !attrs) return;
 
-    const firstQuestionSection = Array.from(viewPanel.querySelectorAll(":scope > .section"))
-      .find((section) => section.textContent && section.textContent.includes("Question"));
+    const questionBox = $("vQuestion");
+    const qstack = questionBox ? questionBox.closest(".qstack") : viewPanel.querySelector(".qstack");
+    if (!qstack) return;
 
-    if (firstQuestionSection && attrs.previousElementSibling !== firstQuestionSection.previousElementSibling) {
-      firstQuestionSection.insertAdjacentElement("beforebegin", attrs);
+    const firstGuidanceDetails = Array.from(qstack.querySelectorAll("details.coll"))
+      .find((details) => {
+        const title = details.querySelector(".collTitle");
+        return title && /question guidance/i.test(title.textContent || "");
+      });
+
+    if (firstGuidanceDetails) {
+      firstGuidanceDetails.insertAdjacentElement("beforebegin", attrs);
+      return;
     }
+
+    const firstDetails = qstack.querySelector("details.coll");
+    if (firstDetails) {
+      firstDetails.insertAdjacentElement("beforebegin", attrs);
+      return;
+    }
+
+    qstack.appendChild(attrs);
   }
 
   function applyDefaultOpenState(questionNumber) {
