@@ -6,7 +6,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "SIRE-REF-DISPLAY-20260514_3";
+  const BUILD = "SIRE-REF-DISPLAY-20260514_4";
   window.CSVB_SIRE_REFERENCE_DISPLAY_BUILD = BUILD;
 
   const state = {
@@ -93,6 +93,26 @@
 
       html[data-csvb-page="q-questions-editor.html"] #viewPanel .collBody {
         padding: 8px 10px 10px;
+      }
+
+      
+      html[data-csvb-page="q-questions-editor.html"] #viewPanel .vhdr-top {
+        display: flex !important;
+        flex-direction: row !important;
+        align-items: center !important;
+        gap: 10px !important;
+        flex-wrap: nowrap !important;
+      }
+
+      html[data-csvb-page="q-questions-editor.html"] #viewPanel .vhdr-short {
+        flex: 0 1 360px !important;
+        min-width: 260px !important;
+        max-width: 420px !important;
+      }
+
+      html[data-csvb-page="q-questions-editor.html"] #viewPanel #vShortText {
+        min-height: 30px !important;
+        padding: 6px 9px !important;
       }
 
       .csvb-sire-ref-display {
@@ -253,27 +273,21 @@
     if (!viewPanel || !attrs) return;
 
     const questionBox = $("vQuestion");
-    const qstack = questionBox ? questionBox.closest(".qstack") : viewPanel.querySelector(".qstack");
-    if (!qstack) return;
+    if (!questionBox) return;
 
-    const firstGuidanceDetails = Array.from(qstack.querySelectorAll("details.coll"))
-      .find((details) => {
-        const title = details.querySelector(".collTitle");
-        return title && /question guidance/i.test(title.textContent || "");
-      });
+    const questionContainer = questionBox.closest("div");
+    const qstack = questionBox.closest(".qstack");
 
-    if (firstGuidanceDetails) {
-      firstGuidanceDetails.insertAdjacentElement("beforebegin", attrs);
+    if (!questionContainer || !qstack) return;
+
+    if (attrs.parentElement !== qstack) {
+      qstack.insertBefore(attrs, questionContainer.nextSibling);
       return;
     }
 
-    const firstDetails = qstack.querySelector("details.coll");
-    if (firstDetails) {
-      firstDetails.insertAdjacentElement("beforebegin", attrs);
-      return;
+    if (attrs.previousElementSibling !== questionContainer) {
+      qstack.insertBefore(attrs, questionContainer.nextSibling);
     }
-
-    qstack.appendChild(attrs);
   }
 
   function applyDefaultOpenState(questionNumber) {
