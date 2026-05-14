@@ -55,9 +55,16 @@ function isPdfNoiseLine(line) {
 }
 
 function refineReferenceTitle(text) {
-  return cleanLine(text)
+  let t = cleanLine(text);
+
+  t = t
     .replace("Classification societies – what why and how?", "Classification societies – what, why and how?")
     .replace("Classification societies - what why and how?", "Classification societies - what, why and how?");
+
+  t = t.replace(/^IMO:\s+ISM Code(?:\s+Company\.?)?$/i, "IMO: ISM Code");
+  t = t.replace(/^IMO:\s+SOLAS(?:\s+MSC\.47\(66\)\.?)?$/i, "IMO: SOLAS");
+
+  return t;
 }
 
 function parseGuidanceEntryStart(text) {
@@ -85,22 +92,38 @@ function parseGuidanceEntryStart(text) {
   };
 }
 
+function isCompleteShortSourceTitle(title) {
+  const t = refineReferenceTitle(title);
+
+  return /^(IMO:\s+ISM Code|IMO\s+SOLAS|IMO:\s+SOLAS|IMO:\s+MARPOL|IMO:\s+STCW Code|IMO:\s+FSS Code|IMO:\s+IGF Code)$/i.test(t);
+}
+
 function looksLikeWrappedSourceTitle(text, current) {
   const t = cleanLine(text);
   if (!t || !current) return false;
 
   if (/^\d+(?:\.\d+)*\b/.test(t)) return false;
+  if (/^[•\-–—]/.test(t)) return false;
   if (/^(The|This|These|Where|When|If|Shipowners|Operators|Crews|Each|A|An)\b/i.test(t)) return false;
 
-  const currentTitle = cleanLine(current.title);
+  const currentTitle = refineReferenceTitle(current.title);
+
+  if (isCompleteShortSourceTitle(currentTitle)) return false;
+
   const titleFamily = /^(IMO:|IACS:|OCIMF|OCIMF\/ICS|ICS:|INTERTANKO:|UK MCA:|SIGTTO:|CDI:|ISO:)/i.test(currentTitle);
 
   if (!titleFamily) return false;
 
-  const hasLowercaseWord = /[a-z]{3,}/.test(t);
-  const mostlyUpper = t === t.toUpperCase();
+  const titleContinuationStart = /^(and|or|of|for|to|in|on|with|without|by|under|from|Types?|Ships?|Carriers?|Tanks?|Spaces?|Documents?|Guidelines?|Code|Regulation|Systems?|Equipment|Tankers?|Survey|Surveys|Rev|Edition|Standard|Standards|Procedures|Certificates?|Management|Programme|Program)\b/i;
 
-  return mostlyUpper && !hasLowercaseWord;
+  if (titleContinuationStart.test(t)) return true;
+
+  const shortLikelyTitleLine =
+    t.length <= 100 &&
+    /^[A-Z0-9][A-Za-z0-9.,:;()\/\-–' ]+$/.test(t) &&
+    !/[.!?]$/.test(currentTitle);
+
+  return shortLikelyTitleLine;
 }
 
 function cleanExtractedBlock(text) {
@@ -145,6 +168,28 @@ function sectionLines(question, startRx, endRxList) {
   }
 
   return lines.slice(start + 1, end).filter((x) => cleanLine(x.text));
+}
+
+function guidanceLinesForQuestion(question) {
+  const explicit = sectionLines(
+    question,
+    /^Industry Guidance:?$/i,
+    [/^Inspection Guidance\.?$/i, /^Suggested Inspector Actions$/i, /^Expected Evidence$/i, /^Potential Grounds for a Negative Observation$/i]
+  );
+
+  if (explicit.length) return explicit;
+
+  const objectiveBlock = sectionLines(
+    question,
+    /^Objective$/i,
+    [/^Inspection Guidance\.?$/i, /^Suggested Inspector Actions$/i, /^Expected Evidence$/i, /^Potential Grounds for a Negative Observation$/i]
+  );
+
+  const firstGuidanceLine = objectiveBlock.findIndex((row) => guidanceStart(row.text));
+
+  if (firstGuidanceLine < 0) return [];
+
+  return objectiveBlock.slice(firstGuidanceLine);
 }
 
 function mergeTitleEntries(lines, startDetector) {
@@ -335,11 +380,7 @@ async function main() {
       [/^Objective$/i, /^Industry Guidance:?$/i, /^Inspection Guidance\.?$/i]
     );
 
-    const guideLines = sectionLines(
-      q,
-      /^Industry Guidance:?$/i,
-      [/^Inspection Guidance\.?$/i, /^Suggested Inspector Actions$/i, /^Expected Evidence$/i, /^Potential Grounds for a Negative Observation$/i]
-    );
+    const guideLines = guidanceLinesForQuestion(q);
 
     const publications = mergeTitleEntries(pubLines, publicationStart);
     const guidance = splitGuidanceEntries(guideLines);
