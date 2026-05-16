@@ -5,7 +5,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "PA7H-2026-05-16-SIRE-VIEWER";
+  const BUILD = "PA7I-2026-05-16-SIRE-VIEWER-PRIMARY";
 
   const AREA_HOME = {
     company_policy: {
@@ -37,22 +37,15 @@
           title: "Inspection question libraries and preparation",
           items: [
             {
-              label: "Read-Only Library",
-              text: "Locked SIRE 2.0 question library for study and reference.",
-              href: "./library.html?mode=study",
-              cardKey: "library",
-              icon: "📚",
-            },
-            {
               label: "SIRE 2.0 Questions Viewer",
-              text: "Read-only operational SIRE 2.0 viewer with filters, normal search, PGNOs, expected evidence, publications and industry guidance.",
+              text: "Primary read-only operational SIRE 2.0 viewer with filters, normal search, PGNOs, expected evidence, publications, industry guidance, print and export tools.",
               href: "./q-sire-questions-viewer.html",
               cardKey: "sire_questions_viewer",
               icon: "🔎",
             },
             {
               label: "SIRE Questions Editor",
-              text: "SIRE 2.0 question library, PGNOs and expected evidence management.",
+              text: "Restricted SIRE 2.0 question library, PGNOs, references and expected evidence management.",
               href: "./q-questions-editor.html",
               cardKey: "qeditor",
               icon: "🖊️",
@@ -63,6 +56,18 @@
               href: "./risq-questions-editor.html",
               cardKey: "risq_questions_editor",
               icon: "📙",
+            },
+          ],
+        },
+        {
+          title: "Legacy / transition",
+          items: [
+            {
+              label: "Read-Only Library (legacy)",
+              text: "Legacy SIRE 2.0 study library retained temporarily until the SIRE 2.0 Questions Viewer fully replaces it.",
+              href: "./library.html?mode=study",
+              cardKey: "library",
+              icon: "📚",
             },
           ],
         },
