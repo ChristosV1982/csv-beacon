@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en" data-csvb-page="q-sire-questions-viewer.html">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>C.S.V. BEACON – SIRE 2.0 Questions Viewer</title>
+
+  <link rel="stylesheet" href="./csv-beacon-theme.css?v=20260428_3" />
+  <link rel="stylesheet" href="./q-questions-editor.css?v=20260130_1" />
+  <link rel="stylesheet" href="./q-sire-questions-viewer.css?v=20260516_1" />
+
+  <script src="./csvb-module-guard.js?v=20260516_1"></script>
+
+  <link rel="stylesheet" href="./csvb-ui-polish.css?v=20260430_1" />
+  <link rel="stylesheet" href="./csvb-help-tooltips.css?v=20260430_1" />
+  <link rel="stylesheet" href="./csvb-100pct-fit.css?v=20260430_1" />
+</head>
+
+<body>
+  <header class="topbar">
+    <div class="topbar-left">
+      <div class="brand">SIRE 2.0 – Questions Viewer</div>
+      <div class="muted small" id="modeLine">Role: — • Mode: Read-only • Module: SIRE_QUESTIONS_VIEWER</div>
+    </div>
+
+    <div class="topbar-right">
+      <label class="themeCtl" for="themeSelect" title="Theme">
+        <span class="themeCtl-label">Theme</span>
+        <select id="themeSelect" class="btn light themeCtl-select">
+          <option value="system">System</option>
+          <option value="light">Light</option>
+          <option value="dark">Dark</option>
+        </select>
+      </label>
+
+      <button class="btn light" type="button" onclick="location.href='./q-dashboard.html'">Dashboard</button>
+      <div id="userBadge" class="badge">Not signed in</div>
+      <button id="loginBtn" class="btn primary" type="button">Login</button>
+      <button id="switchUserBtn" class="btn light" type="button">Switch user</button>
+      <button id="logoutBtn" class="btn" type="button">Logout</button>
+    </div>
+  </header>
+
+  <div class="csvb-sire-viewer-helper">
+    <div>
+      <div class="csvb-sire-viewer-helper-title">SIRE 2.0 Questions Viewer</div>
+      <div class="csvb-sire-viewer-helper-note">
+        Read-only operational viewer for the active SIRE 2.0 question database. Editing, import, delete and audit controls are intentionally not loaded on this page.
+      </div>
+    </div>
+    <div class="csvb-sire-viewer-helper-badge">Read-only</div>
+  </div>
+
+  <div class="page">
+    <div id="warnBox" class="msg warn" style="display:none;"></div>
+    <div id="okBox" class="msg ok" style="display:none;"></div>
+
+    <div class="filterRibbon" id="filterRibbon">
+      <div class="facetWrap facetWrapRibbon">
+        <details class="facet" id="facet_version">
+          <summary>Version <span class="facetSummary" id="facetSummary_version"></span></summary>
+          <div class="facetBody">
+            <div class="facetOptions" id="facetOptions_version"></div>
+          </div>
+        </details>
+
+        <details class="facet" id="facet_questionType">
+          <summary>Question Type <span class="facetSummary" id="facetSummary_questionType"></span></summary>
+          <div class="facetBody">
+            <div class="facetOptions" id="facetOptions_questionType"></div>
+          </div>
+        </details>
+
+        <details class="facet" id="facet_vesselType">
+          <summary>Vessel Type <span class="facetSummary" id="facetSummary_vesselType"></span></summary>
+          <div class="facetBody">
+            <div class="facetOptions" id="facetOptions_vesselType"></div>
+          </div>
+        </details>
+
+        <details class="facet" id="facet_responseType">
+          <summary>Response Type <span class="facetSummary" id="facetSummary_responseType"></span></summary>
+          <div class="facetBody">
+            <div class="facetOptions" id="facetOptions_responseType"></div>
+          </div>
+        </details>
+
+        <details class="facet" id="facet_companyRank">
+          <summary>Company Rank Allocation <span class="facetSummary" id="facetSummary_companyRank"></span></summary>
+          <div class="facetBody">
+            <div class="facetOptions" id="facetOptions_companyRank"></div>
+          </div>
+        </details>
+
+        <details class="facet" id="facet_chapter">
+          <summary>SIRE 2.0 Chapter <span class="facetSummary" id="facetSummary_chapter"></span></summary>
+          <div class="facetBody">
+            <div class="facetOptions" id="facetOptions_chapter"></div>
+          </div>
+        </details>
+      </div>
+    </div>
+
+    <div class="layout">
+      <aside class="sidebar">
+        <div class="card">
+          <div class="card-title">Questions</div>
+
+          <div class="row gap">
+            <button id="reloadBtn" class="btn" type="button">Reload</button>
+            <span class="csvb-sire-viewer-lock">No editing controls loaded</span>
+          </div>
+
+          <div class="hr"></div>
+
+          <label class="lbl">Search</label>
+          <input id="searchInput" class="inp" type="text" placeholder="Search number / text / guidance / attributes..." />
+
+          <div class="meta">
+            <div id="countLine">—</div>
+            <div id="loadedLine" class="muted">—</div>
+          </div>
+
+          <div class="row" style="align-items:center; justify-content:space-between;">
+            <div class="muted small">
+              Show full question in list: <b><span id="showFullQuestionState">—</span></b>
+            </div>
+            <label class="toggle">
+              <input id="showFullQuestionToggle" type="checkbox" />
+              <span> </span>
+            </label>
+          </div>
+
+          <div id="loadHint" class="muted small" style="margin-top:8px;"></div>
+        </div>
+
+        <div class="card listCard">
+          <div id="qList" class="qList"></div>
+        </div>
+      </aside>
+
+      <main class="main">
+        <div id="emptyState" class="card">
+          <div class="card-title">No question selected</div>
+          <div class="muted">Select a SIRE 2.0 question from the list on the left.</div>
+        </div>
+
+        <div id="viewPanel" class="card" style="display:none;">
+          <div class="hdr">
+            <div class="vhdr-left">
+              <div class="vhdr-top">
+                <div class="hnum" id="vhdrNumber">—</div>
+                <div class="vhdr-short">
+                  <div class="box box-inline" id="vShortText" title="Short Text"></div>
+                </div>
+              </div>
+              <div class="muted small" id="vhdrId" style="display:none;"></div>
+            </div>
+            <div class="csvb-sire-viewer-panel-badges">
+              <div class="qe-pill" id="vSourcePill">source: SIRE</div>
+              <div class="qe-pill" id="vStatusPill">status: active</div>
+            </div>
+          </div>
+
+          <div class="section">
+            <div class="section-title">Question</div>
+
+            <div class="qstack">
+              <div>
+                <div class="box qbox qtext" id="vQuestion"></div>
+              </div>
+
+              <details class="coll">
+                <summary><span class="collTitle">Question Guidance</span></summary>
+                <div class="collBody">
+                  <div class="box" id="vGuidance"></div>
+                </div>
+              </details>
+
+              <details class="coll">
+                <summary><span class="collTitle">Suggested inspector actions</span></summary>
+                <div class="collBody">
+                  <div class="box" id="vActions"></div>
+                </div>
+              </details>
+            </div>
+          </div>
+
+          <details class="coll" id="vCollAttrs">
+            <summary><span class="collTitle">Question Attributes</span></summary>
+            <div class="collBody">
+              <div class="grid2 attrGrid">
+                <div><div class="lbl">Question Type</div><div class="box" id="vAttrQuestionType"></div></div>
+                <div><div class="lbl">Vessel Type</div><div class="box" id="vAttrVesselType"></div></div>
+                <div><div class="lbl">ROVIQ List</div><div class="box" id="vAttrRoviq"></div></div>
+                <div><div class="lbl">Company Rank Allocation</div><div class="box" id="vAttrCompanyRank"></div></div>
+                <div><div class="lbl">TMSA3 Reference</div><div class="box" id="vAttrTmsa3"></div></div>
+                <div><div class="lbl">TMSA4 Reference</div><div class="box" id="vAttrTmsa4"></div></div>
+                <div><div class="lbl">Response Type</div><div class="box" id="vAttrResponseType"></div></div>
+                <div><div class="lbl">Tags</div><div class="box" id="vTags"></div></div>
+                <div><div class="lbl">Version</div><div class="box" id="vVersion"></div></div>
+              </div>
+            </div>
+          </details>
+
+          <details class="coll" id="vCollEe">
+            <summary>
+              <span class="collTitle">Expected Evidence</span>
+              <span class="muted small" id="vEeCount" style="margin-left:10px;">—</span>
+            </summary>
+            <div class="collBody">
+              <div id="vEeList"></div>
+            </div>
+          </details>
+
+          <details class="coll" id="vCollPgno">
+            <summary>
+              <span class="collTitle">PGNOs</span>
+              <span class="muted small" id="vPgnoCount" style="margin-left:10px;">—</span>
+            </summary>
+            <div class="collBody">
+              <div id="vPgnoList"></div>
+            </div>
+          </details>
+
+          <div class="section csvb-sire-viewer-advanced">
+            <button id="btnToggleAdvancedView" class="btn" type="button">Advanced (Raw JSON)</button>
+            <div id="viewAdvanced" class="adv" style="display:none;">
+              <pre id="vRaw" class="pre"></pre>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script defer src="./theme.js?v=20260212_1"></script>
+  <script defer src="./auth.js?v=20260130_1"></script>
+  <script defer src="./q-sire-questions-viewer.js?v=20260516_1"></script>
+  <script defer src="./csvb-sire-reference-display.js?v=20260514_5"></script>
+  <script defer src="./csvb-sire-publication-secondary-filter.js?v=20260514_5"></script>
+  <script src="./csvb-ui-polish.js?v=20260430_1"></script>
+  <script src="./csvb-help-tooltips.js?v=20260430_1"></script>
+  <script src="./csvb-100pct-fit.js?v=20260430_1"></script>
+</body>
+</html>
