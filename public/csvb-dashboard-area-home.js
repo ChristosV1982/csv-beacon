@@ -5,7 +5,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "PA7I-2026-05-16-SIRE-VIEWER-PRIMARY";
+  const BUILD = "PA7J-2026-05-16-SIRE-VIEWER-INDEPENDENT";
 
   const AREA_HOME = {
     company_policy: {
@@ -250,12 +250,18 @@
       .replaceAll("'", "&#039;");
   }
 
+  function dashboardModuleAllows(moduleKey) {
+    const access = window.CSVB_DASHBOARD_MODULE_ACCESS;
+    if (!access) return false;
+    if (access.isPlatform === true) return true;
+    return access.enabled?.has?.(moduleKey) === true;
+  }
+
   function isModuleAvailable(cardKey) {
     if (!cardKey) return true;
 
     if (cardKey === "sire_questions_viewer") {
-      const libraryCard = document.querySelector('[data-card="library"]');
-      return !!libraryCard && libraryCard.style.display !== "none";
+      return dashboardModuleAllows("sire_questions_viewer") || dashboardModuleAllows("read_only_library");
     }
 
     const card = document.querySelector(`[data-card="${cardKey}"]`);
