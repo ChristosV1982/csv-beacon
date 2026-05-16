@@ -5,7 +5,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "SIRE-QUESTIONS-VIEWER-20260516_2";
+  const BUILD = "SIRE-QUESTIONS-VIEWER-20260516_3";
   window.CSVB_SIRE_QUESTIONS_VIEWER_BUILD = BUILD;
 
   const $ = (id) => document.getElementById(id);
@@ -130,6 +130,31 @@
     return `${numberBase(row)}.${String(index + 1).padStart(2, "0")}`;
   }
 
+  function normalizeArray(v) {
+    if (Array.isArray(v)) return v;
+
+    if (typeof v === "string") {
+      const trimmed = v.trim();
+      if (!trimmed) return [];
+      try {
+        const parsed = JSON.parse(trimmed);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch {
+        return [];
+      }
+    }
+
+    return [];
+  }
+
+  function flattenText(value) {
+    if (value === null || value === undefined) return "";
+    if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") return s(value);
+    if (Array.isArray(value)) return value.map(flattenText).join(" ");
+    if (typeof value === "object") return Object.values(value).map(flattenText).join(" ");
+    return "";
+  }
+
   const FACETS = [
     ["version", "Version"],
     ["questionType", "Question Type"],
@@ -145,12 +170,19 @@
   const chosen = Object.fromEntries(FACETS.map(([k]) => [k, new Set()]));
 
   // Stage 1 Viewer search index: PGNO + Expected Evidence child rows.
-  // Built in the background so the Viewer opens immediately.
+  // Stage 2 Viewer search index: Applicable Publications + Industry Guidance reference rows.
+  // Both are built in the background so the Viewer opens immediately.
   let childSearchIndex = new Map();
   let childSearchBuildToken = 0;
   let childSearchIndexed = 0;
   let childSearchTotal = 0;
   let childSearchErrors = 0;
+
+  let referenceSearchIndex = new Map();
+  let referenceSearchBuildToken = 0;
+  let referenceSearchIndexed = 0;
+  let referenceSearchTotal = 0;
+  let referenceSearchErrors = 0;
 
   function facetValues(row, key) {
     const p = row?.payload || {};
@@ -177,12 +209,27 @@
   function childIndexStatusText() {
     if (!childSearchTotal) return "";
     if (childSearchIndexed < childSearchTotal) {
-      return ` • EE/PGNO search index ${childSearchIndexed}/${childSearchTotal}`;
+      return ` • EE/PGNO index ${childSearchIndexed}/${childSearchTotal}`;
     }
     if (childSearchErrors > 0) {
-      return ` • EE/PGNO search index complete (${childSearchErrors} fallback/error)`;
+      return ` • EE/PGNO index complete (${childSearchErrors} fallback/error)`;
     }
-    return " • EE/PGNO search index complete";
+    return " • EE/PGNO index complete";
+  }
+
+  function referenceIndexStatusText() {
+    if (!referenceSearchTotal) return "";
+    if (referenceSearchIndexed < referenceSearchTotal) {
+      return ` • References index ${referenceSearchIndexed}/${referenceSearchTotal}`;
+    }
+    if (referenceSearchErrors > 0) {
+      return ` • References index complete (${referenceSearchErrors} fallback/error)`;
+    }
+    return " • References index complete";
+  }
+
+  function indexStatusText() {
+    return `${childIndexStatusText()}${referenceIndexStatusText()}`;
   }
 
   function childIndexTextFromEe(items) {
@@ -203,6 +250,29 @@
     ].map(s).join(" ")).join(" ");
   }
 
+  function referenceIndexTextFromRow(refRow) {
+    const publications = normalizeArray(refRow?.applicable_publications);
+    const guidance = normalizeArray(refRow?.industry_guidance);
+
+    const pubText = publications.map((p, i) => [
+      `Applicable Publication ${i + 1}`,
+      p?.display_name,
+      p?.raw_publication_text,
+      flattenText(p)
+    ].map(s).join(" ")).join(" ");
+
+    const guidanceText = guidance.map((g, i) => [
+      `Industry Guidance ${i + 1}`,
+      g?.guidance_title,
+      g?.guidance_section,
+      g?.guidance_subsection,
+      g?.guidance_content,
+      flattenText(g)
+    ].map(s).join(" ")).join(" ");
+
+    return [pubText, guidanceText].join(" ");
+  }
+
   function seedChildSearchIndexFromPayload() {
     childSearchIndex = new Map();
     rows.forEach((row) => {
@@ -214,6 +284,16 @@
     });
   }
 
+  function seedReferenceSearchIndex() {
+    referenceSearchIndex = new Map();
+    rows.forEach((row) => referenceSearchIndex.set(rowId(row), ""));
+  }
+
+  function updateIndexStatusLine() {
+    txt("loadedLine", `Loaded ${rows.length} active SIRE 2.0 questions${indexStatusText()}`);
+    txt("loadHint", `Loaded ${rows.length} active SIRE 2.0 question(s).${indexStatusText()}`);
+  }
+
   async function buildChildSearchIndex() {
     const token = ++childSearchBuildToken;
     childSearchIndexed = 0;
@@ -222,10 +302,10 @@
 
     if (!rows.length) return;
 
-    txt("loadHint", `Loaded ${rows.length} active SIRE 2.0 question(s). Building EE/PGNO search index…`);
+    updateIndexStatusLine();
 
     let next = 0;
-    const workers = Math.min(6, rows.length);
+    const workers = Math.min(4, rows.length);
 
     async function worker() {
       while (token === childSearchBuildToken && next < rows.length) {
@@ -268,12 +348,8 @@
           childSearchIndexed += 1;
 
           if (childSearchIndexed % 20 === 0 || childSearchIndexed === childSearchTotal) {
-            txt("loadedLine", `Loaded ${rows.length} active SIRE 2.0 questions${childIndexStatusText()}`);
-            txt("loadHint", `Loaded ${rows.length} active SIRE 2.0 question(s).${childIndexStatusText()}`);
-
-            if (s($("searchInput")?.value).trim()) {
-              renderList();
-            }
+            updateIndexStatusLine();
+            if (s($("searchInput")?.value).trim()) renderList();
           }
         }
       }
@@ -283,8 +359,61 @@
 
     if (token !== childSearchBuildToken) return;
 
-    txt("loadedLine", `Loaded ${rows.length} active SIRE 2.0 questions${childIndexStatusText()}`);
-    txt("loadHint", `Loaded ${rows.length} active SIRE 2.0 question(s).${childIndexStatusText()}`);
+    updateIndexStatusLine();
+    renderList();
+  }
+
+  async function buildReferenceSearchIndex() {
+    const token = ++referenceSearchBuildToken;
+    referenceSearchIndexed = 0;
+    referenceSearchTotal = rows.length;
+    referenceSearchErrors = 0;
+
+    if (!rows.length) return;
+
+    updateIndexStatusLine();
+
+    let next = 0;
+    const workers = Math.min(3, rows.length);
+
+    async function worker() {
+      while (token === referenceSearchBuildToken && next < rows.length) {
+        const row = rows[next++];
+        const id = rowId(row);
+
+        try {
+          if (!row.id) {
+            referenceSearchIndex.set(id, "");
+          } else {
+            const { data, error } = await sb.rpc("csvb_sire_question_references_for_question", {
+              p_question_id: row.id
+            });
+
+            if (error) throw error;
+
+            const refRow = Array.isArray(data) ? (data[0] || {}) : (data || {});
+            const text = referenceIndexTextFromRow(refRow).toLowerCase();
+            referenceSearchIndex.set(id, text);
+          }
+        } catch (_) {
+          referenceSearchErrors += 1;
+          referenceSearchIndex.set(id, "");
+        } finally {
+          referenceSearchIndexed += 1;
+
+          if (referenceSearchIndexed % 20 === 0 || referenceSearchIndexed === referenceSearchTotal) {
+            updateIndexStatusLine();
+            if (s($("searchInput")?.value).trim()) renderList();
+          }
+        }
+      }
+    }
+
+    await Promise.all(Array.from({ length: workers }, worker));
+
+    if (token !== referenceSearchBuildToken) return;
+
+    updateIndexStatusLine();
     renderList();
   }
 
@@ -304,7 +433,8 @@
       pget(p, ["TMSA3 Reference", "TMSA3", "tmsa3_reference", "tmsa3Reference"]),
       pget(p, ["TMSA4 Reference", "TMSA4", "tmsa4_reference", "tmsa4Reference"]),
       responseTypes(p).join(" "),
-      childSearchIndex.get(rowId(row)) || ""
+      childSearchIndex.get(rowId(row)) || "",
+      referenceSearchIndex.get(rowId(row)) || ""
     ];
     try { parts.push(JSON.stringify(p)); } catch {}
     return parts.join(" ").toLowerCase();
@@ -403,7 +533,7 @@
     });
 
     txt("countLine", `${data.length} questions`);
-    txt("loadedLine", `Loaded ${rows.length} active SIRE 2.0 questions${childIndexStatusText()}`);
+    txt("loadedLine", `Loaded ${rows.length} active SIRE 2.0 questions${indexStatusText()}`);
     renderFacets();
   }
 
@@ -542,12 +672,17 @@
         });
 
       childSearchBuildToken += 1;
+      referenceSearchBuildToken += 1;
       childSearchIndexed = 0;
       childSearchTotal = rows.length;
       childSearchErrors = 0;
+      referenceSearchIndexed = 0;
+      referenceSearchTotal = rows.length;
+      referenceSearchErrors = 0;
       seedChildSearchIndexFromPayload();
+      seedReferenceSearchIndex();
 
-      txt("loadHint", `Loaded ${rows.length} active SIRE 2.0 question(s). Building EE/PGNO search index…`);
+      txt("loadHint", `Loaded ${rows.length} active SIRE 2.0 question(s). Building search indexes…`);
       renderList();
 
       if (rows.length) await selectRow(rows.slice().sort((a,b) => qkey(a)[0] - qkey(b)[0] || qkey(a)[1] - qkey(b)[1] || qkey(a)[2] - qkey(b)[2])[0]);
@@ -560,6 +695,11 @@
       buildChildSearchIndex().catch((e) => {
         childSearchErrors += 1;
         txt("loadHint", `Loaded ${rows.length} active SIRE 2.0 question(s). EE/PGNO search index warning: ${s(e?.message || e)}`);
+      });
+
+      buildReferenceSearchIndex().catch((e) => {
+        referenceSearchErrors += 1;
+        txt("loadHint", `Loaded ${rows.length} active SIRE 2.0 question(s). Reference search index warning: ${s(e?.message || e)}`);
       });
     } catch (e) {
       txt("loadHint", "");
@@ -614,6 +754,11 @@
           indexed: childSearchIndexed,
           total: childSearchTotal,
           errors: childSearchErrors
+        }),
+        getReferenceSearchIndexStatus: () => ({
+          indexed: referenceSearchIndexed,
+          total: referenceSearchTotal,
+          errors: referenceSearchErrors
         })
       };
     } catch (e) {
