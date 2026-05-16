@@ -5,7 +5,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "PA7G-2026-05-13-INSPECTION-LIBRARIES-KEY";
+  const BUILD = "PA7H-2026-05-16-SIRE-VIEWER";
 
   const AREA_HOME = {
     company_policy: {
@@ -42,6 +42,13 @@
               href: "./library.html?mode=study",
               cardKey: "library",
               icon: "📚",
+            },
+            {
+              label: "SIRE 2.0 Questions Viewer",
+              text: "Read-only operational SIRE 2.0 viewer with filters, normal search, PGNOs, expected evidence, publications and industry guidance.",
+              href: "./q-sire-questions-viewer.html",
+              cardKey: "sire_questions_viewer",
+              icon: "🔎",
             },
             {
               label: "SIRE Questions Editor",
@@ -240,6 +247,11 @@
 
   function isModuleAvailable(cardKey) {
     if (!cardKey) return true;
+
+    if (cardKey === "sire_questions_viewer") {
+      const libraryCard = document.querySelector('[data-card="library"]');
+      return !!libraryCard && libraryCard.style.display !== "none";
+    }
 
     const card = document.querySelector(`[data-card="${cardKey}"]`);
     if (!card) return false;
