@@ -5,13 +5,14 @@
 (() => {
   "use strict";
 
-  const BUILD = "PLA06-2026-05-13-COMPONENT-DETAIL-GUARD";
+  const BUILD = "PLA06-2026-05-16-SIRE-VIEWER-GUARD";
 
   const CSVB_COMPANY_VIEW_ID_KEY = "csvb_superuser_company_view_id";
   const CSVB_COMPANY_VIEW_NAME_KEY = "csvb_superuser_company_view_name";
 
   const PAGE_MODULE_MAP = {
     "library.html": "read_only_library",
+    "q-sire-questions-viewer.html": "read_only_library",
 
     "q-dashboard.html": null,
     "index.html": null,
