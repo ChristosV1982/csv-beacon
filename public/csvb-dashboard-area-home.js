@@ -5,7 +5,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "PA7J-2026-05-16-SIRE-VIEWER-INDEPENDENT";
+  const BUILD = "PA7K-2026-05-16-LEGACY-LIBRARY-SOFT-RETIRED";
 
   const AREA_HOME = {
     company_policy: {
@@ -56,18 +56,6 @@
               href: "./risq-questions-editor.html",
               cardKey: "risq_questions_editor",
               icon: "📙",
-            },
-          ],
-        },
-        {
-          title: "Legacy / transition",
-          items: [
-            {
-              label: "Read-Only Library (legacy)",
-              text: "Legacy SIRE 2.0 study library retained temporarily until the SIRE 2.0 Questions Viewer fully replaces it.",
-              href: "./library.html?mode=study",
-              cardKey: "library",
-              icon: "📚",
             },
           ],
         },
