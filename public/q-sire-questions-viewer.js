@@ -5,7 +5,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "SIRE-QUESTIONS-VIEWER-20260516_1";
+  const BUILD = "SIRE-QUESTIONS-VIEWER-20260516_2";
   window.CSVB_SIRE_QUESTIONS_VIEWER_BUILD = BUILD;
 
   const $ = (id) => document.getElementById(id);
@@ -85,6 +85,10 @@
     return m ? [Number(m[1]), Number(m[2]), Number(m[3]), nb] : [999,999,999,nb];
   }
 
+  function rowId(row) {
+    return s(row?.id || qno(row));
+  }
+
   function chapter(row) {
     const m = numberBase(row).match(/^(\d+)\./);
     return m ? String(Number(m[1])).padStart(2, "0") : "";
@@ -140,6 +144,14 @@
   let selected = null;
   const chosen = Object.fromEntries(FACETS.map(([k]) => [k, new Set()]));
 
+  // Stage 1 Viewer search index: PGNO + Expected Evidence child rows.
+  // Built in the background so the Viewer opens immediately.
+  let childSearchIndex = new Map();
+  let childSearchBuildToken = 0;
+  let childSearchIndexed = 0;
+  let childSearchTotal = 0;
+  let childSearchErrors = 0;
+
   function facetValues(row, key) {
     const p = row?.payload || {};
     if (key === "version") return [s(row?.version).trim()].filter(Boolean);
@@ -162,6 +174,120 @@
     return true;
   }
 
+  function childIndexStatusText() {
+    if (!childSearchTotal) return "";
+    if (childSearchIndexed < childSearchTotal) {
+      return ` • EE/PGNO search index ${childSearchIndexed}/${childSearchTotal}`;
+    }
+    if (childSearchErrors > 0) {
+      return ` • EE/PGNO search index complete (${childSearchErrors} fallback/error)`;
+    }
+    return " • EE/PGNO search index complete";
+  }
+
+  function childIndexTextFromEe(items) {
+    return (items || []).map((it, i) => [
+      `Expected Evidence ${i + 1}`,
+      it.text,
+      it.esms_references,
+      it.esms_forms,
+      it.remarks
+    ].map(s).join(" ")).join(" ");
+  }
+
+  function childIndexTextFromPgno(row, items) {
+    return (items || []).map((it, i) => [
+      pgnoCode(row, i),
+      it.text,
+      it.remarks
+    ].map(s).join(" ")).join(" ");
+  }
+
+  function seedChildSearchIndexFromPayload() {
+    childSearchIndex = new Map();
+    rows.forEach((row) => {
+      const fallbackText = [
+        childIndexTextFromEe(eeFallback(row)),
+        childIndexTextFromPgno(row, pgnoFallback(row))
+      ].join(" ").toLowerCase();
+      childSearchIndex.set(rowId(row), fallbackText);
+    });
+  }
+
+  async function buildChildSearchIndex() {
+    const token = ++childSearchBuildToken;
+    childSearchIndexed = 0;
+    childSearchTotal = rows.length;
+    childSearchErrors = 0;
+
+    if (!rows.length) return;
+
+    txt("loadHint", `Loaded ${rows.length} active SIRE 2.0 question(s). Building EE/PGNO search index…`);
+
+    let next = 0;
+    const workers = Math.min(6, rows.length);
+
+    async function worker() {
+      while (token === childSearchBuildToken && next < rows.length) {
+        const row = rows[next++];
+        const id = rowId(row);
+
+        try {
+          let pgno = [];
+          let ee = [];
+
+          if (row.id) {
+            const results = await Promise.allSettled([
+              loadPgno(row.id),
+              loadEe(row.id)
+            ]);
+
+            pgno = results[0].status === "fulfilled" ? results[0].value : pgnoFallback(row);
+            ee = results[1].status === "fulfilled" ? results[1].value : eeFallback(row);
+
+            if (results.some((r) => r.status === "rejected")) childSearchErrors += 1;
+          } else {
+            pgno = pgnoFallback(row);
+            ee = eeFallback(row);
+          }
+
+          const text = [
+            childIndexTextFromEe(ee),
+            childIndexTextFromPgno(row, pgno)
+          ].join(" ").toLowerCase();
+
+          childSearchIndex.set(id, text);
+        } catch (_) {
+          childSearchErrors += 1;
+          const fallbackText = [
+            childIndexTextFromEe(eeFallback(row)),
+            childIndexTextFromPgno(row, pgnoFallback(row))
+          ].join(" ").toLowerCase();
+          childSearchIndex.set(id, fallbackText);
+        } finally {
+          childSearchIndexed += 1;
+
+          if (childSearchIndexed % 20 === 0 || childSearchIndexed === childSearchTotal) {
+            txt("loadedLine", `Loaded ${rows.length} active SIRE 2.0 questions${childIndexStatusText()}`);
+            txt("loadHint", `Loaded ${rows.length} active SIRE 2.0 question(s).${childIndexStatusText()}`);
+
+            if (s($("searchInput")?.value).trim()) {
+              renderList();
+            }
+          }
+        }
+      }
+    }
+
+    await Promise.all(Array.from({ length: workers }, worker));
+
+    if (token !== childSearchBuildToken) return;
+
+    txt("loadedLine", `Loaded ${rows.length} active SIRE 2.0 questions${childIndexStatusText()}`);
+    txt("loadHint", `Loaded ${rows.length} active SIRE 2.0 question(s).${childIndexStatusText()}`);
+    renderList();
+  }
+
   function haystack(row) {
     const p = row?.payload || {};
     const parts = [
@@ -177,7 +303,8 @@
       pget(p, ["Company Rank Allocation", "Company_Rank_Allocation", "company_rank_allocation", "companyRankAllocation"]),
       pget(p, ["TMSA3 Reference", "TMSA3", "tmsa3_reference", "tmsa3Reference"]),
       pget(p, ["TMSA4 Reference", "TMSA4", "tmsa4_reference", "tmsa4Reference"]),
-      responseTypes(p).join(" ")
+      responseTypes(p).join(" "),
+      childSearchIndex.get(rowId(row)) || ""
     ];
     try { parts.push(JSON.stringify(p)); } catch {}
     return parts.join(" ").toLowerCase();
@@ -276,7 +403,7 @@
     });
 
     txt("countLine", `${data.length} questions`);
-    txt("loadedLine", `Loaded ${rows.length} active SIRE 2.0 questions`);
+    txt("loadedLine", `Loaded ${rows.length} active SIRE 2.0 questions${childIndexStatusText()}`);
     renderFacets();
   }
 
@@ -414,7 +541,13 @@
           return !status || status === "active";
         });
 
-      txt("loadHint", `Loaded ${rows.length} active SIRE 2.0 question(s).`);
+      childSearchBuildToken += 1;
+      childSearchIndexed = 0;
+      childSearchTotal = rows.length;
+      childSearchErrors = 0;
+      seedChildSearchIndexFromPayload();
+
+      txt("loadHint", `Loaded ${rows.length} active SIRE 2.0 question(s). Building EE/PGNO search index…`);
       renderList();
 
       if (rows.length) await selectRow(rows.slice().sort((a,b) => qkey(a)[0] - qkey(b)[0] || qkey(a)[1] - qkey(b)[1] || qkey(a)[2] - qkey(b)[2])[0]);
@@ -423,6 +556,11 @@
         if ($("emptyState")) $("emptyState").style.display = "block";
         if ($("viewPanel")) $("viewPanel").style.display = "none";
       }
+
+      buildChildSearchIndex().catch((e) => {
+        childSearchErrors += 1;
+        txt("loadHint", `Loaded ${rows.length} active SIRE 2.0 question(s). EE/PGNO search index warning: ${s(e?.message || e)}`);
+      });
     } catch (e) {
       txt("loadHint", "");
       msg("warnBox", "Failed to load SIRE 2.0 questions from DB:\n\n" + s(e?.message || e));
@@ -471,7 +609,12 @@
         build: BUILD,
         reload: loadQuestions,
         getRows: () => rows.slice(),
-        getSelected: () => selected ? JSON.parse(JSON.stringify(selected)) : null
+        getSelected: () => selected ? JSON.parse(JSON.stringify(selected)) : null,
+        getChildSearchIndexStatus: () => ({
+          indexed: childSearchIndexed,
+          total: childSearchTotal,
+          errors: childSearchErrors
+        })
       };
     } catch (e) {
       msg("warnBox", "Boot failed:\n\n" + s(e?.message || e));
