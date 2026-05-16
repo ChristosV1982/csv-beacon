@@ -5,7 +5,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "PA6F-2026-05-16-SIRE-VIEWER-COUNT";
+  const BUILD = "PA6G-2026-05-16-SIRE-VIEWER-INDEPENDENT";
   const SELECTED_KEY = "csvb_dashboard_selected_platform_area_v6";
 
   /*
@@ -15,10 +15,12 @@
     Fallback:
       DEFAULT_PLATFORM_AREAS below.
 
-    Note:
-      SIRE 2.0 Questions Viewer currently uses the existing QUESTION_LIBRARY / read_only_library
-      access path. Until a dedicated DB module key is created, it is added as a frontend pseudo-card
-      under Inspection Libraries & Vetting when the Read-Only Library card is available.
+    Transition note:
+      SIRE 2.0 Questions Viewer now has its own module key:
+        sire_questions_viewer
+      During transition, dashboard visibility still falls back to legacy:
+        read_only_library
+      so no company loses Viewer access before Read-Only Library is retired.
   */
 
   const SIRE_VIEWER_CARD_KEY = "sire_questions_viewer";
@@ -233,10 +235,18 @@
     return document.querySelector(`[data-card="${cardKey}"]`);
   }
 
+  function dashboardModuleAllows(moduleKey) {
+    const access = window.CSVB_DASHBOARD_MODULE_ACCESS;
+
+    if (!access) return false;
+    if (access.isPlatform === true) return true;
+
+    return access.enabled?.has?.(moduleKey) === true;
+  }
+
   function isCardAvailable(cardKey) {
     if (cardKey === SIRE_VIEWER_CARD_KEY) {
-      const libraryCard = getCard("library");
-      return !!libraryCard && libraryCard.style.display !== "none";
+      return dashboardModuleAllows("sire_questions_viewer") || dashboardModuleAllows("read_only_library");
     }
 
     const card = getCard(cardKey);
