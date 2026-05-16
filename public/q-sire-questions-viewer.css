@@ -1,0 +1,204 @@
+/* public/q-sire-questions-viewer.css */
+/* C.S.V. BEACON — SIRE 2.0 Questions Viewer */
+
+html[data-csvb-page="q-sire-questions-viewer.html"] body {
+  background: var(--bg-main, #F4F8FC);
+}
+
+html[data-csvb-page="q-sire-questions-viewer.html"] .csvb-sire-viewer-helper {
+  width: 100%;
+  max-width: 100%;
+  margin: 8px auto 10px;
+  padding: 9px 12px;
+  border: 1px solid #D6E4F5;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 8px 20px rgba(3,27,63,.05);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+html[data-csvb-page="q-sire-questions-viewer.html"] .csvb-sire-viewer-helper-title {
+  color: #062A5E;
+  font-weight: 750;
+}
+
+html[data-csvb-page="q-sire-questions-viewer.html"] .csvb-sire-viewer-helper-note {
+  color: #5E6F86;
+  font-size: .9rem;
+  line-height: 1.35;
+}
+
+html[data-csvb-page="q-sire-questions-viewer.html"] .csvb-sire-viewer-helper-badge,
+html[data-csvb-page="q-sire-questions-viewer.html"] .csvb-sire-viewer-lock {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid #AEE3F1;
+  background: #E9F7FB;
+  color: #062A5E;
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-weight: 750;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+html[data-csvb-page="q-sire-questions-viewer.html"] .csvb-sire-viewer-lock::before,
+html[data-csvb-page="q-sire-questions-viewer.html"] .csvb-sire-viewer-helper-badge::before {
+  content: "🔒";
+}
+
+html[data-csvb-page="q-sire-questions-viewer.html"] .layout {
+  grid-template-columns: 380px 1fr;
+}
+
+html[data-csvb-page="q-sire-questions-viewer.html"] .qList {
+  max-height: calc(100vh - 330px);
+}
+
+html[data-csvb-page="q-sire-questions-viewer.html"] .csvb-sire-viewer-panel-badges {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+}
+
+html[data-csvb-page="q-sire-questions-viewer.html"] #viewPanel {
+  overflow: visible;
+}
+
+html[data-csvb-page="q-sire-questions-viewer.html"] #viewPanel .vhdr-top {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  gap: 10px !important;
+  flex-wrap: nowrap !important;
+}
+
+html[data-csvb-page="q-sire-questions-viewer.html"] #viewPanel .hnum {
+  flex: 0 0 auto !important;
+}
+
+html[data-csvb-page="q-sire-questions-viewer.html"] #viewPanel .vhdr-short {
+  flex: 0 1 460px !important;
+  min-width: 260px !important;
+  max-width: 520px !important;
+}
+
+html[data-csvb-page="q-sire-questions-viewer.html"] #viewPanel #vShortText {
+  background: #EAF3FB !important;
+  border-color: #C8DAEF !important;
+  color: #062A5E !important;
+  min-height: 30px !important;
+  padding: 6px 10px !important;
+  font-weight: 400 !important;
+}
+
+html[data-csvb-page="q-sire-questions-viewer.html"] #viewPanel details.coll {
+  margin: 6px 0;
+  border: 1px solid var(--line, #D6E4F5);
+  border-radius: 12px;
+  background: #fff;
+  padding: 0;
+}
+
+html[data-csvb-page="q-sire-questions-viewer.html"] #viewPanel details.coll > summary {
+  min-height: 34px;
+  padding: 7px 10px;
+  border-radius: 12px;
+  color: #062A5E;
+  background: #F7FAFE;
+  border-bottom: 1px solid transparent;
+  font-weight: 650;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+html[data-csvb-page="q-sire-questions-viewer.html"] #viewPanel details.coll[open] > summary {
+  border-bottom-color: #D6E4F5;
+  border-radius: 12px 12px 0 0;
+}
+
+html[data-csvb-page="q-sire-questions-viewer.html"] #viewPanel .collTitle {
+  font-weight: 650;
+  color: #062A5E;
+}
+
+html[data-csvb-page="q-sire-questions-viewer.html"] #viewPanel .collBody {
+  padding: 8px 10px 10px;
+}
+
+html[data-csvb-page="q-sire-questions-viewer.html"] #vCollAttrs {
+  margin-top: 8px;
+  margin-bottom: 8px;
+}
+
+html[data-csvb-page="q-sire-questions-viewer.html"] #vCollAttrs > summary {
+  background: #FFFDF6;
+}
+
+html[data-csvb-page="q-sire-questions-viewer.html"] .csvb-sire-viewer-advanced {
+  display: none;
+}
+
+html[data-csvb-page="q-sire-questions-viewer.html"] .csvb-secondary-filter-shell {
+  display: inline-flex !important;
+  align-items: flex-start !important;
+  gap: 0 !important;
+  margin-left: 0 !important;
+  position: relative !important;
+}
+
+html[data-csvb-page="q-sire-questions-viewer.html"] button.csvb-secondary-filter-btn,
+html[data-csvb-page="q-sire-questions-viewer.html"] button.csvb-secondary-filter-btn.facet {
+  list-style: none !important;
+  cursor: pointer !important;
+  padding: 8px 12px !important;
+  border: 1px solid #d0d7e2 !important;
+  border-radius: 999px !important;
+  background: #ffffff !important;
+  color: #062A5E !important;
+  font-family: inherit !important;
+  font-size: 13px !important;
+  line-height: normal !important;
+  font-weight: 700 !important;
+  user-select: none !important;
+  white-space: nowrap !important;
+  box-shadow: none !important;
+  outline: none !important;
+  appearance: none !important;
+  -webkit-appearance: none !important;
+}
+
+html[data-csvb-page="q-sire-questions-viewer.html"] button.csvb-secondary-filter-btn.active,
+html[data-csvb-page="q-sire-questions-viewer.html"] button.csvb-secondary-filter-btn.facet.active {
+  background: #e9f0ff !important;
+  border-color: #b8c7e6 !important;
+  color: #062A5E !important;
+}
+
+html[data-csvb-page="q-sire-questions-viewer.html"] .csvb-sire-ref-title,
+html[data-csvb-page="q-sire-questions-viewer.html"] .csvb-sire-ref-content {
+  font-weight: 400 !important;
+}
+
+@media (max-width: 1050px) {
+  html[data-csvb-page="q-sire-questions-viewer.html"] .layout {
+    grid-template-columns: 1fr;
+  }
+
+  html[data-csvb-page="q-sire-questions-viewer.html"] .qList {
+    max-height: 420px;
+  }
+
+  html[data-csvb-page="q-sire-questions-viewer.html"] #viewPanel .vhdr-top {
+    flex-wrap: wrap !important;
+  }
+}
