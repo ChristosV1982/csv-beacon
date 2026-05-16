@@ -5,7 +5,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "PA6E-2026-05-13-INSPECTION-LIBRARIES-KEY";
+  const BUILD = "PA6F-2026-05-16-SIRE-VIEWER-COUNT";
   const SELECTED_KEY = "csvb_dashboard_selected_platform_area_v6";
 
   /*
@@ -15,10 +15,13 @@
     Fallback:
       DEFAULT_PLATFORM_AREAS below.
 
-    To add/edit platform areas later:
-      Prefer Supabase data via dashboard_platform_areas and dashboard_platform_area_modules.
-      This file remains the fallback only.
+    Note:
+      SIRE 2.0 Questions Viewer currently uses the existing QUESTION_LIBRARY / read_only_library
+      access path. Until a dedicated DB module key is created, it is added as a frontend pseudo-card
+      under Inspection Libraries & Vetting when the Read-Only Library card is available.
   */
+
+  const SIRE_VIEWER_CARD_KEY = "sire_questions_viewer";
 
   const DEFAULT_PLATFORM_AREAS = [
     {
@@ -40,6 +43,7 @@
         "Question libraries, vetting inspection preparation, post-inspection handling, statistics, inspector intelligence, reporting and related discussion threads.",
       cards: [
         "library",
+        SIRE_VIEWER_CARD_KEY,
         "company",
         "assignments",
         "tasks",
@@ -90,13 +94,54 @@
     },
   ];
 
-  let platformAreas = DEFAULT_PLATFORM_AREAS.slice();
+  let platformAreas = DEFAULT_PLATFORM_AREAS.map(enrichAreaCards);
   let platformAreaSource = "fallback";
   let observer = null;
   let refreshQueued = false;
 
   function safeText(value) {
     return String(value ?? "");
+  }
+
+  function uniqueCards(cards) {
+    const out = [];
+    const seen = new Set();
+
+    (cards || []).forEach((card) => {
+      const key = String(card || "").trim();
+      if (!key || seen.has(key)) return;
+      seen.add(key);
+      out.push(key);
+    });
+
+    return out;
+  }
+
+  function insertAfter(cards, afterKey, newKey) {
+    const clean = uniqueCards(cards).filter((card) => card !== newKey);
+    const idx = clean.indexOf(afterKey);
+
+    if (idx < 0) {
+      clean.unshift(newKey);
+      return clean;
+    }
+
+    clean.splice(idx + 1, 0, newKey);
+    return clean;
+  }
+
+  function enrichAreaCards(area) {
+    const normalized = {
+      ...area,
+      key: normalizeAreaKey(area?.key),
+      cards: uniqueCards(area?.cards || []),
+    };
+
+    if (normalized.key === "inspection_libraries_vetting") {
+      normalized.cards = insertAfter(normalized.cards, "library", SIRE_VIEWER_CARD_KEY);
+    }
+
+    return normalized;
   }
 
   function normalizeModuleCards(value) {
@@ -135,7 +180,7 @@
   }
 
   function normalizeDbArea(row) {
-    return {
+    return enrichAreaCards({
       key: String(row.area_key || "").trim(),
       title: String(row.title || row.area_key || "Untitled Area").trim(),
       icon: String(row.icon || "▣").trim(),
@@ -143,7 +188,7 @@
       placeholder: String(row.placeholder || "No modules are currently available in this platform area.").trim(),
       cards: normalizeModuleCards(row.module_cards),
       defaultSelected: row.default_selected === true,
-    };
+    });
   }
 
   async function loadPlatformAreasFromSupabase() {
@@ -179,7 +224,7 @@
       platformAreaSource = "supabase";
     } catch (error) {
       console.warn("C.S.V. BEACON dashboard platform areas using fallback:", error);
-      platformAreas = DEFAULT_PLATFORM_AREAS.slice();
+      platformAreas = DEFAULT_PLATFORM_AREAS.map(enrichAreaCards);
       platformAreaSource = "fallback";
     }
   }
@@ -189,6 +234,11 @@
   }
 
   function isCardAvailable(cardKey) {
+    if (cardKey === SIRE_VIEWER_CARD_KEY) {
+      const libraryCard = getCard("library");
+      return !!libraryCard && libraryCard.style.display !== "none";
+    }
+
     const card = getCard(cardKey);
     if (!card) return false;
 
