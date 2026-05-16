@@ -5,14 +5,14 @@
 (() => {
   "use strict";
 
-  const BUILD = "PLA06-2026-05-16-SIRE-VIEWER-GUARD";
+  const BUILD = "PLA06-2026-05-16-SIRE-VIEWER-INDEPENDENT";
 
   const CSVB_COMPANY_VIEW_ID_KEY = "csvb_superuser_company_view_id";
   const CSVB_COMPANY_VIEW_NAME_KEY = "csvb_superuser_company_view_name";
 
   const PAGE_MODULE_MAP = {
     "library.html": "read_only_library",
-    "q-sire-questions-viewer.html": "read_only_library",
+    "q-sire-questions-viewer.html": "sire_questions_viewer",
 
     "q-dashboard.html": null,
     "index.html": null,
@@ -128,9 +128,18 @@
     );
   }
 
+  function moduleKeyAlternates(moduleKey) {
+    if (moduleKey === "sire_questions_viewer") {
+      return ["sire_questions_viewer", "read_only_library"];
+    }
+
+    return [moduleKey];
+  }
+
   function moduleKeyToAppModuleCode(moduleKey) {
     const map = {
       read_only_library: "QUESTION_LIBRARY",
+      sire_questions_viewer: "SIRE_QUESTIONS_VIEWER",
       self_assessment: "VESSEL_QUESTIONNAIRES",
       post_inspection: "POST_INSPECTION",
       post_inspection_stats: "POST_INSPECTION_STATS",
@@ -150,11 +159,23 @@
     return map[moduleKey] || "";
   }
 
-  async function rankAllowsModuleView(sb, moduleKey) {
-    const appModuleCode = moduleKeyToAppModuleCode(moduleKey);
+  function moduleKeyToAppModuleCodes(moduleKey) {
+    const primary = moduleKeyToAppModuleCode(moduleKey);
+    const codes = primary ? [primary] : [];
 
-    if (!appModuleCode) {
-      return { allowed: false, appModuleCode: "", rows: [] };
+    if (moduleKey === "sire_questions_viewer") {
+      codes.push("QUESTION_LIBRARY");
+    }
+
+    return Array.from(new Set(codes.filter(Boolean)));
+  }
+
+  async function rankAllowsModuleView(sb, moduleKey) {
+    const appModuleCodes = moduleKeyToAppModuleCodes(moduleKey);
+    const appModuleCode = appModuleCodes[0] || "";
+
+    if (!appModuleCodes.length) {
+      return { allowed: false, appModuleCode: "", appModuleCodes: [], rows: [] };
     }
 
     try {
@@ -162,25 +183,27 @@
 
       if (error) {
         console.warn("Rank-based module guard check failed:", error);
-        return { allowed: false, appModuleCode, rows: [], error };
+        return { allowed: false, appModuleCode, appModuleCodes, rows: [], error };
       }
 
       const rows = data || [];
 
       const allowed = rows.some((row) => {
-        return row.module_code === appModuleCode &&
+        return appModuleCodes.includes(row.module_code) &&
           row.permission_action === "view" &&
           row.is_granted === true;
       });
 
-      return { allowed, appModuleCode, rows };
+      return { allowed, appModuleCode, appModuleCodes, rows };
     } catch (error) {
       console.warn("Rank-based module guard exception:", error);
-      return { allowed: false, appModuleCode, rows: [], error };
+      return { allowed: false, appModuleCode, appModuleCodes, rows: [], error };
     }
   }
 
   async function simulatedCompanyAllowsModule(sb, companyId, moduleKey) {
+    const keys = moduleKeyAlternates(moduleKey);
+
     const { data, error } = await sb.rpc("csvb_admin_list_company_modules", {
       p_company_id: companyId
     });
@@ -189,12 +212,13 @@
       throw new Error("Could not verify simulated company module access: " + error.message);
     }
 
-    return (data || []).some((m) => m.module_key === moduleKey && m.is_enabled === true);
+    return (data || []).some((m) => keys.includes(m.module_key) && m.is_enabled === true);
   }
 
   async function guardPage() {
     const page = currentPageName();
     const moduleKey = PAGE_MODULE_MAP[page];
+    const moduleKeys = moduleKeyAlternates(moduleKey);
 
     window.CSVB_MODULE_GUARD_BUILD = BUILD;
 
@@ -218,6 +242,7 @@
       window.CSVB_MODULE_GUARD = {
         page,
         moduleKey,
+        moduleKeys,
         allowed: false,
         onboardBlocked: true,
         reason: onboardBlockReason
@@ -243,6 +268,7 @@
         window.CSVB_MODULE_GUARD = {
           page,
           moduleKey,
+          moduleKeys,
           allowed: true,
           platformSimulation: false
         };
@@ -254,6 +280,7 @@
       window.CSVB_MODULE_GUARD = {
         page,
         moduleKey,
+        moduleKeys,
         allowed: allowedBySimulation,
         simulatedCompanyId,
         simulatedCompanyName: getSimulatedCompanyName(),
@@ -287,7 +314,7 @@
       } else {
         companyModules = data || [];
         companyAllowed = companyModules.some((m) => {
-          return m.module_key === moduleKey && m.is_enabled === true;
+          return moduleKeys.includes(m.module_key) && m.is_enabled === true;
         });
       }
     } catch (error) {
@@ -302,7 +329,9 @@
     window.CSVB_MODULE_GUARD = {
       page,
       moduleKey,
+      moduleKeys,
       appModuleCode: rankCheck.appModuleCode,
+      appModuleCodes: rankCheck.appModuleCodes,
       allowed,
       companyAllowed,
       rankAllowed,
