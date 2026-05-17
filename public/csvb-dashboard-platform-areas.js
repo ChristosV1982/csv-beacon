@@ -5,7 +5,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "PA6G-2026-05-16-SIRE-VIEWER-INDEPENDENT";
+  const BUILD = "PA6H-2026-05-16-LEGACY-LIBRARY-COUNT-REMOVED";
   const SELECTED_KEY = "csvb_dashboard_selected_platform_area_v6";
 
   /*
@@ -18,9 +18,8 @@
     Transition note:
       SIRE 2.0 Questions Viewer now has its own module key:
         sire_questions_viewer
-      During transition, dashboard visibility still falls back to legacy:
-        read_only_library
-      so no company loses Viewer access before Read-Only Library is retired.
+      Legacy Read-Only Library is soft-retired from visible dashboard navigation/counts,
+      but direct legacy fallback is handled elsewhere until final removal.
   */
 
   const SIRE_VIEWER_CARD_KEY = "sire_questions_viewer";
@@ -44,7 +43,6 @@
       description:
         "Question libraries, vetting inspection preparation, post-inspection handling, statistics, inspector intelligence, reporting and related discussion threads.",
       cards: [
-        "library",
         SIRE_VIEWER_CARD_KEY,
         "company",
         "assignments",
@@ -140,7 +138,15 @@
     };
 
     if (normalized.key === "inspection_libraries_vetting") {
-      normalized.cards = insertAfter(normalized.cards, "library", SIRE_VIEWER_CARD_KEY);
+      // Read-Only Library is soft-retired from visible Dashboard navigation/counts.
+      // SIRE 2.0 Questions Viewer remains available; legacy fallback is handled elsewhere.
+      normalized.cards = uniqueCards(normalized.cards)
+        .filter((card) => card !== "library");
+
+      normalized.cards = [
+        SIRE_VIEWER_CARD_KEY,
+        ...normalized.cards.filter((card) => card !== SIRE_VIEWER_CARD_KEY)
+      ];
     }
 
     return normalized;
