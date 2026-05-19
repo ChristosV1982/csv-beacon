@@ -5,11 +5,21 @@
 (() => {
   "use strict";
 
-  const BUILD = "SIRE-VIEWER-AI-POLISH-20260519_1";
+  const BUILD = "SIRE-VIEWER-AI-POLISH-20260519_2";
   window.CSVB_SIRE_VIEWER_AI_POLISH_BUILD = BUILD;
+
+  let enterHandlerWired = false;
 
   function $(id) {
     return document.getElementById(id);
+  }
+
+  function setTextIfDifferent(el, value) {
+    if (el && el.textContent !== value) el.textContent = value;
+  }
+
+  function setAttrIfDifferent(el, attr, value) {
+    if (el && el.getAttribute(attr) !== value) el.setAttribute(attr, value);
   }
 
   function injectStyles() {
@@ -49,42 +59,41 @@
     const clearBtn = $("csvbAiSourceClearBtn");
     const title = $("csvbAiSourceModalTitle");
     const query = $("csvbAiSourceQuery");
+    const note = document.querySelector(".csvb-ai-source-modal-note");
 
     if (sourceBtn) {
-      sourceBtn.textContent = "Find sources";
-      sourceBtn.title = "Find matching SIRE Viewer source questions without generating an AI answer.";
+      setTextIfDifferent(sourceBtn, "Find sources");
+      setAttrIfDifferent(sourceBtn, "title", "Find matching SIRE Viewer source questions without generating an AI answer.");
       sourceBtn.classList.add("light");
     }
 
     if (askBtn) {
-      askBtn.textContent = "Ask AI";
-      askBtn.title = "Generate a grounded answer from the matched SIRE Viewer source pack.";
+      setTextIfDifferent(askBtn, "Ask AI");
+      setAttrIfDifferent(askBtn, "title", "Generate a grounded answer from the matched SIRE Viewer source pack.");
     }
 
     if (copyPackBtn) {
-      copyPackBtn.textContent = "Copy sources";
-      copyPackBtn.title = "Copy the full source pack used for the AI answer.";
+      setTextIfDifferent(copyPackBtn, "Copy sources");
+      setAttrIfDifferent(copyPackBtn, "title", "Copy the full source pack used for the AI answer.");
     }
 
-    if (clearBtn) {
-      clearBtn.textContent = "Clear";
-    }
+    if (clearBtn) setTextIfDifferent(clearBtn, "Clear");
+    if (title) setTextIfDifferent(title, "SIRE 2.0 AI Search");
 
-    if (title) {
-      title.textContent = "SIRE 2.0 AI Search";
-    }
-
-    const note = document.querySelector(".csvb-ai-source-modal-note");
-    if (note) {
+    if (note && !note.dataset.csvbAiPolished) {
       note.innerHTML = "Ask a SIRE 2.0 topic or operational question. <b>Ask AI</b> generates the answer from matched Viewer sources only; <b>Find sources</b> only displays the source pack.";
+      note.dataset.csvbAiPolished = "1";
     }
 
     if (query) {
-      query.placeholder = "Ask topic, e.g. gas instruments / enclosed space / ECDIS safety depth";
+      setAttrIfDifferent(query, "placeholder", "Ask topic, e.g. gas instruments / enclosed space / ECDIS safety depth");
     }
   }
 
   function wireEnterToAskAi() {
+    if (enterHandlerWired) return;
+    enterHandlerWired = true;
+
     document.addEventListener("keydown", (ev) => {
       const target = ev.target;
       if (!target || target.id !== "csvbAiSourceQuery" || ev.key !== "Enter") return;
@@ -101,11 +110,19 @@
 
   function boot() {
     injectStyles();
-    polishControls();
     wireEnterToAskAi();
 
-    const observer = new MutationObserver(() => polishControls());
-    observer.observe(document.body, { childList: true, subtree: true });
+    // Bounded retries only. Do not observe/mutate the whole document body.
+    // The previous MutationObserver caused a self-triggering mutation loop.
+    let tries = 0;
+    const timer = setInterval(() => {
+      tries += 1;
+      polishControls();
+      if (tries >= 10 || $("csvbAiAskBtn")) clearInterval(timer);
+    }, 500);
+
+    setTimeout(polishControls, 1500);
+    setTimeout(polishControls, 3000);
   }
 
   if (document.readyState === "loading") {
