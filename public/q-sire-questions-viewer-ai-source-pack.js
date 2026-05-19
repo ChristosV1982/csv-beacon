@@ -1,17 +1,18 @@
 // public/q-sire-questions-viewer-ai-source-pack.js
 // C.S.V. BEACON — SIRE 2.0 Questions Viewer AI Search Source Pack
-// Phase E0: source-grounded AI-preparation panel. No external AI call yet.
+// Builds a source-grounded pack from the Viewer. The actual AI call is handled by q-sire-questions-viewer-ai-answer.js.
 // Hidden for vessel and inspector users.
 
 (() => {
   "use strict";
 
-  const BUILD = "SIRE-VIEWER-AI-SOURCE-PACK-20260519_2";
+  const BUILD = "SIRE-VIEWER-AI-SOURCE-PACK-20260519_3";
   window.CSVB_SIRE_VIEWER_AI_SOURCE_PACK_BUILD = BUILD;
 
   const state = {
     sb: null,
     me: null,
+    open: false,
     lastPackText: "",
     lastResults: []
   };
@@ -208,141 +209,240 @@
     const style = document.createElement("style");
     style.id = "csvbSireViewerAiSourcePackStyles";
     style.textContent = `
-      html[data-csvb-page="q-sire-questions-viewer.html"] .csvb-ai-source-inline {
+      html[data-csvb-page="q-sire-questions-viewer.html"] #filterRibbon {
+        position: relative;
+        padding-right: 150px;
+      }
+
+      html[data-csvb-page="q-sire-questions-viewer.html"] .csvb-ai-source-launcher {
+        position: absolute;
+        top: 50%;
+        right: 14px;
+        transform: translateY(-50%);
         display: none;
-        margin-top: 8px;
-        padding: 8px;
-        border: 1px solid #D6E4F5;
+        z-index: 6;
+      }
+
+      html[data-csvb-page="q-sire-questions-viewer.html"] .csvb-ai-source-launcher .btn {
+        min-width: 112px;
+        padding: 9px 14px;
+      }
+
+      html[data-csvb-page="q-sire-questions-viewer.html"] .csvb-ai-source-modal-backdrop {
+        position: fixed;
+        inset: 0;
+        z-index: 9998;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+        background: rgba(3, 27, 63, .50);
+      }
+
+      html[data-csvb-page="q-sire-questions-viewer.html"] .csvb-ai-source-modal {
+        width: min(1180px, 96vw);
+        max-height: 90vh;
+        display: flex;
+        flex-direction: column;
+        background: #FFFFFF;
+        border: 1px solid #BFD3EF;
+        border-radius: 14px;
+        box-shadow: 0 24px 70px rgba(3,27,63,.28);
+        overflow: hidden;
+      }
+
+      html[data-csvb-page="q-sire-questions-viewer.html"] .csvb-ai-source-modal-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 12px;
+        padding: 12px 14px;
+        border-bottom: 1px solid #D6E4F5;
         background: #F8FBFF;
-        border-radius: 10px;
       }
 
-      html[data-csvb-page="q-sire-questions-viewer.html"] .csvb-ai-source-inline-title {
-        display:flex;
-        align-items:center;
-        justify-content:space-between;
-        gap:8px;
-        margin-bottom:6px;
+      html[data-csvb-page="q-sire-questions-viewer.html"] .csvb-ai-source-modal-title {
+        color: #062A5E;
+        font-weight: 900;
+        font-size: 15px;
+        line-height: 1.25;
       }
 
-      html[data-csvb-page="q-sire-questions-viewer.html"] .csvb-ai-source-inline-title .lbl {
-        margin:0;
+      html[data-csvb-page="q-sire-questions-viewer.html"] .csvb-ai-source-modal-note {
+        color: #5E6F86;
+        font-size: 12px;
+        margin-top: 3px;
+        line-height: 1.35;
+      }
+
+      html[data-csvb-page="q-sire-questions-viewer.html"] .csvb-ai-source-modal-body {
+        padding: 12px 14px;
+        overflow: auto;
       }
 
       html[data-csvb-page="q-sire-questions-viewer.html"] .csvb-ai-source-controls {
-        display:grid;
-        grid-template-columns:minmax(0,1fr) auto;
-        gap:6px;
-        align-items:center;
+        display: grid;
+        grid-template-columns: minmax(260px, 1fr) auto;
+        gap: 8px;
+        align-items: center;
       }
 
       html[data-csvb-page="q-sire-questions-viewer.html"] .csvb-ai-source-actions {
-        display:flex;
-        gap:6px;
-        align-items:center;
-        flex-wrap:wrap;
-        margin-top:6px;
+        display: flex;
+        gap: 7px;
+        align-items: center;
+        flex-wrap: wrap;
+        margin-top: 8px;
       }
 
       html[data-csvb-page="q-sire-questions-viewer.html"] .csvb-ai-source-results {
-        display:none;
-        margin-top:8px;
-        max-height: 340px;
-        overflow:auto;
+        display: none;
+        margin-top: 10px;
+        max-height: 48vh;
+        overflow: auto;
         border-top: 1px solid #D6E4F5;
-        padding-top: 8px;
+        padding-top: 9px;
       }
 
       html[data-csvb-page="q-sire-questions-viewer.html"] .csvb-ai-source-result {
-        border:1px solid #D6E4F5;
-        background:#fff;
-        border-radius:9px;
-        padding:7px 8px;
-        margin-bottom:7px;
+        border: 1px solid #D6E4F5;
+        background: #fff;
+        border-radius: 9px;
+        padding: 8px 9px;
+        margin-bottom: 8px;
       }
 
       html[data-csvb-page="q-sire-questions-viewer.html"] .csvb-ai-source-result-title {
-        color:#062A5E;
-        font-weight:850;
-        font-size:12px;
-        line-height:1.3;
+        color: #062A5E;
+        font-weight: 850;
+        font-size: 13px;
+        line-height: 1.3;
       }
 
       html[data-csvb-page="q-sire-questions-viewer.html"] .csvb-ai-source-result-meta {
-        color:#5E6F86;
-        font-size:11px;
-        margin-top:3px;
-        line-height:1.35;
+        color: #5E6F86;
+        font-size: 11px;
+        margin-top: 3px;
+        line-height: 1.35;
       }
 
       html[data-csvb-page="q-sire-questions-viewer.html"] .csvb-ai-source-section {
-        margin-top:6px;
-        color:#10233F;
-        font-size:12px;
-        line-height:1.35;
+        margin-top: 6px;
+        color: #10233F;
+        font-size: 12px;
+        line-height: 1.35;
       }
 
       html[data-csvb-page="q-sire-questions-viewer.html"] .csvb-ai-source-muted {
-        color:#5E6F86;
-        font-size:11px;
-        line-height:1.35;
+        color: #5E6F86;
+        font-size: 12px;
+        line-height: 1.35;
       }
 
-      @media (max-width:900px) {
+      @media (max-width: 900px) {
+        html[data-csvb-page="q-sire-questions-viewer.html"] #filterRibbon {
+          padding-right: 12px;
+          padding-bottom: 54px;
+        }
+
+        html[data-csvb-page="q-sire-questions-viewer.html"] .csvb-ai-source-launcher {
+          top: auto;
+          right: 12px;
+          bottom: 10px;
+          transform: none;
+        }
+
         html[data-csvb-page="q-sire-questions-viewer.html"] .csvb-ai-source-controls {
-          grid-template-columns:1fr;
+          grid-template-columns: 1fr;
         }
       }
     `;
     document.head.appendChild(style);
   }
 
-  function insertionAnchor() {
-    const search = $("searchInput");
-    return search || null;
-  }
-
   function ensurePanel() {
-    if ($("csvbAiSourceInline")) return;
+    if ($("csvbAiSourceModalBackdrop")) return;
 
-    const anchor = insertionAnchor();
-    if (!anchor) return;
+    const filterRibbon = $("filterRibbon") || document.body;
 
-    const panel = document.createElement("div");
-    panel.id = "csvbAiSourceInline";
-    panel.className = "csvb-ai-source-inline";
-    panel.innerHTML = `
-      <div class="csvb-ai-source-inline-title">
-        <label class="lbl" for="csvbAiSourceQuery">AI Search</label>
-        <span class="csvb-ai-source-muted">Source pack</span>
+    const launcher = document.createElement("div");
+    launcher.id = "csvbAiSourceLauncher";
+    launcher.className = "csvb-ai-source-launcher";
+    launcher.innerHTML = `<button id="csvbAiSourceOpenBtn" class="btn" type="button">AI Search</button>`;
+    filterRibbon.appendChild(launcher);
+
+    const modal = document.createElement("div");
+    modal.id = "csvbAiSourceModalBackdrop";
+    modal.className = "csvb-ai-source-modal-backdrop";
+    modal.innerHTML = `
+      <div class="csvb-ai-source-modal" role="dialog" aria-modal="true" aria-labelledby="csvbAiSourceModalTitle">
+        <div class="csvb-ai-source-modal-head">
+          <div>
+            <div id="csvbAiSourceModalTitle" class="csvb-ai-source-modal-title">SIRE 2.0 AI Search</div>
+            <div class="csvb-ai-source-modal-note">Ask against the active SIRE 2.0 Viewer database. The system first builds a source pack from matching questions, Expected Evidence, PGNOs, publications and industry guidance.</div>
+          </div>
+          <button id="csvbAiSourceCloseBtn" class="btn" type="button">Close</button>
+        </div>
+        <div class="csvb-ai-source-modal-body">
+          <div class="csvb-ai-source-controls">
+            <input id="csvbAiSourceQuery" class="inp" type="text" placeholder="Ask topic, e.g. gas instruments / enclosed space / ECDIS safety depth" />
+            <button id="csvbAiSourceRunBtn" class="btn" type="button">Build source pack</button>
+          </div>
+          <div class="csvb-ai-source-actions">
+            <button id="csvbAiSourceCopyBtn" class="btn light" type="button">Copy source pack</button>
+            <button id="csvbAiSourceClearBtn" class="btn light" type="button">Clear</button>
+          </div>
+          <div id="csvbAiSourceStatus" class="csvb-ai-source-muted" style="margin-top:8px;"></div>
+          <div id="csvbAiSourceResults" class="csvb-ai-source-results"></div>
+        </div>
       </div>
-      <div class="csvb-ai-source-controls">
-        <input id="csvbAiSourceQuery" class="inp" type="text" placeholder="Ask topic, e.g. enclosed space / ECDIS / mooring brake" />
-        <button id="csvbAiSourceRunBtn" class="btn" type="button">Build</button>
-      </div>
-      <div class="csvb-ai-source-actions">
-        <button id="csvbAiSourceCopyBtn" class="btn light" type="button">Copy pack</button>
-        <button id="csvbAiSourceClearBtn" class="btn light" type="button">Clear</button>
-      </div>
-      <div id="csvbAiSourceStatus" class="csvb-ai-source-muted" style="margin-top:6px;"></div>
-      <div id="csvbAiSourceResults" class="csvb-ai-source-results"></div>
     `;
+    document.body.appendChild(modal);
 
-    anchor.insertAdjacentElement("afterend", panel);
-
+    $("csvbAiSourceOpenBtn")?.addEventListener("click", openPanel);
+    $("csvbAiSourceCloseBtn")?.addEventListener("click", closePanel);
     $("csvbAiSourceRunBtn")?.addEventListener("click", () => buildSourcePack());
     $("csvbAiSourceCopyBtn")?.addEventListener("click", () => copyPack());
     $("csvbAiSourceClearBtn")?.addEventListener("click", () => clearPack());
     $("csvbAiSourceQuery")?.addEventListener("keydown", (ev) => {
       if (ev.key === "Enter") buildSourcePack();
     });
+
+    modal.addEventListener("click", (ev) => {
+      if (ev.target === modal) closePanel();
+    });
+
+    document.addEventListener("keydown", (ev) => {
+      if (ev.key === "Escape") closePanel();
+    });
+  }
+
+  function openPanel() {
+    state.open = true;
+    renderShell();
+    setTimeout(() => $("csvbAiSourceQuery")?.focus(), 60);
+  }
+
+  function closePanel() {
+    state.open = false;
+    renderShell();
   }
 
   function renderShell() {
     ensurePanel();
-    const panel = $("csvbAiSourceInline");
-    if (!panel) return;
-    panel.style.display = isAllowedRole() ? "block" : "none";
+    const launcher = $("csvbAiSourceLauncher");
+    const modal = $("csvbAiSourceModalBackdrop");
+
+    if (!launcher || !modal) return;
+
+    if (!isAllowedRole()) {
+      launcher.style.display = "none";
+      modal.style.display = "none";
+      return;
+    }
+
+    launcher.style.display = "block";
+    modal.style.display = state.open ? "flex" : "none";
   }
 
   function setStatus(message) {
@@ -376,13 +476,13 @@
       <div class="csvb-ai-source-result">
         <div class="csvb-ai-source-result-title">${esc(qNumber)} — ${esc(shortText || question || "SIRE question")}</div>
         <div class="csvb-ai-source-result-meta">Score: ${item.score} • Type: ${esc(pget(p, ["Question Type", "question_type", "questionType"]))} • Response: ${esc(responseTypes(p))}</div>
-        <div class="csvb-ai-source-section"><b>Question:</b> ${esc(truncate(question, 320))}</div>
-        ${guidance ? `<div class="csvb-ai-source-section"><b>Guidance:</b> ${esc(truncate(guidance, 320))}</div>` : ""}
-        ${actions ? `<div class="csvb-ai-source-section"><b>Inspector actions:</b> ${esc(truncate(actions, 220))}</div>` : ""}
-        ${item.ee.length ? `<div class="csvb-ai-source-section"><b>Expected Evidence:</b><br>${item.ee.slice(0, 2).map((x) => `${x.seq}. ${esc(truncate(x.text, 160))}`).join("<br>")}</div>` : ""}
-        ${item.pgno.length ? `<div class="csvb-ai-source-section"><b>PGNOs:</b><br>${item.pgno.slice(0, 2).map((x, i) => `${esc(x.code || `${qNumber}.${String(i + 1).padStart(2, "0")}`)} — ${esc(truncate(x.text, 160))}`).join("<br>")}</div>` : ""}
-        ${pubs.length ? `<div class="csvb-ai-source-section"><b>Publications:</b><br>${pubs.slice(0, 2).map((x) => esc(truncate(x.display_name || x.raw_publication_text || JSON.stringify(x), 160))).join("<br>")}</div>` : ""}
-        ${gids.length ? `<div class="csvb-ai-source-section"><b>Industry Guidance:</b><br>${gids.slice(0, 2).map((x) => esc(truncate([x.guidance_title, x.guidance_section, x.guidance_content].filter(Boolean).join(" — "), 180))).join("<br>")}</div>` : ""}
+        <div class="csvb-ai-source-section"><b>Question:</b> ${esc(truncate(question, 360))}</div>
+        ${guidance ? `<div class="csvb-ai-source-section"><b>Guidance:</b> ${esc(truncate(guidance, 360))}</div>` : ""}
+        ${actions ? `<div class="csvb-ai-source-section"><b>Inspector actions:</b> ${esc(truncate(actions, 260))}</div>` : ""}
+        ${item.ee.length ? `<div class="csvb-ai-source-section"><b>Expected Evidence:</b><br>${item.ee.slice(0, 3).map((x) => `${x.seq}. ${esc(truncate(x.text, 180))}`).join("<br>")}</div>` : ""}
+        ${item.pgno.length ? `<div class="csvb-ai-source-section"><b>PGNOs:</b><br>${item.pgno.slice(0, 3).map((x, i) => `${esc(x.code || `${qNumber}.${String(i + 1).padStart(2, "0")}`)} — ${esc(truncate(x.text, 180))}`).join("<br>")}</div>` : ""}
+        ${pubs.length ? `<div class="csvb-ai-source-section"><b>Publications:</b><br>${pubs.slice(0, 3).map((x) => esc(truncate(x.display_name || x.raw_publication_text || JSON.stringify(x), 180))).join("<br>")}</div>` : ""}
+        ${gids.length ? `<div class="csvb-ai-source-section"><b>Industry Guidance:</b><br>${gids.slice(0, 3).map((x) => esc(truncate([x.guidance_title, x.guidance_section, x.guidance_content].filter(Boolean).join(" — "), 220))).join("<br>")}</div>` : ""}
       </div>
     `;
   }
@@ -533,6 +633,8 @@
 
       window.CSVB_SIRE_VIEWER_AI_SOURCE_PACK = {
         build: BUILD,
+        open: openPanel,
+        close: closePanel,
         buildSourcePack,
         clear: clearPack,
         getLastPackText: () => state.lastPackText,
