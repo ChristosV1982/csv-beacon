@@ -19,6 +19,22 @@ type ProfileRow = {
 
 type JsonResponseBody = Record<string, unknown>;
 
+type AiUsageLogParams = {
+  supabaseUrl: string;
+  serviceRoleKey: string;
+  profile?: ProfileRow | null;
+  query: string;
+  sourcePack: string;
+  sourceQuestionCount: number;
+  model: string;
+  success: boolean;
+  errorMessage?: string | null;
+  responseChars?: number;
+  durationMs?: number;
+  usage?: unknown;
+  context?: Record<string, unknown>;
+};
+
 function jsonResponse(body: JsonResponseBody, status = 200): Response {
   return new Response(JSON.stringify(body, null, 2), {
     status,
@@ -40,6 +56,14 @@ function compactSourcePack(value: unknown): string {
   return raw.length > 42000 ? raw.slice(0, 42000) : raw;
 }
 
+function estimateSourceQuestionCount(sourcePack: string): number {
+  const headerMatch = sourcePack.match(/Source count:\s*(\d+)/i);
+  if (headerMatch?.[1]) return Number(headerMatch[1]) || 0;
+
+  const sourceMatches = sourcePack.match(/^SOURCE\s+\d+:/gim);
+  return sourceMatches ? sourceMatches.length : 0;
+}
+
 function extractOpenAIText(payload: any): string {
   if (typeof payload?.output_text === "string" && payload.output_text.trim()) {
     return payload.output_text.trim();
@@ -56,6 +80,46 @@ function extractOpenAIText(payload: any): string {
   }
 
   return chunks.join("\n").trim();
+}
+
+async function logAiUsage(params: AiUsageLogParams): Promise<void> {
+  try {
+    if (!params.supabaseUrl || !params.serviceRoleKey) return;
+
+    const payload = {
+      user_id: params.profile?.id || null,
+      company_id: params.profile?.company_id || null,
+      user_role: params.profile?.role || null,
+      query_text: params.query || "",
+      source_question_count: params.sourceQuestionCount || 0,
+      source_pack_chars: params.sourcePack?.length || 0,
+      model: params.model || null,
+      success: !!params.success,
+      error_message: params.errorMessage || null,
+      response_chars: params.responseChars || 0,
+      duration_ms: params.durationMs || null,
+      usage: params.usage || null,
+      request_context: params.context || {},
+    };
+
+    const resp = await fetch(`${params.supabaseUrl}/rest/v1/sire_viewer_ai_usage_log`, {
+      method: "POST",
+      headers: {
+        apikey: params.serviceRoleKey,
+        Authorization: `Bearer ${params.serviceRoleKey}`,
+        "Content-Type": "application/json",
+        Prefer: "return=minimal",
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!resp.ok) {
+      const text = await resp.text().catch(() => "");
+      console.warn("SIRE Viewer AI usage log insert failed:", resp.status, text);
+    }
+  } catch (error) {
+    console.warn("SIRE Viewer AI usage log insert failed:", error);
+  }
 }
 
 async function getAuthenticatedUserId(
@@ -218,11 +282,20 @@ Deno.serve(async (req: Request): Promise<Response> => {
     return jsonResponse({ ok: false, error: "Method not allowed." }, 405);
   }
 
+  const startedAt = Date.now();
+  let supabaseUrl = "";
+  let serviceRoleKey = "";
+  let model = "gpt-4.1";
+  let profile: ProfileRow | null = null;
+  let query = "";
+  let sourcePack = "";
+  let sourceQuestionCount = 0;
+
   try {
-    const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
-    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+    supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
+    serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
     const openaiKey = Deno.env.get("OPENAI_API_KEY") || "";
-    const model = Deno.env.get("OPENAI_MODEL") || "gpt-4.1";
+    model = Deno.env.get("OPENAI_MODEL") || "gpt-4.1";
 
     if (!supabaseUrl || !serviceRoleKey) {
       return jsonResponse({ ok: false, error: "Supabase server configuration is missing." }, 500);
@@ -234,19 +307,20 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
     const authHeader = req.headers.get("Authorization") || "";
     const userId = await getAuthenticatedUserId(supabaseUrl, serviceRoleKey, authHeader);
-    const profile = await getProfile(supabaseUrl, serviceRoleKey, userId);
+    profile = await getProfile(supabaseUrl, serviceRoleKey, userId);
     assertAllowedProfile(profile);
 
     const body = await req.json().catch(() => ({}));
-    const query = cleanText(body.query);
-    const sourcePack = compactSourcePack(body.source_pack);
+    query = cleanText(body.query);
+    sourcePack = compactSourcePack(body.source_pack);
+    sourceQuestionCount = estimateSourceQuestionCount(sourcePack);
 
     if (!query) {
-      return jsonResponse({ ok: false, error: "Query is required." }, 400);
+      throw new Error("Query is required.");
     }
 
     if (!sourcePack || sourcePack.length < 40) {
-      return jsonResponse({ ok: false, error: "Source pack is required." }, 400);
+      throw new Error("Source pack is required.");
     }
 
     const result = await callOpenAI({
@@ -257,17 +331,60 @@ Deno.serve(async (req: Request): Promise<Response> => {
       role: String(profile.role || ""),
     });
 
+    const answerText = result.answer || "";
+
+    await logAiUsage({
+      supabaseUrl,
+      serviceRoleKey,
+      profile,
+      query,
+      sourcePack,
+      sourceQuestionCount,
+      model: result.model,
+      success: true,
+      responseChars: answerText.length,
+      durationMs: Date.now() - startedAt,
+      usage: (result.raw as any)?.usage || null,
+      context: {
+        endpoint: "sire-viewer-ai-search",
+      },
+    });
+
     return jsonResponse({
       ok: true,
-      answer: result.answer,
+      answer: answerText,
       model: result.model,
       source_pack_chars: sourcePack.length,
+      source_question_count: sourceQuestionCount,
       usage: (result.raw as any)?.usage || null,
     });
   } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+
+    if (query || sourcePack || profile?.id) {
+      await logAiUsage({
+        supabaseUrl,
+        serviceRoleKey,
+        profile,
+        query: query || "[not parsed]",
+        sourcePack,
+        sourceQuestionCount,
+        model,
+        success: false,
+        errorMessage: message,
+        responseChars: 0,
+        durationMs: Date.now() - startedAt,
+        usage: null,
+        context: {
+          endpoint: "sire-viewer-ai-search",
+          failure_stage: "handler_catch",
+        },
+      });
+    }
+
     return jsonResponse({
       ok: false,
-      error: error instanceof Error ? error.message : String(error),
+      error: message,
     }, 400);
   }
 });
