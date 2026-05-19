@@ -35,6 +35,15 @@ type AiUsageLogParams = {
   context?: Record<string, unknown>;
 };
 
+type AiUsageControls = {
+  max_query_chars: number;
+  daily_user_limit: number;
+  daily_company_limit: number;
+  user_count_today: number | null;
+  company_count_today: number | null;
+  utc_day_start: string;
+};
+
 function jsonResponse(body: JsonResponseBody, status = 200): Response {
   return new Response(JSON.stringify(body, null, 2), {
     status,
@@ -47,6 +56,19 @@ function jsonResponse(body: JsonResponseBody, status = 200): Response {
 
 function cleanText(value: unknown): string {
   return String(value ?? "").replace(/\s+/g, " ").trim();
+}
+
+function getPositiveIntegerSecret(name: string, fallback: number): number {
+  const raw = Deno.env.get(name) || "";
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n <= 0) return fallback;
+  return Math.floor(n);
+}
+
+function utcDayStartIso(): string {
+  const d = new Date();
+  d.setUTCHours(0, 0, 0, 0);
+  return d.toISOString();
 }
 
 function compactSourcePack(value: unknown): string {
@@ -120,6 +142,103 @@ async function logAiUsage(params: AiUsageLogParams): Promise<void> {
   } catch (error) {
     console.warn("SIRE Viewer AI usage log insert failed:", error);
   }
+}
+
+async function countAiUsageRows(params: {
+  supabaseUrl: string;
+  serviceRoleKey: string;
+  sinceIso: string;
+  userId?: string | null;
+  companyId?: string | null;
+}): Promise<number | null> {
+  try {
+    const url = new URL(`${params.supabaseUrl}/rest/v1/sire_viewer_ai_usage_log`);
+    url.searchParams.set("select", "id");
+    url.searchParams.set("created_at", `gte.${params.sinceIso}`);
+
+    if (params.userId) url.searchParams.set("user_id", `eq.${params.userId}`);
+    if (params.companyId) url.searchParams.set("company_id", `eq.${params.companyId}`);
+
+    const resp = await fetch(url.toString(), {
+      method: "GET",
+      headers: {
+        apikey: params.serviceRoleKey,
+        Authorization: `Bearer ${params.serviceRoleKey}`,
+        Prefer: "count=exact",
+        Range: "0-0",
+        "Range-Unit": "items",
+      },
+    });
+
+    if (!resp.ok) {
+      const text = await resp.text().catch(() => "");
+      console.warn("SIRE Viewer AI usage count failed:", resp.status, text);
+      return null;
+    }
+
+    const contentRange = resp.headers.get("content-range") || "";
+    const totalRaw = contentRange.includes("/") ? contentRange.split("/").pop() : "";
+    const total = Number(totalRaw);
+
+    if (Number.isFinite(total)) return total;
+
+    const rows = await resp.json().catch(() => []);
+    return Array.isArray(rows) ? rows.length : null;
+  } catch (error) {
+    console.warn("SIRE Viewer AI usage count failed:", error);
+    return null;
+  }
+}
+
+async function assertAiUsageControls(params: {
+  supabaseUrl: string;
+  serviceRoleKey: string;
+  profile: ProfileRow;
+  query: string;
+}): Promise<AiUsageControls> {
+  const maxQueryChars = getPositiveIntegerSecret("OPENAI_MAX_QUERY_CHARS", 800);
+  const dailyUserLimit = getPositiveIntegerSecret("OPENAI_DAILY_USER_LIMIT", 50);
+  const dailyCompanyLimit = getPositiveIntegerSecret("OPENAI_DAILY_COMPANY_LIMIT", 500);
+  const sinceIso = utcDayStartIso();
+
+  if (params.query.length > maxQueryChars) {
+    throw new Error(`AI query is too long (${params.query.length}/${maxQueryChars} characters).`);
+  }
+
+  const userCount = await countAiUsageRows({
+    supabaseUrl: params.supabaseUrl,
+    serviceRoleKey: params.serviceRoleKey,
+    sinceIso,
+    userId: params.profile.id,
+  });
+
+  if (userCount !== null && userCount >= dailyUserLimit) {
+    throw new Error(`Daily AI usage limit reached for this user (${userCount}/${dailyUserLimit}).`);
+  }
+
+  let companyCount: number | null = null;
+
+  if (params.profile.company_id) {
+    companyCount = await countAiUsageRows({
+      supabaseUrl: params.supabaseUrl,
+      serviceRoleKey: params.serviceRoleKey,
+      sinceIso,
+      companyId: params.profile.company_id,
+    });
+
+    if (companyCount !== null && companyCount >= dailyCompanyLimit) {
+      throw new Error(`Daily AI usage limit reached for this company (${companyCount}/${dailyCompanyLimit}).`);
+    }
+  }
+
+  return {
+    max_query_chars: maxQueryChars,
+    daily_user_limit: dailyUserLimit,
+    daily_company_limit: dailyCompanyLimit,
+    user_count_today: userCount,
+    company_count_today: companyCount,
+    utc_day_start: sinceIso,
+  };
 }
 
 async function getAuthenticatedUserId(
@@ -290,6 +409,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
   let query = "";
   let sourcePack = "";
   let sourceQuestionCount = 0;
+  let usageControls: AiUsageControls | null = null;
 
   try {
     supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
@@ -323,6 +443,13 @@ Deno.serve(async (req: Request): Promise<Response> => {
       throw new Error("Source pack is required.");
     }
 
+    usageControls = await assertAiUsageControls({
+      supabaseUrl,
+      serviceRoleKey,
+      profile,
+      query,
+    });
+
     const result = await callOpenAI({
       openaiKey,
       model,
@@ -347,6 +474,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       usage: (result.raw as any)?.usage || null,
       context: {
         endpoint: "sire-viewer-ai-search",
+        usage_controls: usageControls,
       },
     });
 
@@ -357,6 +485,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       source_pack_chars: sourcePack.length,
       source_question_count: sourceQuestionCount,
       usage: (result.raw as any)?.usage || null,
+      usage_controls: usageControls,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -378,6 +507,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
         context: {
           endpoint: "sire-viewer-ai-search",
           failure_stage: "handler_catch",
+          usage_controls: usageControls,
         },
       });
     }
