@@ -1,11 +1,12 @@
 // public/q-sire-questions-viewer-ai-usage-log.js
 // C.S.V. BEACON — SIRE 2.0 Questions Viewer AI Usage Log panel
 // Read-only frontend panel. Uses csvb_sire_viewer_ai_usage_log_for_me().
+// Platform roles only.
 
 (() => {
   "use strict";
 
-  const BUILD = "SIRE-VIEWER-AI-USAGE-LOG-20260519_1";
+  const BUILD = "SIRE-VIEWER-AI-USAGE-LOG-20260519_2";
   window.CSVB_SIRE_VIEWER_AI_USAGE_LOG_BUILD = BUILD;
 
   const state = {
@@ -38,7 +39,7 @@
 
   function canSeePanel() {
     const r = role();
-    return r === "super_admin" || r === "platform_owner" || r === "company_admin" || r === "company_superintendent";
+    return r === "super_admin" || r === "platform_owner";
   }
 
   function fmtDate(value) {
@@ -205,7 +206,7 @@
       <div class="csvb-ai-usage-head">
         <div>
           <div class="csvb-ai-usage-title">SIRE Viewer AI Usage Log</div>
-          <div class="csvb-ai-usage-subtitle">Read-only audit view of recent AI Search requests.</div>
+          <div class="csvb-ai-usage-subtitle">Platform-only audit view of recent AI Search requests.</div>
         </div>
         <div class="csvb-ai-usage-actions">
           <span class="csvb-ai-usage-pill" id="csvbAiUsageLogCount">Rows: 0</span>
