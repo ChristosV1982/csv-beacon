@@ -6,13 +6,12 @@
 (() => {
   "use strict";
 
-  const BUILD = "SIRE-VIEWER-AI-SOURCE-PACK-20260519_1";
+  const BUILD = "SIRE-VIEWER-AI-SOURCE-PACK-20260519_2";
   window.CSVB_SIRE_VIEWER_AI_SOURCE_PACK_BUILD = BUILD;
 
   const state = {
     sb: null,
     me: null,
-    open: false,
     lastPackText: "",
     lastResults: []
   };
@@ -65,13 +64,11 @@
   }
 
   function qno(row) {
-    if (window.CSVB_SIRE_QUESTIONS_VIEWER?.getRows) {
-      const sourceType = safeStr(row?.source_type || "SIRE").trim();
-      const base = normalizeNumber(sourceType, row?.number_base);
-      const suffix = safeStr(row?.number_suffix).trim();
-      if (base) return suffix ? `${base}-${suffix}` : base;
-    }
-    return safeStr(row?.number_full || row?.number_base || "—").replace(/-$/, "");
+    const sourceType = safeStr(row?.source_type || "SIRE").trim();
+    const base = normalizeNumber(sourceType, row?.number_base);
+    const suffix = safeStr(row?.number_suffix).trim();
+    if (base) return suffix ? `${base}-${suffix}` : base;
+    return safeStr(row?.number_full || "—").replace(/-$/, "");
   }
 
   function normalizeNumber(sourceType, numberBase) {
@@ -211,90 +208,84 @@
     const style = document.createElement("style");
     style.id = "csvbSireViewerAiSourcePackStyles";
     style.textContent = `
-      html[data-csvb-page="q-sire-questions-viewer.html"] .csvb-ai-source-trigger {
-        width: 100%;
-        margin: 5px auto 6px;
+      html[data-csvb-page="q-sire-questions-viewer.html"] .csvb-ai-source-inline {
         display: none;
-        align-items: center;
-        justify-content: flex-start;
-        gap: 7px;
-        flex-wrap: wrap;
-      }
-
-      html[data-csvb-page="q-sire-questions-viewer.html"] .csvb-ai-source-panel {
-        display: none;
-        width: 100%;
-        margin: 8px auto 10px;
-        border: 1px solid #C7D8F0;
+        margin-top: 8px;
+        padding: 8px;
+        border: 1px solid #D6E4F5;
         background: #F8FBFF;
-        border-radius: 12px;
-        box-shadow: 0 8px 20px rgba(3,27,63,.05);
-        padding: 10px 12px;
+        border-radius: 10px;
       }
 
-      html[data-csvb-page="q-sire-questions-viewer.html"] .csvb-ai-source-head {
+      html[data-csvb-page="q-sire-questions-viewer.html"] .csvb-ai-source-inline-title {
         display:flex;
+        align-items:center;
         justify-content:space-between;
-        align-items:flex-start;
-        gap:10px;
-        flex-wrap:wrap;
+        gap:8px;
+        margin-bottom:6px;
       }
 
-      html[data-csvb-page="q-sire-questions-viewer.html"] .csvb-ai-source-title {
-        color:#062A5E;
-        font-weight:850;
-      }
-
-      html[data-csvb-page="q-sire-questions-viewer.html"] .csvb-ai-source-note {
-        color:#5E6F86;
-        font-size:12px;
-        line-height:1.35;
-        margin-top:2px;
+      html[data-csvb-page="q-sire-questions-viewer.html"] .csvb-ai-source-inline-title .lbl {
+        margin:0;
       }
 
       html[data-csvb-page="q-sire-questions-viewer.html"] .csvb-ai-source-controls {
         display:grid;
-        grid-template-columns:minmax(240px,1fr) auto auto;
-        gap:8px;
-        align-items:end;
-        margin-top:10px;
+        grid-template-columns:minmax(0,1fr) auto;
+        gap:6px;
+        align-items:center;
+      }
+
+      html[data-csvb-page="q-sire-questions-viewer.html"] .csvb-ai-source-actions {
+        display:flex;
+        gap:6px;
+        align-items:center;
+        flex-wrap:wrap;
+        margin-top:6px;
       }
 
       html[data-csvb-page="q-sire-questions-viewer.html"] .csvb-ai-source-results {
-        margin-top:10px;
-        display:grid;
-        gap:8px;
+        display:none;
+        margin-top:8px;
+        max-height: 340px;
+        overflow:auto;
+        border-top: 1px solid #D6E4F5;
+        padding-top: 8px;
       }
 
       html[data-csvb-page="q-sire-questions-viewer.html"] .csvb-ai-source-result {
         border:1px solid #D6E4F5;
         background:#fff;
-        border-radius:10px;
-        padding:8px 9px;
+        border-radius:9px;
+        padding:7px 8px;
+        margin-bottom:7px;
       }
 
       html[data-csvb-page="q-sire-questions-viewer.html"] .csvb-ai-source-result-title {
         color:#062A5E;
         font-weight:850;
+        font-size:12px;
+        line-height:1.3;
       }
 
       html[data-csvb-page="q-sire-questions-viewer.html"] .csvb-ai-source-result-meta {
         color:#5E6F86;
-        font-size:12px;
+        font-size:11px;
         margin-top:3px;
         line-height:1.35;
       }
 
       html[data-csvb-page="q-sire-questions-viewer.html"] .csvb-ai-source-section {
-        margin-top:7px;
+        margin-top:6px;
         color:#10233F;
-        font-size:13px;
+        font-size:12px;
         line-height:1.35;
       }
 
       html[data-csvb-page="q-sire-questions-viewer.html"] .csvb-ai-source-muted {
         color:#5E6F86;
-        font-size:12px;
+        font-size:11px;
+        line-height:1.35;
       }
 
       @media (max-width:900px) {
@@ -307,83 +298,51 @@
   }
 
   function insertionAnchor() {
-    return $("csvbSireViewerChangeLogTrigger") || $("csvbSireViewerAlertsPanel") || document.querySelector(".csvb-sire-viewer-helper");
+    const search = $("searchInput");
+    return search || null;
   }
 
   function ensurePanel() {
-    if ($("csvbAiSourcePanel")) return;
+    if ($("csvbAiSourceInline")) return;
 
     const anchor = insertionAnchor();
-
-    const trigger = document.createElement("div");
-    trigger.id = "csvbAiSourceTrigger";
-    trigger.className = "csvb-ai-source-trigger";
-    trigger.innerHTML = `<button id="csvbAiSourceToggleBtn" class="btn light" type="button">AI Search</button>`;
+    if (!anchor) return;
 
     const panel = document.createElement("div");
-    panel.id = "csvbAiSourcePanel";
-    panel.className = "csvb-ai-source-panel";
+    panel.id = "csvbAiSourceInline";
+    panel.className = "csvb-ai-source-inline";
     panel.innerHTML = `
-      <div class="csvb-ai-source-head">
-        <div>
-          <div class="csvb-ai-source-title">SIRE Viewer AI Search — Source Pack</div>
-          <div class="csvb-ai-source-note">
-            Phase E0: builds a source-grounded pack from SIRE 2.0 questions, Expected Evidence, PGNOs, publications and industry guidance. Full AI answer generation is not connected yet.
-          </div>
-        </div>
-        <button id="csvbAiSourceCloseBtn" class="btn light" type="button">Close</button>
+      <div class="csvb-ai-source-inline-title">
+        <label class="lbl" for="csvbAiSourceQuery">AI Search</label>
+        <span class="csvb-ai-source-muted">Source pack</span>
       </div>
       <div class="csvb-ai-source-controls">
-        <div>
-          <label class="lbl" for="csvbAiSourceQuery">Question / topic</label>
-          <input id="csvbAiSourceQuery" class="inp" type="text" placeholder="e.g. enclosed space entry, mooring winch brake, ECDIS safety depth" />
-        </div>
-        <button id="csvbAiSourceRunBtn" class="btn" type="button">Build source pack</button>
-        <button id="csvbAiSourceCopyBtn" class="btn light" type="button">Copy pack</button>
+        <input id="csvbAiSourceQuery" class="inp" type="text" placeholder="Ask topic, e.g. enclosed space / ECDIS / mooring brake" />
+        <button id="csvbAiSourceRunBtn" class="btn" type="button">Build</button>
       </div>
-      <div id="csvbAiSourceStatus" class="csvb-ai-source-muted" style="margin-top:8px;"></div>
+      <div class="csvb-ai-source-actions">
+        <button id="csvbAiSourceCopyBtn" class="btn light" type="button">Copy pack</button>
+        <button id="csvbAiSourceClearBtn" class="btn light" type="button">Clear</button>
+      </div>
+      <div id="csvbAiSourceStatus" class="csvb-ai-source-muted" style="margin-top:6px;"></div>
       <div id="csvbAiSourceResults" class="csvb-ai-source-results"></div>
     `;
 
-    if (anchor) {
-      anchor.insertAdjacentElement("afterend", panel);
-      anchor.insertAdjacentElement("afterend", trigger);
-    } else {
-      document.body.prepend(panel);
-      document.body.prepend(trigger);
-    }
+    anchor.insertAdjacentElement("afterend", panel);
 
-    $("csvbAiSourceToggleBtn")?.addEventListener("click", () => setOpen(!state.open));
-    $("csvbAiSourceCloseBtn")?.addEventListener("click", () => setOpen(false));
     $("csvbAiSourceRunBtn")?.addEventListener("click", () => buildSourcePack());
     $("csvbAiSourceCopyBtn")?.addEventListener("click", () => copyPack());
+    $("csvbAiSourceClearBtn")?.addEventListener("click", () => clearPack());
     $("csvbAiSourceQuery")?.addEventListener("keydown", (ev) => {
       if (ev.key === "Enter") buildSourcePack();
     });
   }
 
-  function setOpen(value) {
-    state.open = !!value;
-    renderShell();
-  }
-
   function renderShell() {
     ensurePanel();
-    const trigger = $("csvbAiSourceTrigger");
-    const panel = $("csvbAiSourcePanel");
-    const btn = $("csvbAiSourceToggleBtn");
-
-    if (!trigger || !panel) return;
-
-    if (!isAllowedRole()) {
-      trigger.style.display = "none";
-      panel.style.display = "none";
-      return;
-    }
-
-    trigger.style.display = "flex";
-    panel.style.display = state.open ? "block" : "none";
-    if (btn) btn.textContent = state.open ? "Hide AI Search" : "AI Search";
+    const panel = $("csvbAiSourceInline");
+    if (!panel) return;
+    panel.style.display = isAllowedRole() ? "block" : "none";
   }
 
   function setStatus(message) {
@@ -417,13 +376,13 @@
       <div class="csvb-ai-source-result">
         <div class="csvb-ai-source-result-title">${esc(qNumber)} — ${esc(shortText || question || "SIRE question")}</div>
         <div class="csvb-ai-source-result-meta">Score: ${item.score} • Type: ${esc(pget(p, ["Question Type", "question_type", "questionType"]))} • Response: ${esc(responseTypes(p))}</div>
-        <div class="csvb-ai-source-section"><b>Question:</b> ${esc(truncate(question, 450))}</div>
-        ${guidance ? `<div class="csvb-ai-source-section"><b>Guidance:</b> ${esc(truncate(guidance, 450))}</div>` : ""}
-        ${actions ? `<div class="csvb-ai-source-section"><b>Inspector actions:</b> ${esc(truncate(actions, 350))}</div>` : ""}
-        ${item.ee.length ? `<div class="csvb-ai-source-section"><b>Expected Evidence:</b><br>${item.ee.slice(0, 3).map((x) => `${x.seq}. ${esc(truncate(x.text, 220))}`).join("<br>")}</div>` : ""}
-        ${item.pgno.length ? `<div class="csvb-ai-source-section"><b>PGNOs:</b><br>${item.pgno.slice(0, 3).map((x, i) => `${esc(x.code || `${qNumber}.${String(i + 1).padStart(2, "0")}`)} — ${esc(truncate(x.text, 220))}`).join("<br>")}</div>` : ""}
-        ${pubs.length ? `<div class="csvb-ai-source-section"><b>Publications:</b><br>${pubs.slice(0, 3).map((x) => esc(truncate(x.display_name || x.raw_publication_text || JSON.stringify(x), 220))).join("<br>")}</div>` : ""}
-        ${gids.length ? `<div class="csvb-ai-source-section"><b>Industry Guidance:</b><br>${gids.slice(0, 3).map((x) => esc(truncate([x.guidance_title, x.guidance_section, x.guidance_content].filter(Boolean).join(" — "), 260))).join("<br>")}</div>` : ""}
+        <div class="csvb-ai-source-section"><b>Question:</b> ${esc(truncate(question, 320))}</div>
+        ${guidance ? `<div class="csvb-ai-source-section"><b>Guidance:</b> ${esc(truncate(guidance, 320))}</div>` : ""}
+        ${actions ? `<div class="csvb-ai-source-section"><b>Inspector actions:</b> ${esc(truncate(actions, 220))}</div>` : ""}
+        ${item.ee.length ? `<div class="csvb-ai-source-section"><b>Expected Evidence:</b><br>${item.ee.slice(0, 2).map((x) => `${x.seq}. ${esc(truncate(x.text, 160))}`).join("<br>")}</div>` : ""}
+        ${item.pgno.length ? `<div class="csvb-ai-source-section"><b>PGNOs:</b><br>${item.pgno.slice(0, 2).map((x, i) => `${esc(x.code || `${qNumber}.${String(i + 1).padStart(2, "0")}`)} — ${esc(truncate(x.text, 160))}`).join("<br>")}</div>` : ""}
+        ${pubs.length ? `<div class="csvb-ai-source-section"><b>Publications:</b><br>${pubs.slice(0, 2).map((x) => esc(truncate(x.display_name || x.raw_publication_text || JSON.stringify(x), 160))).join("<br>")}</div>` : ""}
+        ${gids.length ? `<div class="csvb-ai-source-section"><b>Industry Guidance:</b><br>${gids.slice(0, 2).map((x) => esc(truncate([x.guidance_title, x.guidance_section, x.guidance_content].filter(Boolean).join(" — "), 180))).join("<br>")}</div>` : ""}
       </div>
     `;
   }
@@ -475,6 +434,7 @@
 
   async function buildSourcePack() {
     try {
+      const resultsHost = $("csvbAiSourceResults");
       const query = normalizeText($("csvbAiSourceQuery")?.value || "");
       if (!query) {
         setStatus("Enter a topic or question first.");
@@ -488,6 +448,10 @@
       }
 
       setStatus("Building source pack…");
+      if (resultsHost) {
+        resultsHost.style.display = "block";
+        resultsHost.innerHTML = `<div class="csvb-ai-source-muted">Loading source matches…</div>`;
+      }
 
       const scored = rows
         .map((row) => ({ row, score: scoreRow(row, query) }))
@@ -498,7 +462,7 @@
       if (!scored.length) {
         state.lastResults = [];
         state.lastPackText = basePackHeader(query, []) + "No matching SIRE 2.0 Viewer sources found.";
-        $("csvbAiSourceResults").innerHTML = `<div class="csvb-ai-source-muted">No matching SIRE 2.0 Viewer sources found.</div>`;
+        if (resultsHost) resultsHost.innerHTML = `<div class="csvb-ai-source-muted">No matching SIRE 2.0 Viewer sources found.</div>`;
         setStatus("No sources found.");
         return;
       }
@@ -521,7 +485,10 @@
         ...enriched.map(resultToPackText)
       ].join("\n---\n");
 
-      $("csvbAiSourceResults").innerHTML = enriched.map(renderResultHtml).join("");
+      if (resultsHost) {
+        resultsHost.style.display = "block";
+        resultsHost.innerHTML = enriched.map(renderResultHtml).join("");
+      }
       setStatus(`Source pack built from ${enriched.length} source question(s).`);
     } catch (error) {
       console.error(error);
@@ -542,6 +509,19 @@
     }
   }
 
+  function clearPack() {
+    state.lastPackText = "";
+    state.lastResults = [];
+    const q = $("csvbAiSourceQuery");
+    const r = $("csvbAiSourceResults");
+    if (q) q.value = "";
+    if (r) {
+      r.innerHTML = "";
+      r.style.display = "none";
+    }
+    setStatus("");
+  }
+
   async function boot() {
     try {
       injectStyles();
@@ -553,9 +533,8 @@
 
       window.CSVB_SIRE_VIEWER_AI_SOURCE_PACK = {
         build: BUILD,
-        open: () => setOpen(true),
-        close: () => setOpen(false),
         buildSourcePack,
+        clear: clearPack,
         getLastPackText: () => state.lastPackText,
         getLastResults: () => state.lastResults.slice()
       };
