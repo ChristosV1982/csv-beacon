@@ -6,12 +6,14 @@
 (() => {
   "use strict";
 
-  const BUILD = "QEDITOR-SIRE-ALERT-BRIDGE-20260517_1";
+  const BUILD = "QEDITOR-SIRE-ALERT-BRIDGE-20260517_2";
   window.CSVB_QEDITOR_SIRE_ALERT_BRIDGE_BUILD = BUILD;
 
   let sb = null;
   let lastSignature = "";
   let lastAt = 0;
+  let patchApplied = false;
+  let recordingEvent = false;
 
   const SUCCESS_PATTERNS = [
     /^Saved new question\.?/i,
@@ -83,6 +85,16 @@
     return "sire_library_update";
   }
 
+  function eventTypeFromUpsertArgs(args) {
+    const status = safeStr(args?.p_status).trim().toLowerCase();
+    const prevStatus = safeStr(textOf("pillStatus").replace(/^status:\s*/i, "")).trim().toLowerCase();
+
+    if (status === "inactive" && prevStatus && prevStatus !== "inactive") return "sire_question_deactivated";
+    if (status === "active" && prevStatus === "inactive") return "sire_question_activated";
+
+    return args?.p_question_id ? "sire_question_updated" : "sire_question_created_or_updated";
+  }
+
   function titleFromEvent(eventType, qno) {
     const suffix = qno ? ` — Q ${qno}` : "";
 
@@ -119,59 +131,138 @@
     return sb;
   }
 
-  async function recordAlertFromSuccess(message) {
-    const sourceType = sourceTypeFromDom();
+  function questionNoFromUpsertArgs(args) {
+    const nb = safeStr(args?.p_number_base).trim();
+    const sx = safeStr(args?.p_number_suffix).trim();
+    return sx ? `${nb}-${sx}` : nb;
+  }
 
-    if (sourceType !== "SIRE") {
-      return;
-    }
+  async function recordSireAlertEvent(payload) {
+    const sourceType = safeStr(payload.sourceType).trim();
+    if (sourceType !== "SIRE") return;
 
-    const eventType = eventTypeFromMessage(message);
-    const qno = questionNumberFromDom(message);
-    const shortText = shortTextFromDom();
-    const reason = changeReasonFromDom();
+    const eventType = payload.eventType || "sire_library_update";
+    const qno = payload.qno || "";
+    const shortText = payload.shortText || "";
+    const reason = payload.reason || "";
     const title = titleFromEvent(eventType, qno);
     const summary = summaryFromEvent(eventType, qno, shortText, reason);
 
-    const signature = [eventType, qno, shortText, reason, safeStr(message).trim()].join("|");
+    const signature = [eventType, qno, shortText, reason, payload.origin || ""].join("|");
     const now = Date.now();
 
-    if (signature === lastSignature && now - lastAt < 10000) {
-      return;
-    }
+    if (signature === lastSignature && now - lastAt < 10000) return;
 
     lastSignature = signature;
     lastAt = now;
 
     const client = await ensureSupabase();
 
-    const { error } = await client.rpc("csvb_record_sire_library_change_event", {
-      p_event_type: eventType,
-      p_source_module: "sire_questions_editor",
-      p_source_record_id: null,
-      p_question_id: null,
-      p_question_no: qno || null,
-      p_change_scope: "question",
-      p_title: title,
-      p_summary: summary,
-      p_details: {
-        bridge_build: BUILD,
-        editor_success_message: safeStr(message).trim(),
-        source_type: sourceType,
-        question_no: qno || null,
-        short_text: shortText || null,
-        change_reason: reason || null,
-        url: window.location.pathname
-      }
-    });
+    recordingEvent = true;
+    try {
+      const { error } = await client.rpc("csvb_record_sire_library_change_event", {
+        p_event_type: eventType,
+        p_source_module: "sire_questions_editor",
+        p_source_record_id: payload.sourceRecordId || null,
+        p_question_id: payload.questionId || null,
+        p_question_no: qno || null,
+        p_change_scope: payload.changeScope || "question",
+        p_title: title,
+        p_summary: summary,
+        p_details: {
+          bridge_build: BUILD,
+          origin: payload.origin || null,
+          source_type: sourceType,
+          question_no: qno || null,
+          short_text: shortText || null,
+          change_reason: reason || null,
+          url: window.location.pathname
+        }
+      });
 
-    if (error) throw error;
+      if (error) throw error;
+    } finally {
+      recordingEvent = false;
+    }
 
     console.info("C.S.V. BEACON: SIRE Viewer update alert event recorded.", {
       eventType,
       qno,
-      title
+      title,
+      origin: payload.origin
     });
+  }
+
+  async function recordAlertFromSuccess(message) {
+    await recordSireAlertEvent({
+      origin: "okBox_observer",
+      sourceType: sourceTypeFromDom(),
+      eventType: eventTypeFromMessage(message),
+      qno: questionNumberFromDom(message),
+      shortText: shortTextFromDom(),
+      reason: changeReasonFromDom(),
+      questionId: null,
+      sourceRecordId: null,
+      changeScope: "question"
+    });
+  }
+
+  function patchRpcClient() {
+    if (patchApplied) return;
+    if (!window.AUTH?.ensureSupabase) return;
+
+    const client = window.AUTH.ensureSupabase();
+    if (!client || typeof client.rpc !== "function") return;
+    if (client.__csvbSireAlertBridgePatched) {
+      patchApplied = true;
+      return;
+    }
+
+    const originalRpc = client.rpc.bind(client);
+
+    client.rpc = async function patchedRpc(name, args = {}, options) {
+      const result = await originalRpc(name, args, options);
+
+      try {
+        if (!recordingEvent && name === "csvb_upsert_question_master_for_me" && !result?.error) {
+          const sourceType = safeStr(args?.p_source_type).trim();
+
+          if (sourceType === "SIRE") {
+            const dataRow = Array.isArray(result?.data) ? result.data[0] : result?.data;
+            const qno = questionNoFromUpsertArgs(args) || questionNumberFromDom("");
+            const payload = args?.p_payload || {};
+            const shortText = safeStr(payload.short_text || payload["Short Text"] || shortTextFromDom()).trim();
+            const reason = safeStr(args?.p_change_reason || changeReasonFromDom()).trim();
+
+            setTimeout(() => {
+              recordSireAlertEvent({
+                origin: "rpc_upsert_intercept",
+                sourceType,
+                eventType: eventTypeFromUpsertArgs(args),
+                qno,
+                shortText,
+                reason,
+                questionId: dataRow?.id || args?.p_question_id || null,
+                sourceRecordId: dataRow?.id || args?.p_question_id || null,
+                changeScope: "question"
+              }).catch((error) => {
+                console.warn("C.S.V. BEACON: could not record SIRE Viewer update alert event:", error);
+              });
+            }, 250);
+          }
+        }
+      } catch (error) {
+        console.warn("C.S.V. BEACON: SIRE alert bridge RPC interception warning:", error);
+      }
+
+      return result;
+    };
+
+    client.__csvbSireAlertBridgePatched = true;
+    sb = client;
+    patchApplied = true;
+
+    console.info("C.S.V. BEACON: SIRE editor alert bridge RPC interception active.", { build: BUILD });
   }
 
   function observeOkBox() {
@@ -186,7 +277,7 @@
         recordAlertFromSuccess(text).catch((error) => {
           console.warn("C.S.V. BEACON: could not record SIRE Viewer update alert event:", error);
         });
-      }, 350);
+      }, 650);
     };
 
     const observer = new MutationObserver(check);
@@ -201,6 +292,15 @@
 
   function boot() {
     observeOkBox();
+    patchRpcClient();
+    setTimeout(patchRpcClient, 700);
+    setTimeout(patchRpcClient, 1800);
+
+    window.CSVB_QEDITOR_SIRE_ALERT_BRIDGE = {
+      build: BUILD,
+      patchRpcClient,
+      isPatched: () => patchApplied
+    };
   }
 
   if (document.readyState === "loading") {
