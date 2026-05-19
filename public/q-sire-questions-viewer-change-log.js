@@ -5,7 +5,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "SIRE-VIEWER-CHANGE-LOG-20260517_2";
+  const BUILD = "SIRE-VIEWER-CHANGE-LOG-20260517_3";
   const LS_OPEN = "csvb_sire_viewer_change_log_open";
 
   window.CSVB_SIRE_VIEWER_CHANGE_LOG_BUILD = BUILD;
@@ -263,7 +263,6 @@
     trigger.className = "csvb-sire-change-log-trigger";
     trigger.innerHTML = `
       <button id="csvbSireViewerChangeLogToggleBtn" class="btn light" type="button">Changes Log</button>
-      <span class="csvb-sire-change-log-pill" id="csvbSireViewerChangeLogTriggerCount">Events: 0</span>
     `;
 
     const panel = document.createElement("div");
@@ -307,7 +306,6 @@
     const trigger = $("csvbSireViewerChangeLogTrigger");
     const panel = $("csvbSireViewerChangeLogPanel");
     const count = $("csvbSireViewerChangeLogCount");
-    const triggerCount = $("csvbSireViewerChangeLogTriggerCount");
     const toggleBtn = $("csvbSireViewerChangeLogToggleBtn");
 
     if (!trigger || !panel) return;
@@ -323,7 +321,6 @@
     panel.style.display = state.isOpen ? "block" : "none";
 
     if (count) count.textContent = `Events: ${rows.length}`;
-    if (triggerCount) triggerCount.textContent = `Events: ${rows.length}`;
     if (toggleBtn) toggleBtn.textContent = state.isOpen ? "Hide Changes Log" : "Changes Log";
   }
 
