@@ -5,7 +5,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "SIRE-VIEWER-ACCESS-DIAGNOSTIC-20260519_1";
+  const BUILD = "SIRE-VIEWER-ACCESS-DIAGNOSTIC-20260519_2";
   window.CSVB_SIRE_VIEWER_ACCESS_DIAGNOSTIC_BUILD = BUILD;
 
   function safeStr(value) {
@@ -34,7 +34,7 @@
 
     const expected = {
       ai_search_visible: allowedAiRoles(role),
-      ai_usage_log_visible: allowedAiRoles(role),
+      ai_usage_log_visible: platformRoles(role),
       changes_log_visible: platformRoles(role),
     };
 
