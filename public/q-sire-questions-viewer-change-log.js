@@ -5,14 +5,17 @@
 (() => {
   "use strict";
 
-  const BUILD = "SIRE-VIEWER-CHANGE-LOG-20260517_1";
+  const BUILD = "SIRE-VIEWER-CHANGE-LOG-20260517_2";
+  const LS_OPEN = "csvb_sire_viewer_change_log_open";
+
   window.CSVB_SIRE_VIEWER_CHANGE_LOG_BUILD = BUILD;
 
   const state = {
     sb: null,
     me: null,
     events: [],
-    recipientsByEvent: new Map()
+    recipientsByEvent: new Map(),
+    isOpen: false
   };
 
   function $(id) {
@@ -50,6 +53,21 @@
     }
   }
 
+  function loadOpenState() {
+    // Default is collapsed because this is a monitoring log, not an operational alert.
+    try {
+      return localStorage.getItem(LS_OPEN) === "1";
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function saveOpenState(value) {
+    try {
+      localStorage.setItem(LS_OPEN, value ? "1" : "0");
+    } catch (_) {}
+  }
+
   function toastOk(message) {
     const ok = $("okBox");
     const warn = $("warnBox");
@@ -82,6 +100,20 @@
     const style = document.createElement("style");
     style.id = "csvbSireViewerChangeLogStyles";
     style.textContent = `
+      html[data-csvb-page="q-sire-questions-viewer.html"] .csvb-sire-change-log-trigger {
+        width: 100%;
+        margin: 5px auto 6px;
+        display: none;
+        align-items: center;
+        justify-content: flex-start;
+        gap: 7px;
+        flex-wrap: wrap;
+      }
+
+      html[data-csvb-page="q-sire-questions-viewer.html"] .csvb-sire-change-log-trigger .btn {
+        padding: 6px 10px;
+      }
+
       html[data-csvb-page="q-sire-questions-viewer.html"] .csvb-sire-change-log-panel {
         width: 100%;
         max-width: 100%;
@@ -217,10 +249,23 @@
     document.head.appendChild(style);
   }
 
+  function insertionAnchor() {
+    return $("csvbSireViewerAlertsPanel") || document.querySelector(".csvb-sire-viewer-helper");
+  }
+
   function ensurePanel() {
     if ($("csvbSireViewerChangeLogPanel")) return;
 
-    const helper = document.querySelector(".csvb-sire-viewer-helper");
+    const anchor = insertionAnchor();
+
+    const trigger = document.createElement("div");
+    trigger.id = "csvbSireViewerChangeLogTrigger";
+    trigger.className = "csvb-sire-change-log-trigger";
+    trigger.innerHTML = `
+      <button id="csvbSireViewerChangeLogToggleBtn" class="btn light" type="button">Changes Log</button>
+      <span class="csvb-sire-change-log-pill" id="csvbSireViewerChangeLogTriggerCount">Events: 0</span>
+    `;
+
     const panel = document.createElement("div");
     panel.id = "csvbSireViewerChangeLogPanel";
     panel.className = "csvb-sire-change-log-panel";
@@ -233,34 +278,63 @@
         <div class="csvb-sire-change-log-actions">
           <span class="csvb-sire-change-log-pill" id="csvbSireViewerChangeLogCount">Events: 0</span>
           <button id="csvbSireViewerChangeLogRefreshBtn" class="btn light" type="button">Refresh log</button>
+          <button id="csvbSireViewerChangeLogCloseBtn" class="btn light" type="button">Close log</button>
         </div>
       </div>
       <div class="csvb-sire-change-log-list" id="csvbSireViewerChangeLogList"></div>
     `;
 
-    if (helper) helper.insertAdjacentElement("afterend", panel);
-    else document.body.prepend(panel);
+    if (anchor) {
+      anchor.insertAdjacentElement("afterend", panel);
+      anchor.insertAdjacentElement("afterend", trigger);
+    } else {
+      document.body.prepend(panel);
+      document.body.prepend(trigger);
+    }
 
+    $("csvbSireViewerChangeLogToggleBtn")?.addEventListener("click", () => setOpen(!state.isOpen));
+    $("csvbSireViewerChangeLogCloseBtn")?.addEventListener("click", () => setOpen(false));
     $("csvbSireViewerChangeLogRefreshBtn")?.addEventListener("click", () => loadLog(true));
   }
 
-  function renderLog() {
-    ensurePanel();
+  function setOpen(value) {
+    state.isOpen = !!value;
+    saveOpenState(state.isOpen);
+    renderLog();
+  }
 
+  function updateTriggerAndPanelShell() {
+    const trigger = $("csvbSireViewerChangeLogTrigger");
     const panel = $("csvbSireViewerChangeLogPanel");
     const count = $("csvbSireViewerChangeLogCount");
-    const list = $("csvbSireViewerChangeLogList");
+    const triggerCount = $("csvbSireViewerChangeLogTriggerCount");
+    const toggleBtn = $("csvbSireViewerChangeLogToggleBtn");
 
-    if (!panel || !count || !list) return;
+    if (!trigger || !panel) return;
 
     if (!isPlatformRole()) {
+      trigger.style.display = "none";
       panel.style.display = "none";
       return;
     }
 
-    panel.style.display = "block";
     const rows = state.events || [];
-    count.textContent = `Events: ${rows.length}`;
+    trigger.style.display = "flex";
+    panel.style.display = state.isOpen ? "block" : "none";
+
+    if (count) count.textContent = `Events: ${rows.length}`;
+    if (triggerCount) triggerCount.textContent = `Events: ${rows.length}`;
+    if (toggleBtn) toggleBtn.textContent = state.isOpen ? "Hide Changes Log" : "Changes Log";
+  }
+
+  function renderLog() {
+    ensurePanel();
+    updateTriggerAndPanelShell();
+
+    const list = $("csvbSireViewerChangeLogList");
+    if (!list || !isPlatformRole()) return;
+
+    const rows = state.events || [];
 
     if (!rows.length) {
       list.innerHTML = `<div class="csvb-sire-change-log-muted">No SIRE library change events recorded yet.</div>`;
@@ -405,12 +479,16 @@
 
       state.sb = window.AUTH.ensureSupabase();
       state.me = await window.AUTH.getSessionUserProfile();
+      state.isOpen = loadOpenState();
 
       if (!state.me?.session?.user) return;
 
       window.CSVB_SIRE_VIEWER_CHANGE_LOG = {
         build: BUILD,
         reload: loadLog,
+        open: () => setOpen(true),
+        close: () => setOpen(false),
+        toggle: () => setOpen(!state.isOpen),
         getEvents: () => (state.events || []).slice(),
         getRecipients: (eventId) => (state.recipientsByEvent.get(eventId) || []).slice()
       };
