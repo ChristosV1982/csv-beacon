@@ -1,0 +1,3 @@
+# supabase/functions/sire-viewer-ai-search/config.toml
+# JWT is verified manually inside index.ts so CORS preflight and custom role checks are controlled by the function.
+verify_jwt = false
