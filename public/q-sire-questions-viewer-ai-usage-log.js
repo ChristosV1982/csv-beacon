@@ -1,19 +1,21 @@
 // public/q-sire-questions-viewer-ai-usage-log.js
-// C.S.V. BEACON — SIRE 2.0 Questions Viewer AI Usage Log panel
+// C.S.V. BEACON — Viewer AI Usage Log panel
 // Read-only frontend panel. Uses csvb_sire_viewer_ai_usage_log_for_me().
-// Platform roles only.
+// Platform roles only. Supports SIRE, RISQ and legacy SIRE rows.
 
 (() => {
   "use strict";
 
-  const BUILD = "SIRE-VIEWER-AI-USAGE-LOG-20260519_2";
+  const BUILD = "VIEWER-AI-USAGE-LOG-20260520_1";
   window.CSVB_SIRE_VIEWER_AI_USAGE_LOG_BUILD = BUILD;
+  window.CSVB_VIEWER_AI_USAGE_LOG_BUILD = BUILD;
 
   const state = {
     sb: null,
     me: null,
     open: false,
-    rows: []
+    rows: [],
+    viewerFilter: "ALL"
   };
 
   function $(id) {
@@ -58,13 +60,48 @@
     return `${(n / 1000).toFixed(1)} s`;
   }
 
+  function viewerType(row) {
+    const direct = safeStr(row.viewer_type || "").trim().toUpperCase();
+    if (direct === "RISQ") return "RISQ";
+    if (direct === "SIRE") return "SIRE";
+    if (direct === "SIRE_LEGACY") return "SIRE_LEGACY";
+
+    const ctx = row.request_context;
+    if (ctx && typeof ctx === "object") {
+      const v = safeStr(ctx.viewer_type || ctx.viewerType || "").trim().toUpperCase();
+      if (v === "RISQ") return "RISQ";
+      if (v === "SIRE") return "SIRE";
+    }
+
+    return "SIRE_LEGACY";
+  }
+
+  function viewerTypeLabel(type) {
+    if (type === "RISQ") return "RISQ";
+    if (type === "SIRE") return "SIRE";
+    if (type === "SIRE_LEGACY") return "SIRE Legacy";
+    return type || "Unknown";
+  }
+
+  function viewerPillClass(type) {
+    if (type === "RISQ") return "csvb-ai-usage-viewer-risq";
+    if (type === "SIRE") return "csvb-ai-usage-viewer-sire";
+    return "csvb-ai-usage-viewer-legacy";
+  }
+
+  function filteredRows() {
+    const filter = state.viewerFilter || "ALL";
+    if (filter === "ALL") return state.rows.slice();
+    return state.rows.filter((row) => viewerType(row) === filter);
+  }
+
   function injectStyles() {
-    if ($("csvbSireViewerAiUsageLogStyles")) return;
+    if ($("csvbViewerAiUsageLogStyles")) return;
 
     const style = document.createElement("style");
-    style.id = "csvbSireViewerAiUsageLogStyles";
+    style.id = "csvbViewerAiUsageLogStyles";
     style.textContent = `
-      html[data-csvb-page="q-sire-questions-viewer.html"] .csvb-ai-usage-trigger {
+      .csvb-ai-usage-trigger {
         width: 100%;
         margin: 5px auto 6px;
         display: none;
@@ -74,7 +111,7 @@
         flex-wrap: wrap;
       }
 
-      html[data-csvb-page="q-sire-questions-viewer.html"] .csvb-ai-usage-panel {
+      .csvb-ai-usage-panel {
         width: 100%;
         max-width: 100%;
         margin: 8px auto 10px;
@@ -86,7 +123,7 @@
         display: none;
       }
 
-      html[data-csvb-page="q-sire-questions-viewer.html"] .csvb-ai-usage-head {
+      .csvb-ai-usage-head {
         display: flex;
         align-items: flex-start;
         justify-content: space-between;
@@ -94,25 +131,38 @@
         flex-wrap: wrap;
       }
 
-      html[data-csvb-page="q-sire-questions-viewer.html"] .csvb-ai-usage-title {
+      .csvb-ai-usage-title {
         color: #062A5E;
         font-weight: 850;
       }
 
-      html[data-csvb-page="q-sire-questions-viewer.html"] .csvb-ai-usage-subtitle {
+      .csvb-ai-usage-subtitle {
         color: #5E6F86;
         font-size: 12px;
         margin-top: 2px;
       }
 
-      html[data-csvb-page="q-sire-questions-viewer.html"] .csvb-ai-usage-actions {
+      .csvb-ai-usage-actions {
         display: inline-flex;
         gap: 7px;
         align-items: center;
         flex-wrap: wrap;
       }
 
-      html[data-csvb-page="q-sire-questions-viewer.html"] .csvb-ai-usage-pill {
+      .csvb-ai-usage-actions select {
+        width: auto;
+        min-height: 31px;
+        border: 1px solid #BFD3EF;
+        background: #FFFFFF;
+        color: #062A5E;
+        border-radius: 9px;
+        padding: 5px 8px;
+        font-size: 12px;
+        font-weight: 800;
+      }
+
+      .csvb-ai-usage-pill,
+      .csvb-ai-usage-viewer-pill {
         display: inline-flex;
         align-items: center;
         justify-content: center;
@@ -126,7 +176,25 @@
         white-space: nowrap;
       }
 
-      html[data-csvb-page="q-sire-questions-viewer.html"] .csvb-ai-usage-table-wrap {
+      .csvb-ai-usage-viewer-sire {
+        border-color: #BFD3EF;
+        background: #EEF6FF;
+        color: #1A4170;
+      }
+
+      .csvb-ai-usage-viewer-risq {
+        border-color: #BDE8D0;
+        background: #ECFDF3;
+        color: #067647;
+      }
+
+      .csvb-ai-usage-viewer-legacy {
+        border-color: #E7D7B3;
+        background: #FFF8E8;
+        color: #8A5A00;
+      }
+
+      .csvb-ai-usage-table-wrap {
         margin-top: 9px;
         overflow-x: auto;
         border: 1px solid #D6E4F5;
@@ -134,47 +202,47 @@
         background: #fff;
       }
 
-      html[data-csvb-page="q-sire-questions-viewer.html"] .csvb-ai-usage-table {
+      .csvb-ai-usage-table {
         width: 100%;
         border-collapse: collapse;
         font-size: 12px;
       }
 
-      html[data-csvb-page="q-sire-questions-viewer.html"] .csvb-ai-usage-table th,
-      html[data-csvb-page="q-sire-questions-viewer.html"] .csvb-ai-usage-table td {
+      .csvb-ai-usage-table th,
+      .csvb-ai-usage-table td {
         border-bottom: 1px solid #E1EAF7;
         padding: 6px 8px;
         vertical-align: top;
         text-align: left;
       }
 
-      html[data-csvb-page="q-sire-questions-viewer.html"] .csvb-ai-usage-table th {
+      .csvb-ai-usage-table th {
         background: #F1F7FF;
         color: #062A5E;
         font-weight: 850;
         white-space: nowrap;
       }
 
-      html[data-csvb-page="q-sire-questions-viewer.html"] .csvb-ai-usage-table td {
+      .csvb-ai-usage-table td {
         color: #10233F;
       }
 
-      html[data-csvb-page="q-sire-questions-viewer.html"] .csvb-ai-usage-query {
+      .csvb-ai-usage-query {
         max-width: 320px;
         white-space: normal;
         word-break: break-word;
       }
 
-      html[data-csvb-page="q-sire-questions-viewer.html"] .csvb-ai-usage-muted {
+      .csvb-ai-usage-muted {
         color: #5E6F86;
       }
 
-      html[data-csvb-page="q-sire-questions-viewer.html"] .csvb-ai-usage-status-ok {
+      .csvb-ai-usage-status-ok {
         color: #067647;
         font-weight: 850;
       }
 
-      html[data-csvb-page="q-sire-questions-viewer.html"] .csvb-ai-usage-status-fail {
+      .csvb-ai-usage-status-fail {
         color: #B42318;
         font-weight: 850;
       }
@@ -184,7 +252,7 @@
   }
 
   function insertionAnchor() {
-    return $("csvbSireViewerChangeLogTrigger") || $("csvbSireViewerAlertsPanel") || document.querySelector(".csvb-sire-viewer-helper");
+    return $("csvbSireViewerChangeLogTrigger") || $("csvbSireViewerAlertsPanel") || document.querySelector(".csvb-sire-viewer-helper") || document.querySelector(".viewer-helper");
   }
 
   function ensurePanel() {
@@ -196,7 +264,7 @@
     trigger.id = "csvbAiUsageLogTrigger";
     trigger.className = "csvb-ai-usage-trigger";
     trigger.innerHTML = `
-      <button id="csvbAiUsageLogToggleBtn" class="btn light" type="button">AI Usage Log</button>
+      <button id="csvbAiUsageLogToggleBtn" class="btn light" type="button">Viewer AI Usage Log</button>
     `;
 
     const panel = document.createElement("div");
@@ -205,10 +273,17 @@
     panel.innerHTML = `
       <div class="csvb-ai-usage-head">
         <div>
-          <div class="csvb-ai-usage-title">SIRE Viewer AI Usage Log</div>
-          <div class="csvb-ai-usage-subtitle">Platform-only audit view of recent AI Search requests.</div>
+          <div class="csvb-ai-usage-title">Viewer AI Usage Log</div>
+          <div class="csvb-ai-usage-subtitle">Platform-only audit view of recent SIRE and RISQ Viewer AI Search requests.</div>
         </div>
         <div class="csvb-ai-usage-actions">
+          <label class="csvb-ai-usage-muted" for="csvbAiUsageViewerFilter">Viewer</label>
+          <select id="csvbAiUsageViewerFilter">
+            <option value="ALL">All</option>
+            <option value="SIRE">SIRE</option>
+            <option value="RISQ">RISQ</option>
+            <option value="SIRE_LEGACY">SIRE Legacy</option>
+          </select>
           <span class="csvb-ai-usage-pill" id="csvbAiUsageLogCount">Rows: 0</span>
           <button id="csvbAiUsageLogRefreshBtn" class="btn light" type="button">Refresh log</button>
           <button id="csvbAiUsageLogCloseBtn" class="btn light" type="button">Close log</button>
@@ -228,6 +303,10 @@
     $("csvbAiUsageLogToggleBtn")?.addEventListener("click", () => setOpen(!state.open));
     $("csvbAiUsageLogCloseBtn")?.addEventListener("click", () => setOpen(false));
     $("csvbAiUsageLogRefreshBtn")?.addEventListener("click", () => loadRows(true));
+    $("csvbAiUsageViewerFilter")?.addEventListener("change", (ev) => {
+      state.viewerFilter = ev.target.value || "ALL";
+      render();
+    });
   }
 
   function setOpen(value) {
@@ -258,12 +337,20 @@
 
     const count = $("csvbAiUsageLogCount");
     const body = $("csvbAiUsageLogBody");
+    const filterEl = $("csvbAiUsageViewerFilter");
+    const rows = filteredRows();
 
-    if (count) count.textContent = `Rows: ${state.rows.length}`;
+    if (filterEl && filterEl.value !== state.viewerFilter) filterEl.value = state.viewerFilter;
+    if (count) count.textContent = `Rows: ${rows.length}/${state.rows.length}`;
     if (!body || !canSeePanel()) return;
 
     if (!state.rows.length) {
       body.innerHTML = `<div style="padding:9px;" class="csvb-ai-usage-muted">No AI usage entries loaded.</div>`;
+      return;
+    }
+
+    if (!rows.length) {
+      body.innerHTML = `<div style="padding:9px;" class="csvb-ai-usage-muted">No rows match the selected viewer filter.</div>`;
       return;
     }
 
@@ -272,6 +359,7 @@
         <thead>
           <tr>
             <th>Date/time</th>
+            <th>Viewer</th>
             <th>User</th>
             <th>Company</th>
             <th>Role</th>
@@ -284,7 +372,7 @@
           </tr>
         </thead>
         <tbody>
-          ${state.rows.map(rowHtml).join("")}
+          ${rows.map(rowHtml).join("")}
         </tbody>
       </table>
     `;
@@ -296,10 +384,12 @@
     const statusClass = ok ? "csvb-ai-usage-status-ok" : "csvb-ai-usage-status-fail";
     const responseChars = Number(row.response_chars || 0);
     const error = safeStr(row.error_message || "");
+    const type = viewerType(row);
 
     return `
       <tr>
         <td>${esc(fmtDate(row.created_at))}</td>
+        <td><span class="csvb-ai-usage-viewer-pill ${viewerPillClass(type)}">${esc(viewerTypeLabel(type))}</span></td>
         <td>${esc(row.username || row.user_id || "—")}</td>
         <td>${esc(row.company_name || row.company_id || "—")}</td>
         <td>${esc(row.user_role || "—")}</td>
@@ -328,18 +418,18 @@
       if (showToast) {
         const ok = $("okBox");
         if (ok) {
-          ok.textContent = `AI usage log refreshed. Rows: ${state.rows.length}.`;
+          ok.textContent = `Viewer AI usage log refreshed. Rows: ${state.rows.length}.`;
           ok.style.display = "block";
           setTimeout(() => {
-            if (ok.textContent.includes("AI usage log refreshed")) ok.style.display = "none";
+            if (ok.textContent.includes("Viewer AI usage log refreshed")) ok.style.display = "none";
           }, 2400);
         }
       }
     } catch (error) {
-      console.warn("AI usage log load failed:", error);
+      console.warn("Viewer AI usage log load failed:", error);
       const body = $("csvbAiUsageLogBody");
       if (body) {
-        body.innerHTML = `<div style="padding:9px;" class="csvb-ai-usage-status-fail">Could not load AI usage log: ${esc(error?.message || error)}</div>`;
+        body.innerHTML = `<div style="padding:9px;" class="csvb-ai-usage-status-fail">Could not load Viewer AI usage log: ${esc(error?.message || error)}</div>`;
       }
     }
   }
@@ -362,9 +452,11 @@
         getRows: () => state.rows.slice()
       };
 
+      window.CSVB_VIEWER_AI_USAGE_LOG = window.CSVB_SIRE_VIEWER_AI_USAGE_LOG;
+
       render();
     } catch (error) {
-      console.warn("AI usage log panel boot failed:", error);
+      console.warn("Viewer AI usage log panel boot failed:", error);
     }
   }
 
