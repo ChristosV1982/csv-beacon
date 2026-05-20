@@ -5,7 +5,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "DASHBOARD-RISQ-VIEWER-CARD-20260520_1";
+  const BUILD = "DASHBOARD-RISQ-VIEWER-CARD-20260520_2";
   window.CSVB_DASHBOARD_RISQ_VIEWER_CARD_BUILD = BUILD;
 
   const CARD_KEY = "risq_questions_viewer";
@@ -22,12 +22,31 @@
     `;
   }
 
+  function areaHomeItemHtml() {
+    return `
+      <div class="csvb-area-home-item" data-csvb-risq-viewer-area-home="1">
+        <div class="csvb-area-home-item-icon">🔎</div>
+        <div class="csvb-area-home-item-main">
+          <div class="csvb-area-home-item-title">RISQ Questions Viewer</div>
+          <div class="csvb-area-home-item-text">Primary read-only operational RISQ 3.2 viewer with filters, normal search, guide text, eSMS references, print and export tools.</div>
+          <div class="csvb-area-home-item-actions">
+            <a class="csvb-area-home-action" href="./risq-questions-viewer.html">Open</a>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
   function ensureCard() {
     let card = document.querySelector(`[data-card="${CARD_KEY}"]`);
     if (card) return card;
 
-    const originalGrid = document.querySelector(".wrap > .grid") || document.querySelector(".csvb-platform-area-grid");
-    if (!originalGrid) return null;
+    const preferredGrid =
+      document.querySelector('[data-platform-area-grid="inspection_libraries_vetting"]') ||
+      document.querySelector(".wrap > .grid") ||
+      document.querySelector(".csvb-platform-area-grid");
+
+    if (!preferredGrid) return null;
 
     card = document.createElement("div");
     card.className = "card";
@@ -36,7 +55,7 @@
 
     const risqEditor = document.querySelector('[data-card="risq_questions_editor"]');
     if (risqEditor?.parentElement) risqEditor.parentElement.insertBefore(card, risqEditor);
-    else originalGrid.appendChild(card);
+    else preferredGrid.appendChild(card);
 
     return card;
   }
@@ -56,13 +75,50 @@
     return rank.allowedViewModules.includes(MODULE_CODE);
   }
 
-  function apply() {
-    const card = ensureCard();
-    if (!card) return false;
+  function isAllowed() {
+    return companyAllows() && rankAllows();
+  }
 
-    const allowed = companyAllows() && rankAllows();
-    card.style.display = allowed ? "block" : "none";
-    return true;
+  function findInspectionLibraryGroupGrid() {
+    const titleNodes = Array.from(document.querySelectorAll(".csvb-area-home-group-title"));
+    const exact = titleNodes.find((node) => /inspection question libraries and preparation/i.test(node.textContent || ""));
+    const fallback = titleNodes.find((node) => /question libraries/i.test(node.textContent || ""));
+    const title = exact || fallback;
+    return title?.parentElement?.querySelector(".csvb-area-home-group-grid") || null;
+  }
+
+  function ensureAreaHomeItem(allowed) {
+    const existing = document.querySelector('[data-csvb-risq-viewer-area-home="1"]');
+
+    if (!allowed) {
+      existing?.remove();
+      return;
+    }
+
+    if (existing) return;
+
+    const grid = findInspectionLibraryGroupGrid();
+    if (!grid) return;
+
+    const sireTitle = Array.from(grid.querySelectorAll(".csvb-area-home-item-title"))
+      .find((node) => /SIRE 2\.0 Questions Viewer/i.test(node.textContent || ""));
+
+    if (sireTitle?.closest(".csvb-area-home-item")) {
+      sireTitle.closest(".csvb-area-home-item").insertAdjacentHTML("afterend", areaHomeItemHtml());
+    } else {
+      grid.insertAdjacentHTML("afterbegin", areaHomeItemHtml());
+    }
+  }
+
+  function apply() {
+    const allowed = isAllowed();
+
+    const card = ensureCard();
+    if (card) card.style.display = allowed ? "block" : "none";
+
+    ensureAreaHomeItem(allowed);
+
+    return !!card || !!document.querySelector('[data-csvb-risq-viewer-area-home="1"]');
   }
 
   function boot() {
@@ -70,12 +126,18 @@
     const timer = setInterval(() => {
       tries += 1;
       apply();
-      if (tries >= 18) clearInterval(timer);
+      if (tries >= 24) clearInterval(timer);
     }, 350);
 
     setTimeout(apply, 1500);
     setTimeout(apply, 3000);
     setTimeout(apply, 5000);
+    setTimeout(apply, 8000);
+
+    const observer = new MutationObserver(() => {
+      window.requestAnimationFrame(apply);
+    });
+    observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["style", "class"] });
 
     window.CSVB_DASHBOARD_RISQ_VIEWER_CARD = {
       build: BUILD,
