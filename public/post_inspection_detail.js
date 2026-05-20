@@ -909,8 +909,131 @@ async function downloadActivePdf() {
   }
 }
 
+
+function hasMeaningfulImportProtectionValue(value) {
+  if (value == null) return false;
+  if (Array.isArray(value)) return value.length > 0;
+  if (typeof value === "string") return value.trim() !== "";
+  return Boolean(value);
+}
+
+function hasManualPgnoSelection(pgno_selected) {
+  const arr = Array.isArray(pgno_selected) ? pgno_selected : [];
+  if (!arr.length) return false;
+
+  /*
+    Auto-matched PGNOs are created during import and should not alone block a
+    clean replacement. Manually saved PGNOs normally do not carry auto_matched.
+  */
+  return arr.some((x) => x && x.auto_matched !== true);
+}
+
+function protectedImportWorkLabels(item) {
+  const labels = [];
+
+  const status = String(item?.response_status || "").trim();
+  if (status && status.toLowerCase() !== "open") labels.push(`Status: ${status}`);
+
+  if (hasMeaningfulImportProtectionValue(item?.responsible_person_id)) labels.push("Responsible person");
+  if (hasMeaningfulImportProtectionValue(item?.verifier_person_id)) labels.push("Verifier");
+  if (hasMeaningfulImportProtectionValue(item?.target_date)) labels.push("Target date");
+  if (hasMeaningfulImportProtectionValue(item?.close_out_date)) labels.push("Close-out date");
+  if (hasMeaningfulImportProtectionValue(item?.closed_by_user_id)) labels.push("Closed by");
+  if (hasMeaningfulImportProtectionValue(item?.closed_at)) labels.push("Closed timestamp");
+
+  if (hasMeaningfulImportProtectionValue(item?.immediate_cause)) labels.push("Immediate Cause");
+  if (hasMeaningfulImportProtectionValue(item?.immediate_cause_subcomments)) labels.push("Immediate Cause comments");
+  if (hasMeaningfulImportProtectionValue(item?.root_cause)) labels.push("Root Cause");
+  if (hasMeaningfulImportProtectionValue(item?.root_cause_subcomments)) labels.push("Root Cause comments");
+  if (hasMeaningfulImportProtectionValue(item?.corrective_action)) labels.push("Corrective Action");
+  if (hasMeaningfulImportProtectionValue(item?.corrective_action_subcomments)) labels.push("Corrective Action comments");
+  if (hasMeaningfulImportProtectionValue(item?.preventative_action)) labels.push("Preventative Action");
+  if (hasMeaningfulImportProtectionValue(item?.preventative_action_subcomments)) labels.push("Preventative Action comments");
+
+  if (hasManualPgnoSelection(item?.pgno_selected)) labels.push("Manual PGNO selection");
+
+  return labels;
+}
+
+async function guardExistingObservationItemsBeforePdfImport() {
+  const reportId = state.activeReport?.id;
+  if (!reportId) return true;
+
+  const { data, error } = await state.supabase
+    .from("post_inspection_observation_items")
+    .select([
+      "id",
+      "question_no",
+      "question_base",
+      "obs_type",
+      "designation",
+      "response_status",
+      "responsible_person_id",
+      "verifier_person_id",
+      "target_date",
+      "close_out_date",
+      "closed_by_user_id",
+      "closed_at",
+      "immediate_cause",
+      "immediate_cause_subcomments",
+      "root_cause",
+      "root_cause_subcomments",
+      "corrective_action",
+      "corrective_action_subcomments",
+      "preventative_action",
+      "preventative_action_subcomments",
+      "pgno_selected"
+    ].join(", "))
+    .eq("report_id", reportId);
+
+  if (error) throw error;
+
+  const existing = Array.isArray(data) ? data : [];
+  if (!existing.length) return true;
+
+  const protectedRows = existing
+    .map((item) => ({
+      item,
+      labels: protectedImportWorkLabels(item),
+    }))
+    .filter((x) => x.labels.length > 0);
+
+  if (protectedRows.length > 0) {
+    const examples = protectedRows.slice(0, 12).map((x) => {
+      const q = canonicalQno(x.item.question_no || x.item.question_base || "");
+      const kind = String(x.item.obs_type || "").trim() || "item";
+      const des = normDesignation(x.item.designation) || "—";
+      return `- ${q || "No question"} (${kind} / ${des}): ${x.labels.join(", ")}`;
+    }).join("\n");
+
+    alert(
+      "PDF re-import blocked.\n\n" +
+      "This report already contains response / workflow work. Re-importing would replace the extracted observation rows and may remove existing close-out work.\n\n" +
+      examples +
+      (protectedRows.length > 12 ? `\n… plus ${protectedRows.length - 12} more item(s).` : "") +
+      "\n\nExport the current report JSON first, or create a new report for testing the new PDF import."
+    );
+
+    return false;
+  }
+
+  return confirm(
+    `This report already has ${existing.length} extracted observation item(s).\n\n` +
+    "Re-importing the PDF will replace the existing extracted observation rows for this report.\n\n" +
+    "No populated response / close-out workflow fields were detected.\n\n" +
+    "Continue with replacement?"
+  );
+}
+
+
 async function importReportPdfAiFromFile(file) {
   if (!file) return;
+
+  const importAllowed = await guardExistingObservationItemsBeforePdfImport();
+  if (!importAllowed) {
+    setSaveStatus("Import blocked");
+    return;
+  }
 
   setSaveStatus("Uploading PDF…");
   const safeName = String(file.name || "report.pdf").replace(/[^a-zA-Z0-9._-]+/g, "_");
