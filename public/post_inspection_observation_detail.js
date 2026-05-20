@@ -237,14 +237,26 @@ function humanSocFromItem(item) {
   return "";
 }
 
+function normalizeHumanPifText(value) {
+  return String(value || "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLowerCase();
+}
+
 function humanPifsFromItem(item) {
   if (isHumanPositive(item)) return [];
+
   const candidates = [];
   const cc = String(item?.classification_coding || "").trim();
   const noc = String(item?.nature_of_concern || "").trim();
+
   if (cc) candidates.push(...cc.split("|").map((x) => x.trim()).filter(Boolean));
   if (noc) candidates.push(...noc.split("|").map((x) => x.trim()).filter(Boolean));
-  return HUMAN_PIF_OPTIONS.filter((opt) => candidates.includes(opt));
+
+  const candidateSet = new Set(candidates.map(normalizeHumanPifText));
+
+  return HUMAN_PIF_OPTIONS.filter((opt) => candidateSet.has(normalizeHumanPifText(opt)));
 }
 
 function socDisplay(item) {

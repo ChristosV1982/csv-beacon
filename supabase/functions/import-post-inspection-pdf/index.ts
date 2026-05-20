@@ -1,7 +1,7 @@
 export const config = {
   verify_jwt: false
 };
-const FUNCTION_VERSION = "cors-jwt-off-v37_process_alphanumeric_soc_codes";
+const FUNCTION_VERSION = "cors-jwt-off-v38_human_noc_and_section_heading_cleanup";
 import { createClient } from "npm:@supabase/supabase-js@2.45.4";
 import * as pdfjsLib from "npm:pdfjs-dist@4.2.67/legacy/build/pdf.mjs";
 /**
@@ -355,12 +355,26 @@ function parseResponseStart(line) {
     rank: null
   };
 }
+function isReportSectionHeading(line) {
+  const t = String(line || "").trim();
+  if (!t) return false;
+  if (isQuestionHeaderStart(t)) return false;
+
+  /*
+    Report section headings appear inside extracted question blocks, for example:
+    "5.8. Area Safety Inspections" or "10.3. Safety Management".
+    They are not part of the observation supporting comment.
+  */
+  return /^\d{1,2}\.\d{1,2}\.\s+[A-Z][A-Za-z0-9/&(),'\- ]{2,}$/.test(t);
+}
+
 function isQuestionSectionBreakLine(line) {
   const t = line.trim();
   if (!t) return true;
   if (isReportHeaderOrFooter(t)) return true;
   if (/^PIQ additional data$/i.test(t)) return true;
   if (/^Unvalidated PIQ Responses$/i.test(t)) return true;
+  if (isReportSectionHeading(t)) return true;
   if (parseResponseStart(t)) return true;
   if (isQuestionHeaderStart(t)) return true;
   return false;
@@ -440,6 +454,11 @@ function buildResponseBlocks(section) {
       current = null;
       break;
     }
+    if (isReportSectionHeading(t)) {
+      blocks.push(current);
+      current = null;
+      continue;
+    }
     if (isQuestionHeaderStart(t)) {
       blocks.push(current);
       current = null;
@@ -491,6 +510,7 @@ function parseResponseBlock(block) {
     if (!t) continue;
     if (isReportHeaderOrFooter(t)) continue;
     if (/^PIQ additional data$/i.test(t)) continue;
+    if (isReportSectionHeading(t)) break;
     // NEW IN v31:
     // hard stop before operator comments / corrective-action workflow
     if (isOperatorCommentsStart(t)) break;
