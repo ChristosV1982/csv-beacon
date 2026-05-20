@@ -4,11 +4,12 @@
 (() => {
   "use strict";
 
-  const BUILD = "CSVBEACON-DASHBOARD-RANK-ACCESS-20260520-2";
+  const BUILD = "CSVBEACON-DASHBOARD-RANK-ACCESS-20260520-3-RISQ-VIEWER";
 
   const CARD_TO_APP_MODULE_CODE = {
     library: "QUESTION_LIBRARY",
     sire_questions_viewer: "SIRE_QUESTIONS_VIEWER",
+    risq_questions_viewer: "RISQ_QUESTIONS_VIEWER",
     risq_questions_editor: "RISQ_QUESTIONS_EDITOR",
     compare: "PRE_POST_COMPARE",
     vessel: "VESSEL_QUESTIONNAIRES",
@@ -65,7 +66,7 @@
   function hideAllNonPublicCards() {
     document.querySelectorAll("[data-card]").forEach((card) => {
       const key = card.getAttribute("data-card");
-      const keep = key === "sire_questions_viewer";
+      const keep = key === "sire_questions_viewer" || key === "risq_questions_viewer";
       card.style.display = keep ? "block" : "none";
     });
   }
