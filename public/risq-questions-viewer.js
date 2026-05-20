@@ -4,7 +4,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "RISQ-QUESTIONS-VIEWER-20260520_2";
+  const BUILD = "RISQ-QUESTIONS-VIEWER-20260520_3";
   window.CSVB_RISQ_QUESTIONS_VIEWER_BUILD = BUILD;
 
   const state = {
@@ -630,6 +630,17 @@
     document.body.appendChild(script);
   }
 
+  function ensurePolishHelperLoaded() {
+    if (window.CSVB_RISQ_VIEWER_POLISH_BUILD) return;
+    if (document.querySelector('script[data-csvb-risq-polish-loader="1"]')) return;
+
+    const script = document.createElement("script");
+    script.src = "./risq-questions-viewer-polish.js?v=20260520_1";
+    script.defer = true;
+    script.dataset.csvbRisqPolishLoader = "1";
+    document.body.appendChild(script);
+  }
+
   async function init() {
     cacheDom();
 
@@ -659,6 +670,7 @@
     };
 
     ensureAiHelperLoaded();
+    ensurePolishHelperLoaded();
   }
 
   if (document.readyState === "loading") {
