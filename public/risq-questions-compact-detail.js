@@ -1,11 +1,11 @@
 // public/risq-questions-compact-detail.js
 // C.S.V. BEACON — Shared RISQ detail compaction helper
-// Frontend display only. Keeps all RISQ data in place; hides non-essential info boxes and top statistics cards.
+// Frontend display only. Keeps all RISQ data in place; hides non-essential info boxes, top statistics cards and default metadata pills.
 
 (() => {
   "use strict";
 
-  const BUILD = "RISQ-COMPACT-DETAIL-20260520_2";
+  const BUILD = "RISQ-COMPACT-DETAIL-20260520_3";
   window.CSVB_RISQ_COMPACT_DETAIL_BUILD = BUILD;
 
   const HIDE_LABELS = new Set([
@@ -65,7 +65,8 @@
         display: none !important;
       }
 
-      .csvb-risq-hidden-info-box {
+      .csvb-risq-hidden-info-box,
+      .csvb-risq-hidden-default-pill {
         display: none !important;
       }
 
@@ -171,6 +172,40 @@
     row.innerHTML = parts.join("");
   }
 
+  function shouldHideDefaultPill(text) {
+    const raw = compactSpaces(text);
+    const lower = raw.toLowerCase();
+
+    if (!raw) return false;
+
+    // Duplicates the clearer compact Answers pill.
+    if (lower.startsWith("answer:")) return true;
+
+    // Default/non-action metadata.
+    if (lower === "standard risq") return true;
+    if (lower === "active question") return true;
+    if (lower === "guide provided") return true;
+
+    // Marker remains visible only when not blank.
+    if (lower === "marker: blank") return true;
+
+    return false;
+  }
+
+  function processDefaultPills(detailBody) {
+    if (!detailBody) return;
+
+    detailBody.querySelectorAll(".pill-row .pill").forEach((pill) => {
+      const text = compactSpaces(pill.textContent || "");
+
+      if (shouldHideDefaultPill(text)) {
+        pill.classList.add("csvb-risq-hidden-default-pill");
+      } else {
+        pill.classList.remove("csvb-risq-hidden-default-pill");
+      }
+    });
+  }
+
   function processInfoGrid(grid) {
     if (!grid || grid.dataset.csvbRisqCompactProcessing === "1") return;
 
@@ -203,7 +238,9 @@
         grid.classList.remove("csvb-risq-info-grid-empty");
       }
 
-      insertOrUpdatePills(detailBodyForGrid(grid), sectionText, answerText);
+      const detailBody = detailBodyForGrid(grid);
+      insertOrUpdatePills(detailBody, sectionText, answerText);
+      processDefaultPills(detailBody);
     } finally {
       grid.dataset.csvbRisqCompactProcessing = "0";
     }
@@ -212,6 +249,7 @@
   function apply() {
     injectStyles();
     document.querySelectorAll(".detail-body .info-grid").forEach(processInfoGrid);
+    document.querySelectorAll(".detail-body").forEach(processDefaultPills);
   }
 
   function boot() {
