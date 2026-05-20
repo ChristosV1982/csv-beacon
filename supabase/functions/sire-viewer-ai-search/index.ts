@@ -1,6 +1,6 @@
 // supabase/functions/sire-viewer-ai-search/index.ts
-// C.S.V. BEACON — SIRE 2.0 Questions Viewer AI Search
-// Server-side OpenAI Responses API integration.
+// C.S.V. BEACON — Viewer AI Search
+// Server-side OpenAI Responses API integration for SIRE and RISQ source packs.
 // The OPENAI_API_KEY must be stored as a Supabase Edge Function secret.
 
 const corsHeaders = {
@@ -8,6 +8,8 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
+
+type ViewerType = "SIRE" | "RISQ";
 
 type ProfileRow = {
   id: string;
@@ -58,6 +60,12 @@ function cleanText(value: unknown): string {
   return String(value ?? "").replace(/\s+/g, " ").trim();
 }
 
+function normalizeViewerType(value: unknown): ViewerType {
+  const raw = String(value ?? "").trim().toUpperCase();
+  if (raw === "RISQ" || raw === "RISQ_3_2" || raw === "RIGHTSHIP") return "RISQ";
+  return "SIRE";
+}
+
 function getPositiveIntegerSecret(name: string, fallback: number): number {
   const raw = Deno.env.get(name) || "";
   const n = Number(raw);
@@ -73,8 +81,6 @@ function utcDayStartIso(): string {
 
 function compactSourcePack(value: unknown): string {
   const raw = String(value ?? "").trim();
-  // Keep the source pack bounded. The frontend already limits the number of sources.
-  // This protects the function against accidental huge requests.
   return raw.length > 42000 ? raw.slice(0, 42000) : raw;
 }
 
@@ -137,10 +143,10 @@ async function logAiUsage(params: AiUsageLogParams): Promise<void> {
 
     if (!resp.ok) {
       const text = await resp.text().catch(() => "");
-      console.warn("SIRE Viewer AI usage log insert failed:", resp.status, text);
+      console.warn("Viewer AI usage log insert failed:", resp.status, text);
     }
   } catch (error) {
-    console.warn("SIRE Viewer AI usage log insert failed:", error);
+    console.warn("Viewer AI usage log insert failed:", error);
   }
 }
 
@@ -172,7 +178,7 @@ async function countAiUsageRows(params: {
 
     if (!resp.ok) {
       const text = await resp.text().catch(() => "");
-      console.warn("SIRE Viewer AI usage count failed:", resp.status, text);
+      console.warn("Viewer AI usage count failed:", resp.status, text);
       return null;
     }
 
@@ -185,7 +191,7 @@ async function countAiUsageRows(params: {
     const rows = await resp.json().catch(() => []);
     return Array.isArray(rows) ? rows.length : null;
   } catch (error) {
-    console.warn("SIRE Viewer AI usage count failed:", error);
+    console.warn("Viewer AI usage count failed:", error);
     return null;
   }
 }
@@ -321,14 +327,20 @@ function assertAllowedProfile(profile: ProfileRow): void {
   }
 }
 
-async function callOpenAI(params: {
-  openaiKey: string;
-  model: string;
-  query: string;
-  sourcePack: string;
-  role: string;
-}): Promise<{ answer: string; raw: unknown; model: string }> {
-  const instructions = [
+function buildInstructions(viewerType: ViewerType): string {
+  if (viewerType === "RISQ") {
+    return [
+      "You are the C.S.V. BEACON RISQ Questions Viewer AI assistant.",
+      "Answer only from the provided RightShip RISQ 3.2 source pack.",
+      "Do not use outside knowledge. Do not invent RightShip/RISQ requirements, question numbers, guide text, eSMS references, or forms.",
+      "If the source pack is insufficient, say exactly what is missing.",
+      "Cite every substantive statement with the relevant RISQ question number in square brackets, for example [RISQ 05A.001].",
+      "Keep the answer practical for RISQ preparation and dry cargo / bulk carrier vetting.",
+      "Use this structure: Answer; Relevant RISQ references; Limitations.",
+    ].join("\n");
+  }
+
+  return [
     "You are the C.S.V. BEACON SIRE 2.0 Questions Viewer AI assistant.",
     "Answer only from the provided SIRE 2.0 source pack.",
     "Do not use outside knowledge. Do not invent OCIMF/SIRE requirements, question numbers, publications, or industry guidance.",
@@ -337,6 +349,17 @@ async function callOpenAI(params: {
     "Keep the answer practical for tanker vetting / SIRE preparation.",
     "Use this structure: Answer; Relevant SIRE 2.0 references; Limitations.",
   ].join("\n");
+}
+
+async function callOpenAI(params: {
+  openaiKey: string;
+  model: string;
+  query: string;
+  sourcePack: string;
+  role: string;
+  viewerType: ViewerType;
+}): Promise<{ answer: string; raw: unknown; model: string }> {
+  const instructions = buildInstructions(params.viewerType);
 
   const input = [
     {
@@ -345,6 +368,7 @@ async function callOpenAI(params: {
         {
           type: "input_text",
           text: [
+            `Viewer type: ${params.viewerType}`,
             `User role: ${params.role}`,
             `User query: ${params.query}`,
             "",
@@ -410,6 +434,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
   let sourcePack = "";
   let sourceQuestionCount = 0;
   let usageControls: AiUsageControls | null = null;
+  let viewerType: ViewerType = "SIRE";
 
   try {
     supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
@@ -431,6 +456,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
     assertAllowedProfile(profile);
 
     const body = await req.json().catch(() => ({}));
+    viewerType = normalizeViewerType(body.viewer_type || body.viewerType || body.source_kind || body.sourceKind);
     query = cleanText(body.query);
     sourcePack = compactSourcePack(body.source_pack);
     sourceQuestionCount = estimateSourceQuestionCount(sourcePack);
@@ -456,6 +482,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       query,
       sourcePack,
       role: String(profile.role || ""),
+      viewerType,
     });
 
     const answerText = result.answer || "";
@@ -474,6 +501,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       usage: (result.raw as any)?.usage || null,
       context: {
         endpoint: "sire-viewer-ai-search",
+        viewer_type: viewerType,
         usage_controls: usageControls,
       },
     });
@@ -482,6 +510,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
       ok: true,
       answer: answerText,
       model: result.model,
+      viewer_type: viewerType,
       source_pack_chars: sourcePack.length,
       source_question_count: sourceQuestionCount,
       usage: (result.raw as any)?.usage || null,
@@ -506,6 +535,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
         usage: null,
         context: {
           endpoint: "sire-viewer-ai-search",
+          viewer_type: viewerType,
           failure_stage: "handler_catch",
           usage_controls: usageControls,
         },
@@ -515,6 +545,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
     return jsonResponse({
       ok: false,
       error: message,
+      viewer_type: viewerType,
     }, 400);
   }
 });
