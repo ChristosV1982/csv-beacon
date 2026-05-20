@@ -1,7 +1,7 @@
 export const config = {
   verify_jwt: false
 };
-const FUNCTION_VERSION = "cors-jwt-off-v31_strip_operator_comments_and_full_question_text";
+const FUNCTION_VERSION = "cors-jwt-off-v32_allow_company_superintendent_import";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import * as pdfjsLib from "npm:pdfjs-dist@4.2.67/legacy/build/pdf.mjs";
 /**
@@ -51,7 +51,11 @@ async function requireAdminRole(supabaseAdmin, uid) {
   const { data: prof, error: profErr } = await supabaseAdmin.from("profiles").select("role").eq("id", uid).maybeSingle();
   if (profErr) throw new Error("Profile lookup failed");
   const role = prof?.role;
-  if (role !== "super_admin" && role !== "company_admin") {
+  if (
+    role !== "super_admin" &&
+    role !== "company_admin" &&
+    role !== "company_superintendent"
+  ) {
     throw new Error("Forbidden");
   }
   return {
