@@ -1,8 +1,8 @@
 export const config = {
   verify_jwt: false
 };
-const FUNCTION_VERSION = "cors-jwt-off-v32_allow_company_superintendent_import";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+const FUNCTION_VERSION = "cors-jwt-off-v33_npm_supabase_client_allow_company_superintendent";
+import { createClient } from "npm:@supabase/supabase-js@2.45.4";
 import * as pdfjsLib from "npm:pdfjs-dist@4.2.67/legacy/build/pdf.mjs";
 /**
  * CORS
