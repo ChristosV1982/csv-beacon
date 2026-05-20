@@ -5,7 +5,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "PLA08-2026-05-19-SIRE-VIEWER-NO-LIBRARY-FALLBACK";
+  const BUILD = "PLA09-2026-05-20-COMPANY-AND-RANK-ACCESS";
 
   const CSVB_COMPANY_VIEW_ID_KEY = "csvb_superuser_company_view_id";
   const CSVB_COMPANY_VIEW_NAME_KEY = "csvb_superuser_company_view_name";
@@ -333,7 +333,10 @@
     const rankCheck = await rankAllowsModuleView(sb, moduleKey);
     const rankAllowed = rankCheck.allowed === true;
 
-    const allowed = companyAllowed || rankAllowed;
+    // Normal company users require BOTH company-level module enablement and
+    // role/position permission. Company module enablement is tenant scope;
+    // rank permission is the user's functional access right.
+    const allowed = companyAllowed === true && rankAllowed === true;
 
     window.CSVB_MODULE_GUARD = {
       page,
@@ -351,8 +354,14 @@
 
     if (allowed) return;
 
+    const deniedParts = [];
+    if (!companyAllowed) deniedParts.push("the module is not enabled for your company");
+    if (!rankAllowed) deniedParts.push("your role/position does not have view permission");
+
     showAccessDenied(
-      "Access denied. This module is not enabled for your company or rank: " + moduleKey + ". Redirecting to Dashboard…"
+      "Access denied. " +
+      (deniedParts.length ? deniedParts.join(" and ") : "This module is not available") +
+      ": " + moduleKey + ". Redirecting to Dashboard…"
     );
 
     setTimeout(() => {
