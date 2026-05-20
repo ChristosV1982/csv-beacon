@@ -1,11 +1,11 @@
 // public/risq-questions-compact-detail.js
 // C.S.V. BEACON — Shared RISQ detail compaction helper
-// Frontend display only. Keeps all RISQ data in place; hides non-essential info boxes.
+// Frontend display only. Keeps all RISQ data in place; hides non-essential info boxes and top statistics cards.
 
 (() => {
   "use strict";
 
-  const BUILD = "RISQ-COMPACT-DETAIL-20260520_1";
+  const BUILD = "RISQ-COMPACT-DETAIL-20260520_2";
   window.CSVB_RISQ_COMPACT_DETAIL_BUILD = BUILD;
 
   const HIDE_LABELS = new Set([
@@ -61,6 +61,10 @@
     const style = document.createElement("style");
     style.id = "csvbRisqCompactDetailStyles";
     style.textContent = `
+      body:has(.detail-card) .stats-grid {
+        display: none !important;
+      }
+
       .csvb-risq-hidden-info-box {
         display: none !important;
       }
