@@ -5,7 +5,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "PA7K-2026-05-16-LEGACY-LIBRARY-SOFT-RETIRED";
+  const BUILD = "PA7L-2026-05-19-NO-READ-ONLY-LIBRARY-FALLBACK";
 
   const AREA_HOME = {
     company_policy: {
@@ -239,6 +239,8 @@
   }
 
   function dashboardModuleAllows(moduleKey) {
+    if (moduleKey === "read_only_library") return false;
+
     const access = window.CSVB_DASHBOARD_MODULE_ACCESS;
     if (!access) return false;
     if (access.isPlatform === true) return true;
@@ -247,9 +249,10 @@
 
   function isModuleAvailable(cardKey) {
     if (!cardKey) return true;
+    if (cardKey === "library") return false;
 
     if (cardKey === "sire_questions_viewer") {
-      return dashboardModuleAllows("sire_questions_viewer") || dashboardModuleAllows("read_only_library");
+      return dashboardModuleAllows("sire_questions_viewer");
     }
 
     const card = document.querySelector(`[data-card="${cardKey}"]`);
