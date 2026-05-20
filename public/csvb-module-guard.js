@@ -5,7 +5,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "PLA10-2026-05-20-RISQ-VIEWER-GUARD";
+  const BUILD = "PLA11-2026-05-20-PLATFORM-GUARD-MODULE-CODES";
 
   const CSVB_COMPANY_VIEW_ID_KEY = "csvb_superuser_company_view_id";
   const CSVB_COMPANY_VIEW_NAME_KEY = "csvb_superuser_company_view_name";
@@ -230,6 +230,8 @@
     const page = currentPageName();
     const moduleKey = PAGE_MODULE_MAP[page];
     const moduleKeys = moduleKeyAlternates(moduleKey);
+    const appModuleCodes = moduleKeyToAppModuleCodes(moduleKey);
+    const appModuleCode = appModuleCodes[0] || "";
 
     window.CSVB_MODULE_GUARD_BUILD = BUILD;
 
@@ -254,6 +256,8 @@
         page,
         moduleKey,
         moduleKeys,
+        appModuleCode,
+        appModuleCodes,
         allowed: false,
         onboardBlocked: true,
         reason: onboardBlockReason
@@ -280,6 +284,8 @@
           page,
           moduleKey,
           moduleKeys,
+          appModuleCode,
+          appModuleCodes,
           allowed: true,
           platformSimulation: false
         };
@@ -292,6 +298,8 @@
         page,
         moduleKey,
         moduleKeys,
+        appModuleCode,
+        appModuleCodes,
         allowed: allowedBySimulation,
         simulatedCompanyId,
         simulatedCompanyName: getSimulatedCompanyName(),
@@ -344,8 +352,8 @@
       page,
       moduleKey,
       moduleKeys,
-      appModuleCode: rankCheck.appModuleCode,
-      appModuleCodes: rankCheck.appModuleCodes,
+      appModuleCode: rankCheck.appModuleCode || appModuleCode,
+      appModuleCodes: rankCheck.appModuleCodes?.length ? rankCheck.appModuleCodes : appModuleCodes,
       allowed,
       companyAllowed,
       rankAllowed,
