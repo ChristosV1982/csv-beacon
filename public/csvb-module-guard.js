@@ -5,7 +5,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "PLA06-2026-05-16-SIRE-VIEWER-INDEPENDENT";
+  const BUILD = "PLA07-2026-05-19-LEGACY-LIBRARY-STUDY-REDIRECT";
 
   const CSVB_COMPANY_VIEW_ID_KEY = "csvb_superuser_company_view_id";
   const CSVB_COMPANY_VIEW_NAME_KEY = "csvb_superuser_company_view_name";
@@ -61,6 +61,23 @@
   function currentPageName() {
     const p = String(window.location.pathname || "");
     return p.split("/").pop() || "index.html";
+  }
+
+  function redirectLegacyLibraryStudyRoute() {
+    const page = currentPageName();
+    if (page !== "library.html") return false;
+
+    try {
+      const params = new URLSearchParams(window.location.search || "");
+      const mode = String(params.get("mode") || "").trim().toLowerCase();
+
+      if (mode === "study" || mode === "readonly" || mode === "read-only") {
+        window.location.replace("./q-sire-questions-viewer.html");
+        return true;
+      }
+    } catch (_) {}
+
+    return false;
   }
 
   function getSimulatedCompanyId() {
@@ -216,6 +233,8 @@
   }
 
   async function guardPage() {
+    if (redirectLegacyLibraryStudyRoute()) return;
+
     const page = currentPageName();
     const moduleKey = PAGE_MODULE_MAP[page];
     const moduleKeys = moduleKeyAlternates(moduleKey);
