@@ -6,7 +6,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "RISQ-EDITOR-CHANGE-EVENT-BRIDGE-20260520_1";
+  const BUILD = "RISQ-EDITOR-CHANGE-EVENT-BRIDGE-20260520_2";
   window.CSVB_RISQ_EDITOR_CHANGE_EVENT_BRIDGE_BUILD = BUILD;
 
   const WRITE_RPC_CONFIG = {
@@ -49,6 +49,17 @@
 
   function safeStr(value) {
     return value === null || value === undefined ? "" : String(value);
+  }
+
+  function ensureCompactDetailLoaded() {
+    if (window.CSVB_RISQ_COMPACT_DETAIL_BUILD) return;
+    if (document.querySelector('script[data-csvb-risq-compact-detail-loader="1"]')) return;
+
+    const script = document.createElement("script");
+    script.src = "./risq-questions-compact-detail.js?v=20260520_1";
+    script.defer = true;
+    script.dataset.csvbRisqCompactDetailLoader = "1";
+    document.body.appendChild(script);
   }
 
   function currentQuestionNo() {
@@ -212,6 +223,8 @@
   }
 
   function boot() {
+    ensureCompactDetailLoaded();
+
     let tries = 0;
     const timer = setInterval(() => {
       tries += 1;
