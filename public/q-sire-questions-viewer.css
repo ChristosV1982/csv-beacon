@@ -5,11 +5,15 @@ html[data-csvb-page="q-sire-questions-viewer.html"] body {
   background: var(--bg-main, #F4F8FC);
 }
 
+html[data-csvb-page="q-sire-questions-viewer.html"] .page {
+  padding-top: 6px !important;
+}
+
 html[data-csvb-page="q-sire-questions-viewer.html"] .csvb-sire-viewer-helper {
   width: 100%;
   max-width: 100%;
-  margin: 8px auto 10px;
-  padding: 9px 12px;
+  margin: 4px auto 6px;
+  padding: 7px 10px;
   border: 1px solid #D6E4F5;
   border-radius: 12px;
   background: #fff;
@@ -17,7 +21,7 @@ html[data-csvb-page="q-sire-questions-viewer.html"] .csvb-sire-viewer-helper {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: 8px;
   flex-wrap: wrap;
 }
 
@@ -28,8 +32,8 @@ html[data-csvb-page="q-sire-questions-viewer.html"] .csvb-sire-viewer-helper-tit
 
 html[data-csvb-page="q-sire-questions-viewer.html"] .csvb-sire-viewer-helper-note {
   color: #5E6F86;
-  font-size: .9rem;
-  line-height: 1.35;
+  font-size: .86rem;
+  line-height: 1.25;
 }
 
 html[data-csvb-page="q-sire-questions-viewer.html"] .csvb-sire-viewer-helper-badge,
@@ -41,7 +45,7 @@ html[data-csvb-page="q-sire-questions-viewer.html"] .csvb-sire-viewer-lock {
   background: #E9F7FB;
   color: #062A5E;
   border-radius: 999px;
-  padding: 6px 10px;
+  padding: 5px 9px;
   font-weight: 750;
   font-size: 12px;
   white-space: nowrap;
@@ -52,12 +56,36 @@ html[data-csvb-page="q-sire-questions-viewer.html"] .csvb-sire-viewer-helper-bad
   content: "🔒";
 }
 
+html[data-csvb-page="q-sire-questions-viewer.html"] .filterRibbon,
+html[data-csvb-page="q-sire-questions-viewer.html"] #filterRibbon {
+  margin-top: 5px !important;
+  margin-bottom: 8px !important;
+  padding-top: 7px !important;
+  padding-bottom: 7px !important;
+  min-height: 0 !important;
+}
+
+html[data-csvb-page="q-sire-questions-viewer.html"] .facetWrapRibbon {
+  gap: 7px !important;
+}
+
+html[data-csvb-page="q-sire-questions-viewer.html"] details.facet > summary,
+html[data-csvb-page="q-sire-questions-viewer.html"] .facet > summary {
+  padding-top: 7px !important;
+  padding-bottom: 7px !important;
+}
+
 html[data-csvb-page="q-sire-questions-viewer.html"] .layout {
   grid-template-columns: 380px 1fr;
+  gap: 12px !important;
+}
+
+html[data-csvb-page="q-sire-questions-viewer.html"] .card {
+  padding: 10px !important;
 }
 
 html[data-csvb-page="q-sire-questions-viewer.html"] .qList {
-  max-height: calc(100vh - 330px);
+  max-height: calc(100vh - 300px);
 }
 
 html[data-csvb-page="q-sire-questions-viewer.html"] .csvb-sire-viewer-panel-badges {
@@ -70,6 +98,15 @@ html[data-csvb-page="q-sire-questions-viewer.html"] .csvb-sire-viewer-panel-badg
 
 html[data-csvb-page="q-sire-questions-viewer.html"] #viewPanel {
   overflow: visible;
+}
+
+html[data-csvb-page="q-sire-questions-viewer.html"] #viewPanel .hdr {
+  margin-bottom: 8px !important;
+}
+
+html[data-csvb-page="q-sire-questions-viewer.html"] #viewPanel .section {
+  margin-top: 8px !important;
+  margin-bottom: 8px !important;
 }
 
 html[data-csvb-page="q-sire-questions-viewer.html"] #viewPanel .vhdr-top {
@@ -94,13 +131,13 @@ html[data-csvb-page="q-sire-questions-viewer.html"] #viewPanel #vShortText {
   background: #EAF3FB !important;
   border-color: #C8DAEF !important;
   color: #062A5E !important;
-  min-height: 30px !important;
-  padding: 6px 10px !important;
+  min-height: 28px !important;
+  padding: 5px 9px !important;
   font-weight: 400 !important;
 }
 
 html[data-csvb-page="q-sire-questions-viewer.html"] #viewPanel details.coll {
-  margin: 6px 0;
+  margin: 5px 0;
   border: 1px solid var(--line, #D6E4F5);
   border-radius: 12px;
   background: #fff;
@@ -108,8 +145,8 @@ html[data-csvb-page="q-sire-questions-viewer.html"] #viewPanel details.coll {
 }
 
 html[data-csvb-page="q-sire-questions-viewer.html"] #viewPanel details.coll > summary {
-  min-height: 34px;
-  padding: 7px 10px;
+  min-height: 31px;
+  padding: 6px 9px;
   border-radius: 12px;
   color: #062A5E;
   background: #F7FAFE;
@@ -132,12 +169,12 @@ html[data-csvb-page="q-sire-questions-viewer.html"] #viewPanel .collTitle {
 }
 
 html[data-csvb-page="q-sire-questions-viewer.html"] #viewPanel .collBody {
-  padding: 8px 10px 10px;
+  padding: 7px 9px 9px;
 }
 
 html[data-csvb-page="q-sire-questions-viewer.html"] #vCollAttrs {
-  margin-top: 8px;
-  margin-bottom: 8px;
+  margin-top: 6px;
+  margin-bottom: 6px;
 }
 
 html[data-csvb-page="q-sire-questions-viewer.html"] #vCollAttrs > summary {
@@ -160,7 +197,7 @@ html[data-csvb-page="q-sire-questions-viewer.html"] button.csvb-secondary-filter
 html[data-csvb-page="q-sire-questions-viewer.html"] button.csvb-secondary-filter-btn.facet {
   list-style: none !important;
   cursor: pointer !important;
-  padding: 8px 12px !important;
+  padding: 7px 11px !important;
   border: 1px solid #d0d7e2 !important;
   border-radius: 999px !important;
   background: #ffffff !important;
