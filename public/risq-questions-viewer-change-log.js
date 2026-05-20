@@ -5,7 +5,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "RISQ-VIEWER-CHANGE-LOG-20260520_1";
+  const BUILD = "RISQ-VIEWER-CHANGE-LOG-20260520_2";
   const LS_OPEN = "csvb_risq_viewer_change_log_open";
 
   window.CSVB_RISQ_VIEWER_CHANGE_LOG_BUILD = BUILD;
@@ -90,6 +90,26 @@
     if (!warn) return;
     warn.textContent = message || "";
     warn.style.display = message ? "block" : "none";
+  }
+
+  function eventTypeLabel(type) {
+    const map = {
+      mapping_update: "Mapping Update",
+      standard_question_update: "Standard Question",
+      company_question_create: "Company Question Created",
+      company_question_update: "Company Question Updated",
+      company_question_delete: "Company Question Deleted"
+    };
+    return map[type] || type || "Unknown";
+  }
+
+  function eventTypeClass(type) {
+    if (type === "company_question_delete") return "csvb-risq-event-delete";
+    if (type === "company_question_create") return "csvb-risq-event-create";
+    if (type === "standard_question_update") return "csvb-risq-event-standard";
+    if (type === "mapping_update") return "csvb-risq-event-mapping";
+    if (type === "company_question_update") return "csvb-risq-event-company";
+    return "csvb-risq-event-default";
   }
 
   function injectStyles() {
@@ -198,7 +218,8 @@
         margin-top: 7px;
       }
 
-      html[data-csvb-page="risq-questions-viewer.html"] .csvb-risq-change-log-pill {
+      html[data-csvb-page="risq-questions-viewer.html"] .csvb-risq-change-log-pill,
+      html[data-csvb-page="risq-questions-viewer.html"] .csvb-risq-event-badge {
         display: inline-flex;
         align-items: center;
         justify-content: center;
@@ -210,6 +231,42 @@
         font-weight: 800;
         font-size: 11px;
         white-space: nowrap;
+      }
+
+      html[data-csvb-page="risq-questions-viewer.html"] .csvb-risq-event-mapping {
+        border-color: #BFD3EF;
+        background: #EEF6FF;
+        color: #1A4170;
+      }
+
+      html[data-csvb-page="risq-questions-viewer.html"] .csvb-risq-event-standard {
+        border-color: #BDE8D0;
+        background: #ECFDF3;
+        color: #067647;
+      }
+
+      html[data-csvb-page="risq-questions-viewer.html"] .csvb-risq-event-create {
+        border-color: #BDE8D0;
+        background: #ECFDF3;
+        color: #067647;
+      }
+
+      html[data-csvb-page="risq-questions-viewer.html"] .csvb-risq-event-company {
+        border-color: #CDB7F6;
+        background: #F5F0FF;
+        color: #5B21B6;
+      }
+
+      html[data-csvb-page="risq-questions-viewer.html"] .csvb-risq-event-delete {
+        border-color: #F1B9B9;
+        background: #FFF1F1;
+        color: #B42318;
+      }
+
+      html[data-csvb-page="risq-questions-viewer.html"] .csvb-risq-event-default {
+        border-color: #E7D7B3;
+        background: #FFF8E8;
+        color: #8A5A00;
       }
 
       html[data-csvb-page="risq-questions-viewer.html"] .csvb-risq-change-log-muted {
@@ -301,6 +358,53 @@
     if (toggleBtn) toggleBtn.textContent = state.isOpen ? "Hide Changes Log" : "Changes Log";
   }
 
+  function findQuestionByNo(questionNo) {
+    const qno = safeStr(questionNo).trim().toLowerCase();
+    if (!qno) return null;
+
+    const rows = window.CSVB_RISQ_QUESTIONS_VIEWER?.getRows?.() || [];
+    if (!Array.isArray(rows)) return null;
+
+    return rows.find((row) => {
+      return safeStr(row.internal_question_no).trim().toLowerCase() === qno ||
+        safeStr(row.printed_question_no).trim().toLowerCase() === qno;
+    }) || null;
+  }
+
+  function openRelatedQuestion(questionNo) {
+    const qno = safeStr(questionNo).trim();
+    if (!qno) {
+      toastWarn("No RISQ question number is available for this change event.");
+      return;
+    }
+
+    const row = findQuestionByNo(qno);
+    const searchInput = $("searchInput");
+    const clearBtn = $("clearFiltersBtn");
+
+    try {
+      if (clearBtn) clearBtn.click();
+      if (searchInput) {
+        searchInput.value = qno;
+        searchInput.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+    } catch (_) {}
+
+    setTimeout(() => {
+      const node = row?.id
+        ? document.querySelector(`[data-risq-id="${CSS.escape(String(row.id))}"]`)
+        : Array.from(document.querySelectorAll("[data-risq-id]")).find((el) => (el.textContent || "").includes(qno));
+
+      if (node) {
+        node.click();
+        node.scrollIntoView({ behavior: "smooth", block: "center" });
+        toastOk(`Opened related RISQ question: ${qno}`);
+      } else {
+        toastWarn(`Could not locate related RISQ question in current viewer list: ${qno}`);
+      }
+    }, 180);
+  }
+
   function renderLog() {
     ensurePanel();
     updateTriggerAndPanelShell();
@@ -320,6 +424,7 @@
       const changedBy = safeStr(e.created_by_username || e.created_by || "—");
       const company = safeStr(e.company_name || e.company_id || "—");
       const payloadKeys = e.payload && typeof e.payload === "object" ? Object.keys(e.payload).length : 0;
+      const eventType = safeStr(e.event_type || "");
 
       return `
         <div class="csvb-risq-change-log-item" data-risq-event-id="${esc(e.event_id || "")}">
@@ -330,20 +435,27 @@
                 ${esc(fmtDate(e.created_at))}
                 ${qno ? " • RISQ " + esc(qno) : ""}
                 ${e.change_scope ? " • Scope: " + esc(e.change_scope) : ""}
-                ${e.event_type ? " • Type: " + esc(e.event_type) : ""}
                 ${" • Changed by: " + esc(changedBy)}
                 ${company !== "—" ? " • Company: " + esc(company) : ""}
               </div>
               ${e.summary ? `<div class="csvb-risq-change-log-summary">${esc(e.summary)}</div>` : ""}
               <div class="csvb-risq-change-log-counts">
+                <span class="csvb-risq-event-badge ${eventTypeClass(eventType)}">${esc(eventTypeLabel(eventType))}</span>
                 <span class="csvb-risq-change-log-pill">Payload fields: ${payloadKeys}</span>
                 <span class="csvb-risq-change-log-pill">Source: ${esc(e.source_module || "—")}</span>
               </div>
+            </div>
+            <div class="csvb-risq-change-log-actions">
+              ${qno ? `<button class="btn2" type="button" data-risq-open-question="${esc(qno)}">Open related question</button>` : ""}
             </div>
           </div>
         </div>
       `;
     }).join("");
+
+    list.querySelectorAll("[data-risq-open-question]").forEach((btn) => {
+      btn.addEventListener("click", () => openRelatedQuestion(btn.getAttribute("data-risq-open-question") || ""));
+    });
   }
 
   async function loadLog(showToast = false) {
@@ -367,6 +479,35 @@
     }
   }
 
+  function diagnostic() {
+    const trigger = $("csvbRisqViewerChangeLogTrigger");
+    const panel = $("csvbRisqViewerChangeLogPanel");
+    const latest = state.events?.[0] || null;
+
+    const report = {
+      build: BUILD,
+      role: role(),
+      is_platform_role: isPlatformRole(),
+      trigger_present: !!trigger,
+      panel_present: !!panel,
+      is_open: state.isOpen === true,
+      event_count: Array.isArray(state.events) ? state.events.length : 0,
+      latest_event: latest,
+      latest_event_type: latest?.event_type || null,
+      latest_question_no: latest?.question_no || null,
+      viewer_build: window.CSVB_RISQ_QUESTIONS_VIEWER_BUILD || "",
+      pass: !!trigger && !!panel && Array.isArray(state.events)
+    };
+
+    if (report.pass) {
+      console.log("C.S.V. BEACON: RISQ Viewer change log diagnostic PASS", report);
+    } else {
+      console.warn("C.S.V. BEACON: RISQ Viewer change log diagnostic WARN", report);
+    }
+
+    return report;
+  }
+
   async function boot() {
     try {
       injectStyles();
@@ -386,6 +527,8 @@
         open: () => setOpen(true),
         close: () => setOpen(false),
         toggle: () => setOpen(!state.isOpen),
+        diagnostic,
+        openRelatedQuestion,
         getEvents: () => (state.events || []).slice()
       };
 
