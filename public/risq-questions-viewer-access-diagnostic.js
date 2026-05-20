@@ -5,11 +5,22 @@
 (() => {
   "use strict";
 
-  const BUILD = "RISQ-VIEWER-ACCESS-DIAGNOSTIC-20260520_1";
+  const BUILD = "RISQ-VIEWER-ACCESS-DIAGNOSTIC-20260520_2";
   window.CSVB_RISQ_VIEWER_ACCESS_DIAGNOSTIC_BUILD = BUILD;
 
   function safeStr(value) {
     return value === null || value === undefined ? "" : String(value);
+  }
+
+  function ensureCompactDetailLoaded() {
+    if (window.CSVB_RISQ_COMPACT_DETAIL_BUILD) return;
+    if (document.querySelector('script[data-csvb-risq-compact-detail-loader="1"]')) return;
+
+    const script = document.createElement("script");
+    script.src = "./risq-questions-compact-detail.js?v=20260520_1";
+    script.defer = true;
+    script.dataset.csvbRisqCompactDetailLoader = "1";
+    document.body.appendChild(script);
   }
 
   function isElementVisible(el) {
@@ -132,6 +143,8 @@
 
     return report;
   }
+
+  ensureCompactDetailLoaded();
 
   window.CSVB_RISQ_VIEWER_ACCESS_DIAGNOSTIC = {
     build: BUILD,
