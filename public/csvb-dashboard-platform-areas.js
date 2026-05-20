@@ -5,23 +5,11 @@
 (() => {
   "use strict";
 
-  const BUILD = "PA6I-2026-05-19-READ-ONLY-LIBRARY-RETIRED";
+  const BUILD = "PA6J-2026-05-20-RISQ-VIEWER";
   const SELECTED_KEY = "csvb_dashboard_selected_platform_area_v6";
 
-  /*
-    Database source:
-      public.csvb_dashboard_list_platform_areas()
-
-    Fallback:
-      DEFAULT_PLATFORM_AREAS below.
-
-    Transition note:
-      SIRE 2.0 Questions Viewer is now the active read-only operational SIRE library.
-      Legacy Read-Only Library is soft-retired from visible Dashboard navigation/counts.
-      The legacy file may remain temporarily as a direct-route fallback until final deletion.
-  */
-
   const SIRE_VIEWER_CARD_KEY = "sire_questions_viewer";
+  const RISQ_VIEWER_CARD_KEY = "risq_questions_viewer";
 
   const DEFAULT_PLATFORM_AREAS = [
     {
@@ -43,6 +31,7 @@
         "Question libraries, vetting inspection preparation, post-inspection handling, statistics, inspector intelligence, reporting and related discussion threads.",
       cards: [
         SIRE_VIEWER_CARD_KEY,
+        RISQ_VIEWER_CARD_KEY,
         "company",
         "assignments",
         "tasks",
@@ -102,6 +91,15 @@
     return String(value ?? "");
   }
 
+  function esc(value) {
+    return String(value ?? "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+
   function uniqueCards(cards) {
     const out = [];
     const seen = new Set();
@@ -129,7 +127,8 @@
 
       normalized.cards = [
         SIRE_VIEWER_CARD_KEY,
-        ...normalized.cards.filter((card) => card !== SIRE_VIEWER_CARD_KEY)
+        RISQ_VIEWER_CARD_KEY,
+        ...normalized.cards.filter((card) => card !== SIRE_VIEWER_CARD_KEY && card !== RISQ_VIEWER_CARD_KEY)
       ];
     }
 
@@ -221,6 +220,26 @@
     }
   }
 
+  function ensureRisqViewerDashboardCard(originalGrid) {
+    if (document.querySelector('[data-card="risq_questions_viewer"]')) return;
+    if (!originalGrid) return;
+
+    const card = document.createElement("div");
+    card.className = "card";
+    card.setAttribute("data-card", "risq_questions_viewer");
+    card.innerHTML = `
+      <div class="title">RISQ Questions Viewer</div>
+      <div class="muted">Primary read-only operational RISQ 3.2 viewer with filters, normal search, guide text, eSMS references, print and export tools.</div>
+      <div style="margin-top:12px;">
+        <button class="btn2" type="button" onclick="location.href='./risq-questions-viewer.html'">Open</button>
+      </div>
+    `;
+
+    const risqEditor = originalGrid.querySelector('[data-card="risq_questions_editor"]');
+    if (risqEditor) originalGrid.insertBefore(card, risqEditor);
+    else originalGrid.appendChild(card);
+  }
+
   function retireLegacyReadOnlyLibrary() {
     document.querySelectorAll('[data-card="library"]').forEach((card) => {
       card.remove();
@@ -252,12 +271,16 @@
       return dashboardModuleAllows("sire_questions_viewer");
     }
 
+    if (cardKey === RISQ_VIEWER_CARD_KEY) {
+      const card = getCard(cardKey);
+      return dashboardModuleAllows("risq_questions_viewer") && !!card && card.style.display !== "none";
+    }
+
     if (cardKey === "library") return false;
 
     const card = getCard(cardKey);
     if (!card) return false;
 
-    // Dashboard role/module logic uses inline style.display.
     return card.style.display !== "none";
   }
 
@@ -535,6 +558,8 @@
 
     const originalGrid = document.querySelector(".wrap > .grid");
     if (!originalGrid) return null;
+
+    ensureRisqViewerDashboardCard(originalGrid);
 
     let root = document.getElementById("csvbPlatformAreaRoot");
     if (root) return root;
