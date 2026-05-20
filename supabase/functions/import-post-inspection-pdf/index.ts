@@ -1,7 +1,7 @@
 export const config = {
   verify_jwt: false
 };
-const FUNCTION_VERSION = "cors-jwt-off-v35_recognize_normal_hardware_photo_responses";
+const FUNCTION_VERSION = "cors-jwt-off-v36_stop_at_unvalidated_piq_responses";
 import { createClient } from "npm:@supabase/supabase-js@2.45.4";
 import * as pdfjsLib from "npm:pdfjs-dist@4.2.67/legacy/build/pdf.mjs";
 /**
@@ -360,6 +360,7 @@ function isQuestionSectionBreakLine(line) {
   if (!t) return true;
   if (isReportHeaderOrFooter(t)) return true;
   if (/^PIQ additional data$/i.test(t)) return true;
+  if (/^Unvalidated PIQ Responses$/i.test(t)) return true;
   if (parseResponseStart(t)) return true;
   if (isQuestionHeaderStart(t)) return true;
   return false;
@@ -434,6 +435,11 @@ function buildResponseBlocks(section) {
       continue;
     }
     if (!current) continue;
+    if (/^Unvalidated PIQ Responses$/i.test(t)) {
+      blocks.push(current);
+      current = null;
+      break;
+    }
     if (isQuestionHeaderStart(t)) {
       blocks.push(current);
       current = null;
