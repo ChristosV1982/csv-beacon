@@ -4,7 +4,157 @@
 (() => {
   "use strict";
 
-  const BUILD = "CSVB-CHECKBOX-DROPDOWN-FILTERS-20260512-1";
+  const BUILD = "CSVB-CHECKBOX-DROPDOWN-FILTERS-20260520-2";
+
+  function injectStyles() {
+    if (document.getElementById("csvbCheckboxDropdownFilterStyles")) return;
+
+    const style = document.createElement("style");
+    style.id = "csvbCheckboxDropdownFilterStyles";
+    style.textContent = `
+      .csvb-checkdrop {
+        position: relative;
+        z-index: 3100;
+        width: 100%;
+      }
+
+      .csvb-checkdrop.open {
+        z-index: 9000;
+      }
+
+      .csvb-checkdrop-source {
+        display: none !important;
+      }
+
+      .csvb-checkdrop-button {
+        width: 100%;
+        min-height: 34px;
+        border: 1px solid #bfd5ee;
+        background: #fff;
+        color: #10233f;
+        border-radius: 9px;
+        padding: 7px 32px 7px 10px;
+        text-align: left;
+        font-family: inherit;
+        font-size: .86rem;
+        font-weight: 750;
+        cursor: pointer;
+        position: relative;
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+        box-sizing: border-box;
+      }
+
+      .csvb-checkdrop-button::after {
+        content: "▾";
+        position: absolute;
+        right: 10px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #062a5e;
+        font-weight: 950;
+      }
+
+      .csvb-checkdrop.open .csvb-checkdrop-button {
+        border-color: #0097a7;
+        box-shadow: 0 0 0 3px rgba(0,151,167,.16);
+      }
+
+      .csvb-checkdrop-panel {
+        display: none;
+        position: absolute;
+        z-index: 99999 !important;
+        top: calc(100% + 5px);
+        left: 0;
+        min-width: 100%;
+        width: max(100%, 320px);
+        max-width: 460px;
+        background: #fff;
+        border: 1px solid #bfd5ee;
+        border-radius: 12px;
+        box-shadow: 0 18px 46px rgba(3,27,63,.20);
+        padding: 8px;
+        box-sizing: border-box;
+      }
+
+      .csvb-checkdrop.open .csvb-checkdrop-panel {
+        display: block;
+      }
+
+      .csvb-checkdrop-search {
+        width: 100%;
+        min-height: 34px;
+        border: 1px solid #d4e2f2;
+        border-radius: 9px;
+        padding: 7px 9px;
+        margin-bottom: 7px;
+        box-sizing: border-box;
+        font-family: inherit;
+      }
+
+      .csvb-checkdrop-actions {
+        display: flex;
+        gap: 6px;
+        margin-bottom: 7px;
+      }
+
+      .csvb-checkdrop-actions button {
+        border: 1px solid #a8d8e8;
+        background: #f2f9fd;
+        color: #062a5e;
+        border-radius: 8px;
+        padding: 5px 8px;
+        font-size: .76rem;
+        font-weight: 900;
+        cursor: pointer;
+        font-family: inherit;
+      }
+
+      .csvb-checkdrop-list {
+        max-height: 260px;
+        overflow: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+      }
+
+      .csvb-checkdrop-option {
+        display: grid;
+        grid-template-columns: 18px 1fr;
+        gap: 8px;
+        align-items: center;
+        padding: 6px 7px;
+        border-radius: 8px;
+        cursor: pointer;
+        color: #10233f;
+        font-weight: 750;
+        font-size: .84rem;
+        line-height: 1.25;
+      }
+
+      .csvb-checkdrop-option:hover {
+        background: #f4f8fc;
+      }
+
+      .csvb-checkdrop-option input {
+        width: 15px !important;
+        height: 15px !important;
+        min-height: unset !important;
+        padding: 0 !important;
+        margin: 0 !important;
+      }
+
+      .csvb-checkdrop-empty {
+        color: #52677f;
+        font-weight: 700;
+        font-size: .84rem;
+        padding: 8px;
+      }
+    `;
+
+    document.head.appendChild(style);
+  }
 
   function esc(value) {
     return String(value ?? "")
@@ -91,6 +241,8 @@
 
   function enhanceSelect(select) {
     if (!select || select.getAttribute("data-csvb-checkdrop-enhanced") === "1") return;
+
+    injectStyles();
 
     select.setAttribute("data-csvb-checkdrop-enhanced", "1");
     select.classList.add("csvb-checkdrop-source");
@@ -189,6 +341,8 @@
   }
 
   function enhanceAll() {
+    injectStyles();
+
     document
       .querySelectorAll("select[multiple][data-csvb-checkdrop]")
       .forEach(enhanceSelect);
