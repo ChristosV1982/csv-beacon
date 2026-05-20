@@ -5,7 +5,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "PLA09-2026-05-20-COMPANY-AND-RANK-ACCESS";
+  const BUILD = "PLA10-2026-05-20-RISQ-VIEWER-GUARD";
 
   const CSVB_COMPANY_VIEW_ID_KEY = "csvb_superuser_company_view_id";
   const CSVB_COMPANY_VIEW_NAME_KEY = "csvb_superuser_company_view_name";
@@ -13,6 +13,7 @@
   const PAGE_MODULE_MAP = {
     "library.html": "read_only_library",
     "q-sire-questions-viewer.html": "sire_questions_viewer",
+    "risq-questions-viewer.html": "risq_questions_viewer",
 
     "q-dashboard.html": null,
     "index.html": null,
@@ -153,6 +154,7 @@
     const map = {
       read_only_library: "QUESTION_LIBRARY",
       sire_questions_viewer: "SIRE_QUESTIONS_VIEWER",
+      risq_questions_viewer: "RISQ_QUESTIONS_VIEWER",
       self_assessment: "VESSEL_QUESTIONNAIRES",
       post_inspection: "POST_INSPECTION",
       post_inspection_stats: "POST_INSPECTION_STATS",
