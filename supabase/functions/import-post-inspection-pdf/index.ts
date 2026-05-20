@@ -1,7 +1,7 @@
 export const config = {
   verify_jwt: false
 };
-const FUNCTION_VERSION = "cors-jwt-off-v33_npm_supabase_client_allow_company_superintendent";
+const FUNCTION_VERSION = "cors-jwt-off-v34_debug_qa_output";
 import { createClient } from "npm:@supabase/supabase-js@2.45.4";
 import * as pdfjsLib from "npm:pdfjs-dist@4.2.67/legacy/build/pdf.mjs";
 /**
@@ -529,6 +529,129 @@ function dedupeObservations(observations) {
   }
   return out;
 }
+
+function previewText(value, max = 240) {
+  const s = normSpaces(String(value ?? ""));
+  if (s.length <= max) return s;
+  return `${s.slice(0, max)}…`;
+}
+
+function buildImportQaDebug(pages, header, observations, question_sections_count, response_blocks_count) {
+  const flatLines = flattenPages(pages);
+  const questionSections = buildQuestionSections(flatLines);
+  const warnings = [];
+  const response_blocks = [];
+  const unparsed_response_lines = [];
+  const operator_comment_stops = [];
+
+  if (!header?.report_reference) warnings.push("Header: report_reference not detected.");
+  if (!header?.vessel_name) warnings.push("Header: vessel_name not detected.");
+  if (!header?.inspection_date) warnings.push("Header: inspection_date not detected.");
+  if (!header?.port_name) warnings.push("Header: port_name not detected.");
+  if (!header?.ocimf_inspecting_company) warnings.push("Header: ocimf_inspecting_company not detected.");
+
+  for (const line of flatLines) {
+    const t = String(line.text || "").trim();
+    if (!t) continue;
+
+    if (isOperatorCommentsStart(t)) {
+      operator_comment_stops.push({
+        page: line.page,
+        text: previewText(t, 180)
+      });
+    }
+
+    if (/^(Hardware|Process|Human|Photo|Photograph)\b/i.test(t) && !parseResponseStart(t)) {
+      unparsed_response_lines.push({
+        page: line.page,
+        text: previewText(t, 220)
+      });
+    }
+  }
+
+  for (const section of questionSections) {
+    const blocks = buildResponseBlocks(section);
+    for (const block of blocks) {
+      const tailPreview = block.lines
+        .slice(1, 6)
+        .map((x) => previewText(x.text, 160))
+        .filter(Boolean);
+
+      response_blocks.push({
+        question_base: block.question_base,
+        page_hint: block.page_hint,
+        designation: block.designation,
+        response_type: block.response_type,
+        extractable: isExtractableResponseType(block.response_type),
+        nature_of_concern: block.nature_of_concern,
+        rank: block.rank || null,
+        header_line: previewText(block.lines[0]?.text || "", 220),
+        lines_count: block.lines.length,
+        tail_preview: tailPreview
+      });
+    }
+  }
+
+  for (const obs of observations || []) {
+    const q = obs.question_base || "unknown question";
+    const label = `${q} / ${obs.obs_type || "unknown"} / ${obs.designation || "unknown"}`;
+
+    if (!obs.question_full) {
+      warnings.push(`${label}: question_full was not captured.`);
+    }
+
+    if (obs.obs_type !== "largely" && !String(obs.observation_text || "").trim()) {
+      warnings.push(`${label}: observation_text is empty.`);
+    }
+
+    if ((obs.designation === "Process" || obs.designation === "Hardware") && !String(obs.classification_coding || "").trim()) {
+      warnings.push(`${label}: classification_coding was not detected.`);
+    }
+
+    if (obs.designation === "Human" && obs.obs_type !== "positive" && !String(obs.classification_coding || "").trim()) {
+      warnings.push(`${label}: Human PIF/classification line was not detected.`);
+    }
+  }
+
+  const page_line_counts = pages.map((p, idx) => ({
+    page: idx + 1,
+    lines: p.split("\n").map(normSpaces).filter(Boolean).length
+  }));
+
+  const duplicate_findings_removed = Math.max(0, Number(response_blocks_count || 0) - Number((observations || []).length || 0));
+
+  return {
+    schema_version: "post_inspection_import_qa_debug_v1",
+    generated_at: new Date().toISOString(),
+    function_version: FUNCTION_VERSION,
+    page_count: pages.length,
+    page_line_counts,
+    counts: {
+      question_sections_count,
+      response_blocks_count,
+      observations_after_dedupe: Array.isArray(observations) ? observations.length : 0,
+      duplicate_findings_removed,
+      warnings_count: warnings.length,
+      unparsed_response_lines_count: unparsed_response_lines.length,
+      operator_comment_stops_count: operator_comment_stops.length
+    },
+    header,
+    question_sections: questionSections.slice(0, 300).map((s) => ({
+      question_base: s.question_base,
+      page_hint: s.page_hint,
+      question_full_preview: previewText(s.question_full || "", 260),
+      start_idx: s.start_idx,
+      end_idx: s.end_idx,
+      lines_count: Array.isArray(s.lines) ? s.lines.length : 0
+    })),
+    response_blocks: response_blocks.slice(0, 600),
+    unparsed_response_lines: unparsed_response_lines.slice(0, 300),
+    operator_comment_stops: operator_comment_stops.slice(0, 300),
+    warnings: warnings.slice(0, 500)
+  };
+}
+
+
 function extractFindingsFromPages(pages) {
   const flatLines = flattenPages(pages);
   const questionSections = buildQuestionSections(flatLines);
@@ -581,6 +704,7 @@ Deno.serve(async (req)=>{
     await requireAdminRole(supabaseAdmin, uid);
     // 3) Read payload
     const payload = await req.json();
+    const want_debug = payload?.debug === true || payload?.debug === "true";
     const report_id = payload?.report_id;
     const pdf_storage_path = payload?.pdf_storage_path;
     if (!report_id) return json(req, {
@@ -611,7 +735,7 @@ Deno.serve(async (req)=>{
       examined_questions,
       examined_count: examined_questions.length
     };
-    return json(req, {
+    const responseBody = {
       ok: true,
       extracted,
       function_version: FUNCTION_VERSION,
@@ -623,7 +747,17 @@ Deno.serve(async (req)=>{
         examined_count: examined_questions.length,
         examined_sample: examined_questions.slice(0, 20)
       }
-    });
+    };
+    if (want_debug) {
+      responseBody.qa_debug = buildImportQaDebug(
+        pages,
+        header,
+        observations,
+        question_sections_count,
+        response_blocks_count
+      );
+    }
+    return json(req, responseBody);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     const status = msg.startsWith("Unauthorized") ? 401 : msg === "Forbidden" ? 403 : 500;
