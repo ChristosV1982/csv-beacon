@@ -1,7 +1,7 @@
 export const config = {
   verify_jwt: false
 };
-const FUNCTION_VERSION = "cors-jwt-off-v34_debug_qa_output";
+const FUNCTION_VERSION = "cors-jwt-off-v35_recognize_normal_hardware_photo_responses";
 import { createClient } from "npm:@supabase/supabase-js@2.45.4";
 import * as pdfjsLib from "npm:pdfjs-dist@4.2.67/legacy/build/pdf.mjs";
 /**
@@ -276,6 +276,18 @@ function parseResponsePhrase(phrase) {
     return {
       response_type: "negative",
       nature_of_concern: p
+    };
+  }
+  if (/^Free from obvious deterioration or deficiency\.$/i.test(p)) {
+    return {
+      response_type: "as_expected",
+      nature_of_concern: "Free from obvious deterioration or deficiency."
+    };
+  }
+  if (/^Photo provided representative\.$/i.test(p)) {
+    return {
+      response_type: "as_expected",
+      nature_of_concern: "Photo provided representative."
     };
   }
   if (/^As expected\.$/i.test(p)) {
