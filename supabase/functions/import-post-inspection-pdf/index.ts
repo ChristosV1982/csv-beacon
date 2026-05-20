@@ -1,7 +1,7 @@
 export const config = {
   verify_jwt: false
 };
-const FUNCTION_VERSION = "cors-jwt-off-v36_stop_at_unvalidated_piq_responses";
+const FUNCTION_VERSION = "cors-jwt-off-v37_process_alphanumeric_soc_codes";
 import { createClient } from "npm:@supabase/supabase-js@2.45.4";
 import * as pdfjsLib from "npm:pdfjs-dist@4.2.67/legacy/build/pdf.mjs";
 /**
@@ -454,7 +454,7 @@ function isExtractableResponseType(t) {
   return t === "negative" || t === "positive" || t === "largely";
 }
 function isLikelyProcessCodeLine(line) {
-  return /^\d{1,2}(?:\.\d{1,2}){2,5}\s*-\s*.+$/.test(line);
+  return /^\d{1,2}[A-Z]?(?:\.\d{1,2}){2,5}\s*-\s*.+$/i.test(line);
 }
 function isLikelyHumanPifLine(line) {
   return /^\d{1,2}\.\s+.+$/.test(line);
