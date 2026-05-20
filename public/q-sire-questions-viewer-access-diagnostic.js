@@ -5,18 +5,31 @@
 (() => {
   "use strict";
 
-  const BUILD = "SIRE-VIEWER-ACCESS-DIAGNOSTIC-20260519_2";
+  const BUILD = "SIRE-VIEWER-ACCESS-DIAGNOSTIC-20260519_3";
   window.CSVB_SIRE_VIEWER_ACCESS_DIAGNOSTIC_BUILD = BUILD;
 
   function safeStr(value) {
     return value === null || value === undefined ? "" : String(value);
   }
 
-  function visibleById(id) {
-    const el = document.getElementById(id);
+  function isElementVisible(el) {
     if (!el) return false;
+
     const style = window.getComputedStyle(el);
-    return style.display !== "none" && style.visibility !== "hidden" && style.opacity !== "0";
+    if (style.display === "none" || style.visibility === "hidden" || style.opacity === "0") return false;
+
+    const rects = el.getClientRects();
+    if (rects && rects.length > 0) return true;
+
+    return !!(el.offsetWidth || el.offsetHeight);
+  }
+
+  function visibleById(id) {
+    return isElementVisible(document.getElementById(id));
+  }
+
+  function visibleByAnyId(ids) {
+    return (ids || []).some((id) => visibleById(id));
   }
 
   function allowedAiRoles(role) {
@@ -39,10 +52,19 @@
     };
 
     const actual = {
-      ai_search_visible: visibleById("csvbAiSourceLauncher"),
-      ai_usage_log_visible: visibleById("csvbAiUsageLogTrigger"),
-      changes_log_visible: visibleById("csvbSireViewerChangeLogTrigger"),
-      readonly_pill_visible: !!document.querySelector(".csvb-sire-viewer-helper-badge"),
+      ai_search_visible: visibleByAnyId([
+        "csvbAiSourceLauncher",
+        "csvbAiSourceOpenBtn"
+      ]),
+      ai_usage_log_visible: visibleByAnyId([
+        "csvbAiUsageLogTrigger",
+        "csvbAiUsageLogToggleBtn"
+      ]),
+      changes_log_visible: visibleByAnyId([
+        "csvbSireViewerChangeLogTrigger",
+        "csvbSireViewerChangeLogToggleBtn"
+      ]),
+      readonly_pill_visible: isElementVisible(document.querySelector(".csvb-sire-viewer-helper-badge")),
     };
 
     const warnings = [];
@@ -73,6 +95,9 @@
         warnings: ["AUTH.getSessionUserProfile is not available."],
       };
     }
+
+    // Give deferred header/action helpers a short moment to settle after hard refresh.
+    await new Promise((resolve) => setTimeout(resolve, 120));
 
     const me = await window.AUTH.getSessionUserProfile();
     const report = buildDiagnostic(me?.profile || {});
