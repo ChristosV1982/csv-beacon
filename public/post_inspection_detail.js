@@ -1,6 +1,6 @@
 import { loadLockedLibraryJson } from "./question_library_loader.js";
 
-const DETAIL_BUILD = "post_inspection_detail_v4_auto_pgno_match_on_import_2026-04-25";
+const DETAIL_BUILD = "post_inspection_detail_v5_qa_debug_json_2026-05-20";
 const PDF_BUCKET_DEFAULT = "inspection-reports";
 const PDF_FOLDER_PREFIX = "post_inspections";
 const HUMAN_POSITIVE_FIXED_NOC = "Exceeded normal expectation.";
@@ -1186,6 +1186,110 @@ async function importReportPdfAiFromFile(file) {
   }
 }
 
+
+function downloadJsonFile(payload, filename) {
+  const safeName = String(filename || "qa_debug.json").replace(/[^a-zA-Z0-9._-]+/g, "_");
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = safeName;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function qaDebugExportFilename(file, data) {
+  const reportRef =
+    String(data?.extracted?.header?.report_reference || state.activeReport?.report_ref || "report")
+      .replace(/[^a-zA-Z0-9._-]+/g, "_");
+  const sourceName =
+    String(file?.name || "inspection.pdf")
+      .replace(/[^a-zA-Z0-9._-]+/g, "_")
+      .replace(/\.pdf$/i, "");
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+  return `post_inspection_qa_debug_${reportRef}_${sourceName}_${stamp}.json`;
+}
+
+async function importReportPdfQaDebugFromFile(file) {
+  if (!file) return;
+
+  const ok = confirm(
+    "QA Debug JSON will upload this PDF temporarily, call the extraction function with debug=true, and download a JSON diagnostic file.\n\n" +
+    "It will NOT create/update the report and will NOT replace extracted observations.\n\n" +
+    "Continue?"
+  );
+  if (!ok) {
+    setSaveStatus("QA debug cancelled");
+    return;
+  }
+
+  setSaveStatus("Uploading PDF for QA debug…");
+
+  const safeName = String(file.name || "report.pdf").replace(/[^a-zA-Z0-9._-]+/g, "_");
+  const tempPath = `${PDF_FOLDER_PREFIX}/tmp/debug_${Date.now()}_${safeName}`;
+
+  const { error: upErr } = await state.supabase
+    .storage
+    .from(PDF_BUCKET_DEFAULT)
+    .upload(tempPath, file, { upsert: true, contentType: "application/pdf" });
+
+  if (upErr) throw upErr;
+
+  setSaveStatus("Extracting QA debug…");
+
+  const { data, error } = await state.supabase.functions.invoke(
+    "import-post-inspection-pdf",
+    {
+      body: {
+        report_id: state.activeReport?.id || "temp",
+        pdf_storage_path: tempPath,
+        debug: true,
+      },
+    }
+  );
+
+  if (error) throw error;
+  if (!data?.ok) throw new Error(data?.error || "QA debug extraction failed");
+
+  const extracted = data.extracted || {};
+  const qaPayload = {
+    export_type: "post_inspection_pdf_import_qa_debug",
+    exported_at: nowIso(),
+    source_file_name: file.name || null,
+    temp_pdf_storage_path: tempPath,
+    active_report_id: state.activeReport?.id || null,
+    active_report_ref: state.activeReport?.report_ref || null,
+    function_version: data.function_version || null,
+    basic_debug: data.debug || null,
+    extracted_summary: {
+      report_reference: extracted?.header?.report_reference || null,
+      vessel_name: extracted?.header?.vessel_name || null,
+      inspection_date: extracted?.header?.inspection_date || null,
+      examined_count: Number(extracted?.examined_count || 0),
+      observations_count: Array.isArray(extracted?.observations) ? extracted.observations.length : 0,
+    },
+    edge_response: data,
+  };
+
+  downloadJsonFile(qaPayload, qaDebugExportFilename(file, data));
+
+  const warningsCount = Number(data?.qa_debug?.counts?.warnings_count || 0);
+  const unparsedCount = Number(data?.qa_debug?.counts?.unparsed_response_lines_count || 0);
+
+  setSaveStatus("QA debug JSON downloaded");
+  alert(
+    "QA Debug JSON downloaded.\n\n" +
+    `Function version: ${data.function_version || "unknown"}\n` +
+    `Questions examined: ${qaPayload.extracted_summary.examined_count}\n` +
+    `Observations extracted: ${qaPayload.extracted_summary.observations_count}\n` +
+    `Warnings: ${warningsCount}\n` +
+    `Unparsed response-like lines: ${unparsedCount}`
+  );
+}
+
+
 function buildExportPayload() {
   if (!state.activeReport) return null;
   return {
@@ -1382,6 +1486,20 @@ async function init() {
     } catch (err) {
       console.error(err);
       alert("AI import failed:\n\n" + (err?.message || String(err)));
+      setSaveStatus("Error");
+    } finally {
+      e.target.value = "";
+    }
+  });
+
+  el("qaDebugPdfBtn").addEventListener("click", () => el("qaDebugPdfFile").click());
+  el("qaDebugPdfFile").addEventListener("change", async (e) => {
+    const f = e.target.files && e.target.files[0];
+    try {
+      if (f) await importReportPdfQaDebugFromFile(f);
+    } catch (err) {
+      console.error(err);
+      alert("QA debug failed:\n\n" + (err?.message || String(err)));
       setSaveStatus("Error");
     } finally {
       e.target.value = "";
