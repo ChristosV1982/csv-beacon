@@ -5,7 +5,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "SIRE-VIEWER-AI-ANSWER-MODAL-20260519_1";
+  const BUILD = "SIRE-VIEWER-AI-ANSWER-MODAL-20260519_2";
   window.CSVB_SIRE_VIEWER_AI_ANSWER_MODAL_BUILD = BUILD;
 
   function $(id) {
@@ -16,9 +16,90 @@
     return value === null || value === undefined ? "" : String(value);
   }
 
+  function esc(value) {
+    return safeStr(value)
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+
   function setStatus(message) {
     const el = $("csvbAiSourceStatus");
     if (el) el.textContent = message || "";
+  }
+
+  function normalizeHeading(line) {
+    const text = safeStr(line)
+      .replace(/^#{1,4}\s*/, "")
+      .replace(/[:：]\s*$/, "")
+      .trim();
+
+    if (/^answer$/i.test(text)) return "Answer";
+    if (/^relevant\s+sire(?:\s+2\.0)?\s+references?$/i.test(text)) return "Relevant SIRE 2.0 References";
+    if (/^relevant\s+sire(?:\s+2\.0)?\s+questions?$/i.test(text)) return "Relevant SIRE 2.0 References";
+    if (/^references?$/i.test(text)) return "Relevant SIRE 2.0 References";
+    if (/^sources?$/i.test(text)) return "Relevant SIRE 2.0 References";
+    if (/^limitations?$/i.test(text)) return "Limitations";
+    if (/^verification\s+notes?$/i.test(text)) return "Limitations";
+
+    return "";
+  }
+
+  function formatInline(value) {
+    return esc(value)
+      .replace(/\[(Q\s+\d{1,2}\.\d{1,2}\.\d{1,3}(?:[-.]\d{1,3})?)\]/gi, '<span class="csvb-ai-answer-ref">[$1]</span>')
+      .replace(/\b(Q\s+\d{1,2}\.\d{1,2}\.\d{1,3}(?:[-.]\d{1,3})?)\b/gi, '<span class="csvb-ai-answer-ref">$1</span>');
+  }
+
+  function renderFormattedAnswer(answer) {
+    const lines = safeStr(answer).replace(/\r\n/g, "\n").split("\n");
+    const sections = [];
+    let current = { title: "Answer", lines: [] };
+
+    const pushCurrent = () => {
+      const cleanLines = current.lines.map((x) => safeStr(x)).filter((x) => x.trim());
+      if (cleanLines.length) {
+        sections.push({ title: current.title, lines: cleanLines });
+      }
+    };
+
+    lines.forEach((line) => {
+      const heading = normalizeHeading(line);
+      if (heading) {
+        pushCurrent();
+        current = { title: heading, lines: [] };
+        return;
+      }
+      current.lines.push(line);
+    });
+    pushCurrent();
+
+    if (!sections.length) {
+      sections.push({ title: "Answer", lines: [answer] });
+    }
+
+    return sections.map((section) => {
+      const body = section.lines.map((raw) => {
+        const line = safeStr(raw).trim();
+        if (!line) return "";
+
+        const bullet = line.match(/^([-*•]|\d+[.)])\s+(.*)$/);
+        if (bullet) {
+          return `<div class="csvb-ai-answer-bullet"><span class="csvb-ai-answer-bullet-mark">${esc(bullet[1])}</span><span>${formatInline(bullet[2])}</span></div>`;
+        }
+
+        return `<div class="csvb-ai-answer-line">${formatInline(line)}</div>`;
+      }).filter(Boolean).join("");
+
+      return `
+        <section class="csvb-ai-answer-section">
+          <div class="csvb-ai-answer-section-title">${esc(section.title)}</div>
+          <div class="csvb-ai-answer-section-body">${body}</div>
+        </section>
+      `;
+    }).join("");
   }
 
   function injectStyles() {
@@ -38,13 +119,13 @@
         display: none;
         align-items: center;
         justify-content: center;
-        padding: 22px;
+        padding: 18px;
         background: rgba(3, 27, 63, .52);
       }
 
       html[data-csvb-page="q-sire-questions-viewer.html"] .csvb-ai-answer-modal {
-        width: min(1120px, 96vw);
-        max-height: 90vh;
+        width: min(1180px, 97vw);
+        max-height: 92vh;
         display: flex;
         flex-direction: column;
         background: #fff;
@@ -59,7 +140,7 @@
         justify-content: space-between;
         align-items: flex-start;
         gap: 12px;
-        padding: 12px 14px;
+        padding: 10px 13px;
         border-bottom: 1px solid #D6E4F5;
         background: #F8FBFF;
       }
@@ -75,7 +156,7 @@
         color: #5E6F86;
         font-size: 12px;
         margin-top: 3px;
-        line-height: 1.35;
+        line-height: 1.3;
       }
 
       html[data-csvb-page="q-sire-questions-viewer.html"] .csvb-ai-answer-modal-actions {
@@ -87,16 +168,68 @@
       }
 
       html[data-csvb-page="q-sire-questions-viewer.html"] .csvb-ai-answer-modal-body {
-        padding: 14px;
+        padding: 12px 13px;
         overflow: auto;
         color: #10233F;
-        font-size: 14px;
-        line-height: 1.52;
-        white-space: pre-wrap;
+        font-size: 13px;
+        line-height: 1.45;
+        white-space: normal;
+        background: #FFFFFF;
+      }
+
+      html[data-csvb-page="q-sire-questions-viewer.html"] .csvb-ai-answer-section {
+        border: 1px solid #D6E4F5;
+        border-radius: 11px;
+        background: #FFFFFF;
+        margin-bottom: 10px;
+        overflow: hidden;
+      }
+
+      html[data-csvb-page="q-sire-questions-viewer.html"] .csvb-ai-answer-section-title {
+        color: #062A5E;
+        background: #F1F7FF;
+        border-bottom: 1px solid #D6E4F5;
+        padding: 7px 10px;
+        font-size: 13px;
+        font-weight: 900;
+      }
+
+      html[data-csvb-page="q-sire-questions-viewer.html"] .csvb-ai-answer-section-body {
+        padding: 8px 10px 10px;
+      }
+
+      html[data-csvb-page="q-sire-questions-viewer.html"] .csvb-ai-answer-line {
+        margin: 0 0 7px;
+      }
+
+      html[data-csvb-page="q-sire-questions-viewer.html"] .csvb-ai-answer-bullet {
+        display: grid;
+        grid-template-columns: 28px minmax(0, 1fr);
+        gap: 4px;
+        margin: 0 0 6px;
+        align-items: start;
+      }
+
+      html[data-csvb-page="q-sire-questions-viewer.html"] .csvb-ai-answer-bullet-mark {
+        color: #1A4170;
+        font-weight: 900;
+        text-align: right;
+      }
+
+      html[data-csvb-page="q-sire-questions-viewer.html"] .csvb-ai-answer-ref {
+        display: inline-block;
+        border: 1px solid #BFD3EF;
+        background: #EEF6FF;
+        color: #062A5E;
+        border-radius: 999px;
+        padding: 1px 6px;
+        font-size: 11px;
+        font-weight: 850;
+        white-space: nowrap;
       }
 
       html[data-csvb-page="q-sire-questions-viewer.html"] .csvb-ai-answer-modal-foot {
-        padding: 9px 14px;
+        padding: 8px 13px;
         border-top: 1px solid #D6E4F5;
         color: #5E6F86;
         font-size: 12px;
@@ -105,7 +238,7 @@
 
       @media (max-width: 760px) {
         html[data-csvb-page="q-sire-questions-viewer.html"] .csvb-ai-answer-modal-backdrop {
-          padding: 10px;
+          padding: 8px;
         }
 
         html[data-csvb-page="q-sire-questions-viewer.html"] .csvb-ai-answer-modal-head {
@@ -142,7 +275,7 @@
         </div>
         <div id="csvbAiAnswerModalBody" class="csvb-ai-answer-modal-body"></div>
         <div class="csvb-ai-answer-modal-foot">
-          Generated from the SIRE Viewer source pack. Verify critical conclusions against the referenced SIRE question numbers.
+          Generated from the SIRE Viewer source pack only. Verify critical conclusions against the referenced SIRE question numbers.
         </div>
       </div>
     `;
@@ -184,7 +317,10 @@
     const metaEl = $("csvbAiAnswerModalMeta");
     const backdrop = $("csvbAiAnswerModalBackdrop");
 
-    if (body) body.textContent = answer;
+    if (body) {
+      body.dataset.rawAnswer = answer;
+      body.innerHTML = renderFormattedAnswer(answer);
+    }
     if (metaEl) metaEl.textContent = meta || "Grounded answer from selected SIRE 2.0 Viewer source pack.";
     if (backdrop) backdrop.style.display = "flex";
   }
@@ -195,7 +331,8 @@
   }
 
   async function copyModalAnswer() {
-    const answer = safeStr($("csvbAiAnswerModalBody")?.textContent || currentAnswerText()).trim();
+    const body = $("csvbAiAnswerModalBody");
+    const answer = safeStr(body?.dataset?.rawAnswer || currentAnswerText()).trim();
     if (!answer) {
       setStatus("No AI answer to copy yet.");
       return;
