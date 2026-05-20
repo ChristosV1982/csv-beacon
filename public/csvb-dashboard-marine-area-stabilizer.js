@@ -6,16 +6,19 @@
 (() => {
   "use strict";
 
-  const BUILD = "MARINE-AREA-SHIM-RISQ-VIEWER-20260520-1";
+  const BUILD = "MARINE-AREA-SHIM-RISQ-VIEWER-20260520-2";
 
   function ensureRisqViewerHelperLoaded() {
-    if (window.CSVB_DASHBOARD_RISQ_VIEWER_CARD_BUILD) return;
-    if (document.querySelector('script[data-csvb-risq-viewer-card-loader="1"]')) return;
+    if (window.CSVB_DASHBOARD_RISQ_VIEWER_CARD_BUILD === "DASHBOARD-RISQ-VIEWER-CARD-20260520_2") return;
+    if (document.querySelector('script[data-csvb-risq-viewer-card-loader="2"]')) return;
+
+    const old = document.querySelector('script[data-csvb-risq-viewer-card-loader="1"]');
+    if (old) old.remove();
 
     const script = document.createElement("script");
-    script.src = "./csvb-dashboard-risq-viewer-card.js?v=20260520_1";
+    script.src = "./csvb-dashboard-risq-viewer-card.js?v=20260520_2";
     script.defer = true;
-    script.dataset.csvbRisqViewerCardLoader = "1";
+    script.dataset.csvbRisqViewerCardLoader = "2";
     document.body.appendChild(script);
   }
 
