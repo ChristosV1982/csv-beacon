@@ -5,7 +5,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "PLA07-2026-05-19-LEGACY-LIBRARY-STUDY-REDIRECT";
+  const BUILD = "PLA08-2026-05-19-SIRE-VIEWER-NO-LIBRARY-FALLBACK";
 
   const CSVB_COMPANY_VIEW_ID_KEY = "csvb_superuser_company_view_id";
   const CSVB_COMPANY_VIEW_NAME_KEY = "csvb_superuser_company_view_name";
@@ -146,10 +146,6 @@
   }
 
   function moduleKeyAlternates(moduleKey) {
-    if (moduleKey === "sire_questions_viewer") {
-      return ["sire_questions_viewer", "read_only_library"];
-    }
-
     return [moduleKey];
   }
 
@@ -178,13 +174,7 @@
 
   function moduleKeyToAppModuleCodes(moduleKey) {
     const primary = moduleKeyToAppModuleCode(moduleKey);
-    const codes = primary ? [primary] : [];
-
-    if (moduleKey === "sire_questions_viewer") {
-      codes.push("QUESTION_LIBRARY");
-    }
-
-    return Array.from(new Set(codes.filter(Boolean)));
+    return Array.from(new Set(primary ? [primary] : []));
   }
 
   async function rankAllowsModuleView(sb, moduleKey) {
