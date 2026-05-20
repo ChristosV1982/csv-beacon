@@ -5,7 +5,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "RISQ-VIEWER-POLISH-20260520_1";
+  const BUILD = "RISQ-VIEWER-POLISH-20260520_2";
   window.CSVB_RISQ_VIEWER_POLISH_BUILD = BUILD;
 
   function $(id) {
@@ -350,9 +350,21 @@
     if (clear && clear.parentElement !== toolbar) toolbar.appendChild(clear);
   }
 
+  function ensureAccessDiagnosticLoaded() {
+    if (window.CSVB_RISQ_VIEWER_ACCESS_DIAGNOSTIC_BUILD) return;
+    if (document.querySelector('script[data-csvb-risq-access-diagnostic-loader="1"]')) return;
+
+    const script = document.createElement("script");
+    script.src = "./risq-questions-viewer-access-diagnostic.js?v=20260520_1";
+    script.defer = true;
+    script.dataset.csvbRisqAccessDiagnosticLoader = "1";
+    document.body.appendChild(script);
+  }
+
   function apply() {
     injectStyles();
     moveActionOrder();
+    ensureAccessDiagnosticLoaded();
   }
 
   function boot() {
