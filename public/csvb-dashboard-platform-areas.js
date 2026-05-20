@@ -5,7 +5,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "PA6H-2026-05-16-LEGACY-LIBRARY-COUNT-REMOVED";
+  const BUILD = "PA6I-2026-05-19-READ-ONLY-LIBRARY-RETIRED";
   const SELECTED_KEY = "csvb_dashboard_selected_platform_area_v6";
 
   /*
@@ -16,10 +16,9 @@
       DEFAULT_PLATFORM_AREAS below.
 
     Transition note:
-      SIRE 2.0 Questions Viewer now has its own module key:
-        sire_questions_viewer
-      Legacy Read-Only Library is soft-retired from visible dashboard navigation/counts,
-      but direct legacy fallback is handled elsewhere until final removal.
+      SIRE 2.0 Questions Viewer is now the active read-only operational SIRE library.
+      Legacy Read-Only Library is soft-retired from visible Dashboard navigation/counts.
+      The legacy file may remain temporarily as a direct-route fallback until final deletion.
   */
 
   const SIRE_VIEWER_CARD_KEY = "sire_questions_viewer";
@@ -117,19 +116,6 @@
     return out;
   }
 
-  function insertAfter(cards, afterKey, newKey) {
-    const clean = uniqueCards(cards).filter((card) => card !== newKey);
-    const idx = clean.indexOf(afterKey);
-
-    if (idx < 0) {
-      clean.unshift(newKey);
-      return clean;
-    }
-
-    clean.splice(idx + 1, 0, newKey);
-    return clean;
-  }
-
   function enrichAreaCards(area) {
     const normalized = {
       ...area,
@@ -138,8 +124,6 @@
     };
 
     if (normalized.key === "inspection_libraries_vetting") {
-      // Read-Only Library is soft-retired from visible Dashboard navigation/counts.
-      // SIRE 2.0 Questions Viewer remains available; legacy fallback is handled elsewhere.
       normalized.cards = uniqueCards(normalized.cards)
         .filter((card) => card !== "library");
 
@@ -237,11 +221,24 @@
     }
   }
 
+  function retireLegacyReadOnlyLibrary() {
+    document.querySelectorAll('[data-card="library"]').forEach((card) => {
+      card.remove();
+    });
+
+    const access = window.CSVB_DASHBOARD_MODULE_ACCESS;
+    if (access?.enabled?.delete) {
+      access.enabled.delete("read_only_library");
+    }
+  }
+
   function getCard(cardKey) {
     return document.querySelector(`[data-card="${cardKey}"]`);
   }
 
   function dashboardModuleAllows(moduleKey) {
+    if (moduleKey === "read_only_library") return false;
+
     const access = window.CSVB_DASHBOARD_MODULE_ACCESS;
 
     if (!access) return false;
@@ -252,8 +249,10 @@
 
   function isCardAvailable(cardKey) {
     if (cardKey === SIRE_VIEWER_CARD_KEY) {
-      return dashboardModuleAllows("sire_questions_viewer") || dashboardModuleAllows("read_only_library");
+      return dashboardModuleAllows("sire_questions_viewer");
     }
+
+    if (cardKey === "library") return false;
 
     const card = getCard(cardKey);
     if (!card) return false;
@@ -532,6 +531,8 @@
   }
 
   function createRoot() {
+    retireLegacyReadOnlyLibrary();
+
     const originalGrid = document.querySelector(".wrap > .grid");
     if (!originalGrid) return null;
 
@@ -580,6 +581,8 @@
   }
 
   function renderStaticShell() {
+    retireLegacyReadOnlyLibrary();
+
     const tiles = document.getElementById("csvbPlatformAreaTiles");
     const panels = document.getElementById("csvbPlatformAreaPanels");
 
@@ -605,11 +608,15 @@
   }
 
   function moveCardsOnce() {
+    retireLegacyReadOnlyLibrary();
+
     platformAreas.forEach((area) => {
       const grid = document.querySelector(`[data-platform-area-grid="${area.key}"]`);
       if (!grid) return;
 
       (area.cards || []).forEach((cardKey) => {
+        if (cardKey === "library") return;
+
         const card = getCard(cardKey);
         if (!card) return;
 
@@ -621,6 +628,8 @@
   }
 
   function updateAreaCounts() {
+    retireLegacyReadOnlyLibrary();
+
     platformAreas.forEach((area) => {
       const count = availableCardCount(area);
       const countText = count === 1 ? "1 module" : `${count} modules`;
@@ -641,6 +650,8 @@
   }
 
   function updatePanels() {
+    retireLegacyReadOnlyLibrary();
+
     const key = selectedAreaKey();
 
     document.querySelectorAll("[data-platform-area-panel]").forEach((panel) => {
@@ -667,6 +678,7 @@
   }
 
   function refreshDisplay() {
+    retireLegacyReadOnlyLibrary();
     createRoot();
     moveCardsOnce();
     updateAreaCounts();
