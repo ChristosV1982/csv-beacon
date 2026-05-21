@@ -2037,3 +2037,499 @@ html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-score-pill-neutral
   border-color: #d6e4f5 !important;
   color: #5e6f86 !important;
 }
+
+
+/* v20260521_25 — Observation Detail compact selected-profile risk tiles */
+html[data-csvb-page="post_inspection_observation_detail.html"] #observationRiskCard {
+  padding: 8px 10px !important;
+  overflow: visible !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] #observationRiskCard h2 {
+  margin: 0 0 3px !important;
+  font-size: 1.02rem !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] #observationRiskProfileLine {
+  font-size: .74rem !important;
+  line-height: 1.15 !important;
+  margin-bottom: 6px !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-observation-risk-grid {
+  display: none !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-observation-risk-profile-list {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 8px !important;
+  margin-top: 6px !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-observation-risk-profile-tile {
+  flex: 0 0 116px !important;
+  width: 116px !important;
+  min-height: 72px !important;
+  border: 1px solid #b8dce8 !important;
+  border-radius: 10px !important;
+  background: #eefaff !important;
+  padding: 7px !important;
+  text-align: center !important;
+  box-sizing: border-box !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-observation-risk-profile-name {
+  color: #062a5e !important;
+  font-size: .68rem !important;
+  font-weight: 900 !important;
+  line-height: 1.05 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-observation-risk-profile-score {
+  color: #031b3f !important;
+  font-size: 1.34rem !important;
+  font-weight: 950 !important;
+  line-height: 1 !important;
+  margin: 5px 0 3px !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-observation-risk-profile-sub {
+  color: #5e6f86 !important;
+  font-size: .62rem !important;
+  font-weight: 850 !important;
+  line-height: 1.05 !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-observation-risk-profile-tile-neg {
+  background: #ffe9e9 !important;
+  border-color: #ffb5b5 !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-observation-risk-profile-tile-neg * {
+  color: #8b1d1d !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-observation-risk-profile-tile-lae {
+  background: #eaf4ff !important;
+  border-color: #b8d7f5 !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-observation-risk-profile-tile-lae * {
+  color: #164e7a !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-observation-risk-profile-tile-pos {
+  background: #e9fff0 !important;
+  border-color: #b8f0c9 !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-observation-risk-profile-tile-pos * {
+  color: #0d4f2a !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-observation-factor-strip-wrap {
+  margin-top: 7px !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-observation-factor-strip {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 6px !important;
+  color: #5e6f86 !important;
+  font-size: .68rem !important;
+  font-weight: 800 !important;
+  line-height: 1.15 !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-observation-factor-strip span {
+  border: 1px solid #d6e4f5 !important;
+  background: #f8fbff !important;
+  border-radius: 999px !important;
+  padding: 3px 7px !important;
+  white-space: nowrap !important;
+}
+
+
+/* v20260521_26 — Observation Detail row-based risk evaluation + collapsible response tracking */
+html[data-csvb-page="post_inspection_observation_detail.html"] #observationRiskCard {
+  padding: 8px 10px !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] #observationRiskCard h2 {
+  margin: 0 0 2px !important;
+  font-size: 1.02rem !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] #observationRiskProfileLine {
+  margin: 0 0 6px !important;
+  font-size: .74rem !important;
+  line-height: 1.15 !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-observation-risk-action-bar {
+  display: flex !important;
+  justify-content: flex-end !important;
+  margin-bottom: 4px !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-observation-risk-mini-refresh {
+  width: 28px !important;
+  height: 28px !important;
+  min-width: 28px !important;
+  padding: 0 !important;
+  border-radius: 8px !important;
+  border: 1px solid #b7d7e8 !important;
+  background: #eef8ff !important;
+  color: #0b376d !important;
+  font-size: 1rem !important;
+  font-weight: 900 !important;
+  cursor: pointer !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-observation-risk-mini-refresh:hover {
+  background: #dff1ff !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-observation-risk-grid {
+  display: none !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-obs-risk-empty {
+  font-size: .86rem !important;
+  color: #5e6f86 !important;
+  padding: 4px 0 !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-obs-risk-table-wrap {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 4px !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-obs-risk-table-head,
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-obs-risk-table-row {
+  display: grid !important;
+  grid-template-columns: 1.5fr 1fr 1fr 1fr 1fr 1fr 1fr !important;
+  gap: 6px !important;
+  align-items: center !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-obs-risk-table-head {
+  font-size: .72rem !important;
+  font-weight: 900 !important;
+  color: #5d6e86 !important;
+  padding: 2px 4px !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-obs-risk-table-row {
+  border: 1px solid #d8e8f5 !important;
+  border-radius: 10px !important;
+  padding: 6px 8px !important;
+  font-size: .82rem !important;
+  font-weight: 800 !important;
+  color: #062a5e !important;
+  background: #f8fbff !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-obs-risk-profile-name {
+  font-weight: 900 !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-obs-risk-row-neg {
+  background: #ffeaea !important;
+  border-color: #f5bbbb !important;
+  color: #8b1d1d !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-obs-risk-row-lae {
+  background: #ebf5ff !important;
+  border-color: #bedbf8 !important;
+  color: #1a517f !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-obs-risk-row-pos {
+  background: #ecfff2 !important;
+  border-color: #bce9c8 !important;
+  color: #145331 !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-obs-risk-row-neutral {
+  background: #f8fbff !important;
+  border-color: #d8e8f5 !important;
+  color: #062a5e !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-collapsible-header {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 10px !important;
+  margin-bottom: 6px !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-collapsible-title > * {
+  margin: 0 !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-mini-toggle-btn {
+  width: 30px !important;
+  height: 30px !important;
+  min-width: 30px !important;
+  padding: 0 !important;
+  border-radius: 8px !important;
+  border: 1px solid #b7d7e8 !important;
+  background: #eef8ff !important;
+  color: #0b376d !important;
+  font-weight: 900 !important;
+  cursor: pointer !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-mini-toggle-btn:hover {
+  background: #dff1ff !important;
+}
+
+
+/* v20260521_27 — Force Observation Detail risk rows and collapsed response tracking */
+html[data-csvb-page="post_inspection_observation_detail.html"] #observationRiskCard {
+  padding: 8px 10px !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] #observationRiskCard h2 {
+  margin: 0 0 2px !important;
+  font-size: 1.02rem !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] #observationRiskProfileLine {
+  margin: 0 0 6px !important;
+  font-size: .74rem !important;
+  line-height: 1.15 !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-observation-risk-action-bar {
+  display: flex !important;
+  justify-content: flex-end !important;
+  margin-bottom: 4px !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-observation-risk-mini-refresh {
+  width: 28px !important;
+  height: 28px !important;
+  min-width: 28px !important;
+  padding: 0 !important;
+  border-radius: 8px !important;
+  border: 1px solid #b7d7e8 !important;
+  background: #eef8ff !important;
+  color: #0b376d !important;
+  font-size: 1rem !important;
+  font-weight: 900 !important;
+  cursor: pointer !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-observation-risk-grid {
+  display: none !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-obs-risk-table-wrap {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 4px !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-obs-risk-table-head,
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-obs-risk-table-row {
+  display: grid !important;
+  grid-template-columns: 1.5fr 1fr 1fr 1fr 1fr 1fr 1fr !important;
+  gap: 6px !important;
+  align-items: center !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-obs-risk-table-head {
+  font-size: .72rem !important;
+  font-weight: 900 !important;
+  color: #5d6e86 !important;
+  padding: 2px 4px !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-obs-risk-table-row {
+  border: 1px solid #d8e8f5 !important;
+  border-radius: 10px !important;
+  padding: 6px 8px !important;
+  font-size: .82rem !important;
+  font-weight: 800 !important;
+  color: #062a5e !important;
+  background: #f8fbff !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-obs-risk-profile-name {
+  font-weight: 900 !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-obs-risk-row-neg {
+  background: #ffeaea !important;
+  border-color: #f5bbbb !important;
+  color: #8b1d1d !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-obs-risk-row-lae {
+  background: #ebf5ff !important;
+  border-color: #bedbf8 !important;
+  color: #1a517f !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-obs-risk-row-pos {
+  background: #ecfff2 !important;
+  border-color: #bce9c8 !important;
+  color: #145331 !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-response-collapse-header {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 10px !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-response-collapse-header h2 {
+  margin: 0 !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-mini-toggle-btn {
+  width: 30px !important;
+  height: 30px !important;
+  min-width: 30px !important;
+  padding: 0 !important;
+  border-radius: 8px !important;
+  border: 1px solid #b7d7e8 !important;
+  background: #eef8ff !important;
+  color: #0b376d !important;
+  font-weight: 900 !important;
+  cursor: pointer !important;
+}
+
+
+/* v20260521_28 — Force final Observation Detail risk rows and collapsed Response Tracking */
+html[data-csvb-page="post_inspection_observation_detail.html"] #observationRiskCard {
+  padding: 8px 10px !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] #observationRiskCard h2 {
+  margin: 0 0 2px !important;
+  font-size: 1.02rem !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] #observationRiskProfileLine {
+  margin: 0 0 6px !important;
+  font-size: .74rem !important;
+  line-height: 1.15 !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-observation-risk-action-bar {
+  display: flex !important;
+  justify-content: flex-end !important;
+  margin-bottom: 4px !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-observation-risk-mini-refresh {
+  width: 28px !important;
+  height: 28px !important;
+  min-width: 28px !important;
+  padding: 0 !important;
+  border-radius: 8px !important;
+  border: 1px solid #b7d7e8 !important;
+  background: #eef8ff !important;
+  color: #0b376d !important;
+  font-size: 1rem !important;
+  font-weight: 900 !important;
+  cursor: pointer !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-observation-risk-grid {
+  display: none !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-obs-risk-empty {
+  font-size: .86rem !important;
+  color: #5e6f86 !important;
+  padding: 4px 0 !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-obs-risk-table-wrap {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 4px !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-obs-risk-table-head,
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-obs-risk-table-row {
+  display: grid !important;
+  grid-template-columns: 1.5fr 1fr 1fr 1fr 1fr 1fr 1fr !important;
+  gap: 6px !important;
+  align-items: center !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-obs-risk-table-head {
+  font-size: .72rem !important;
+  font-weight: 900 !important;
+  color: #5d6e86 !important;
+  padding: 2px 4px !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-obs-risk-table-row {
+  border: 1px solid #d8e8f5 !important;
+  border-radius: 10px !important;
+  padding: 6px 8px !important;
+  font-size: .82rem !important;
+  font-weight: 800 !important;
+  color: #062a5e !important;
+  background: #f8fbff !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-obs-risk-profile-name {
+  font-weight: 900 !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-obs-risk-row-neg {
+  background: #ffeaea !important;
+  border-color: #f5bbbb !important;
+  color: #8b1d1d !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-obs-risk-row-lae {
+  background: #ebf5ff !important;
+  border-color: #bedbf8 !important;
+  color: #1a517f !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-obs-risk-row-pos {
+  background: #ecfff2 !important;
+  border-color: #bce9c8 !important;
+  color: #145331 !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-response-collapse-header {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 10px !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-response-collapse-header h2 {
+  margin: 0 !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-mini-toggle-btn {
+  width: 30px !important;
+  height: 30px !important;
+  min-width: 30px !important;
+  padding: 0 !important;
+  border-radius: 8px !important;
+  border: 1px solid #b7d7e8 !important;
+  background: #eef8ff !important;
+  color: #0b376d !important;
+  font-weight: 900 !important;
+  cursor: pointer !important;
+}

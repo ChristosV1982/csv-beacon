@@ -1,6 +1,77 @@
 import { loadLockedLibraryJson } from "./question_library_loader.js";
 
-const OBS_DETAIL_BUILD = "post_inspection_observation_detail_v7_human_positive_noc_pif_2026-05-20";
+const OBS_DETAIL_BUILD = "post_inspection_observation_detail_v24_esc_direct_hotfix_2026-05-21";
+
+
+
+
+
+function esc(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+/* CSVB_OBS_DETAIL_ROWCLASS_HOTFIX_V22_START */
+
+function csvbObsCompatKind(row = null) {
+  return String(
+    (typeof state !== "undefined" && state?.item?.obs_type) ||
+    (typeof state !== "undefined" && state?.item?.kind) ||
+    row?.finding_type ||
+    ""
+  ).trim().toLowerCase();
+}
+
+function csvbObservationRowClass(row = null) {
+  const k = csvbObsCompatKind(row);
+  if (k === "negative") return "csvb-obs-risk-row-neg";
+  if (k === "largely") return "csvb-obs-risk-row-lae";
+  if (k === "positive") return "csvb-obs-risk-row-pos";
+  return "csvb-obs-risk-row-neutral";
+}
+
+/* CSVB_OBS_DETAIL_ROWCLASS_HOTFIX_V22_END */
+
+const CSVB_RISK_PROFILE_SELECTION_KEY = "csvb_post_entry_visible_risk_profile_ids";
+
+function csvbSelectedRiskProfileIds() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(CSVB_RISK_PROFILE_SELECTION_KEY) || "[]");
+    return Array.isArray(raw) ? raw.map(String).filter(Boolean).slice(0, 3) : [];
+  } catch {
+    return [];
+  }
+}
+
+function csvbFilterSelectedRiskRows(rows) {
+  const arr = Array.isArray(rows) ? rows : [];
+  const ids = csvbSelectedRiskProfileIds();
+
+  if (!ids.length) return arr.slice(0, 3);
+
+  const selected = new Set(ids);
+
+  return arr
+    .filter((r) => selected.has(String(r.profile_id)))
+    .sort((a, b) => ids.indexOf(String(a.profile_id)) - ids.indexOf(String(b.profile_id)))
+    .slice(0, 3);
+}
+
+function csvbRiskNumber(value) {
+  if (value == null || value === "") return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+function csvbRiskText(value) {
+  const n = csvbRiskNumber(value);
+  return n == null ? "—" : n.toFixed(1);
+}
+
 const HUMAN_POSITIVE_FIXED_NOC = "Exceeded normal expectation.";
 const LOCKED_LIBRARY_JSON = "./sire_questions_all_columns_named.json";
 
@@ -290,6 +361,7 @@ const state = {
   supabase: null,
   report: null,
   item: null,
+  observationRisks: [],
   users: [],
   workflowSettings: { ...DEFAULT_WORKFLOW_SETTINGS },
   lib: [],
@@ -375,6 +447,229 @@ async function loadObservationItem(reportId, itemId) {
   }));
 
   return rows.find((x) => String(x.id) === String(itemId)) || null;
+}
+
+
+async function loadSelectedObservationRisks() {
+  state.observationRisks = [];
+
+  const item = state.item;
+  if (!item || !item.id || String(item.id).startsWith("legacy-")) {
+    renderObservationRisk();
+    return [];
+  }
+
+  const { data, error } = await state.supabase.rpc("csvb_pi_obs_risks_for_item", {
+    p_observation_item_id: item.id,
+  });
+
+  if (error) {
+    console.warn("Observation risk scores failed to load", error);
+    renderObservationRisk();
+    return [];
+  }
+
+  state.observationRisks = csvbFilterSelectedRiskRows(data || []);
+  renderObservationRisk();
+  return state.observationRisks;
+}
+
+function ensureObservationRiskCard() {
+  let card = document.getElementById("observationRiskCard");
+  if (card) return card;
+
+  card = document.createElement("div");
+  card.className = "pi-card csvb-risk-card";
+  card.id = "observationRiskCard";
+  card.innerHTML = `
+    <h2>Risk Evaluation</h2>
+    <div class="muted" id="observationRiskProfileLine">No stored observation risk score yet.</div>
+
+    <div class="csvb-observation-risk-grid">
+      <div class="csvb-risk-dial">
+        <div class="csvb-risk-dial-label">Observation Risk Score</div>
+        <div class="csvb-risk-dial-value" id="observationRiskScoreVal">—</div>
+        <div class="csvb-risk-dial-sub" id="observationRiskIncludedVal">—</div>
+      </div>
+      <div class="csvb-risk-metric"><label>Finding type factor</label><div id="observationFindingFactorVal">—</div></div>
+      <div class="csvb-risk-metric"><label>Question type weight</label><div id="observationQuestionWeightVal">—</div></div>
+      <div class="csvb-risk-metric"><label>NOC score</label><div id="observationNocScoreVal">—</div></div>
+      <div class="csvb-risk-metric"><label>Vessel age factor</label><div id="observationAgeFactorVal">—</div></div>
+      <div class="csvb-risk-metric"><label>Repetition factor</label><div id="observationRepetitionFactorVal">—</div></div>
+    </div>
+
+    <div id="observationRiskProfilesArea" class="csvb-observation-risk-profile-list"></div>
+  `;
+
+  const pgno = document.querySelector("#pgnoSelectorArea")?.closest(".pi-card");
+  if (pgno && pgno.parentElement) {
+    pgno.parentElement.insertBefore(card, pgno);
+  } else {
+    document.querySelector("main")?.prepend(card);
+  }
+
+  return card;
+}
+
+
+function csvbObservationKind(row = null) {
+  return String(
+    state.item?.obs_type ||
+    state.item?.kind ||
+    row?.finding_type ||
+    ""
+  ).trim().toLowerCase();
+}
+
+function csvbDisplayedObservationRisk(row) {
+  const kind = csvbObservationKind(row);
+
+  if (kind === "positive") return null;
+
+  /*
+    Largely A.E. display risk is shown locally at 50%.
+    It is not included in the inspection risk total unless the Entry page switch is used.
+  */
+  if (kind === "largely") {
+    const qWeight = csvbRiskNumber(row?.question_type_weight);
+    const nocScore = csvbRiskNumber(row?.noc_score);
+    const ageFactor = csvbRiskNumber(row?.vessel_age_factor);
+    const repFactor = csvbRiskNumber(row?.repetition_factor);
+
+    if (
+      qWeight != null &&
+      nocScore != null &&
+      ageFactor != null &&
+      repFactor != null
+    ) {
+      return 0.5 * qWeight * nocScore * ageFactor * repFactor;
+    }
+  }
+
+  return csvbRiskNumber(row?.observation_risk_score);
+}
+
+function csvbObservationRiskTileClass(row = null) {
+  const kind = csvbObservationKind(row);
+
+  if (kind === "negative") return "csvb-observation-risk-profile-tile-neg";
+  if (kind === "largely") return "csvb-observation-risk-profile-tile-lae";
+  if (kind === "positive") return "csvb-observation-risk-profile-tile-pos";
+
+  return "csvb-observation-risk-profile-tile-neutral";
+}
+
+function csvbObservationFactorStripHtml(row) {
+  if (!row) return "";
+
+  return `
+    <div class="csvb-observation-factor-strip">
+      <span><b>Finding:</b> ${esc(csvbRiskText(row.finding_type_factor))}</span>
+      <span><b>Q Weight:</b> ${esc(csvbRiskText(row.question_type_weight))}</span>
+      <span><b>NOC:</b> ${esc(csvbRiskText(row.noc_score))}</span>
+      <span><b>Age:</b> ${esc(csvbRiskText(row.vessel_age_factor))}</span>
+      <span><b>Repeat:</b> ${esc(csvbRiskText(row.repetition_factor))}</span>
+    </div>
+  `;
+}
+
+function renderObservationRisk() {
+  const card = document.getElementById("observationRiskCard");
+  if (!card) return;
+
+  const risks = Array.isArray(state.observationRisks) ? state.observationRisks : [];
+
+  let line = document.getElementById("observationRiskProfileLine");
+  let area = document.getElementById("observationRiskProfilesArea");
+
+  if (!line) {
+    line = document.createElement("div");
+    line.className = "muted";
+    line.id = "observationRiskProfileLine";
+    card.appendChild(line);
+  }
+
+  if (!area) {
+    area = document.createElement("div");
+    area.id = "observationRiskProfilesArea";
+    area.className = "csvb-observation-risk-profile-list";
+    card.appendChild(area);
+  }
+
+  let refreshBtn = document.getElementById("csvbObservationRiskMiniRefresh");
+  if (!refreshBtn) {
+    const bar = document.createElement("div");
+    bar.className = "csvb-observation-risk-action-bar";
+    bar.innerHTML = `
+      <button type="button" id="csvbObservationRiskMiniRefresh" class="csvb-observation-risk-mini-refresh" title="Refresh">↻</button>
+    `;
+    card.insertBefore(bar, card.firstChild);
+    refreshBtn = document.getElementById("csvbObservationRiskMiniRefresh");
+  }
+
+  refreshBtn.onclick = async () => {
+    refreshBtn.disabled = true;
+    try {
+      
+    } finally {
+      refreshBtn.disabled = false;
+    }
+  };
+
+  const grid = card.querySelector(".csvb-observation-risk-grid");
+  if (grid) grid.style.display = "none";
+
+  if (!risks.length) {
+    line.textContent = "No selected observation risk profile snapshot found. Use Bulk Risk Refresh if needed.";
+    area.innerHTML = `
+      <div class="csvb-obs-risk-empty">No stored observation risk score yet.</div>
+    `;
+    return;
+  }
+
+  const calculated = risks[0]?.calculated_at
+    ? String(risks[0].calculated_at).replace("T", " ").slice(0, 19)
+    : "—";
+
+  line.textContent = `Selected risk profiles: ${risks.length} • Current snapshot • ${calculated}`;
+
+  const header = `
+    <div class="csvb-obs-risk-table-head">
+      <div>Risk Profile</div>
+      <div>Observation Risk Score</div>
+      <div>Finding type factor</div>
+      <div>Question type weight</div>
+      <div>NOC score</div>
+      <div>Vessel age factor</div>
+      <div>Repetition factor</div>
+    </div>
+  `;
+
+  const rows = risks.map((r) => {
+    const kind = csvbObservationKind(r);
+    const rowClass = csvbObservationRowClass(r);
+    const displayRisk = csvbDisplayedObservationRisk(r);
+    const scoreText = kind === "positive" ? "N/A" : csvbRiskText(displayRisk);
+
+    return `
+      <div class="csvb-obs-risk-table-row ${rowClass}">
+        <div class="csvb-obs-risk-profile-name">${esc(r.profile_name || "Risk Profile")}</div>
+        <div>${esc(scoreText)}</div>
+        <div>${esc(csvbRiskText(r.finding_type_factor))}</div>
+        <div>${esc(csvbRiskText(r.question_type_weight))}</div>
+        <div>${esc(csvbRiskText(r.noc_score))}</div>
+        <div>${esc(csvbRiskText(r.vessel_age_factor))}</div>
+        <div>${esc(csvbRiskText(r.repetition_factor))}</div>
+      </div>
+    `;
+  }).join("");
+
+  area.innerHTML = `
+    <div class="csvb-obs-risk-table-wrap">
+      ${header}
+      ${rows}
+    </div>
+  `;
 }
 
 function renderObservation() {
@@ -691,7 +986,56 @@ async function reloadItemFromDb() {
   renderObservation();
   renderPgnoSelector();
   loadResponseFields();
+  
   setSaveStatus("Loaded");
+}
+
+function forceCollapseResponseTracking() {
+  const headings = Array.from(document.querySelectorAll("h1,h2,h3,h4"));
+  const h = headings.find((x) => /^\s*Response Tracking\s*$/i.test(x.textContent || ""));
+  if (!h) return;
+
+  const card = h.closest(".pi-card") || h.parentElement;
+  if (!card || card.dataset.csvbResponseCollapseReady === "1") return;
+
+  card.dataset.csvbResponseCollapseReady = "1";
+  card.classList.add("csvb-response-collapsed-card");
+
+  const body = document.createElement("div");
+  body.className = "csvb-response-collapse-body";
+
+  const children = Array.from(card.children).filter((child) => child !== h);
+  children.forEach((child) => body.appendChild(child));
+
+  const header = document.createElement("div");
+  header.className = "csvb-response-collapse-header";
+
+  const title = document.createElement("h2");
+  title.textContent = "Response Tracking";
+
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.id = "csvbResponseTrackingToggle";
+  btn.className = "csvb-mini-toggle-btn";
+  btn.textContent = "▸";
+  btn.title = "Expand / collapse Response Tracking";
+  btn.setAttribute("aria-expanded", "false");
+
+  header.appendChild(title);
+  header.appendChild(btn);
+
+  card.innerHTML = "";
+  card.appendChild(header);
+  card.appendChild(body);
+
+  body.style.display = "none";
+
+  btn.onclick = () => {
+    const expanded = btn.getAttribute("aria-expanded") === "true";
+    btn.setAttribute("aria-expanded", expanded ? "false" : "true");
+    btn.textContent = expanded ? "▸" : "▾";
+    body.style.display = expanded ? "none" : "";
+  };
 }
 
 async function init() {
@@ -761,6 +1105,8 @@ async function init() {
   renderObservation();
   renderPgnoSelector();
   loadResponseFields();
+  await loadSelectedObservationRisks();
+  forceCollapseResponseTracking();
   setSaveStatus("Loaded");
 
   el("responseStatus").addEventListener("change", renderWorkflowBadges);
@@ -778,3 +1124,319 @@ async function init() {
     alert("Observation detail page failed to load: " + (e?.message || String(e)));
   }
 })();
+
+
+/* CSVB_OBS_DETAIL_FORCE_RENDER_V21_START */
+(function csvbObsDetailForceRenderV21() {
+  const PROFILE_KEY = "csvb_post_entry_visible_risk_profile_ids";
+  let running = false;
+  let renderedForItem = "";
+
+  function q(id) {
+    return document.getElementById(id);
+  }
+
+  function escLocal(value) {
+    return String(value ?? "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+
+  function selectedProfileIds() {
+    try {
+      const raw = JSON.parse(localStorage.getItem(PROFILE_KEY) || "[]");
+      return Array.isArray(raw) ? raw.map(String).filter(Boolean).slice(0, 3) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function filterSelected(rows) {
+    const arr = Array.isArray(rows) ? rows : [];
+    const ids = selectedProfileIds();
+
+    if (!ids.length) return arr.slice(0, 3);
+
+    const selected = new Set(ids);
+    return arr
+      .filter((r) => selected.has(String(r.profile_id)))
+      .sort((a, b) => ids.indexOf(String(a.profile_id)) - ids.indexOf(String(b.profile_id)))
+      .slice(0, 3);
+  }
+
+  function num(value) {
+    if (value == null || value === "") return null;
+    const n = Number(value);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  function txt(value) {
+    const n = num(value);
+    return n == null ? "—" : n.toFixed(1);
+  }
+
+  function kind(row) {
+    return String(
+      state?.item?.obs_type ||
+      state?.item?.kind ||
+      row?.finding_type ||
+      ""
+    ).trim().toLowerCase();
+  }
+
+  function displayedRisk(row) {
+    const k = kind(row);
+
+    if (k === "positive") return null;
+
+    if (k === "largely") {
+      const qWeight = num(row?.question_type_weight);
+      const nocScore = num(row?.noc_score);
+      const ageFactor = num(row?.vessel_age_factor);
+      const repFactor = num(row?.repetition_factor);
+
+      if (qWeight != null && nocScore != null && ageFactor != null && repFactor != null) {
+        return 0.5 * qWeight * nocScore * ageFactor * repFactor;
+      }
+    }
+
+    return num(row?.observation_risk_score);
+  }
+
+  function rowClass(row) {
+    const k = kind(row);
+    if (k === "negative") return "csvb-obs-risk-row-neg";
+    if (k === "largely") return "csvb-obs-risk-row-lae";
+    if (k === "positive") return "csvb-obs-risk-row-pos";
+    return "csvb-obs-risk-row-neutral";
+  }
+
+  function ensureRiskCard() {
+    let card = q("observationRiskCard");
+
+    if (!card) {
+      card = document.createElement("div");
+      card.className = "pi-card csvb-risk-card";
+      card.id = "observationRiskCard";
+      card.innerHTML = '<h2>Risk Evaluation</h2>';
+
+      const pgnoCard = q("pgnoSelectorArea")?.closest(".pi-card");
+      if (pgnoCard?.parentElement) {
+        pgnoCard.parentElement.insertBefore(card, pgnoCard);
+      } else {
+        document.querySelector("main")?.prepend(card);
+      }
+    }
+
+    let title = card.querySelector("h2");
+    if (!title) {
+      title = document.createElement("h2");
+      title.textContent = "Risk Evaluation";
+      card.prepend(title);
+    }
+
+    let bar = q("csvbObservationRiskActionBar");
+    if (!bar) {
+      bar = document.createElement("div");
+      bar.id = "csvbObservationRiskActionBar";
+      bar.className = "csvb-observation-risk-action-bar";
+      bar.innerHTML = '<button type="button" id="csvbObservationRiskMiniRefresh" class="csvb-observation-risk-mini-refresh" title="Refresh">↻</button>';
+      title.insertAdjacentElement("afterend", bar);
+    }
+
+    let line = q("observationRiskProfileLine");
+    if (!line) {
+      line = document.createElement("div");
+      line.id = "observationRiskProfileLine";
+      line.className = "muted";
+      bar.insertAdjacentElement("afterend", line);
+    }
+
+    let area = q("observationRiskProfilesArea");
+    if (!area) {
+      area = document.createElement("div");
+      area.id = "observationRiskProfilesArea";
+      area.className = "csvb-observation-risk-profile-list";
+      line.insertAdjacentElement("afterend", area);
+    }
+
+    const legacyGrid = card.querySelector(".csvb-observation-risk-grid");
+    if (legacyGrid) legacyGrid.style.display = "none";
+
+    return { card, line, area };
+  }
+
+  async function fetchRows() {
+    if (!state?.supabase || !state?.item?.id || String(state.item.id).startsWith("legacy-")) {
+      return [];
+    }
+
+    const { data, error } = await state.supabase.rpc("csvb_pi_obs_risks_for_item", {
+      p_observation_item_id: state.item.id,
+    });
+
+    if (error) {
+      console.warn("Observation risk RPC failed", error);
+      return { error };
+    }
+
+    return filterSelected(data || []);
+  }
+
+  function renderRows(rowsOrError) {
+    const { line, area } = ensureRiskCard();
+
+    if (rowsOrError && rowsOrError.error) {
+      line.textContent = "Observation risk calculation failed.";
+      area.innerHTML = '<div class="csvb-obs-risk-empty">' + escLocal(rowsOrError.error.message || "RPC error") + '</div>';
+      return;
+    }
+
+    const rows = Array.isArray(rowsOrError) ? rowsOrError : [];
+
+    const calculated = rows[0]?.calculated_at
+      ? String(rows[0].calculated_at).replace("T", " ").slice(0, 19)
+      : "—";
+
+    line.textContent = "Selected risk profiles: " + rows.length + " • Current snapshot • " + calculated;
+
+    if (!rows.length) {
+      area.innerHTML = '<div class="csvb-obs-risk-empty">No stored observation risk score yet. Use Bulk Risk Refresh if needed.</div>';
+      return;
+    }
+
+    const header =
+      '<div class="csvb-obs-risk-table-head">' +
+        '<div>Risk Profile</div>' +
+        '<div>Observation Risk Score</div>' +
+        '<div>Finding type factor</div>' +
+        '<div>Question type weight</div>' +
+        '<div>NOC score</div>' +
+        '<div>Vessel age factor</div>' +
+        '<div>Repetition factor</div>' +
+      '</div>';
+
+    const body = rows.map((r) => {
+      const k = kind(r);
+      const scoreText = k === "positive" ? "N/A" : txt(displayedRisk(r));
+
+      return (
+        '<div class="csvb-obs-risk-table-row ' + rowClass(r) + '">' +
+          '<div class="csvb-obs-risk-profile-name">' + escLocal(r.profile_name || "Risk Profile") + '</div>' +
+          '<div>' + escLocal(scoreText) + '</div>' +
+          '<div>' + escLocal(txt(r.finding_type_factor)) + '</div>' +
+          '<div>' + escLocal(txt(r.question_type_weight)) + '</div>' +
+          '<div>' + escLocal(txt(r.noc_score)) + '</div>' +
+          '<div>' + escLocal(txt(r.vessel_age_factor)) + '</div>' +
+          '<div>' + escLocal(txt(r.repetition_factor)) + '</div>' +
+        '</div>'
+      );
+    }).join("");
+
+    area.innerHTML =
+      '<div class="csvb-obs-risk-table-wrap">' +
+        header +
+        body +
+      '</div>';
+  }
+
+  async function refreshRiskRows() {
+    if (running) return;
+    running = true;
+
+    try {
+      ensureRiskCard();
+
+      const btn = q("csvbObservationRiskMiniRefresh");
+      if (btn) btn.disabled = true;
+
+      const rows = await fetchRows();
+      renderRows(rows);
+      renderedForItem = String(state?.item?.id || "");
+    } finally {
+      const btn = q("csvbObservationRiskMiniRefresh");
+      if (btn) btn.disabled = false;
+      running = false;
+    }
+  }
+
+  function collapseResponseTracking() {
+    const cards = Array.from(document.querySelectorAll(".pi-card"));
+    const card = cards.find((c) => {
+      const h = c.querySelector("h2");
+      return /^\s*Response Tracking\s*$/i.test(h?.textContent || "");
+    });
+
+    if (!card || card.dataset.csvbResponseCollapsed === "1") return;
+
+    const h = card.querySelector("h2");
+    if (!h) return;
+
+    card.dataset.csvbResponseCollapsed = "1";
+
+    const body = document.createElement("div");
+    body.className = "csvb-response-collapse-body";
+
+    let node = h.nextSibling;
+    while (node) {
+      const next = node.nextSibling;
+      body.appendChild(node);
+      node = next;
+    }
+
+    const header = document.createElement("div");
+    header.className = "csvb-response-collapse-header";
+
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.id = "csvbResponseTrackingToggle";
+    btn.className = "csvb-mini-toggle-btn";
+    btn.textContent = "▸";
+    btn.title = "Expand / collapse Response Tracking";
+    btn.setAttribute("aria-expanded", "false");
+
+    card.insertBefore(header, h);
+    header.appendChild(h);
+    header.appendChild(btn);
+    card.appendChild(body);
+
+    body.style.display = "none";
+
+    btn.onclick = () => {
+      const expanded = btn.getAttribute("aria-expanded") === "true";
+      btn.setAttribute("aria-expanded", expanded ? "false" : "true");
+      btn.textContent = expanded ? "▸" : "▾";
+      body.style.display = expanded ? "none" : "";
+    };
+  }
+
+  function bindRefresh() {
+    const btn = q("csvbObservationRiskMiniRefresh");
+    if (btn && btn.dataset.csvbBound !== "1") {
+      btn.dataset.csvbBound = "1";
+      btn.onclick = refreshRiskRows;
+    }
+  }
+
+  async function tick() {
+    collapseResponseTracking();
+    ensureRiskCard();
+    bindRefresh();
+
+    const currentId = String(state?.item?.id || "");
+    if (currentId && currentId !== renderedForItem && state?.supabase) {
+      await refreshRiskRows();
+    }
+  }
+
+  const timer = setInterval(tick, 500);
+  setTimeout(() => clearInterval(timer), 30000);
+
+  document.addEventListener("DOMContentLoaded", tick);
+  window.addEventListener("load", tick);
+})();
+ /* CSVB_OBS_DETAIL_FORCE_RENDER_V21_END */
+

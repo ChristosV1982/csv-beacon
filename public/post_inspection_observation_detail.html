@@ -194,7 +194,7 @@
   <link rel="stylesheet" href="./csvb-ui-polish.css?v=20260430_1" />
   <link rel="stylesheet" href="./csvb-help-tooltips.css?v=20260430_1" />
   <link rel="stylesheet" href="./csvb-100pct-fit.css?v=20260430_1" />
-  <link rel="stylesheet" href="./csvb-post-inspection-module-polish.css?v=20260520_5" />
+  <link rel="stylesheet" href="./csvb-post-inspection-module-polish.css?v=20260521_v24_esc_direct_hotfix" />
 </head>
 
 <body>
@@ -253,6 +253,46 @@
         <label>Observation Text</label>
         <textarea id="supportingCommentField" readonly style="min-height:140px;"></textarea>
       </div>
+    </div>
+
+    <div class="pi-card csvb-risk-card" id="observationRiskCard">
+      <h2>Risk Evaluation</h2>
+      <div class="muted" id="observationRiskProfileLine">No stored observation risk score yet.</div>
+
+      <div class="csvb-observation-risk-grid">
+        <div class="csvb-risk-dial">
+          <div class="csvb-risk-dial-label">Observation Risk Score</div>
+          <div class="csvb-risk-dial-value" id="observationRiskScoreVal">—</div>
+          <div class="csvb-risk-dial-sub" id="observationRiskIncludedVal">—</div>
+        </div>
+
+        <div class="csvb-risk-metric">
+          <label>Finding type factor</label>
+          <div id="observationFindingFactorVal">—</div>
+        </div>
+
+        <div class="csvb-risk-metric">
+          <label>Question type weight</label>
+          <div id="observationQuestionWeightVal">—</div>
+        </div>
+
+        <div class="csvb-risk-metric">
+          <label>NOC score</label>
+          <div id="observationNocScoreVal">—</div>
+        </div>
+
+        <div class="csvb-risk-metric">
+          <label>Vessel age factor</label>
+          <div id="observationAgeFactorVal">—</div>
+        </div>
+
+        <div class="csvb-risk-metric">
+          <label>Repetition factor</label>
+          <div id="observationRepetitionFactorVal">—</div>
+        </div>
+      </div>
+
+      <div id="observationRiskProfilesArea" class="csvb-observation-risk-profile-list"></div>
     </div>
 
     <div class="pi-card">
@@ -385,7 +425,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js" defer></script>
   <script src="./app-config.js" defer></script>
   <script src="./auth.js" defer></script>
-  <script type="module" src="./post_inspection_observation_detail.js"></script>
+  <script type="module" src="./post_inspection_observation_detail.js?v=20260521_v24_esc_direct_hotfix"></script>
   <script src="./csvb-post-obs-thread-link.js?v=20260505_1"></script>
   <script src="./csvb-ui-polish.js?v=20260430_1"></script>
   <script src="./csvb-help-tooltips.js?v=20260430_1"></script>
