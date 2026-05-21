@@ -885,7 +885,7 @@ function renderVessels() {
             p_hull_number: v.hull_number || null,
             p_imo_number: v.imo_number ? String(v.imo_number) : null,
             p_call_sign: v.call_sign || null,
-            p_is_active: active,
+            p_is_active: (v.is_active === false ? false : true),
             p_move_related: false,
             p_date_delivered: date_delivered || null
           });
