@@ -1290,3 +1290,99 @@ html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-inline-metrics str
     grid-template-columns: 1fr !important;
   }
 }
+
+/* v20260521_6 — Company average Risk/Inspection and relative colour coding */
+html[data-csvb-page="post_inspection.html"] .csvb-risk-average-panel {
+  background: #ffffff !important;
+  border: 1px solid #d6e4f5 !important;
+  border-radius: 12px !important;
+  padding: 10px !important;
+  margin: 8px 0 !important;
+  box-shadow: 0 6px 18px rgba(3,27,63,.06) !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .csvb-risk-average-title {
+  color: #062a5e !important;
+  font-size: .98rem !important;
+  font-weight: 950 !important;
+  margin-bottom: 8px !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .csvb-risk-average-grid {
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(160px, 1fr)) !important;
+  gap: 8px !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .csvb-risk-average-box {
+  border: 1px solid #d6e4f5 !important;
+  border-radius: 10px !important;
+  background: #f8fbff !important;
+  padding: 8px 10px !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .csvb-risk-average-box span {
+  display: block !important;
+  color: #5e6f86 !important;
+  font-size: .76rem !important;
+  font-weight: 800 !important;
+  margin-bottom: 3px !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .csvb-risk-average-box strong {
+  display: block !important;
+  color: #031b3f !important;
+  font-size: 1.25rem !important;
+  font-weight: 950 !important;
+  line-height: 1.05 !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .csvb-risk-average-box em {
+  display: block !important;
+  color: #5e6f86 !important;
+  font-size: .72rem !important;
+  font-style: normal !important;
+  font-weight: 700 !important;
+  margin-top: 4px !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .csvb-risk-mini {
+  transition: background-color .15s ease, border-color .15s ease !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .csvb-risk-mini-ratio {
+  display: block !important;
+  font-size: .66rem !important;
+  font-weight: 800 !important;
+  line-height: 1.05 !important;
+  color: #5e6f86 !important;
+  margin-top: 2px !important;
+}
+
+@media (max-width: 1200px) {
+  html[data-csvb-page="post_inspection.html"] .csvb-risk-average-grid {
+    grid-template-columns: repeat(2, minmax(160px, 1fr)) !important;
+  }
+}
+
+@media (max-width: 760px) {
+  html[data-csvb-page="post_inspection.html"] .csvb-risk-average-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* v20260521_7 — Make risk mini boxes use calculated colour variables */
+html[data-csvb-page="post_inspection.html"] .csvb-risk-mini {
+  background: var(--csvb-risk-bg, #eefaff) !important;
+  border-color: var(--csvb-risk-border, #b8dce8) !important;
+  color: var(--csvb-risk-text, #031b3f) !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .csvb-risk-mini-value {
+  color: var(--csvb-risk-text, #031b3f) !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .csvb-risk-mini-ratio {
+  color: var(--csvb-risk-text, #031b3f) !important;
+  opacity: .78 !important;
+}

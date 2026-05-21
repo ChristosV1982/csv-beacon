@@ -1,5 +1,5 @@
 const POST_INSPECTION_INDEX_BUILD =
-  "post_inspection_index_v4_risk_score_gauge_2026-05-21";
+  "post_inspection_index_v5_risk_average_colour_2026-05-21";
 
 function el(id) {
   return document.getElementById(id);
@@ -60,6 +60,16 @@ const state = {
   supabase: null,
   reports: [],
   riskScoresByReport: new Map(),
+  riskAverages: {
+    ytdAverage: null,
+    ytdTotal: 0,
+    ytdCount: 0,
+    last12Average: null,
+    last12Total: 0,
+    last12Count: 0,
+    basisAverage: null,
+    unscoredCount: 0,
+  },
   storedFilters: {},
   storedDateYears: new Set(),
   storedDateMonths: new Set(),
@@ -348,21 +358,33 @@ function riskMiniGaugeHtml(reportId) {
     return '<div class="csvb-risk-mini no-risk"><span class="csvb-risk-mini-label">Risk</span><span class="csvb-risk-mini-value">—</span></div>';
   }
 
-  const score = fmtRiskScore(r.inspection_risk_score);
+  const rawScore = riskScoreNumber(r);
+  const score = fmtRiskScore(rawScore);
   const profile = String(r.profile_name || "Risk").trim();
+  const avg = state.riskAverages?.basisAverage;
+  const ratio = Number.isFinite(rawScore) && Number.isFinite(Number(avg)) && Number(avg) > 0
+    ? rawScore / Number(avg)
+    : null;
+
   const title =
     profile +
     " / " +
     String(r.version_label || "") +
+    " | Score: " +
+    score +
+    " | Average basis: " +
+    fmtAvgRisk(avg) +
+    (ratio == null ? "" : " | Ratio: " + ratio.toFixed(2) + "x") +
     " | Eligible: " +
     String(r.eligible_risk_observations ?? "—") +
     " | Max: " +
     fmtRiskScore(r.max_observation_risk);
 
   return (
-    '<div class="csvb-risk-mini" title="' + esc(title) + '">' +
+    '<div class="csvb-risk-mini" style="' + esc(riskColourStyle(rawScore)) + '" title="' + esc(title) + '">' +
       '<span class="csvb-risk-mini-label">' + esc(profile) + '</span>' +
       '<span class="csvb-risk-mini-value">' + esc(score) + '</span>' +
+      '<span class="csvb-risk-mini-ratio">' + esc(ratio == null ? "avg —" : ratio.toFixed(2) + "× avg") + '</span>' +
     '</div>'
   );
 }
@@ -383,9 +405,154 @@ async function loadCurrentRiskScoresForStoredReports() {
 }
 
 
+
+function parseInspectionDateForRisk(value) {
+  const s = String(value || "").trim();
+  if (!s) return null;
+
+  let m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (m) return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+
+  m = s.match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
+  if (m) return new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]));
+
+  return null;
+}
+
+function riskScoreNumber(row) {
+  const n = Number(row?.inspection_risk_score);
+  return Number.isFinite(n) ? n : null;
+}
+
+function computeRiskAverages() {
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const last12Start = new Date(now);
+  last12Start.setMonth(last12Start.getMonth() - 12);
+
+  const scored = [];
+  let unscoredCount = 0;
+
+  for (const report of state.reports || []) {
+    const risk = riskScoreForReport(report.id);
+    const score = riskScoreNumber(risk);
+    const date = parseInspectionDateForRisk(report.inspection_date);
+
+    if (score == null) {
+      unscoredCount++;
+      continue;
+    }
+
+    scored.push({ report, risk, score, date });
+  }
+
+  const ytd = scored.filter((x) => x.date && x.date.getFullYear() === currentYear);
+  const last12 = scored.filter((x) => x.date && x.date >= last12Start && x.date <= now);
+
+  const sum = (arr) => arr.reduce((acc, x) => acc + x.score, 0);
+  const avg = (arr) => arr.length ? sum(arr) / arr.length : null;
+
+  const ytdTotal = sum(ytd);
+  const last12Total = sum(last12);
+
+  state.riskAverages = {
+    ytdAverage: avg(ytd),
+    ytdTotal,
+    ytdCount: ytd.length,
+    last12Average: avg(last12),
+    last12Total,
+    last12Count: last12.length,
+    basisAverage: avg(ytd) ?? avg(last12) ?? avg(scored),
+    unscoredCount,
+  };
+
+  return state.riskAverages;
+}
+
+function fmtAvgRisk(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return "—";
+  return n.toFixed(2);
+}
+
+function riskColourStyle(score) {
+  const avg = Number(state.riskAverages?.basisAverage);
+
+  if (!Number.isFinite(score) || !Number.isFinite(avg) || avg <= 0) {
+    return "--csvb-risk-bg:#f8fbff;--csvb-risk-border:#d6e4f5;--csvb-risk-text:#5e6f86;";
+  }
+
+  /*
+    Relative colour scale:
+    0.00 × avg      = green
+    1.00 × avg      = yellow
+    2.00 × avg+     = red
+  */
+  const ratio = Math.max(0, Math.min(2, score / avg));
+  const hue = Math.round(120 - (ratio / 2) * 120);
+
+  return [
+    `--csvb-risk-bg:hsl(${hue} 95% 84%)`,
+    `--csvb-risk-border:hsl(${hue} 78% 42%)`,
+    `--csvb-risk-text:#031b3f`
+  ].join(";") + ";";
+}
+
+function ensureRiskAveragePanel() {
+  let panel = el("riskAveragePanel");
+  if (panel) return panel;
+
+  panel = document.createElement("div");
+  panel.id = "riskAveragePanel";
+  panel.className = "csvb-risk-average-panel";
+
+  const storedCount = el("storedCount");
+  const anchor = storedCount?.parentElement || document.querySelector(".card");
+  if (anchor && anchor.parentElement) {
+    anchor.parentElement.insertBefore(panel, anchor.nextSibling);
+  } else {
+    document.body.prepend(panel);
+  }
+
+  return panel;
+}
+
+function renderRiskAveragePanel() {
+  const a = state.riskAverages || computeRiskAverages();
+  const panel = ensureRiskAveragePanel();
+
+  panel.innerHTML = `
+    <div class="csvb-risk-average-title">Risk / Inspection Average</div>
+    <div class="csvb-risk-average-grid">
+      <div class="csvb-risk-average-box">
+        <span>Current Calendar Year</span>
+        <strong>${fmtAvgRisk(a.ytdAverage)}</strong>
+        <em>${a.ytdCount || 0} scored inspection(s) • total ${fmtAvgRisk(a.ytdTotal)}</em>
+      </div>
+      <div class="csvb-risk-average-box">
+        <span>Last 12 Months</span>
+        <strong>${fmtAvgRisk(a.last12Average)}</strong>
+        <em>${a.last12Count || 0} scored inspection(s) • total ${fmtAvgRisk(a.last12Total)}</em>
+      </div>
+      <div class="csvb-risk-average-box">
+        <span>Colour Basis</span>
+        <strong>${fmtAvgRisk(a.basisAverage)}</strong>
+        <em>Green below average • red above average</em>
+      </div>
+      <div class="csvb-risk-average-box">
+        <span>Unscored Inspections</span>
+        <strong>${a.unscoredCount || 0}</strong>
+        <em>Use Refresh Risk to include them</em>
+      </div>
+    </div>
+  `;
+}
+
 function renderStoredTable() {
   const body = el("storedTableBody");
   const rows = (state.reports || []).filter(reportPassesStoredFilters);
+
+  renderRiskAveragePanel();
 
   el("storedCount").textContent = `${rows.length} inspection(s)`;
 
@@ -650,6 +817,8 @@ async function init() {
 
   state.reports = await loadReportsFromDb();
   await loadCurrentRiskScoresForStoredReports();
+  computeRiskAverages();
+  renderRiskAveragePanel();
   renderStoredTable();
 }
 
