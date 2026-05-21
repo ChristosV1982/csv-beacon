@@ -1,0 +1,559 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>C.S.V. BEACON – Risk Rating Profiles</title>
+
+  <link rel="stylesheet" href="./csv-beacon-theme.css?v=20260428_3" />
+  <link rel="stylesheet" href="./style.css?v=20260428_3" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="./auth.js"></script>
+  <script src="./csvb-module-guard.js?v=20260429_1"></script>
+
+  <style>
+    body{
+      margin:0;
+      font-family:Arial, Helvetica, sans-serif;
+      background:#f4f8fc;
+      color:#0c1b2a;
+    }
+
+    .topbar{
+      background:linear-gradient(90deg,#031b3f,#062a5e);
+      color:#fff;
+      min-height:58px;
+      padding:8px 14px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      box-shadow:0 8px 24px rgba(3,27,63,.16);
+    }
+
+    .brand-wrap{
+      display:flex;
+      align-items:center;
+      gap:12px;
+      min-width:0;
+    }
+
+    .brand-logo{
+      width:42px;
+      height:42px;
+      object-fit:contain;
+      flex:0 0 auto;
+    }
+
+    .brand-title{
+      font-weight:950;
+      font-size:1.05rem;
+      line-height:1.05;
+      color:#fff;
+    }
+
+    .brand-sub{
+      color:#bfeff4;
+      font-size:.78rem;
+      font-weight:700;
+      line-height:1.15;
+      margin-top:3px;
+    }
+
+    .top-actions{
+      display:flex;
+      align-items:center;
+      justify-content:flex-end;
+      gap:8px;
+      flex-wrap:wrap;
+    }
+
+    .btn{
+      border:1px solid #b8dce8;
+      background:#eefaff;
+      color:#062a5e;
+      border-radius:9px;
+      padding:8px 11px;
+      font-weight:850;
+      cursor:pointer;
+    }
+
+    .btn.primary{
+      background:#0097a7;
+      border-color:#0097a7;
+      color:#fff;
+    }
+
+    .btn.danger{
+      background:#ffeaea;
+      border-color:#ffc7c7;
+      color:#8b1d1d;
+    }
+
+    .btn.dark{
+      background:rgba(255,255,255,.12);
+      border-color:rgba(255,255,255,.32);
+      color:#fff;
+    }
+
+    .pill{
+      display:inline-flex;
+      align-items:center;
+      padding:6px 10px;
+      border-radius:999px;
+      background:rgba(255,255,255,.10);
+      border:1px solid rgba(255,255,255,.22);
+      color:#fff;
+      font-size:.8rem;
+      font-weight:750;
+    }
+
+    .wrap{
+      width:100%;
+      max-width:100%;
+      padding:10px;
+      box-sizing:border-box;
+    }
+
+    .page-head{
+      background:#fff;
+      border:1px solid #d6e4f5;
+      border-radius:14px;
+      padding:12px;
+      box-shadow:0 8px 22px rgba(3,27,63,.08);
+      margin-bottom:10px;
+    }
+
+    .page-head h1{
+      margin:0 0 4px;
+      color:#062a5e;
+      font-size:1.24rem;
+      font-weight:950;
+    }
+
+    .muted{
+      color:#5e6f86;
+      font-weight:650;
+      line-height:1.3;
+    }
+
+    .status-row{
+      display:flex;
+      gap:8px;
+      flex-wrap:wrap;
+      align-items:center;
+      margin-top:10px;
+    }
+
+    .ok-box,
+    .warn-box{
+      display:none;
+      border-radius:12px;
+      padding:10px 12px;
+      font-weight:800;
+      white-space:pre-wrap;
+      margin-bottom:10px;
+    }
+
+    .ok-box{
+      color:#0d4f2a;
+      background:#e9fff0;
+      border:1px solid #b8f0c9;
+    }
+
+    .warn-box{
+      color:#8b1d1d;
+      background:#ffeaea;
+      border:1px solid #ffc7c7;
+    }
+
+    .layout{
+      display:grid;
+      grid-template-columns:320px 1fr;
+      gap:10px;
+      align-items:start;
+    }
+
+    .card{
+      background:#fff;
+      border:1px solid #d6e4f5;
+      border-radius:14px;
+      padding:12px;
+      box-shadow:0 8px 22px rgba(3,27,63,.08);
+      overflow:hidden;
+    }
+
+    .card h2{
+      margin:0 0 9px;
+      color:#062a5e;
+      font-size:1.04rem;
+      font-weight:950;
+    }
+
+    .profile-list{
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+    }
+
+    .profile-btn{
+      text-align:left;
+      border:1px solid #d6e4f5;
+      background:#f8fbff;
+      border-radius:12px;
+      padding:10px;
+      cursor:pointer;
+    }
+
+    .profile-btn.active{
+      border-color:#0097a7;
+      background:#eefaff;
+      box-shadow:0 0 0 2px rgba(0,151,167,.12);
+    }
+
+    .profile-name{
+      color:#062a5e;
+      font-weight:950;
+      font-size:.96rem;
+    }
+
+    .profile-meta{
+      color:#5e6f86;
+      font-size:.82rem;
+      font-weight:700;
+      margin-top:3px;
+    }
+
+    .grid2{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:10px;
+    }
+
+    .grid3{
+      display:grid;
+      grid-template-columns:repeat(3,1fr);
+      gap:10px;
+    }
+
+    label{
+      display:block;
+      color:#062a5e;
+      font-size:.84rem;
+      font-weight:850;
+      margin:0 0 4px;
+    }
+
+    input,
+    select,
+    textarea{
+      width:100%;
+      box-sizing:border-box;
+      border:1px solid #b8dce8;
+      border-radius:9px;
+      padding:8px 10px;
+      background:#fff;
+      color:#17324d;
+      font:inherit;
+      font-weight:650;
+    }
+
+    textarea{
+      min-height:70px;
+      resize:vertical;
+    }
+
+    .section{
+      margin-top:10px;
+      border:1px solid #d6e4f5;
+      border-radius:13px;
+      background:#f8fbff;
+      padding:10px;
+    }
+
+    .section-head{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:10px;
+      margin-bottom:8px;
+    }
+
+    .section-title{
+      color:#062a5e;
+      font-weight:950;
+      font-size:.98rem;
+    }
+
+    .table-wrap{
+      overflow:auto;
+      border:1px solid #d6e4f5;
+      border-radius:10px;
+      background:#fff;
+    }
+
+    table{
+      width:100%;
+      border-collapse:collapse;
+    }
+
+    th,
+    td{
+      padding:7px 8px;
+      border-bottom:1px solid #edf3fb;
+      vertical-align:top;
+      text-align:left;
+      font-size:.88rem;
+    }
+
+    th{
+      background:#eef6fc;
+      color:#062a5e;
+      font-weight:900;
+      white-space:nowrap;
+    }
+
+    td{
+      color:#17324d;
+      font-weight:600;
+    }
+
+    td.score-cell{
+      width:110px;
+    }
+
+    td.score-cell input{
+      max-width:90px;
+      text-align:right;
+      font-weight:900;
+    }
+
+    .small{
+      font-size:.82rem;
+    }
+
+    .hidden{
+      display:none !important;
+    }
+
+    @media(max-width:1100px){
+      .layout{
+        grid-template-columns:1fr;
+      }
+      .grid2,
+      .grid3{
+        grid-template-columns:1fr;
+      }
+    }
+  </style>
+
+  <link rel="stylesheet" href="./csvb-ui-polish.css?v=20260430_1" />
+  <link rel="stylesheet" href="./csvb-help-tooltips.css?v=20260430_1" />
+  <link rel="stylesheet" href="./csvb-100pct-fit.css?v=20260430_1" />
+</head>
+
+<body>
+  <header class="topbar">
+    <div class="brand-wrap">
+      <img class="brand-logo" src="./assets/csv-beacon-icon.png" alt="C.S.V. BEACON" />
+      <div>
+        <div class="brand-title">Risk Rating Profiles</div>
+        <div class="brand-sub">Inspection Libraries & Vetting • Post-Inspection Risk Evaluation</div>
+      </div>
+    </div>
+
+    <div class="top-actions">
+      <span class="pill" id="userBadge">Not signed in</span>
+      <button class="btn dark" id="dashboardBtn" type="button">Dashboard</button>
+      <button class="btn dark" id="modeBtn" type="button">Mode Selection</button>
+      <button class="btn primary" id="logoutBtn" type="button">Logout</button>
+      <span class="pill" id="buildPill">build: risk_rating_profiles_v1_2026-05-21</span>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <div id="warnBox" class="warn-box"></div>
+    <div id="okBox" class="ok-box"></div>
+
+    <div class="page-head">
+      <h1>Risk Rating Profiles</h1>
+      <div class="muted">
+        Configure risk profiles used by Post-Inspection Risk Evaluation. Start with the default
+        <b>InHouse rating</b>, then clone it to create oil-major or client-specific profiles.
+      </div>
+      <div class="status-row">
+        <button class="btn" id="reloadBtn" type="button">Reload</button>
+        <button class="btn primary" id="saveProfileBtn" type="button">Save Profile</button>
+        <button class="btn primary" id="saveVersionBtn" type="button">Save Version Settings</button>
+      </div>
+    </div>
+
+    <div class="layout">
+      <section class="card">
+        <h2>Profiles</h2>
+        <div id="profileList" class="profile-list">
+          <div class="muted">Loading…</div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">Clone selected profile</div>
+          <div class="muted small" style="margin:5px 0 8px;">
+            Creates a new active v1 profile using the selected profile's active version values.
+          </div>
+
+          <label>New profile name</label>
+          <input id="cloneName" placeholder="e.g. Oil Major X rating" />
+
+          <div style="height:8px;"></div>
+
+          <label>New profile code</label>
+          <input id="cloneCode" placeholder="e.g. oil_major_x_rating" />
+
+          <div style="height:8px;"></div>
+
+          <label>Description</label>
+          <textarea id="cloneDescription" placeholder="Optional description"></textarea>
+
+          <div style="height:8px;"></div>
+          <button class="btn primary" id="cloneBtn" type="button">Clone Profile</button>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Selected Profile / Version</h2>
+
+        <div class="grid2">
+          <div>
+            <label>Profile name</label>
+            <input id="profileName" />
+          </div>
+          <div>
+            <label>Profile code</label>
+            <input id="profileCode" readonly />
+          </div>
+        </div>
+
+        <div style="height:8px;"></div>
+
+        <label>Description</label>
+        <textarea id="profileDescription"></textarea>
+
+        <div style="height:10px;"></div>
+
+        <div class="grid3">
+          <div>
+            <label>Active version</label>
+            <input id="versionLabel" readonly />
+          </div>
+          <div>
+            <label>Include Largely A.E. in risk</label>
+            <select id="includeLargely">
+              <option value="false">No</option>
+              <option value="true">Yes</option>
+            </select>
+          </div>
+          <div>
+            <label>Repetition scope</label>
+            <select id="repetitionScope">
+              <option value="company">Company history</option>
+              <option value="vessel">Vessel history</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="height:8px;"></div>
+
+        <div class="grid2">
+          <div>
+            <label>Repetition lookback months</label>
+            <input id="lookbackMonths" type="number" min="1" step="1" />
+          </div>
+          <div>
+            <label>Selected profile/version ID</label>
+            <input id="selectedIds" readonly />
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-head">
+            <div>
+              <div class="section-title">Question Type Weights</div>
+              <div class="muted small">Factor a1: Core / Rotational 1 / Rotational 2.</div>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>Question Type</th><th>Code</th><th>Weight</th><th>Action</th></tr>
+              </thead>
+              <tbody id="questionWeightsBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-head">
+            <div>
+              <div class="section-title">NOC Scores</div>
+              <div class="muted small">Factor b: Hardware / Process / Human NOC scoring.</div>
+            </div>
+            <select id="nocDesignationFilter" style="max-width:180px;">
+              <option value="">All</option>
+              <option value="Hardware">Hardware</option>
+              <option value="Process">Process</option>
+              <option value="Human">Human</option>
+            </select>
+          </div>
+          <div class="table-wrap" style="max-height:420px;">
+            <table>
+              <thead>
+                <tr><th>Designation</th><th>NOC / PIF</th><th>Score</th><th>Action</th></tr>
+              </thead>
+              <tbody id="nocScoresBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-head">
+            <div>
+              <div class="section-title">Vessel Age Factors</div>
+              <div class="muted small">Factor c: age is inspection date minus vessel date delivered.</div>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>Designation</th><th>Band</th><th>Range</th><th>Factor</th><th>Action</th></tr>
+              </thead>
+              <tbody id="ageFactorsBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-head">
+            <div>
+              <div class="section-title">Repetition Factors</div>
+              <div class="muted small">Factor d: same observation key in selected historical scope/lookback.</div>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th>Band</th><th>Count range</th><th>Factor</th><th>Action</th></tr>
+              </thead>
+              <tbody id="repetitionFactorsBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script type="module" src="./risk_rating_profiles.js?v=20260521_1"></script>
+  <script src="./csvb-ui-polish.js?v=20260430_1"></script>
+  <script src="./csvb-help-tooltips.js?v=20260430_1"></script>
+  <script src="./csvb-100pct-fit.js?v=20260430_1"></script>
+</body>
+</html>

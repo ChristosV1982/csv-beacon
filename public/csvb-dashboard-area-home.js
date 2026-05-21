@@ -110,6 +110,14 @@
               icon: "📈",
             },
             {
+              label: "Risk Rating Profiles",
+              text: "Configure InHouse and oil-major risk rating profiles for Post-Inspection Risk Evaluation.",
+              href: "./risk_rating_profiles.html",
+              cardKey: "risk_rating_profiles",
+              icon: "🎚️",
+            },
+
+            {
               label: "Pre/Post Compare",
               text: "Compare self-assessment results against post-inspection findings.",
               href: "./sa_compare.html",
