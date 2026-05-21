@@ -813,14 +813,15 @@ function renderVessels() {
       v.name,
       v.imo_number,
       v.hull_number,
-      v.call_sign
+      v.call_sign,
+      v.date_delivered
     ].filter(Boolean).join(" ").toLowerCase();
 
     return hay.includes(q);
   });
 
   if (!filtered.length) {
-    tbody.innerHTML = '<tr><td colspan="7" class="muted small">No vessels found.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" class="muted small">No vessels found.</td></tr>';
     return;
   }
 
@@ -837,6 +838,9 @@ function renderVessels() {
       ? '<button class="btnSmall btnDanger" data-act="deactivate" data-id="' + esc(v.id) + '" type="button">Deactivate</button>'
       : '<button class="btnSmall btn" data-act="activate" data-id="' + esc(v.id) + '" type="button">Activate</button>';
 
+    const saveDateBtn =
+      '<button class="btnSmall btn2" data-act="save_date" data-id="' + esc(v.id) + '" type="button">Save date</button>';
+
     const deleteBtn =
       '<button class="btnSmall btnDanger" data-act="delete" data-id="' + esc(v.id) + '" type="button">Delete</button>';
 
@@ -847,8 +851,9 @@ function renderVessels() {
         <td>${esc(v.hull_number || "")}</td>
         <td>${esc(v.imo_number || "")}</td>
         <td>${esc(v.call_sign || "")}</td>
+        <td><input class="v-date-input" data-id="${esc(v.id)}" type="date" value="${esc(v.date_delivered || "")}" style="min-width:145px;" /></td>
         <td>${statusPill}</td>
-        <td><div class="actions">${activeBtn}${deleteBtn}</div></td>
+        <td><div class="actions">${saveDateBtn}${activeBtn}${deleteBtn}</div></td>
       </tr>
     `);
   }
@@ -866,6 +871,31 @@ function renderVessels() {
         const v = state.vessels.find((x) => String(x.id) === String(id));
 
         if (!v) throw new Error("Vessel not found in state.");
+
+        if (act === "save_date") {
+          const dateInput = document.querySelector('.v-date-input[data-id="' + id + '"]');
+          const date_delivered = (dateInput?.value || "").trim();
+
+          setStatus("Saving vessel Date Delivered…");
+
+          await csvbRpc("csvb_admin_upsert_vessel", {
+            p_vessel_id: v.id,
+            p_company_id: v.company_id || publicDefaultCompanyId(),
+            p_name: v.name || "",
+            p_hull_number: v.hull_number || null,
+            p_imo_number: v.imo_number ? String(v.imo_number) : null,
+            p_call_sign: v.call_sign || null,
+            p_is_active: active,
+            p_move_related: false,
+            p_date_delivered: date_delivered || null
+          });
+
+          showOk("Vessel Date Delivered saved.");
+          await refreshVessels();
+          renderVesselDropdown();
+          setStatus("Ready");
+          return;
+        }
 
         if (act === "delete") {
           const message =
@@ -918,7 +948,8 @@ function renderVessels() {
           p_imo_number: v.imo_number ? String(v.imo_number) : null,
           p_call_sign: v.call_sign || null,
           p_is_active: nextActive,
-          p_move_related: false
+          p_move_related: false,
+          p_date_delivered: v.date_delivered || null
         });
 
         showOk(nextActive ? "Vessel activated." : "Vessel deactivated.");
@@ -1168,6 +1199,7 @@ function initAddVessel() {
       document.getElementById("v_hull").value = "";
       document.getElementById("v_imo").value = "";
       document.getElementById("v_call").value = "";
+      document.getElementById("v_date_delivered").value = "";
 
       renderVesselCompanyDropdown();
     });
@@ -1191,6 +1223,7 @@ function initAddVessel() {
       const hull_number = (document.getElementById("v_hull").value || "").trim();
       const imo_number_raw = (document.getElementById("v_imo").value || "").trim();
       const call_sign = (document.getElementById("v_call").value || "").trim();
+      const date_delivered = (document.getElementById("v_date_delivered")?.value || "").trim();
 
       if (!company_id) throw new Error("Company is required.");
       if (!name) throw new Error("Vessel name is required.");
@@ -1209,7 +1242,8 @@ function initAddVessel() {
         p_imo_number: imo_number_raw || null,
         p_call_sign: call_sign || null,
         p_is_active: true,
-        p_move_related: true
+        p_move_related: true,
+        p_date_delivered: date_delivered || null
       });
 
       showOk("Vessel saved.\n\n" + JSON.stringify(resp, null, 2));
@@ -1218,6 +1252,7 @@ function initAddVessel() {
       document.getElementById("v_hull").value = "";
       document.getElementById("v_imo").value = "";
       document.getElementById("v_call").value = "";
+      document.getElementById("v_date_delivered").value = "";
 
       state.selectedCompanyId = company_id;
 
