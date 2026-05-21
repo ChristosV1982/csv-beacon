@@ -1,5 +1,8 @@
 const POST_INSPECTION_INDEX_BUILD =
-  "post_inspection_index_v5_risk_average_colour_2026-05-21";
+  "post_inspection_index_v16_compact_entry_risk_panel_2026-05-21";
+
+const RISK_INCLUDE_LAE_KEY = "csvb_post_entry_include_largely_ae_risk";
+const RISK_PROFILE_SELECTION_KEY = "csvb_post_entry_visible_risk_profile_ids";
 
 function el(id) {
   return document.getElementById(id);
@@ -60,6 +63,9 @@ const state = {
   supabase: null,
   reports: [],
   riskScoresByReport: new Map(),
+  riskProfiles: [],
+  selectedRiskProfileIds: [],
+  includeLargelyInEntryRisk: localStorage.getItem(RISK_INCLUDE_LAE_KEY) === "1",
   riskAverages: {
     ytdAverage: null,
     ytdTotal: 0,
@@ -341,70 +347,240 @@ async function openStoredInspectionKpis(reportId) {
 
 
 function fmtRiskScore(value) {
+  if (value == null || value === "") return "—";
   const n = Number(value);
   if (!Number.isFinite(n)) return "—";
-  return Number.isInteger(n) ? String(n) : n.toFixed(2);
+  return n.toFixed(1);
+}
+
+function riskScoresForReport(reportId) {
+  const v = state.riskScoresByReport instanceof Map
+    ? state.riskScoresByReport.get(String(reportId))
+    : null;
+
+  const arr = Array.isArray(v) ? v : (v ? [v] : []);
+  const selected = selectedRiskProfileSet();
+
+  if (!selected.size) return arr.slice(0, 3);
+
+  return arr
+    .filter((r) => selected.has(String(r.profile_id)))
+    .sort((a, b) => {
+      const aIdx = (state.selectedRiskProfileIds || []).indexOf(String(a.profile_id));
+      const bIdx = (state.selectedRiskProfileIds || []).indexOf(String(b.profile_id));
+      return aIdx - bIdx;
+    })
+    .slice(0, 3);
 }
 
 function riskScoreForReport(reportId) {
-  return state.riskScoresByReport instanceof Map
-    ? state.riskScoresByReport.get(String(reportId))
-    : null;
+  return riskScoresForReport(reportId)[0] || null;
 }
 
 function riskMiniGaugeHtml(reportId) {
-  const r = riskScoreForReport(reportId);
-  if (!r) {
+  const risks = riskScoresForReport(reportId);
+
+  if (!risks.length) {
     return '<div class="csvb-risk-mini no-risk"><span class="csvb-risk-mini-label">Risk</span><span class="csvb-risk-mini-value">—</span></div>';
   }
 
-  const rawScore = riskScoreNumber(r);
-  const score = fmtRiskScore(rawScore);
-  const profile = String(r.profile_name || "Risk").trim();
-  const avg = state.riskAverages?.basisAverage;
-  const ratio = Number.isFinite(rawScore) && Number.isFinite(Number(avg)) && Number(avg) > 0
-    ? rawScore / Number(avg)
-    : null;
+  return '<div class="csvb-risk-mini-stack">' + risks.map((r) => {
+    const rawScore = riskScoreNumber(r);
+    const score = fmtRiskScore(rawScore);
+    const profile = String(r.profile_name || "Risk").trim();
 
-  const title =
-    profile +
-    " / " +
-    String(r.version_label || "") +
-    " | Score: " +
-    score +
-    " | Average basis: " +
-    fmtAvgRisk(avg) +
-    (ratio == null ? "" : " | Ratio: " + ratio.toFixed(2) + "x") +
-    " | Eligible: " +
-    String(r.eligible_risk_observations ?? "—") +
-    " | Max: " +
-    fmtRiskScore(r.max_observation_risk);
+    const profileKey = String(r.profile_id || r.profile_code || r.profile_name || "risk");
+    const avg = state.riskAveragesByProfile?.get(profileKey)?.basisAverage ?? state.riskAverages?.basisAverage;
 
-  return (
-    '<div class="csvb-risk-mini" style="' + esc(riskColourStyle(rawScore)) + '" title="' + esc(title) + '">' +
-      '<span class="csvb-risk-mini-label">' + esc(profile) + '</span>' +
-      '<span class="csvb-risk-mini-value">' + esc(score) + '</span>' +
-      '<span class="csvb-risk-mini-ratio">' + esc(ratio == null ? "avg —" : ratio.toFixed(2) + "× avg") + '</span>' +
-    '</div>'
-  );
+    const ratio = Number.isFinite(rawScore) && Number.isFinite(Number(avg)) && Number(avg) > 0
+      ? rawScore / Number(avg)
+      : null;
+
+    const title =
+      profile +
+      " / " +
+      String(r.version_label || "") +
+      " | Score: " +
+      score +
+      " | Average basis: " +
+      fmtAvgRisk(avg) +
+      (ratio == null ? "" : " | Ratio: " + ratio.toFixed(1) + "x") +
+      " | Eligible: " +
+      String(r.eligible_risk_observations ?? "—") +
+      " | Max: " +
+      fmtRiskScore(r.max_observation_risk);
+
+    return (
+      '<div class="csvb-risk-mini" style="' + esc(riskColourStyle(rawScore, avg)) + '" title="' + esc(title) + '">' +
+        '<span class="csvb-risk-mini-label">' + esc(profile) + '</span>' +
+        '<span class="csvb-risk-mini-value">' + esc(score) + '</span>' +
+        '<span class="csvb-risk-mini-ratio">' + esc(rawScore == null ? "Refresh needed" : (ratio == null ? "avg —" : ratio.toFixed(1) + "× avg")) + '</span>' +
+      '</div>'
+    );
+  }).join("") + '</div>';
 }
 
 async function loadCurrentRiskScoresForStoredReports() {
   state.riskScoresByReport = new Map();
 
-  const { data, error } = await state.supabase.rpc("csvb_post_inspection_current_risk_scores_for_me");
+  state.includeLargelyInEntryRisk = localStorage.getItem(RISK_INCLUDE_LAE_KEY) === "1";
+
+  const { data, error } = await state.supabase.rpc("csvb_post_inspection_all_profile_risk_scores_for_me_adjusted", {
+    p_include_largely_as_expected: !!state.includeLargelyInEntryRisk,
+  });
+
   if (error) {
-    console.warn("Current risk scores failed to load", error);
+    console.warn("All-profile adjusted risk scores failed to load.", error);
     return;
   }
 
   for (const row of data || []) {
     if (!row?.report_id) continue;
-    state.riskScoresByReport.set(String(row.report_id), row);
+
+    const key = String(row.report_id);
+    const arr = state.riskScoresByReport.get(key) || [];
+    arr.push(row);
+    state.riskScoresByReport.set(key, arr);
   }
 }
 
 
+
+
+function loadSelectedRiskProfileIds() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(RISK_PROFILE_SELECTION_KEY) || "[]");
+    return Array.isArray(raw) ? raw.map(String).filter(Boolean).slice(0, 3) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveSelectedRiskProfileIds(ids) {
+  const clean = [...new Set((ids || []).map(String).filter(Boolean))].slice(0, 3);
+  localStorage.setItem(RISK_PROFILE_SELECTION_KEY, JSON.stringify(clean));
+  state.selectedRiskProfileIds = clean;
+}
+
+function defaultRiskProfileIds() {
+  const profiles = state.riskProfiles || [];
+
+  const preselected = profiles
+    .filter((p) => p.show_in_post_inspection === true)
+    .sort((a, b) =>
+      Number(a.post_inspection_display_order || 999) - Number(b.post_inspection_display_order || 999) ||
+      String(a.profile_name || "").localeCompare(String(b.profile_name || ""))
+    )
+    .map((p) => String(p.profile_id))
+    .slice(0, 3);
+
+  if (preselected.length) return preselected;
+
+  return profiles
+    .slice()
+    .sort((a, b) =>
+      (a.is_default === b.is_default ? 0 : a.is_default ? -1 : 1) ||
+      String(a.profile_name || "").localeCompare(String(b.profile_name || ""))
+    )
+    .map((p) => String(p.profile_id))
+    .slice(0, 3);
+}
+
+async function loadSelectableRiskProfiles() {
+  const { data, error } = await state.supabase.rpc("csvb_post_inspection_selectable_risk_profiles_for_me");
+  if (error) {
+    console.warn("Selectable risk profiles failed to load", error);
+    state.riskProfiles = [];
+    state.selectedRiskProfileIds = [];
+    return;
+  }
+
+  state.riskProfiles = data || [];
+
+  const saved = loadSelectedRiskProfileIds();
+  const existing = new Set(state.riskProfiles.map((p) => String(p.profile_id)));
+  let selected = saved.filter((id) => existing.has(String(id))).slice(0, 3);
+
+  if (!selected.length) {
+    selected = defaultRiskProfileIds();
+  }
+
+  saveSelectedRiskProfileIds(selected);
+}
+
+function selectedRiskProfileSet() {
+  return new Set((state.selectedRiskProfileIds || []).map(String).slice(0, 3));
+}
+
+function selectedRiskProfileLabel() {
+  const selected = selectedRiskProfileSet();
+  const labels = (state.riskProfiles || [])
+    .filter((p) => selected.has(String(p.profile_id)))
+    .map((p) => p.profile_name);
+
+  return labels.length ? labels.join(", ") : "None selected";
+}
+
+function riskProfileSelectorHtml() {
+  const selected = selectedRiskProfileSet();
+
+  const items = (state.riskProfiles || []).map((p) => {
+    const checked = selected.has(String(p.profile_id)) ? "checked" : "";
+    return `
+      <label class="csvb-risk-profile-option">
+        <input type="checkbox" class="csvb-risk-profile-check" value="${esc(p.profile_id)}" ${checked} />
+        <span>${esc(p.profile_name)}</span>
+      </label>
+    `;
+  }).join("");
+
+  return `
+    <div class="csvb-risk-profile-dropdown" id="riskProfileDrop">
+      <button type="button" class="csvb-risk-profile-drop-btn" id="riskProfileDropBtn">
+        ${esc(selectedRiskProfileLabel())}
+      </button>
+      <div class="csvb-risk-profile-drop-panel" id="riskProfileDropPanel">
+        <div class="muted" style="font-size:.72rem;margin-bottom:6px;">Select maximum three profiles for operational display.</div>
+        ${items || '<div class="muted">No active risk profiles.</div>'}
+      </div>
+    </div>
+  `;
+}
+
+function bindRiskProfileSelector() {
+  const drop = el("riskProfileDrop");
+  const btn = el("riskProfileDropBtn");
+  if (!drop || !btn) return;
+
+  btn.onclick = (e) => {
+    e.stopPropagation();
+    drop.classList.toggle("open");
+  };
+
+  drop.onclick = (e) => e.stopPropagation();
+
+  drop.querySelectorAll(".csvb-risk-profile-check").forEach((chk) => {
+    chk.onchange = async () => {
+      const checked = [...drop.querySelectorAll(".csvb-risk-profile-check:checked")].map((x) => x.value);
+
+      if (checked.length > 3) {
+        chk.checked = false;
+        alert("Only three Risk Rating Profiles can be displayed at the same time.");
+        return;
+      }
+
+      saveSelectedRiskProfileIds(checked);
+
+      computeRiskAverages();
+      renderRiskAveragePanel();
+      renderStoredTable();
+    };
+  });
+
+  document.addEventListener("click", () => {
+    drop.classList.remove("open");
+  }, { once: true });
+}
 
 function parseInspectionDateForRisk(value) {
   const s = String(value || "").trim();
@@ -420,7 +596,8 @@ function parseInspectionDateForRisk(value) {
 }
 
 function riskScoreNumber(row) {
-  const n = Number(row?.inspection_risk_score);
+  if (!row || row.inspection_risk_score == null || row.inspection_risk_score === "") return null;
+  const n = Number(row.inspection_risk_score);
   return Number.isFinite(n) ? n : null;
 }
 
@@ -430,49 +607,88 @@ function computeRiskAverages() {
   const last12Start = new Date(now);
   last12Start.setMonth(last12Start.getMonth() - 12);
 
-  const scored = [];
-  let unscoredCount = 0;
+  const selected = selectedRiskProfileSet();
+  const byProfile = new Map();
 
   for (const report of state.reports || []) {
-    const risk = riskScoreForReport(report.id);
-    const score = riskScoreNumber(risk);
+    const allRisks = state.riskScoresByReport instanceof Map
+      ? (state.riskScoresByReport.get(String(report.id)) || [])
+      : [];
+
+    const risks = (Array.isArray(allRisks) ? allRisks : [allRisks])
+      .filter((r) => r && (!selected.size || selected.has(String(r.profile_id))))
+      .slice(0, 3);
+
     const date = parseInspectionDateForRisk(report.inspection_date);
 
-    if (score == null) {
-      unscoredCount++;
-      continue;
-    }
+    for (const risk of risks) {
+      const score = riskScoreNumber(risk);
+      if (score == null) continue;
 
-    scored.push({ report, risk, score, date });
+      const profileKey = String(risk.profile_id || risk.profile_code || risk.profile_name || "risk");
+      if (!byProfile.has(profileKey)) byProfile.set(profileKey, []);
+      byProfile.get(profileKey).push({ report, risk, score, date });
+    }
   }
 
-  const ytd = scored.filter((x) => x.date && x.date.getFullYear() === currentYear);
-  const last12 = scored.filter((x) => x.date && x.date >= last12Start && x.date <= now);
+  function sum(arr) {
+    return arr.reduce((acc, x) => acc + (Number(x.score) || 0), 0);
+  }
 
-  const sum = (arr) => arr.reduce((acc, x) => acc + x.score, 0);
-  const avg = (arr) => arr.length ? sum(arr) / arr.length : null;
+  function avg(arr) {
+    return arr.length ? sum(arr) / arr.length : null;
+  }
 
-  const ytdTotal = sum(ytd);
-  const last12Total = sum(last12);
+  function calcSet(scored) {
+    const ytd = scored.filter((x) => x.date && x.date.getFullYear() === currentYear);
+    const last12 = scored.filter((x) => x.date && x.date >= last12Start && x.date <= now);
 
-  state.riskAverages = {
-    ytdAverage: avg(ytd),
-    ytdTotal,
-    ytdCount: ytd.length,
-    last12Average: avg(last12),
-    last12Total,
-    last12Count: last12.length,
-    basisAverage: avg(ytd) ?? avg(last12) ?? avg(scored),
-    unscoredCount,
+    return {
+      ytdAverage: avg(ytd),
+      ytdTotal: sum(ytd),
+      ytdCount: ytd.length,
+
+      last12Average: avg(last12),
+      last12Total: sum(last12),
+      last12Count: last12.length,
+
+      allTimeAverage: avg(scored),
+      allTimeTotal: sum(scored),
+      allTimeCount: scored.length,
+
+      basisAverage: avg(last12) ?? avg(ytd) ?? avg(scored),
+    };
+  }
+
+  state.riskAveragesByProfile = new Map();
+  for (const [profileKey, arr] of byProfile.entries()) {
+    state.riskAveragesByProfile.set(profileKey, calcSet(arr));
+  }
+
+  const firstProfileId = (state.selectedRiskProfileIds || [])[0];
+  const first = firstProfileId ? state.riskAveragesByProfile.get(String(firstProfileId)) : null;
+
+  state.riskAverages = first || {
+    ytdAverage: null,
+    ytdTotal: 0,
+    ytdCount: 0,
+    last12Average: null,
+    last12Total: 0,
+    last12Count: 0,
+    allTimeAverage: null,
+    allTimeTotal: 0,
+    allTimeCount: 0,
+    basisAverage: null,
   };
 
   return state.riskAverages;
 }
 
 function fmtAvgRisk(value) {
+  if (value == null || value === "") return "—";
   const n = Number(value);
   if (!Number.isFinite(n)) return "—";
-  return n.toFixed(2);
+  return n.toFixed(1);
 }
 
 function riskColourStyle(score) {
@@ -517,35 +733,154 @@ function ensureRiskAveragePanel() {
   return panel;
 }
 
+async function refreshAllRisksForStoredReports() {
+  const ok = confirm(
+    "Refresh Risk for all accessible stored inspections?\n\n" +
+    "This will calculate current risk snapshots for all active Risk Rating Profiles.\n\n" +
+    "The Largely A.E. display switch is separate and is not changed by this action."
+  );
+
+  if (!ok) return;
+
+  const btn = el("refreshAllRisksBtn");
+  const oldText = btn ? btn.textContent : "";
+
+  try {
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = "Refreshing…";
+    }
+
+    const { data, error } = await state.supabase.rpc("csvb_refresh_all_post_inspection_risks_for_me");
+
+    if (error) throw error;
+
+    await loadCurrentRiskScoresForStoredReports();
+    computeRiskAverages();
+    renderRiskAveragePanel();
+    renderStoredTable();
+
+    const failed = Number(data?.failed || 0);
+    const success = Number(data?.success || 0);
+    const total = Number(data?.total_reports || 0);
+
+    if (failed > 0) {
+      alert(
+        "Risk refresh completed with errors.\n\n" +
+        "Total reports: " + total + "\n" +
+        "Succeeded: " + success + "\n" +
+        "Failed: " + failed + "\n\n" +
+        "Check console/logs for details."
+      );
+      console.warn("Risk refresh errors:", data?.errors || []);
+    } else {
+      alert(
+        "Risk refresh completed.\n\n" +
+        "Reports refreshed: " + success + "\n" +
+        "Active profiles were recalculated for each report."
+      );
+    }
+  } catch (err) {
+    console.error(err);
+    alert("Refresh all risks failed: " + (err?.message || String(err)));
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = oldText || "Refresh All Risks";
+    }
+  }
+}
+
+function selectedProfileAverageBoxesHtml() {
+  const selected = selectedRiskProfileSet();
+  const currentYear = new Date().getFullYear();
+
+  const profiles = (state.riskProfiles || [])
+    .filter((p) => selected.has(String(p.profile_id)))
+    .slice(0, 3);
+
+  if (!profiles.length) {
+    return `
+      <div class="csvb-risk-average-box csvb-profile-average-box">
+        <span>No Risk Profile Selected</span>
+        <strong>—</strong>
+        <div class="csvb-profile-average-lines">
+          <div>Select up to three profiles.</div>
+        </div>
+      </div>
+    `;
+  }
+
+  return profiles.map((p) => {
+    const key = String(p.profile_id);
+    const a = state.riskAveragesByProfile?.get(key) || {};
+    const main = a.last12Average ?? a.ytdAverage ?? a.allTimeAverage;
+
+    return `
+      <div class="csvb-risk-average-box csvb-profile-average-box">
+        <span>${esc(p.profile_name)}</span>
+        <strong>${fmtAvgRisk(main)}</strong>
+        <div class="csvb-profile-average-lines">
+          <div><b>12M:</b> ${fmtAvgRisk(a.last12Average)}</div>
+          <div><b>${currentYear}:</b> ${fmtAvgRisk(a.ytdAverage)}</div>
+          <div><b>All Time:</b> ${fmtAvgRisk(a.allTimeAverage)}</div>
+        </div>
+      </div>
+    `;
+  }).join("");
+}
+
 function renderRiskAveragePanel() {
-  const a = state.riskAverages || computeRiskAverages();
   const panel = ensureRiskAveragePanel();
+  const checked = !!state.includeLargelyInEntryRisk;
 
   panel.innerHTML = `
     <div class="csvb-risk-average-title">Risk / Inspection Average</div>
-    <div class="csvb-risk-average-grid">
-      <div class="csvb-risk-average-box">
-        <span>Current Calendar Year</span>
-        <strong>${fmtAvgRisk(a.ytdAverage)}</strong>
-        <em>${a.ytdCount || 0} scored inspection(s) • total ${fmtAvgRisk(a.ytdTotal)}</em>
+    <div class="csvb-risk-average-grid csvb-risk-average-grid-operational">
+      ${selectedProfileAverageBoxesHtml()}
+
+      <div class="csvb-risk-average-box csvb-risk-profile-select-box">
+        <span>Risk Profiles Displayed</span>
+        ${riskProfileSelectorHtml()}
+        <em>Maximum three profiles. Applies to all Post-Inspection pages.</em>
       </div>
-      <div class="csvb-risk-average-box">
-        <span>Last 12 Months</span>
-        <strong>${fmtAvgRisk(a.last12Average)}</strong>
-        <em>${a.last12Count || 0} scored inspection(s) • total ${fmtAvgRisk(a.last12Total)}</em>
+
+      <div class="csvb-risk-average-box csvb-risk-lae-switch-box">
+        <span>Largely A.E. Display</span>
+        <label class="csvb-risk-switch">
+          <input id="includeLargelyRiskSwitch" type="checkbox" ${checked ? "checked" : ""} />
+          <b>Include at 50%</b>
+        </label>
+        <em>Display recalculation only. Does not store new snapshots.</em>
       </div>
-      <div class="csvb-risk-average-box">
-        <span>Colour Basis</span>
-        <strong>${fmtAvgRisk(a.basisAverage)}</strong>
-        <em>Green below average • red above average</em>
-      </div>
-      <div class="csvb-risk-average-box">
-        <span>Unscored Inspections</span>
-        <strong>${a.unscoredCount || 0}</strong>
-        <em>Use Refresh Risk to include them</em>
+
+      <div class="csvb-risk-average-box csvb-risk-bulk-refresh-box">
+        <span>Bulk Risk Refresh</span>
+        <button class="btn muted csvb-refresh-all-risk-btn" id="refreshAllRisksBtn" type="button">Refresh All Risks</button>
+        <em>Stores current snapshots for all active profiles and inspections.</em>
       </div>
     </div>
   `;
+
+  bindRiskProfileSelector();
+
+  const sw = el("includeLargelyRiskSwitch");
+  if (sw) {
+    sw.onchange = async () => {
+      localStorage.setItem(RISK_INCLUDE_LAE_KEY, sw.checked ? "1" : "0");
+      state.includeLargelyInEntryRisk = sw.checked;
+
+      await loadCurrentRiskScoresForStoredReports();
+      computeRiskAverages();
+      renderRiskAveragePanel();
+      renderStoredTable();
+    };
+  }
+
+  const btn = el("refreshAllRisksBtn");
+  if (btn) {
+    btn.onclick = refreshAllRisksForStoredReports;
+  }
 }
 
 function renderStoredTable() {
@@ -816,9 +1151,31 @@ async function init() {
   });
 
   state.reports = await loadReportsFromDb();
-  await loadCurrentRiskScoresForStoredReports();
-  computeRiskAverages();
-  renderRiskAveragePanel();
+
+  /*
+    Risk display must never block the stored inspection list.
+    If Risk/Largely A.E. recalculation fails, show inspections anyway.
+  */
+  try {
+    await loadSelectableRiskProfiles();
+    await loadCurrentRiskScoresForStoredReports();
+    computeRiskAverages();
+    renderRiskAveragePanel();
+  } catch (riskErr) {
+    console.warn("Risk average display failed; stored inspection list will still load.", riskErr);
+    state.riskScoresByReport = new Map();
+    state.riskAverages = {
+      ytdAverage: null,
+      ytdTotal: 0,
+      ytdCount: 0,
+      last12Average: null,
+      last12Total: 0,
+      last12Count: 0,
+      basisAverage: null,
+      unscoredCount: 0,
+    };
+  }
+
   renderStoredTable();
 }
 
