@@ -194,23 +194,34 @@
   <link rel="stylesheet" href="./csvb-ui-polish.css?v=20260430_1" />
   <link rel="stylesheet" href="./csvb-help-tooltips.css?v=20260430_1" />
   <link rel="stylesheet" href="./csvb-100pct-fit.css?v=20260430_1" />
+  <link rel="stylesheet" href="./csvb-post-inspection-module-polish.css?v=20260520_5" />
 </head>
 
 <body>
   <div class="pi-wrap">
-    <div class="pi-hero">
-      <h1>Observation Detail</h1>
-      <p>Dedicated page for one extracted observation, with permanent response storage.</p>
+  <header class="topbar csvb-pi-topbar">
+    <div class="topbar-left">
+      <div class="brand">Post-Inspection Observation Detail</div>
+      <div class="muted small csvb-pi-mode-line">Role: — • Mode: Post-inspection • Module: POST_INSPECTION_OBSERVATION_DETAIL</div>
+    </div>
 
-      <div class="pi-toprow">
-        <span class="pi-pill" id="userBadge">Not signed in</span>
+    <div class="topbar-right csvb-pi-actions">
+      <label class="themeCtl csvb-pi-themeCtl" for="themeSelect" title="Theme">
+        <span class="themeCtl-label">Theme</span>
+        <select id="themeSelect" class="btn light themeCtl-select">
+          <option value="system">System</option>
+          <option value="light">Light</option>
+          <option value="dark">Dark</option>
+        </select>
+      </label>
+      <span class="pi-pill" id="userBadge">Not signed in</span>
         <button class="btn light" id="backToInspectionBtn" type="button">Back to Inspection</button>
         <button class="btn light" id="backToListBtn" type="button">Back to Stored Inspections</button>
         <button class="btn primary" id="logoutBtn" type="button">Logout</button>
         <span class="pi-pill" id="buildPill">build: —</span>
         <span class="pi-pill" id="saveStatus">Not saved</span>
-      </div>
     </div>
+  </header>
 
     <div class="pi-card">
       <h2>Observation Summary</h2>
@@ -239,7 +250,7 @@
       </div>
 
       <div class="pi-field" style="margin-top:16px;">
-        <label>Supporting Comment</label>
+        <label>Observation Text</label>
         <textarea id="supportingCommentField" readonly style="min-height:140px;"></textarea>
       </div>
     </div>

@@ -177,16 +177,27 @@
   <link rel="stylesheet" href="./csvb-ui-polish.css?v=20260430_1" />
   <link rel="stylesheet" href="./csvb-help-tooltips.css?v=20260430_1" />
   <link rel="stylesheet" href="./csvb-100pct-fit.css?v=20260430_1" />
+  <link rel="stylesheet" href="./csvb-post-inspection-module-polish.css?v=20260520_8" />
 </head>
 
 <body>
   <div class="pi-wrap">
-    <div class="pi-hero">
-      <h1>Inspection Detail</h1>
-      <p>Dedicated page for one stored inspection.</p>
+  <header class="topbar csvb-pi-topbar">
+    <div class="topbar-left">
+      <div class="brand">Post-Inspection Detail</div>
+      <div class="muted small csvb-pi-mode-line">Role: — • Mode: Post-inspection • Module: POST_INSPECTION_DETAIL</div>
+    </div>
 
-      <div class="pi-toprow">
-        <span class="pi-pill" id="userBadge">Not signed in</span>
+    <div class="topbar-right csvb-pi-actions">
+      <label class="themeCtl csvb-pi-themeCtl" for="themeSelect" title="Theme">
+        <span class="themeCtl-label">Theme</span>
+        <select id="themeSelect" class="btn light themeCtl-select">
+          <option value="system">System</option>
+          <option value="light">Light</option>
+          <option value="dark">Dark</option>
+        </select>
+      </label>
+      <span class="pi-pill" id="userBadge">Not signed in</span>
         <button class="btn light" id="backToListBtn" type="button">Back to Stored Inspections</button>
         <button class="btn light" id="dashboardBtn" type="button">Dashboard</button>
         <button class="btn light" id="modeSelectBtn" type="button">Mode Selection</button>
@@ -195,8 +206,8 @@
         <span class="pi-pill" id="activeReportPill">No active report</span>
         <span class="pi-pill" id="saveStatus">Not saved</span>
         <span class="pi-pill" id="buildPill">build: —</span>
-      </div>
     </div>
+  </header>
 
     <div class="pi-card">
       <h2>Inspection Header</h2>
@@ -331,7 +342,7 @@
               <th style="width:160px;">Category</th>
               <th style="width:260px;">SOC</th>
               <th style="width:260px;">NOC</th>
-              <th>Supporting Comment</th>
+              <th>Observation Text</th>
               <th style="width:220px;">PGNO</th>
             </tr>
           </thead>
@@ -342,25 +353,76 @@
       </div>
     </div>
 
-    <dialog id="statsDialog">
-      <div class="dlg">
-        <h3>KPIs</h3>
-        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
-          <div><label>Total questions examined</label><input id="kpiQuestionsExamined" readonly /></div>
-          <div><label>Total extracted items</label><input id="kpiTotal" readonly /></div>
-          <div><label>Negative</label><input id="kpiNeg" readonly /></div>
-          <div><label>Positive</label><input id="kpiPos" readonly /></div>
-          <div><label>Largely</label><input id="kpiLae" readonly /></div>
-          <div><label>Missing PGNO</label><input id="kpiMissingPgno" readonly /></div>
+    <dialog id="statsDialog" class="csvb-kpi-dialog">
+      <div class="dlg csvb-kpi-dlg">
+        <div class="csvb-kpi-head">
+          <div>
+            <h3>Single Inspection KPIs</h3>
+            <div class="csvb-kpi-note">Breakdown of extracted SIRE 2.0 inspection findings for the active report.</div>
+          </div>
         </div>
 
-        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-top:12px;">
-          <div><label>Top Questions</label><textarea id="kpiTopQuestions" readonly style="min-height:150px;"></textarea></div>
-          <div><label>Top Categories</label><textarea id="kpiTopCategories" readonly style="min-height:150px;"></textarea></div>
-          <div><label>Top SOC</label><textarea id="kpiTopSoc" readonly style="min-height:150px;"></textarea></div>
-          <div><label>Top NOC</label><textarea id="kpiTopNoc" readonly style="min-height:150px;"></textarea></div>
-          <div><label>Top Human SOC</label><textarea id="kpiTopHumanSoc" readonly style="min-height:150px;"></textarea></div>
-          <div><label>Top Human PIF</label><textarea id="kpiTopHumanPif" readonly style="min-height:150px;"></textarea></div>
+        <div class="csvb-kpi-summary-grid">
+          <div class="csvb-kpi-metric">
+            <label>Total questions examined</label>
+            <input id="kpiQuestionsExamined" readonly />
+          </div>
+          <div class="csvb-kpi-metric">
+            <label>Total extracted items</label>
+            <input id="kpiTotal" readonly />
+          </div>
+          <div class="csvb-kpi-metric">
+            <label>Negative</label>
+            <input id="kpiNeg" readonly />
+          </div>
+          <div class="csvb-kpi-metric">
+            <label>Positive</label>
+            <input id="kpiPos" readonly />
+          </div>
+          <div class="csvb-kpi-metric">
+            <label>Largely A.E.</label>
+            <input id="kpiLae" readonly />
+          </div>
+        </div>
+
+        <div class="csvb-kpi-section">
+          <h4>Questions by finding type</h4>
+          <div class="csvb-kpi-grid-3">
+            <div><label>Questions with positive findings</label><textarea id="kpiQuestionsPositive" readonly></textarea></div>
+            <div><label>Questions with Largely A.E. findings</label><textarea id="kpiQuestionsLargely" readonly></textarea></div>
+            <div><label>Questions with negative findings</label><textarea id="kpiQuestionsNegative" readonly></textarea></div>
+          </div>
+        </div>
+
+        <div class="csvb-kpi-section">
+          <h4>Observation categories by finding type</h4>
+          <div class="csvb-kpi-grid-3">
+            <div><label>Observation categories — Positive</label><textarea id="kpiCategoriesPositive" readonly></textarea></div>
+            <div><label>Observation categories — Largely A.E.</label><textarea id="kpiCategoriesLargely" readonly></textarea></div>
+            <div><label>Observation categories — Negative</label><textarea id="kpiCategoriesNegative" readonly></textarea></div>
+          </div>
+        </div>
+
+        <div class="csvb-kpi-section">
+          <h4>Subject of Concern (SOC) by finding type</h4>
+          <div class="csvb-kpi-grid-3">
+            <div><label>Positive SOC</label><textarea id="kpiSocPositive" readonly></textarea></div>
+            <div><label>Largely A.E. SOC</label><textarea id="kpiSocLargely" readonly></textarea></div>
+            <div><label>Negative SOC</label><textarea id="kpiSocNegative" readonly></textarea></div>
+          </div>
+        </div>
+
+        <div class="csvb-kpi-section">
+          <h4>Nature of Concern (NOC) by finding type</h4>
+          <div class="csvb-kpi-grid-3">
+            <div><label>Positive NOC</label><textarea id="kpiNocPositive" readonly></textarea></div>
+            <div><label>Largely A.E. NOC</label><textarea id="kpiNocLargely" readonly></textarea></div>
+            <div><label>Negative NOC</label><textarea id="kpiNocNegative" readonly></textarea></div>
+          </div>
+        </div>
+
+        <div class="csvb-kpi-hidden-analytics-note">
+          Human SOC and Human PIF breakdowns are retained internally for future fleet / larger-image analytics, but are not shown in the single-inspection KPI popup.
         </div>
 
         <div class="dlg-actions">
@@ -373,7 +435,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js" defer></script>
   <script src="./app-config.js" defer></script>
   <script src="./auth.js" defer></script>
-  <script type="module" src="./post_inspection_detail.js"></script>
+  <script type="module" src="./post_inspection_detail.js?v=20260520_8"></script>
   <script src="./csvb-ui-polish.js?v=20260430_1"></script>
   <script src="./csvb-help-tooltips.js?v=20260430_1"></script>
   <script src="./csvb-100pct-fit.js?v=20260430_1"></script>

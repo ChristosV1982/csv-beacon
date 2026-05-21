@@ -1,0 +1,688 @@
+/* public/csvb-post-inspection-module-polish.css
+   C.S.V. BEACON — Post-Inspection module topbar standard
+   Matches SIRE 2.0 Questions Viewer header pattern.
+   CSS-only. No data / backend logic.
+*/
+
+html[data-csvb-page="post_inspection.html"],
+html[data-csvb-page="post_inspection_detail.html"],
+html[data-csvb-page="post_inspection_observation_detail.html"] {
+  --csvb-pi-bg: #f4f8fc;
+  --csvb-pi-card: #ffffff;
+  --csvb-pi-border: #d6e4f5;
+  --csvb-pi-text: #17324d;
+  --csvb-pi-muted: #5e6f86;
+  --csvb-pi-navy: #062a5e;
+  --csvb-pi-navy-dark: #031b3f;
+  --csvb-pi-teal: #0097a7;
+  --csvb-pi-shadow: 0 8px 22px rgba(3, 27, 63, .08);
+  --csvb-pi-radius: 12px;
+  --csvb-pi-radius-sm: 8px;
+}
+
+html[data-csvb-page="post_inspection.html"] body,
+html[data-csvb-page="post_inspection_detail.html"] body,
+html[data-csvb-page="post_inspection_observation_detail.html"] body {
+  background: var(--csvb-pi-bg) !important;
+  color: var(--csvb-pi-text) !important;
+  font-family: Arial, Helvetica, sans-serif !important;
+  margin: 0 !important;
+  overflow-x: hidden !important;
+}
+
+/* Viewer-style topbar */
+html[data-csvb-page="post_inspection.html"] .topbar.csvb-pi-topbar,
+html[data-csvb-page="post_inspection_detail.html"] .topbar.csvb-pi-topbar,
+html[data-csvb-page="post_inspection_observation_detail.html"] .topbar.csvb-pi-topbar {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 12px !important;
+  min-height: 58px !important;
+  padding: 8px 14px !important;
+  background: linear-gradient(90deg, var(--csvb-pi-navy-dark), var(--csvb-pi-navy)) !important;
+  color: #ffffff !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: 0 8px 24px rgba(3, 27, 63, .16) !important;
+}
+
+/* keep global theme logo visible and correctly sized */
+html[data-csvb-page="post_inspection.html"] .topbar.csvb-pi-topbar::before,
+html[data-csvb-page="post_inspection_detail.html"] .topbar.csvb-pi-topbar::before,
+html[data-csvb-page="post_inspection_observation_detail.html"] .topbar.csvb-pi-topbar::before {
+  width: 42px !important;
+  height: 42px !important;
+  min-width: 42px !important;
+  background: url("./assets/csv-beacon-icon.png") center center / contain no-repeat !important;
+  display: block !important;
+  flex: 0 0 auto !important;
+  content: "" !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .topbar-left,
+html[data-csvb-page="post_inspection_detail.html"] .topbar-left,
+html[data-csvb-page="post_inspection_observation_detail.html"] .topbar-left {
+  flex: 1 1 auto !important;
+  min-width: 260px !important;
+  text-align: center !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .topbar-left .brand,
+html[data-csvb-page="post_inspection_detail.html"] .topbar-left .brand,
+html[data-csvb-page="post_inspection_observation_detail.html"] .topbar-left .brand {
+  color: #ffffff !important;
+  font-size: 1.05rem !important;
+  font-weight: 850 !important;
+  line-height: 1.1 !important;
+  letter-spacing: .01em !important;
+  margin: 0 !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .csvb-pi-mode-line,
+html[data-csvb-page="post_inspection_detail.html"] .csvb-pi-mode-line,
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-pi-mode-line {
+  color: #bfeff4 !important;
+  font-size: .78rem !important;
+  font-weight: 600 !important;
+  line-height: 1.15 !important;
+  margin-top: 3px !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .topbar-right.csvb-pi-actions,
+html[data-csvb-page="post_inspection_detail.html"] .topbar-right.csvb-pi-actions,
+html[data-csvb-page="post_inspection_observation_detail.html"] .topbar-right.csvb-pi-actions {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 7px !important;
+  flex: 0 1 auto !important;
+  flex-wrap: wrap !important;
+}
+
+/* Topbar controls */
+html[data-csvb-page="post_inspection.html"] .topbar .btn,
+html[data-csvb-page="post_inspection_detail.html"] .topbar .btn,
+html[data-csvb-page="post_inspection_observation_detail.html"] .topbar .btn {
+  min-height: 30px !important;
+  padding: 6px 10px !important;
+  border-radius: 8px !important;
+  font-size: .84rem !important;
+  font-weight: 750 !important;
+  line-height: 1.1 !important;
+  white-space: nowrap !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .topbar .btn.primary,
+html[data-csvb-page="post_inspection_detail.html"] .topbar .btn.primary,
+html[data-csvb-page="post_inspection_observation_detail.html"] .topbar .btn.primary {
+  background: var(--csvb-pi-teal) !important;
+  color: #ffffff !important;
+  border: 1px solid var(--csvb-pi-teal) !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .topbar .btn.light,
+html[data-csvb-page="post_inspection_detail.html"] .topbar .btn.light,
+html[data-csvb-page="post_inspection_observation_detail.html"] .topbar .btn.light {
+  background: rgba(255,255,255,.12) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255,255,255,.32) !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .topbar .pill,
+html[data-csvb-page="post_inspection_detail.html"] .topbar .pi-pill,
+html[data-csvb-page="post_inspection_observation_detail.html"] .topbar .pi-pill,
+html[data-csvb-page="post_inspection.html"] .topbar #userBadge,
+html[data-csvb-page="post_inspection_detail.html"] .topbar #userBadge,
+html[data-csvb-page="post_inspection_observation_detail.html"] .topbar #userBadge {
+  padding: 5px 9px !important;
+  border-radius: 999px !important;
+  font-size: .78rem !important;
+  font-weight: 650 !important;
+  line-height: 1.1 !important;
+  background: rgba(255,255,255,.10) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255,255,255,.22) !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .csvb-pi-themeCtl,
+html[data-csvb-page="post_inspection_detail.html"] .csvb-pi-themeCtl,
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-pi-themeCtl {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  margin: 0 4px 0 0 !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .csvb-pi-themeCtl .themeCtl-label,
+html[data-csvb-page="post_inspection_detail.html"] .csvb-pi-themeCtl .themeCtl-label,
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-pi-themeCtl .themeCtl-label {
+  color: #b8c9d9 !important;
+  font-size: .78rem !important;
+  font-weight: 700 !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .csvb-pi-themeCtl select,
+html[data-csvb-page="post_inspection_detail.html"] .csvb-pi-themeCtl select,
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-pi-themeCtl select {
+  background: rgba(255,255,255,.12) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255,255,255,.32) !important;
+  border-radius: 8px !important;
+  min-height: 30px !important;
+  padding: 5px 26px 5px 9px !important;
+}
+
+/* Page shell below topbar */
+html[data-csvb-page="post_inspection.html"] .wrap,
+html[data-csvb-page="post_inspection_detail.html"] .pi-wrap,
+html[data-csvb-page="post_inspection_observation_detail.html"] .pi-wrap {
+  width: 100% !important;
+  max-width: 100% !important;
+  margin: 0 auto !important;
+  padding: 8px !important;
+}
+
+/* If old shell still wraps header, remove extra top padding */
+html[data-csvb-page="post_inspection.html"] .wrap > .topbar:first-child,
+html[data-csvb-page="post_inspection_detail.html"] .pi-wrap > .topbar:first-child,
+html[data-csvb-page="post_inspection_observation_detail.html"] .pi-wrap > .topbar:first-child {
+  margin: -8px -8px 8px -8px !important;
+}
+
+/* Cards */
+html[data-csvb-page="post_inspection.html"] .card,
+html[data-csvb-page="post_inspection_detail.html"] .pi-card,
+html[data-csvb-page="post_inspection_observation_detail.html"] .pi-card {
+  background: var(--csvb-pi-card) !important;
+  border: 1px solid var(--csvb-pi-border) !important;
+  border-radius: 12px !important;
+  padding: 10px !important;
+  margin-top: 8px !important;
+  margin-bottom: 8px !important;
+  box-shadow: var(--csvb-pi-shadow) !important;
+  overflow: hidden !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .card h2,
+html[data-csvb-page="post_inspection_detail.html"] .pi-card h2,
+html[data-csvb-page="post_inspection_observation_detail.html"] .pi-card h2 {
+  color: var(--csvb-pi-navy) !important;
+  font-size: 1.05rem !important;
+  line-height: 1.15 !important;
+  font-weight: 800 !important;
+  margin: 0 0 8px !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .muted,
+html[data-csvb-page="post_inspection_detail.html"] .muted,
+html[data-csvb-page="post_inspection_observation_detail.html"] .muted {
+  color: var(--csvb-pi-muted) !important;
+  font-size: .88rem !important;
+  font-weight: 500 !important;
+  line-height: 1.25 !important;
+}
+
+/* Forms */
+html[data-csvb-page="post_inspection_detail.html"] .pi-field label,
+html[data-csvb-page="post_inspection_observation_detail.html"] .pi-field label {
+  color: var(--csvb-pi-navy) !important;
+  font-size: .86rem !important;
+  font-weight: 750 !important;
+  margin: 0 0 4px !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] input,
+html[data-csvb-page="post_inspection_detail.html"] select,
+html[data-csvb-page="post_inspection_detail.html"] textarea,
+html[data-csvb-page="post_inspection_observation_detail.html"] input,
+html[data-csvb-page="post_inspection_observation_detail.html"] select,
+html[data-csvb-page="post_inspection_observation_detail.html"] textarea {
+  border: 1px solid #b8dce8 !important;
+  border-radius: 8px !important;
+  background: #ffffff !important;
+  color: var(--csvb-pi-text) !important;
+  font-size: .92rem !important;
+  line-height: 1.35 !important;
+  padding: 7px 9px !important;
+  min-height: 34px !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] textarea,
+html[data-csvb-page="post_inspection_observation_detail.html"] textarea {
+  min-height: 82px !important;
+  resize: vertical !important;
+}
+
+/* Tables */
+html[data-csvb-page="post_inspection.html"] .tbl-wrap,
+html[data-csvb-page="post_inspection_detail.html"] .tbl-wrap {
+  width: 100% !important;
+  max-width: 100% !important;
+  border-radius: 10px !important;
+  border: 1px solid var(--csvb-pi-border) !important;
+  overflow: auto !important;
+}
+
+html[data-csvb-page="post_inspection.html"] table,
+html[data-csvb-page="post_inspection_detail.html"] table {
+  width: 100% !important;
+  border-collapse: collapse !important;
+  table-layout: auto !important;
+}
+
+html[data-csvb-page="post_inspection.html"] th,
+html[data-csvb-page="post_inspection.html"] td,
+html[data-csvb-page="post_inspection_detail.html"] th,
+html[data-csvb-page="post_inspection_detail.html"] td {
+  padding: 6px 7px !important;
+  line-height: 1.25 !important;
+  vertical-align: top !important;
+  border-bottom: 1px solid #edf3fb !important;
+}
+
+html[data-csvb-page="post_inspection.html"] th,
+html[data-csvb-page="post_inspection_detail.html"] th {
+  background: #eef6fc !important;
+  color: var(--csvb-pi-navy) !important;
+  font-weight: 800 !important;
+  white-space: nowrap !important;
+}
+
+html[data-csvb-page="post_inspection.html"] td,
+html[data-csvb-page="post_inspection_detail.html"] td {
+  color: var(--csvb-pi-text) !important;
+  font-weight: 450 !important;
+}
+
+html[data-csvb-page="post_inspection.html"] tbody tr:hover td,
+html[data-csvb-page="post_inspection_detail.html"] tbody tr:hover td {
+  background: #f7fbfe !important;
+}
+
+/* Observation / PGNO */
+html[data-csvb-page="post_inspection_detail.html"] .obs-badge,
+html[data-csvb-page="post_inspection_observation_detail.html"] .obs-badge {
+  font-size: .78rem !important;
+  font-weight: 750 !important;
+  padding: 5px 9px !important;
+  border-radius: 999px !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .grid-2,
+html[data-csvb-page="post_inspection_observation_detail.html"] .grid-3 {
+  gap: 10px !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] #socField,
+html[data-csvb-page="post_inspection_observation_detail.html"] #nocField {
+  min-height: 64px !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] #questionFullField {
+  min-height: 72px !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] #supportingCommentField {
+  min-height: 86px !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .response-block,
+html[data-csvb-page="post_inspection_observation_detail.html"] .pgno-list {
+  border: 1px solid var(--csvb-pi-border) !important;
+  border-radius: 12px !important;
+  background: #fbfdff !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .response-block {
+  padding: 10px !important;
+  margin-top: 10px !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .pgno-list {
+  padding: 6px !important;
+  max-height: 320px !important;
+}
+
+@media (max-width: 1100px) {
+  html[data-csvb-page="post_inspection.html"] .topbar.csvb-pi-topbar,
+  html[data-csvb-page="post_inspection_detail.html"] .topbar.csvb-pi-topbar,
+  html[data-csvb-page="post_inspection_observation_detail.html"] .topbar.csvb-pi-topbar {
+    align-items: flex-start !important;
+    flex-wrap: wrap !important;
+  }
+
+  html[data-csvb-page="post_inspection.html"] .topbar-left,
+  html[data-csvb-page="post_inspection_detail.html"] .topbar-left,
+  html[data-csvb-page="post_inspection_observation_detail.html"] .topbar-left {
+    text-align: left !important;
+  }
+}
+
+/* Single-inspection KPI popup */
+html[data-csvb-page="post_inspection_detail.html"] #statsDialog.csvb-kpi-dialog {
+  width: min(1280px, calc(100vw - 32px)) !important;
+  max-width: min(1280px, calc(100vw - 32px)) !important;
+  border: 0 !important;
+  border-radius: 14px !important;
+  padding: 0 !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] #statsDialog::backdrop {
+  background: rgba(3, 27, 63, .35) !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-kpi-dlg {
+  padding: 14px !important;
+  max-height: calc(100vh - 42px) !important;
+  overflow: auto !important;
+  background: #ffffff !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-kpi-head {
+  display: flex !important;
+  justify-content: space-between !important;
+  gap: 12px !important;
+  align-items: flex-start !important;
+  margin-bottom: 10px !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-kpi-head h3 {
+  margin: 0 0 3px !important;
+  color: #062a5e !important;
+  font-size: 1.18rem !important;
+  font-weight: 850 !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-kpi-note,
+html[data-csvb-page="post_inspection_detail.html"] .csvb-kpi-hidden-analytics-note {
+  color: #5e6f86 !important;
+  font-size: .86rem !important;
+  font-weight: 500 !important;
+  line-height: 1.25 !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-kpi-summary-grid {
+  display: grid !important;
+  grid-template-columns: repeat(5, minmax(130px, 1fr)) !important;
+  gap: 10px !important;
+  margin-bottom: 12px !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-kpi-section {
+  border: 1px solid #d6e4f5 !important;
+  border-radius: 12px !important;
+  padding: 10px !important;
+  margin-top: 10px !important;
+  background: #f8fbff !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-kpi-section h4 {
+  margin: 0 0 8px !important;
+  color: #062a5e !important;
+  font-size: .98rem !important;
+  font-weight: 850 !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-kpi-grid-3 {
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(220px, 1fr)) !important;
+  gap: 10px !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-kpi-dlg label {
+  display: block !important;
+  color: #062a5e !important;
+  font-size: .84rem !important;
+  font-weight: 750 !important;
+  margin: 0 0 4px !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-kpi-dlg input,
+html[data-csvb-page="post_inspection_detail.html"] .csvb-kpi-dlg textarea {
+  width: 100% !important;
+  border: 1px solid #b8dce8 !important;
+  border-radius: 8px !important;
+  background: #ffffff !important;
+  color: #17324d !important;
+  padding: 7px 9px !important;
+  font-size: .9rem !important;
+  line-height: 1.3 !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-kpi-dlg textarea {
+  min-height: 96px !important;
+  resize: vertical !important;
+  font-family: Arial, Helvetica, sans-serif !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-kpi-hidden-analytics-note {
+  margin-top: 10px !important;
+  padding: 8px 10px !important;
+  border-left: 3px solid #0097a7 !important;
+  background: #eefaff !important;
+  border-radius: 8px !important;
+}
+
+@media (max-width: 1000px) {
+  html[data-csvb-page="post_inspection_detail.html"] .csvb-kpi-summary-grid,
+  html[data-csvb-page="post_inspection_detail.html"] .csvb-kpi-grid-3 {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* v20260520_8 — Single-inspection KPI popup */
+html[data-csvb-page="post_inspection_detail.html"] #statsDialog.csvb-kpi-dialog {
+  width: min(1280px, calc(100vw - 32px)) !important;
+  max-width: min(1280px, calc(100vw - 32px)) !important;
+  border: 0 !important;
+  border-radius: 14px !important;
+  padding: 0 !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] #statsDialog::backdrop {
+  background: rgba(3, 27, 63, .35) !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-kpi-dlg {
+  padding: 14px !important;
+  max-height: calc(100vh - 42px) !important;
+  overflow: auto !important;
+  background: #ffffff !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-kpi-head h3 {
+  margin: 0 0 3px !important;
+  color: #062a5e !important;
+  font-size: 1.18rem !important;
+  font-weight: 850 !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-kpi-note,
+html[data-csvb-page="post_inspection_detail.html"] .csvb-kpi-hidden-analytics-note {
+  color: #5e6f86 !important;
+  font-size: .86rem !important;
+  font-weight: 500 !important;
+  line-height: 1.25 !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-kpi-summary-grid {
+  display: grid !important;
+  grid-template-columns: repeat(5, minmax(130px, 1fr)) !important;
+  gap: 10px !important;
+  margin: 10px 0 12px !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-kpi-section {
+  border: 1px solid #d6e4f5 !important;
+  border-radius: 12px !important;
+  padding: 10px !important;
+  margin-top: 10px !important;
+  background: #f8fbff !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-kpi-section h4 {
+  margin: 0 0 8px !important;
+  color: #062a5e !important;
+  font-size: .98rem !important;
+  font-weight: 850 !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-kpi-grid-3 {
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(220px, 1fr)) !important;
+  gap: 10px !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-kpi-dlg label {
+  display: block !important;
+  color: #062a5e !important;
+  font-size: .84rem !important;
+  font-weight: 750 !important;
+  margin: 0 0 4px !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-kpi-dlg input,
+html[data-csvb-page="post_inspection_detail.html"] .csvb-kpi-dlg textarea {
+  width: 100% !important;
+  border: 1px solid #b8dce8 !important;
+  border-radius: 8px !important;
+  background: #ffffff !important;
+  color: #17324d !important;
+  padding: 7px 9px !important;
+  font-size: .9rem !important;
+  line-height: 1.3 !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-kpi-dlg textarea {
+  min-height: 96px !important;
+  resize: vertical !important;
+  font-family: Arial, Helvetica, sans-serif !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-kpi-hidden-analytics-note {
+  margin-top: 10px !important;
+  padding: 8px 10px !important;
+  border-left: 3px solid #0097a7 !important;
+  background: #eefaff !important;
+  border-radius: 8px !important;
+}
+
+@media (max-width: 1000px) {
+  html[data-csvb-page="post_inspection_detail.html"] .csvb-kpi-summary-grid,
+  html[data-csvb-page="post_inspection_detail.html"] .csvb-kpi-grid-3 {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* Stored Inspections — per-report KPI quick view */
+html[data-csvb-page="post_inspection.html"] .stored-kpi-btn {
+  min-height: 28px !important;
+  padding: 5px 9px !important;
+  border-radius: 8px !important;
+  font-size: .82rem !important;
+  font-weight: 750 !important;
+}
+
+html[data-csvb-page="post_inspection.html"] #storedKpiDialog.csvb-kpi-dialog {
+  width: min(1280px, calc(100vw - 32px)) !important;
+  max-width: min(1280px, calc(100vw - 32px)) !important;
+  border: 0 !important;
+  border-radius: 14px !important;
+  padding: 0 !important;
+}
+
+html[data-csvb-page="post_inspection.html"] #storedKpiDialog::backdrop {
+  background: rgba(3, 27, 63, .35) !important;
+}
+
+html[data-csvb-page="post_inspection.html"] #storedKpiDialog .csvb-kpi-dlg {
+  padding: 14px !important;
+  max-height: calc(100vh - 42px) !important;
+  overflow: auto !important;
+  background: #ffffff !important;
+}
+
+html[data-csvb-page="post_inspection.html"] #storedKpiDialog .csvb-kpi-head h3 {
+  margin: 0 0 3px !important;
+  color: #062a5e !important;
+  font-size: 1.18rem !important;
+  font-weight: 850 !important;
+}
+
+html[data-csvb-page="post_inspection.html"] #storedKpiDialog .csvb-kpi-note,
+html[data-csvb-page="post_inspection.html"] #storedKpiDialog .csvb-kpi-hidden-analytics-note {
+  color: #5e6f86 !important;
+  font-size: .86rem !important;
+  font-weight: 500 !important;
+  line-height: 1.25 !important;
+}
+
+html[data-csvb-page="post_inspection.html"] #storedKpiDialog .csvb-kpi-summary-grid {
+  display: grid !important;
+  grid-template-columns: repeat(5, minmax(130px, 1fr)) !important;
+  gap: 10px !important;
+  margin: 10px 0 12px !important;
+}
+
+html[data-csvb-page="post_inspection.html"] #storedKpiDialog .csvb-kpi-section {
+  border: 1px solid #d6e4f5 !important;
+  border-radius: 12px !important;
+  padding: 10px !important;
+  margin-top: 10px !important;
+  background: #f8fbff !important;
+}
+
+html[data-csvb-page="post_inspection.html"] #storedKpiDialog .csvb-kpi-section h4 {
+  margin: 0 0 8px !important;
+  color: #062a5e !important;
+  font-size: .98rem !important;
+  font-weight: 850 !important;
+}
+
+html[data-csvb-page="post_inspection.html"] #storedKpiDialog .csvb-kpi-grid-3 {
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(220px, 1fr)) !important;
+  gap: 10px !important;
+}
+
+html[data-csvb-page="post_inspection.html"] #storedKpiDialog label {
+  display: block !important;
+  color: #062a5e !important;
+  font-size: .84rem !important;
+  font-weight: 750 !important;
+  margin: 0 0 4px !important;
+}
+
+html[data-csvb-page="post_inspection.html"] #storedKpiDialog input,
+html[data-csvb-page="post_inspection.html"] #storedKpiDialog textarea {
+  width: 100% !important;
+  border: 1px solid #b8dce8 !important;
+  border-radius: 8px !important;
+  background: #ffffff !important;
+  color: #17324d !important;
+  padding: 7px 9px !important;
+  font-size: .9rem !important;
+  line-height: 1.3 !important;
+}
+
+html[data-csvb-page="post_inspection.html"] #storedKpiDialog textarea {
+  min-height: 96px !important;
+  resize: vertical !important;
+  font-family: Arial, Helvetica, sans-serif !important;
+}
+
+html[data-csvb-page="post_inspection.html"] #storedKpiDialog .csvb-kpi-hidden-analytics-note {
+  margin-top: 10px !important;
+  padding: 8px 10px !important;
+  border-left: 3px solid #0097a7 !important;
+  background: #eefaff !important;
+  border-radius: 8px !important;
+}
+
+@media (max-width: 1000px) {
+  html[data-csvb-page="post_inspection.html"] #storedKpiDialog .csvb-kpi-summary-grid,
+  html[data-csvb-page="post_inspection.html"] #storedKpiDialog .csvb-kpi-grid-3 {
+    grid-template-columns: 1fr !important;
+  }
+}

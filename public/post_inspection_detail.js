@@ -1,10 +1,11 @@
 import { loadLockedLibraryJson } from "./question_library_loader.js";
 
-const DETAIL_BUILD = "post_inspection_detail_v5_qa_debug_json_2026-05-20";
+const DETAIL_BUILD = "post_inspection_detail_v8_single_inspection_kpi_split_2026-05-20";
 const PDF_BUCKET_DEFAULT = "inspection-reports";
 const PDF_FOLDER_PREFIX = "post_inspections";
 const HUMAN_POSITIVE_FIXED_NOC = "Exceeded normal expectation.";
 const LOCKED_LIBRARY_JSON = "./sire_questions_all_columns_named.json";
+const DEFAULT_POST_INSPECTION_TITLE = "SIRE 2.0 Inspection Report";
 
 function el(id) {
   return document.getElementById(id);
@@ -213,8 +214,6 @@ function normalizeHumanPifText(value) {
 }
 
 function humanPifsFromItem(item) {
-  if (isHumanPositive(item)) return [];
-
   const candidates = [];
   const cc = String(item?.classification_coding || "").trim();
   const noc = String(item?.nature_of_concern || "").trim();
@@ -235,10 +234,15 @@ function socDisplay(item) {
 
 function nocDisplay(item) {
   const d = normDesignation(item?.designation);
+
   if (d === "Human") {
-    if (isHumanPositive(item)) return HUMAN_POSITIVE_FIXED_NOC;
+    /*
+      Human NOC = PIF(s), including positive Human observations.
+      "Exceeded normal expectation." is the response result, not the NOC.
+    */
     return humanPifsFromItem(item).join(" | ");
   }
+
   return String(item?.nature_of_concern || "").trim();
 }
 
@@ -275,17 +279,16 @@ function splitSocNocFromCombinedCoding(raw) {
 
 function normalizeImportedSocNocFields(designation, obsType, classificationCoding, natureOfConcern) {
   const d = normDesignation(designation);
-  const k = String(obsType || "").trim().toLowerCase();
   const cc = String(classificationCoding || "").trim();
   const noc = String(natureOfConcern || "").trim();
 
   if (d === "Human") {
-    if (k === "positive") {
-      return {
-        classification_coding: null,
-        nature_of_concern: HUMAN_POSITIVE_FIXED_NOC,
-      };
-    }
+    /*
+      Human SOC = rank grouping.
+      Human NOC = PIF(s), supplied by the extractor in classification_coding.
+      Do not discard PIFs for positive Human observations.
+      Do not use "Exceeded normal expectation." as the NOC.
+    */
     return {
       classification_coding: cc || null,
       nature_of_concern: noc || null,
@@ -502,7 +505,7 @@ function loadReportIntoHeader(r) {
   el("portCode").value = r.port_code || "";
   el("ocimfCompany").value = r.ocimf_inspecting_company || "";
   el("reportRef").value = r.report_ref || "";
-  el("reportTitle").value = r.title || "";
+  el("reportTitle").value = String(r.title || "").trim() || DEFAULT_POST_INSPECTION_TITLE;
   el("inspectorName").value = r.inspector_name || "";
   el("inspectorCompany").value = r.inspector_company || "";
   el("pdfStatus").textContent = r.pdf_storage_path
@@ -518,7 +521,7 @@ function headerInputs() {
     port_code: String(el("portCode").value || "").trim() || null,
     ocimf_inspecting_company: String(el("ocimfCompany").value || "").trim() || null,
     report_ref: String(el("reportRef").value || "").trim(),
-    title: String(el("reportTitle").value || "").trim() || null,
+    title: String(el("reportTitle").value || "").trim() || DEFAULT_POST_INSPECTION_TITLE,
     inspector_name: String(el("inspectorName").value || "").trim() || null,
     inspector_company: String(el("inspectorCompany").value || "").trim() || null,
     pdf_storage_path: state.activeReport?.pdf_storage_path || null,
@@ -838,24 +841,59 @@ function topLines(items, getter, limit = 12) {
 
 function renderKpis() {
   const items = state.extractedItems || [];
+
+  const byKind = {
+    positive: items.filter((x) => x.kind === "positive"),
+    largely: items.filter((x) => x.kind === "largely"),
+    negative: items.filter((x) => x.kind === "negative"),
+  };
+
   const total = items.length;
-  const neg = items.filter((x) => x.kind === "negative").length;
-  const pos = items.filter((x) => x.kind === "positive").length;
-  const lae = items.filter((x) => x.kind === "largely").length;
-  const miss = items.filter((x) => itemNeedsPgno(x) && missingPgnoForItem(x)).length;
+  const neg = byKind.negative.length;
+  const pos = byKind.positive.length;
+  const lae = byKind.largely.length;
 
-  el("kpiQuestionsExamined").value = String(examinedCountFromActive());
-  el("kpiTotal").value = String(total);
-  el("kpiNeg").value = String(neg);
-  el("kpiPos").value = String(pos);
-  el("kpiLae").value = String(lae);
-  el("kpiMissingPgno").value = String(miss);
+  function setVal(id, value) {
+    const node = el(id);
+    if (node) node.value = String(value ?? "");
+  }
 
-  const topQ = topLines(items, (x) => x.qno);
-  const topCat = topLines(items, (x) => normDesignation(x.designation));
-  const topSoc = topLines(items, (x) => socDisplay(x));
-  const topNoc = topLines(items, (x) => nocDisplay(x));
-  const topHumanSoc = topLines(items.filter((x) => normDesignation(x.designation) === "Human"), (x) => humanSocFromItem(x));
+  function topLinesFor(sourceItems, getter, limit = 20) {
+    const pairs = uniqueCountMap(sourceItems, getter).slice(0, limit);
+    if (!pairs.length) return "—";
+    return pairs.map(([k, v]) => `${v} × ${k}`).join("\n");
+  }
+
+  setVal("kpiQuestionsExamined", examinedCountFromActive());
+  setVal("kpiTotal", total);
+  setVal("kpiNeg", neg);
+  setVal("kpiPos", pos);
+  setVal("kpiLae", lae);
+
+  setVal("kpiQuestionsPositive", topLinesFor(byKind.positive, (x) => x.qno));
+  setVal("kpiQuestionsLargely", topLinesFor(byKind.largely, (x) => x.qno));
+  setVal("kpiQuestionsNegative", topLinesFor(byKind.negative, (x) => x.qno));
+
+  setVal("kpiCategoriesPositive", topLinesFor(byKind.positive, (x) => normDesignation(x.designation)));
+  setVal("kpiCategoriesLargely", topLinesFor(byKind.largely, (x) => normDesignation(x.designation)));
+  setVal("kpiCategoriesNegative", topLinesFor(byKind.negative, (x) => normDesignation(x.designation)));
+
+  setVal("kpiSocPositive", topLinesFor(byKind.positive, (x) => socDisplay(x)));
+  setVal("kpiSocLargely", topLinesFor(byKind.largely, (x) => socDisplay(x)));
+  setVal("kpiSocNegative", topLinesFor(byKind.negative, (x) => socDisplay(x)));
+
+  setVal("kpiNocPositive", topLinesFor(byKind.positive, (x) => nocDisplay(x)));
+  setVal("kpiNocLargely", topLinesFor(byKind.largely, (x) => nocDisplay(x)));
+  setVal("kpiNocNegative", topLinesFor(byKind.negative, (x) => nocDisplay(x)));
+
+  /*
+    Retained for later fleet / larger-image analytics.
+    Not displayed in the single-inspection KPI popup.
+  */
+  const topHumanSoc = topLinesFor(
+    items.filter((x) => normDesignation(x.designation) === "Human"),
+    (x) => humanSocFromItem(x)
+  );
 
   const humanPifCounts = new Map();
   for (const it of items.filter((x) => normDesignation(x.designation) === "Human")) {
@@ -863,18 +901,25 @@ function renderKpis() {
       humanPifCounts.set(p, (humanPifCounts.get(p) || 0) + 1);
     }
   }
+
   const topHumanPif = [...humanPifCounts.entries()]
     .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-    .slice(0, 12)
+    .slice(0, 20)
     .map(([k, v]) => `${v} × ${k}`)
     .join("\n") || "—";
 
-  el("kpiTopQuestions").value = topQ;
-  el("kpiTopCategories").value = topCat;
-  el("kpiTopSoc").value = topSoc;
-  el("kpiTopNoc").value = topNoc;
-  el("kpiTopHumanSoc").value = topHumanSoc;
-  el("kpiTopHumanPif").value = topHumanPif;
+  state.lastSingleInspectionKpis = {
+    generated_at: nowIso(),
+    total_questions_examined: examinedCountFromActive(),
+    total_extracted_items: total,
+    negative: neg,
+    positive: pos,
+    largely: lae,
+    future_analytics_kept_hidden: {
+      top_human_soc: topHumanSoc,
+      top_human_pif: topHumanPif,
+    },
+  };
 
   el("statsDialog").showModal();
 }

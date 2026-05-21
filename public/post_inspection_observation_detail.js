@@ -1,6 +1,6 @@
 import { loadLockedLibraryJson } from "./question_library_loader.js";
 
-const OBS_DETAIL_BUILD = "post_inspection_observation_detail_v5_overdue_configurable_roles_pgno_merge_fix_2026-04-25";
+const OBS_DETAIL_BUILD = "post_inspection_observation_detail_v7_human_positive_noc_pif_2026-05-20";
 const HUMAN_POSITIVE_FIXED_NOC = "Exceeded normal expectation.";
 const LOCKED_LIBRARY_JSON = "./sire_questions_all_columns_named.json";
 
@@ -245,8 +245,6 @@ function normalizeHumanPifText(value) {
 }
 
 function humanPifsFromItem(item) {
-  if (isHumanPositive(item)) return [];
-
   const candidates = [];
   const cc = String(item?.classification_coding || "").trim();
   const noc = String(item?.nature_of_concern || "").trim();
@@ -267,10 +265,15 @@ function socDisplay(item) {
 
 function nocDisplay(item) {
   const d = normDesignation(item?.designation);
+
   if (d === "Human") {
-    if (isHumanPositive(item)) return HUMAN_POSITIVE_FIXED_NOC;
+    /*
+      Human NOC = PIF(s), including positive Human observations.
+      "Exceeded normal expectation." is the response result, not the NOC.
+    */
     return humanPifsFromItem(item).join(" | ");
   }
+
   return String(item?.nature_of_concern || "").trim();
 }
 
