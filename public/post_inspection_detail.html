@@ -177,7 +177,7 @@
   <link rel="stylesheet" href="./csvb-ui-polish.css?v=20260430_1" />
   <link rel="stylesheet" href="./csvb-help-tooltips.css?v=20260430_1" />
   <link rel="stylesheet" href="./csvb-100pct-fit.css?v=20260430_1" />
-  <link rel="stylesheet" href="./csvb-post-inspection-module-polish.css?v=20260520_8" />
+  <link rel="stylesheet" href="./csvb-post-inspection-module-polish.css?v=20260521_risk_layout5" />
 </head>
 
 <body>
@@ -248,15 +248,52 @@
           <input id="reportTitle" type="text" />
         </div>
 
-        <div class="pi-field pi-span3">
-          <label>Inspector Name</label>
-          <input id="inspectorName" type="text" />
+        <div class="pi-span6 csvb-inspector-risk-row">
+          <div class="csvb-inspector-stack">
+            <div class="pi-field">
+              <label>Inspector Name</label>
+              <input id="inspectorName" type="text" />
+            </div>
+
+            <div class="pi-field">
+              <label>Inspector’s Company</label>
+              <input id="inspectorCompany" type="text" />
+            </div>
+          </div>
+
+          <div class="csvb-risk-inline-card" id="riskEvaluationCard">
+            <div class="csvb-risk-inline-head">
+              <div>
+                <div class="csvb-risk-inline-title">Risk Evaluation</div>
+                <div class="csvb-risk-inline-profile" id="riskProfileLine">No stored risk score yet.</div>
+              </div>
+              <button class="btn btn-muted csvb-risk-refresh-btn" id="refreshRiskBtn" type="button">Refresh Risk</button>
+            </div>
+
+            <div class="csvb-risk-inline-body">
+              <div class="csvb-risk-profile-strip">
+                <div class="csvb-risk-inline-score">
+                  <span class="csvb-risk-inline-score-label">Inspection Risk Score</span>
+                  <span class="csvb-risk-inline-score-value" id="riskScoreVal">—</span>
+                  <span class="csvb-risk-inline-score-profile" id="riskScoreProfile">—</span>
+                </div>
+              </div>
+
+              <div class="csvb-risk-inline-metrics">
+                <div>
+                  <label>Eligible observations</label>
+                  <strong id="riskEligibleVal">—</strong>
+                </div>
+                <div>
+                  <label>Average observation risk</label>
+                  <strong id="riskAverageVal">—</strong>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
-        <div class="pi-field pi-span3">
-          <label>Inspector’s Company</label>
-          <input id="inspectorCompany" type="text" />
-        </div>
+        
 
         <div class="pi-field pi-span3">
           <label>PDF Report</label>
@@ -265,6 +302,8 @@
             <span id="pdfStatus" style="font-weight:800; color:#143a63;">No PDF linked</span>
           </div>
         </div>
+
+        
 
         <div class="pi-field pi-span6">
           <div class="pi-actions">
@@ -300,6 +339,8 @@
         <span style="font-weight:900;">Largely:</span> <span id="cntLae">0</span>
       </div>
     </div>
+
+        
 
     <div class="pi-card">
       <h2>Extracted Items</h2>
@@ -343,7 +384,7 @@
               <th style="width:260px;">SOC</th>
               <th style="width:260px;">NOC</th>
               <th>Observation Text</th>
-              <th style="width:220px;">PGNO</th>
+              <th style="width:150px;">Risk Score</th>
             </tr>
           </thead>
           <tbody id="obsTableBody">
@@ -435,7 +476,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js" defer></script>
   <script src="./app-config.js" defer></script>
   <script src="./auth.js" defer></script>
-  <script type="module" src="./post_inspection_detail.js?v=20260520_8"></script>
+  <script type="module" src="./post_inspection_detail.js?v=20260521_risk_score_fix5"></script>
   <script src="./csvb-ui-polish.js?v=20260430_1"></script>
   <script src="./csvb-help-tooltips.js?v=20260430_1"></script>
   <script src="./csvb-100pct-fit.js?v=20260430_1"></script>

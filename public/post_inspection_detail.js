@@ -1,6 +1,6 @@
 import { loadLockedLibraryJson } from "./question_library_loader.js";
 
-const DETAIL_BUILD = "post_inspection_detail_v8_single_inspection_kpi_split_2026-05-20";
+const DETAIL_BUILD = "post_inspection_detail_v11_risk_score_column_fix_2026-05-21";
 const PDF_BUCKET_DEFAULT = "inspection-reports";
 const PDF_FOLDER_PREFIX = "post_inspections";
 const HUMAN_POSITIVE_FIXED_NOC = "Exceeded normal expectation.";
@@ -431,10 +431,145 @@ const state = {
   activeReport: null,
   observationItems: [],
   extractedItems: [],
+  currentRisk: null,
+  observationRiskByItem: new Map(),
   lib: [],
   libByNo: new Map(),
   libCanonToExact: new Map(),
 };
+
+
+function fmtRiskScore(value, decimals = 2) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return "—";
+  if (Number.isInteger(n)) return String(n);
+  return n.toFixed(decimals);
+}
+
+function setTextIfPresent(id, value) {
+  const node = el(id);
+  if (node) node.textContent = value;
+}
+
+function riskForItem(itemId) {
+  if (!(state.observationRiskByItem instanceof Map)) return null;
+  return state.observationRiskByItem.get(String(itemId)) || null;
+}
+
+function riskScoreCellHtml(item) {
+  const kind = String(item?.kind || item?.obs_type || "").trim().toLowerCase();
+
+  if (kind === "positive") {
+    return '<span class="csvb-risk-score-na">N/A</span>';
+  }
+
+  const r = riskForItem(item?.id);
+  if (!r) {
+    return '<span class="csvb-risk-score-missing">—</span>';
+  }
+
+  const score = fmtRiskScore(r.observation_risk_score);
+  const title =
+    "Risk score: " + score +
+    " | " + String(r.profile_name || "Risk") +
+    " / " + String(r.version_label || "") +
+    " | Included: " + String(r.included_in_risk);
+
+  return '<span class="csvb-risk-score-pill" title="' + esc(title) + '">' + esc(score) + '</span>';
+}
+
+async function loadCurrentObservationRiskForActiveReport() {
+  state.observationRiskByItem = new Map();
+
+  if (!state.activeReport?.id) return state.observationRiskByItem;
+
+  const { data, error } = await state.supabase.rpc("csvb_post_inspection_current_observation_risk_for_report", {
+    p_report_id: state.activeReport.id,
+  });
+
+  if (error) {
+    console.warn("Observation risk scores failed to load", error);
+    return state.observationRiskByItem;
+  }
+
+  for (const row of data || []) {
+    if (!row?.observation_item_id) continue;
+    state.observationRiskByItem.set(String(row.observation_item_id), row);
+  }
+
+  return state.observationRiskByItem;
+}
+
+function renderRiskCard() {
+  const risk = state.currentRisk || null;
+
+  if (!risk) {
+    setTextIfPresent("riskProfileLine", "No stored risk score yet.");
+    setTextIfPresent("riskScoreVal", "—");
+    setTextIfPresent("riskScoreProfile", "—");
+    setTextIfPresent("riskEligibleVal", "—");
+    setTextIfPresent("riskAverageVal", "—");
+    return;
+  }
+
+  const profile = String(risk.profile_name || "Risk").trim();
+  const version = String(risk.version_label || "").trim();
+  const calculated = String(risk.calculated_at || "").replace("T", " ").slice(0, 19);
+
+  setTextIfPresent("riskProfileLine", `${profile} ${version ? "/ " + version : ""} • Current snapshot • ${calculated || "—"}`);
+  setTextIfPresent("riskScoreVal", fmtRiskScore(risk.inspection_risk_score));
+  setTextIfPresent("riskScoreProfile", profile);
+  setTextIfPresent("riskEligibleVal", String(risk.eligible_risk_observations ?? "—"));
+  setTextIfPresent("riskAverageVal", fmtRiskScore(risk.average_observation_risk));
+}
+
+async function loadCurrentRiskForActiveReport() {
+  state.currentRisk = null;
+
+  if (!state.activeReport?.id) {
+    renderRiskCard();
+    return null;
+  }
+
+  const { data, error } = await state.supabase.rpc("csvb_post_inspection_current_risk_for_report", {
+    p_report_id: state.activeReport.id,
+  });
+
+  if (error) {
+    console.warn("Current risk score failed to load", error);
+    renderRiskCard();
+    return null;
+  }
+
+  const row = Array.isArray(data) ? data[0] : data;
+  state.currentRisk = row || null;
+  renderRiskCard();
+  return state.currentRisk;
+}
+
+async function refreshRiskSnapshotForActiveReport() {
+  if (!state.activeReport?.id) {
+    alert("Save or load a report first.");
+    return;
+  }
+
+  setSaveStatus("Calculating risk…");
+
+  const { data, error } = await state.supabase.rpc("csvb_store_post_inspection_risk_snapshot", {
+    p_report_id: state.activeReport.id,
+    p_profile_id: null,
+    p_profile_version_id: null,
+  });
+
+  if (error) throw error;
+  if (!data?.ok) throw new Error(data?.error || "Risk calculation failed.");
+
+  await loadCurrentRiskForActiveReport();
+  await loadCurrentObservationRiskForActiveReport();
+  renderObsTable();
+  setSaveStatus("Risk updated");
+}
+
 
 function setSaveStatus(text) {
   el("saveStatus").textContent = text || "Not saved";
@@ -796,8 +931,6 @@ function renderObsTable() {
   }
 
   body.innerHTML = items.map((it) => {
-    const pgRequired = itemNeedsPgno(it);
-    const pgText = selectedPgnoText(it.pgno_selected);
     return `
       <tr class="obs-row" data-id="${esc(it.id)}">
         <td>${esc(it.qno)}</td>
@@ -806,7 +939,7 @@ function renderObsTable() {
         <td title="${esc(socDisplay(it))}">${esc(socDisplay(it) || "—")}</td>
         <td title="${esc(nocDisplay(it))}">${esc(nocDisplay(it) || "—")}</td>
         <td title="${esc(supportingCommentDisplay(it))}">${esc(supportingCommentDisplay(it))}</td>
-        <td>${pgRequired ? esc(pgText || "—") : "n/a"}</td>
+        <td>${riskScoreCellHtml(it)}</td>
       </tr>
     `;
   }).join("");
@@ -1455,6 +1588,9 @@ async function saveHeader() {
 
   loadReportIntoHeader(state.activeReport);
   setActivePill("Loaded");
+  await loadCurrentRiskForActiveReport();
+  await loadCurrentObservationRiskForActiveReport();
+  renderObsTable();
   setSaveStatus("Saved");
 
   if (!getUrlParam("report_id") && report.id) {
@@ -1579,6 +1715,15 @@ async function init() {
   });
 
   el("statsBtn").addEventListener("click", renderKpis);
+  el("refreshRiskBtn").addEventListener("click", async () => {
+    try {
+      await refreshRiskSnapshotForActiveReport();
+    } catch (err) {
+      console.error(err);
+      alert("Risk refresh failed: " + (err?.message || String(err)));
+      setSaveStatus("Error");
+    }
+  });
   el("closeStatsBtn").addEventListener("click", () => el("statsDialog").close());
   el("finalizeBtn").addEventListener("click", finalizeCheck);
 
@@ -1604,6 +1749,9 @@ async function init() {
     rebuildExtractedItems();
     renderObsTable();
     renderObsSummary();
+    await loadCurrentRiskForActiveReport();
+    await loadCurrentObservationRiskForActiveReport();
+    renderObsTable();
     setSaveStatus("Loaded");
   } else {
     setActivePill("New unsaved report");
@@ -1611,6 +1759,7 @@ async function init() {
     rebuildExtractedItems();
     renderObsTable();
     renderObsSummary();
+    renderRiskCard();
   }
 }
 

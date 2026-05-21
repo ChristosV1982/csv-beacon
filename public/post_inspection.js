@@ -1,5 +1,5 @@
 const POST_INSPECTION_INDEX_BUILD =
-  "post_inspection_index_v3_row_kpi_quick_view_2026-05-20";
+  "post_inspection_index_v4_risk_score_gauge_2026-05-21";
 
 function el(id) {
   return document.getElementById(id);
@@ -59,6 +59,7 @@ const state = {
   me: null,
   supabase: null,
   reports: [],
+  riskScoresByReport: new Map(),
   storedFilters: {},
   storedDateYears: new Set(),
   storedDateMonths: new Set(),
@@ -328,6 +329,60 @@ async function openStoredInspectionKpis(reportId) {
 }
 
 
+
+function fmtRiskScore(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return "—";
+  return Number.isInteger(n) ? String(n) : n.toFixed(2);
+}
+
+function riskScoreForReport(reportId) {
+  return state.riskScoresByReport instanceof Map
+    ? state.riskScoresByReport.get(String(reportId))
+    : null;
+}
+
+function riskMiniGaugeHtml(reportId) {
+  const r = riskScoreForReport(reportId);
+  if (!r) {
+    return '<div class="csvb-risk-mini no-risk"><span class="csvb-risk-mini-label">Risk</span><span class="csvb-risk-mini-value">—</span></div>';
+  }
+
+  const score = fmtRiskScore(r.inspection_risk_score);
+  const profile = String(r.profile_name || "Risk").trim();
+  const title =
+    profile +
+    " / " +
+    String(r.version_label || "") +
+    " | Eligible: " +
+    String(r.eligible_risk_observations ?? "—") +
+    " | Max: " +
+    fmtRiskScore(r.max_observation_risk);
+
+  return (
+    '<div class="csvb-risk-mini" title="' + esc(title) + '">' +
+      '<span class="csvb-risk-mini-label">' + esc(profile) + '</span>' +
+      '<span class="csvb-risk-mini-value">' + esc(score) + '</span>' +
+    '</div>'
+  );
+}
+
+async function loadCurrentRiskScoresForStoredReports() {
+  state.riskScoresByReport = new Map();
+
+  const { data, error } = await state.supabase.rpc("csvb_post_inspection_current_risk_scores_for_me");
+  if (error) {
+    console.warn("Current risk scores failed to load", error);
+    return;
+  }
+
+  for (const row of data || []) {
+    if (!row?.report_id) continue;
+    state.riskScoresByReport.set(String(row.report_id), row);
+  }
+}
+
+
 function renderStoredTable() {
   const body = el("storedTableBody");
   const rows = (state.reports || []).filter(reportPassesStoredFilters);
@@ -335,7 +390,7 @@ function renderStoredTable() {
   el("storedCount").textContent = `${rows.length} inspection(s)`;
 
   if (!rows.length) {
-    body.innerHTML = `<tr><td colspan="8" class="muted">No inspections found.</td></tr>`;
+    body.innerHTML = `<tr><td colspan="9" class="muted">No inspections found.</td></tr>`;
     return;
   }
 
@@ -349,6 +404,7 @@ function renderStoredTable() {
         <td title="${esc(r.ocimf_inspecting_company || "")}">${esc(r.ocimf_inspecting_company || "—")}</td>
         <td title="${esc(r.inspector_name || "")}">${esc(r.inspector_name || "—")}</td>
         <td title="${esc(r.inspector_company || "")}">${esc(r.inspector_company || "—")}</td>
+        <td>${riskMiniGaugeHtml(r.id)}</td>
         <td>
           <button class="btn muted stored-kpi-btn" type="button" data-kpi-id="${esc(r.id)}" title="Quick KPI view for this inspection.">KPIs</button>
         </td>
@@ -593,6 +649,7 @@ async function init() {
   });
 
   state.reports = await loadReportsFromDb();
+  await loadCurrentRiskScoresForStoredReports();
   renderStoredTable();
 }
 
