@@ -1904,3 +1904,136 @@ html[data-csvb-page="post_inspection.html"] .csvb-risk-mini-ratio {
     grid-template-columns: 1fr !important;
   }
 }
+
+
+/* v20260521_23 — Post-Inspection Detail compact risk-only layout */
+html[data-csvb-page="post_inspection_detail.html"] #riskEvaluationCard {
+  min-height: 0 !important;
+  padding: 8px 10px !important;
+  overflow: visible !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-inline-body {
+  display: block !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-inline-metrics {
+  display: none !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-profile-strip {
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  align-items: stretch !important;
+  justify-content: flex-start !important;
+  gap: 8px !important;
+  width: 100% !important;
+  max-width: 460px !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-inline-score-compact {
+  flex: 0 0 126px !important;
+  width: 126px !important;
+  min-height: 70px !important;
+  padding: 7px 8px !important;
+  box-sizing: border-box !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-inline-score-label {
+  font-size: .66rem !important;
+  line-height: 1.05 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-inline-score-value {
+  font-size: 1.45rem !important;
+  margin: 4px 0 0 !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-inline-mini {
+  display: none !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-score-stack {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 3px !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-score-stack .csvb-risk-score-pill {
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  align-items: center !important;
+  justify-items: center !important;
+  width: 76px !important;
+  min-width: 76px !important;
+  max-width: 76px !important;
+  min-height: 32px !important;
+  padding: 3px 5px !important;
+  line-height: 1.05 !important;
+  border-radius: 999px !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-score-profile-name {
+  display: block !important;
+  font-size: .58rem !important;
+  font-weight: 900 !important;
+  line-height: 1 !important;
+  max-width: 66px !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-score-profile-value {
+  display: block !important;
+  font-size: .90rem !important;
+  font-weight: 950 !important;
+  line-height: 1 !important;
+}
+
+
+/* v20260521_24 — Post-Inspection Detail risk score pills coloured by observation type */
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-score-pill-neg {
+  background: #ffe9e9 !important;
+  border-color: #ffb5b5 !important;
+  color: #8b1d1d !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-score-pill-neg .csvb-risk-score-profile-name,
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-score-pill-neg .csvb-risk-score-profile-value {
+  color: #8b1d1d !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-score-pill-lae {
+  background: #eaf4ff !important;
+  border-color: #b8d7f5 !important;
+  color: #164e7a !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-score-pill-lae .csvb-risk-score-profile-name,
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-score-pill-lae .csvb-risk-score-profile-value {
+  color: #164e7a !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-score-pill-pos {
+  background: #e9fff0 !important;
+  border-color: #b8f0c9 !important;
+  color: #0d4f2a !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-score-pill-pos .csvb-risk-score-profile-name,
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-score-pill-pos .csvb-risk-score-profile-value {
+  color: #0d4f2a !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-score-pill-neutral {
+  background: #f8fbff !important;
+  border-color: #d6e4f5 !important;
+  color: #5e6f86 !important;
+}

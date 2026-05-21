@@ -1,6 +1,6 @@
 import { loadLockedLibraryJson } from "./question_library_loader.js";
 
-const DETAIL_BUILD = "post_inspection_detail_v11_risk_score_column_fix_2026-05-21";
+const DETAIL_BUILD = "post_inspection_detail_v22_risk_pill_colours_2026-05-21";
 const PDF_BUCKET_DEFAULT = "inspection-reports";
 const PDF_FOLDER_PREFIX = "post_inspections";
 const HUMAN_POSITIVE_FIXED_NOC = "Exceeded normal expectation.";
@@ -432,6 +432,7 @@ const state = {
   observationItems: [],
   extractedItems: [],
   currentRisk: null,
+  currentRisks: [],
   observationRiskByItem: new Map(),
   lib: [],
   libByNo: new Map(),
@@ -439,11 +440,62 @@ const state = {
 };
 
 
-function fmtRiskScore(value, decimals = 2) {
+
+const RISK_PROFILE_SELECTION_KEY = "csvb_post_entry_visible_risk_profile_ids";
+
+function selectedOperationalRiskProfileSet() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(RISK_PROFILE_SELECTION_KEY) || "[]");
+    if (Array.isArray(raw) && raw.length) return new Set(raw.map(String).slice(0, 3));
+  } catch {}
+  return null;
+}
+
+function filterOperationalRisks(rows) {
+  const arr = Array.isArray(rows) ? rows : [];
+  const selected = selectedOperationalRiskProfileSet();
+
+  if (!selected) return arr.slice(0, 3);
+
+  return arr
+    .filter((r) => selected.has(String(r.profile_id)))
+    .sort((a, b) => {
+      const ids = [...selected];
+      return ids.indexOf(String(a.profile_id)) - ids.indexOf(String(b.profile_id));
+    })
+    .slice(0, 3);
+}
+
+
+const CSVB_RISK_PROFILE_SELECTION_KEY = "csvb_post_entry_visible_risk_profile_ids";
+
+function csvbSelectedRiskProfileIds() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(CSVB_RISK_PROFILE_SELECTION_KEY) || "[]");
+    return Array.isArray(raw) ? raw.map(String).filter(Boolean).slice(0, 3) : [];
+  } catch {
+    return [];
+  }
+}
+
+function csvbFilterSelectedRiskRows(rows) {
+  const arr = Array.isArray(rows) ? rows : [];
+  const ids = csvbSelectedRiskProfileIds();
+
+  if (!ids.length) return arr.slice(0, 3);
+
+  const selected = new Set(ids);
+
+  return arr
+    .filter((r) => selected.has(String(r.profile_id)))
+    .sort((a, b) => ids.indexOf(String(a.profile_id)) - ids.indexOf(String(b.profile_id)))
+    .slice(0, 3);
+}
+
+function fmtRiskScore(value, decimals = 1) {
   const n = Number(value);
   if (!Number.isFinite(n)) return "—";
-  if (Number.isInteger(n)) return String(n);
-  return n.toFixed(decimals);
+  return n.toFixed(1);
 }
 
 function setTextIfPresent(id, value) {
@@ -456,26 +508,90 @@ function riskForItem(itemId) {
   return state.observationRiskByItem.get(String(itemId)) || null;
 }
 
+
+function csvbLocalRiskNumber(value) {
+  if (value == null || value === "") return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+function csvbLocalRiskText(value) {
+  const n = csvbLocalRiskNumber(value);
+  return n == null ? "—" : n.toFixed(1);
+}
+
+function csvbDisplayedObservationRisk(row, item) {
+  const kind = String(item?.kind || item?.obs_type || row?.finding_type || "").trim().toLowerCase();
+
+  if (kind === "positive") return null;
+
+  /*
+    Largely A.E. display risk is shown locally at 50%.
+    It is not included in the inspection risk total unless the Entry page switch is used.
+  */
+  if (kind === "largely") {
+    const qWeight = csvbLocalRiskNumber(row?.question_type_weight);
+    const nocScore = csvbLocalRiskNumber(row?.noc_score);
+    const ageFactor = csvbLocalRiskNumber(row?.vessel_age_factor);
+    const repFactor = csvbLocalRiskNumber(row?.repetition_factor);
+
+    if (
+      qWeight != null &&
+      nocScore != null &&
+      ageFactor != null &&
+      repFactor != null
+    ) {
+      return 0.5 * qWeight * nocScore * ageFactor * repFactor;
+    }
+  }
+
+  return csvbLocalRiskNumber(row?.observation_risk_score);
+}
+
+function csvbRiskPillKindClass(item) {
+  const kind = String(item?.kind || item?.obs_type || "").trim().toLowerCase();
+
+  if (kind === "negative") return "csvb-risk-score-pill-neg";
+  if (kind === "largely") return "csvb-risk-score-pill-lae";
+  if (kind === "positive") return "csvb-risk-score-pill-pos";
+
+  return "csvb-risk-score-pill-neutral";
+}
+
 function riskScoreCellHtml(item) {
   const kind = String(item?.kind || item?.obs_type || "").trim().toLowerCase();
 
   if (kind === "positive") {
-    return '<span class="csvb-risk-score-na">N/A</span>';
+    return '<span class="csvb-risk-score-na csvb-risk-score-pill-pos">N/A</span>';
   }
 
-  const r = riskForItem(item?.id);
-  if (!r) {
+  const rows = riskForItem(item?.id);
+  const risks = Array.isArray(rows) ? rows : (rows ? [rows] : []);
+
+  if (!risks.length) {
     return '<span class="csvb-risk-score-missing">—</span>';
   }
 
-  const score = fmtRiskScore(r.observation_risk_score);
-  const title =
-    "Risk score: " + score +
-    " | " + String(r.profile_name || "Risk") +
-    " / " + String(r.version_label || "") +
-    " | Included: " + String(r.included_in_risk);
+  const kindClass = csvbRiskPillKindClass(item);
 
-  return '<span class="csvb-risk-score-pill" title="' + esc(title) + '">' + esc(score) + '</span>';
+  return '<div class="csvb-risk-score-stack">' + risks.map((r) => {
+    const displayScore = csvbDisplayedObservationRisk(r, item);
+    const score = csvbLocalRiskText(displayScore);
+    const profile = String(r?.profile_name || "Risk").trim();
+
+    const title =
+      profile +
+      " / " +
+      String(r?.version_label || "") +
+      " | Display score: " +
+      score +
+      (kind === "largely" ? " | Largely A.E. local display risk at 50%" : "");
+
+    return '<span class="csvb-risk-score-pill ' + kindClass + '" title="' + esc(title) + '">' +
+      '<span class="csvb-risk-score-profile-name">' + esc(profile) + '</span>' +
+      '<span class="csvb-risk-score-profile-value">' + esc(score) + '</span>' +
+    '</span>';
+  }).join("") + '</div>';
 }
 
 async function loadCurrentObservationRiskForActiveReport() {
@@ -483,7 +599,7 @@ async function loadCurrentObservationRiskForActiveReport() {
 
   if (!state.activeReport?.id) return state.observationRiskByItem;
 
-  const { data, error } = await state.supabase.rpc("csvb_post_inspection_current_observation_risk_for_report", {
+  const { data, error } = await state.supabase.rpc("csvb_pi_obs_risks_for_report", {
     p_report_id: state.activeReport.id,
   });
 
@@ -492,57 +608,82 @@ async function loadCurrentObservationRiskForActiveReport() {
     return state.observationRiskByItem;
   }
 
+  const grouped = new Map();
+
   for (const row of data || []) {
     if (!row?.observation_item_id) continue;
-    state.observationRiskByItem.set(String(row.observation_item_id), row);
+    const key = String(row.observation_item_id);
+    const arr = grouped.get(key) || [];
+    arr.push(row);
+    grouped.set(key, arr);
+  }
+
+  for (const [key, rows] of grouped.entries()) {
+    state.observationRiskByItem.set(key, csvbFilterSelectedRiskRows(rows));
   }
 
   return state.observationRiskByItem;
 }
 
 function renderRiskCard() {
-  const risk = state.currentRisk || null;
+  const risks = Array.isArray(state.currentRisks) ? state.currentRisks : [];
+  const card = document.getElementById("riskEvaluationCard");
 
-  if (!risk) {
-    setTextIfPresent("riskProfileLine", "No stored risk score yet.");
-    setTextIfPresent("riskScoreVal", "—");
-    setTextIfPresent("riskScoreProfile", "—");
-    setTextIfPresent("riskEligibleVal", "—");
-    setTextIfPresent("riskAverageVal", "—");
+  if (!card) return;
+
+  let strip = card.querySelector(".csvb-risk-profile-strip");
+  if (!strip) {
+    strip = document.createElement("div");
+    strip.className = "csvb-risk-profile-strip";
+
+    const oldScore = card.querySelector(".csvb-risk-inline-score");
+    if (oldScore) oldScore.replaceWith(strip);
+    else card.appendChild(strip);
+  }
+
+  if (!risks.length) {
+    setTextIfPresent("riskProfileLine", "No selected risk profile snapshot found. Use Bulk Risk Refresh if needed.");
+    strip.innerHTML = "";
     return;
   }
 
-  const profile = String(risk.profile_name || "Risk").trim();
-  const version = String(risk.version_label || "").trim();
-  const calculated = String(risk.calculated_at || "").replace("T", " ").slice(0, 19);
+  const calculated = String(risks[0]?.calculated_at || "").replace("T", " ").slice(0, 19);
+  setTextIfPresent("riskProfileLine", `Selected risk profiles: ${risks.length} • Current snapshot • ${calculated || "—"}`);
 
-  setTextIfPresent("riskProfileLine", `${profile} ${version ? "/ " + version : ""} • Current snapshot • ${calculated || "—"}`);
-  setTextIfPresent("riskScoreVal", fmtRiskScore(risk.inspection_risk_score));
-  setTextIfPresent("riskScoreProfile", profile);
-  setTextIfPresent("riskEligibleVal", String(risk.eligible_risk_observations ?? "—"));
-  setTextIfPresent("riskAverageVal", fmtRiskScore(risk.average_observation_risk));
+  strip.innerHTML = risks.map((risk) => {
+    const profile = String(risk.profile_name || "Risk").trim();
+    const score = risk.inspection_risk_score == null ? "—" : fmtRiskScore(risk.inspection_risk_score);
+
+    return `
+      <div class="csvb-risk-inline-score csvb-risk-inline-score-compact">
+        <span class="csvb-risk-inline-score-label">${esc(profile)}</span>
+        <span class="csvb-risk-inline-score-value">${esc(score)}</span>
+      </div>
+    `;
+  }).join("");
 }
 
 async function loadCurrentRiskForActiveReport() {
   state.currentRisk = null;
+  state.currentRisks = [];
 
   if (!state.activeReport?.id) {
     renderRiskCard();
     return null;
   }
 
-  const { data, error } = await state.supabase.rpc("csvb_post_inspection_current_risk_for_report", {
+  const { data, error } = await state.supabase.rpc("csvb_pi_all_risks_for_report", {
     p_report_id: state.activeReport.id,
   });
 
   if (error) {
-    console.warn("Current risk score failed to load", error);
+    console.warn("Current risk scores failed to load", error);
     renderRiskCard();
     return null;
   }
 
-  const row = Array.isArray(data) ? data[0] : data;
-  state.currentRisk = row || null;
+  state.currentRisks = csvbFilterSelectedRiskRows(data || []);
+  state.currentRisk = state.currentRisks[0] || null;
   renderRiskCard();
   return state.currentRisk;
 }
@@ -553,12 +694,10 @@ async function refreshRiskSnapshotForActiveReport() {
     return;
   }
 
-  setSaveStatus("Calculating risk…");
+  setSaveStatus("Calculating risk profiles…");
 
-  const { data, error } = await state.supabase.rpc("csvb_store_post_inspection_risk_snapshot", {
+  const { data, error } = await state.supabase.rpc("csvb_store_post_inspection_risk_snapshots_all_profiles", {
     p_report_id: state.activeReport.id,
-    p_profile_id: null,
-    p_profile_version_id: null,
   });
 
   if (error) throw error;
