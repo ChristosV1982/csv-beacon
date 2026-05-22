@@ -5,7 +5,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "SIRE-FILTER-LEGEND-HELPER-20260520_1";
+  const BUILD = "SIRE-FILTER-LEGEND-HELPER-20260520_2";
   window.CSVB_SIRE_FILTER_LEGEND_HELPER_BUILD = BUILD;
 
   const FILTER_NOTES = {
@@ -19,8 +19,34 @@
     facet_chapter: "Filter the question list by SIRE 2.0 chapter. Empty selection = all chapters."
   };
 
+  const CHAPTER_LABELS = {
+    "02": "Certification and Documentation",
+    "03": "Crew Management",
+    "04": "Navigation and Communications",
+    "05": "Safety Management",
+    "06": "Pollution Prevention",
+    "07": "Maritime Security",
+    "08": "Cargo and Ballast Systems",
+    "09": "Mooring",
+    "10": "Engine and Steering Compartments",
+    "11": "General Appearance and Condition",
+    "12": "Ice Operations",
+    "13": "Chemical Cargo Operations",
+    "14": "Liquefied Gas Cargo Operations",
+    "15": "Shuttle Tanker Operations"
+  };
+
   function $(id) {
     return document.getElementById(id);
+  }
+
+  function safeStr(value) {
+    return value === null || value === undefined ? "" : String(value);
+  }
+
+  function chapterName(code) {
+    const c = safeStr(code).trim().padStart(2, "0");
+    return CHAPTER_LABELS[c] || "";
   }
 
   function injectStyles() {
@@ -81,6 +107,11 @@
       .csvb-sire-legend-core { background: #eaf7ea; }
       .csvb-sire-legend-rot1 { background: #fdecec; }
       .csvb-sire-legend-rot2 { background: #fff2e0; }
+
+      #facetOptions_chapter .facetOpt label span {
+        white-space: normal;
+        line-height: 1.25;
+      }
     `;
 
     document.head.appendChild(style);
@@ -101,6 +132,24 @@
       div.textContent = note;
 
       body.insertBefore(div, body.firstChild);
+    });
+  }
+
+  function labelChapterOptions() {
+    const host = $("facetOptions_chapter");
+    if (!host) return;
+
+    host.querySelectorAll(".facetOpt:not(.facetOptAll) label span").forEach((span) => {
+      const raw = safeStr(span.textContent).trim();
+      if (!raw || raw.includes("—")) return;
+
+      const code = raw.match(/^\d{1,2}$/) ? raw.padStart(2, "0") : "";
+      if (!code) return;
+
+      const name = chapterName(code);
+      if (!name) return;
+
+      span.textContent = `${code} — ${name}`;
     });
   }
 
@@ -165,6 +214,7 @@
   function apply() {
     injectStyles();
     addFilterNotes();
+    labelChapterOptions();
     wireFacetClosing();
     addColourLegend();
   }
@@ -175,9 +225,20 @@
     setTimeout(apply, 1500);
     setTimeout(apply, 3000);
 
+    const chapterHost = $("facetOptions_chapter");
+    if (chapterHost && !chapterHost.dataset.csvbSireChapterObserver) {
+      chapterHost.dataset.csvbSireChapterObserver = "1";
+      new MutationObserver(() => window.requestAnimationFrame(labelChapterOptions)).observe(chapterHost, {
+        childList: true,
+        subtree: true
+      });
+    }
+
     window.CSVB_SIRE_FILTER_LEGEND_HELPER = {
       build: BUILD,
       apply,
+      chapterName,
+      chapterLabels: { ...CHAPTER_LABELS }
     };
   }
 
