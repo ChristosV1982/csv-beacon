@@ -1,14 +1,16 @@
 // public/csvb-module-guard.js
 // C.S.V. BEACON — Direct Page Module Access Guard
 // CP-8C: adds Company Policy module guard mapping.
+// DASH-1: normalises/creates Dashboard navigation on module pages.
 
 (() => {
   "use strict";
 
-  const BUILD = "PLA11-2026-05-20-PLATFORM-GUARD-MODULE-CODES";
+  const BUILD = "PLA12-2026-05-22-DASHBOARD-BUTTON-GUARD";
 
   const CSVB_COMPANY_VIEW_ID_KEY = "csvb_superuser_company_view_id";
   const CSVB_COMPANY_VIEW_NAME_KEY = "csvb_superuser_company_view_name";
+  const DASHBOARD_PATH = "./q-dashboard.html";
 
   const PAGE_MODULE_MAP = {
     "library.html": "read_only_library",
@@ -62,6 +64,113 @@
   function currentPageName() {
     const p = String(window.location.pathname || "");
     return p.split("/").pop() || "index.html";
+  }
+
+  function shouldSkipDashboardButton() {
+    const page = currentPageName().toLowerCase();
+    return page === "q-dashboard.html" ||
+      page === "login.html" ||
+      page === "index.html" ||
+      page === "";
+  }
+
+  function goDashboard() {
+    window.location.href = DASHBOARD_PATH;
+  }
+
+  function dashboardElementScore(node) {
+    if (!node) return 0;
+
+    const id = String(node.id || "").toLowerCase();
+    const text = String(node.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
+    const href = String(node.getAttribute?.("href") || "").toLowerCase();
+    const title = String(node.getAttribute?.("title") || "").toLowerCase();
+
+    if (id === "dashboardbtn" || id === "dashboardbutton" || id === "csvbdashboardbtn") return 100;
+    if (href.includes("q-dashboard.html")) return 95;
+    if (text === "dashboard" || text === "⌂ dashboard" || text === "⌂ dashboard") return 90;
+    if (text.includes("dashboard")) return 80;
+    if (title.includes("dashboard")) return 70;
+    return 0;
+  }
+
+  function normaliseDashboardButton(btn) {
+    if (!btn) return;
+
+    btn.classList.add("csvb-dashboard-btn");
+    if (!btn.id) btn.id = "dashboardBtn";
+    btn.setAttribute("title", "Go to Dashboard");
+
+    if (!String(btn.textContent || "").trim()) {
+      btn.textContent = "⌂ Dashboard";
+    }
+
+    if (btn.tagName === "A") {
+      btn.setAttribute("href", DASHBOARD_PATH);
+    } else {
+      btn.setAttribute("type", "button");
+      btn.onclick = goDashboard;
+    }
+  }
+
+  function findDashboardActionContainer() {
+    const topbar = document.querySelector(
+      ".topbar, header.topbar, .csvb-pi-topbar, .csvb-topbar, .pi-hero, header"
+    );
+
+    if (!topbar) return null;
+
+    return topbar.querySelector(
+      ".topbar-right, .top-actions, .csvb-pi-actions, .header-actions, .nav-actions, .row"
+    ) || topbar;
+  }
+
+  function createDashboardButton() {
+    const btn = document.createElement("button");
+    btn.id = "dashboardBtn";
+    btn.type = "button";
+    btn.className = "btn light csvb-dashboard-btn";
+    btn.title = "Go to Dashboard";
+    btn.textContent = "⌂ Dashboard";
+    btn.onclick = goDashboard;
+    return btn;
+  }
+
+  function ensureDashboardButton() {
+    if (shouldSkipDashboardButton()) return null;
+    if (!document.body) return null;
+
+    const existing = Array.from(document.querySelectorAll("a, button"))
+      .map((node) => ({ node, score: dashboardElementScore(node) }))
+      .filter((x) => x.score > 0)
+      .sort((a, b) => b.score - a.score)[0]?.node || null;
+
+    if (existing) {
+      normaliseDashboardButton(existing);
+      return existing;
+    }
+
+    const container = findDashboardActionContainer();
+    if (!container) return null;
+
+    const btn = createDashboardButton();
+
+    const before = Array.from(container.children || []).find((child) => {
+      const text = String(child.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
+      return text.includes("mode selection") || text.includes("logout");
+    });
+
+    if (before) container.insertBefore(btn, before);
+    else container.appendChild(btn);
+
+    return btn;
+  }
+
+  function bootDashboardButton() {
+    ensureDashboardButton();
+    setTimeout(ensureDashboardButton, 250);
+    setTimeout(ensureDashboardButton, 1000);
+    setTimeout(ensureDashboardButton, 2500);
   }
 
   function redirectLegacyLibraryStudyRoute() {
@@ -225,6 +334,8 @@
   }
 
   async function guardPage() {
+    ensureDashboardButton();
+
     if (redirectLegacyLibraryStudyRoute()) return;
 
     const page = currentPageName();
@@ -266,7 +377,7 @@
       showAccessDenied(onboardBlockReason + " Redirecting to Dashboard…");
 
       setTimeout(() => {
-        window.location.href = "./q-dashboard.html";
+        window.location.href = DASHBOARD_PATH;
       }, 1000);
 
       return;
@@ -289,6 +400,7 @@
           allowed: true,
           platformSimulation: false
         };
+        ensureDashboardButton();
         return;
       }
 
@@ -306,7 +418,10 @@
         platformSimulation: true
       };
 
-      if (allowedBySimulation) return;
+      if (allowedBySimulation) {
+        ensureDashboardButton();
+        return;
+      }
 
       showAccessDenied(
         "Access denied by simulated company context. Module is not enabled for " +
@@ -315,7 +430,7 @@
       );
 
       setTimeout(() => {
-        window.location.href = "./q-dashboard.html";
+        window.location.href = DASHBOARD_PATH;
       }, 1000);
 
       return;
@@ -362,7 +477,10 @@
       effectivePermissionRows: rankCheck.rows || []
     };
 
-    if (allowed) return;
+    if (allowed) {
+      ensureDashboardButton();
+      return;
+    }
 
     const deniedParts = [];
     if (!companyAllowed) deniedParts.push("the module is not enabled for your company");
@@ -375,18 +493,20 @@
     );
 
     setTimeout(() => {
-      window.location.href = "./q-dashboard.html";
+      window.location.href = DASHBOARD_PATH;
     }, 1000);
   }
 
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", () => {
+      bootDashboardButton();
       guardPage().catch((e) => {
         console.error("C.S.V. BEACON module guard error:", e);
         showAccessDenied(String(e?.message || e));
       });
     });
   } else {
+    bootDashboardButton();
     guardPage().catch((e) => {
       console.error("C.S.V. BEACON module guard error:", e);
       showAccessDenied(String(e?.message || e));
