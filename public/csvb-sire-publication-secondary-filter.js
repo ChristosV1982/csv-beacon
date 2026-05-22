@@ -1,11 +1,11 @@
 // public/csvb-sire-publication-secondary-filter.js
-// C.S.V. BEACON — SIRE Questions Editor Secondary Publication Filter
+// C.S.V. BEACON — SIRE Questions Editor/Viewer Secondary Publication Filter
 // Read-only DOM filter for Applicable Publications.
 
 (() => {
   "use strict";
 
-  const BUILD = "SIRE-PUB-SECONDARY-FILTER-20260514_5";
+  const BUILD = "SIRE-PUB-SECONDARY-FILTER-20260520_6";
   window.CSVB_SIRE_PUBLICATION_SECONDARY_FILTER_BUILD = BUILD;
 
   const LS_SELECTED = "csvb_sire_publication_secondary_filter_selected_v1";
@@ -34,6 +34,17 @@
       .replaceAll(">", "&gt;")
       .replaceAll('"', "&quot;")
       .replaceAll("'", "&#039;");
+  }
+
+  function ensureSireFilterLegendHelperLoaded() {
+    if (window.CSVB_SIRE_FILTER_LEGEND_HELPER_BUILD) return;
+    if (document.querySelector('script[data-csvb-sire-filter-legend-loader="1"]')) return;
+
+    const script = document.createElement("script");
+    script.src = "./csvb-sire-filter-and-legend-helper.js?v=20260520_1";
+    script.defer = true;
+    script.dataset.csvbSireFilterLegendLoader = "1";
+    document.body.appendChild(script);
   }
 
   function normalizeQuestionNumber(raw) {
@@ -480,6 +491,7 @@
   async function init() {
     injectStyles();
     ensureUi();
+    ensureSireFilterLegendHelperLoaded();
     loadSelected();
     wireListObserver();
 
