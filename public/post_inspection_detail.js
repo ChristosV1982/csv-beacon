@@ -1,6 +1,6 @@
 import { loadLockedLibraryJson } from "./question_library_loader.js";
 
-const DETAIL_BUILD = "post_inspection_detail_v22_risk_pill_colours_2026-05-21";
+const DETAIL_BUILD = "post_inspection_detail_v24_lae_percent_detail_fix_2026-05-22";
 const PDF_BUCKET_DEFAULT = "inspection-reports";
 const PDF_FOLDER_PREFIX = "post_inspections";
 const HUMAN_POSITIVE_FIXED_NOC = "Exceeded normal expectation.";
@@ -520,6 +520,13 @@ function csvbLocalRiskText(value) {
   return n == null ? "—" : n.toFixed(1);
 }
 
+function csvbLargelyAeDisplayFactor() {
+  const raw = localStorage.getItem("csvb_post_entry_largely_ae_percent");
+  const n = Number(raw == null || raw === "" ? 50 : raw);
+  if (!Number.isFinite(n)) return 0.5;
+  return Math.max(0, Math.min(100, n)) / 100;
+}
+
 function csvbDisplayedObservationRisk(row, item) {
   const kind = String(item?.kind || item?.obs_type || row?.finding_type || "").trim().toLowerCase();
 
@@ -541,7 +548,7 @@ function csvbDisplayedObservationRisk(row, item) {
       ageFactor != null &&
       repFactor != null
     ) {
-      return 0.5 * qWeight * nocScore * ageFactor * repFactor;
+      return csvbLargelyAeDisplayFactor() * qWeight * nocScore * ageFactor * repFactor;
     }
   }
 
@@ -585,7 +592,7 @@ function riskScoreCellHtml(item) {
       String(r?.version_label || "") +
       " | Display score: " +
       score +
-      (kind === "largely" ? " | Largely A.E. local display risk at 50%" : "");
+      (kind === "largely" ? " | Largely A.E. local display risk at selected percentage" : "");
 
     return '<span class="csvb-risk-score-pill ' + kindClass + '" title="' + esc(title) + '">' +
       '<span class="csvb-risk-score-profile-name">' + esc(profile) + '</span>' +

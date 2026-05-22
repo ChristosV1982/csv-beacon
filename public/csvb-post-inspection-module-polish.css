@@ -2533,3 +2533,28 @@ html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-mini-toggle
   font-weight: 900 !important;
   cursor: pointer !important;
 }
+
+
+/* v20260522_1 — Editable independent Largely A.E. percentage */
+html[data-csvb-page="post_inspection.html"] .csvb-lae-percent-row {
+  display: grid !important;
+  grid-template-columns: 1fr auto !important;
+  gap: 5px !important;
+  align-items: center !important;
+  margin-top: 5px !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .csvb-lae-percent-row input {
+  min-height: 26px !important;
+  padding: 4px 6px !important;
+  text-align: center !important;
+  font-size: .78rem !important;
+  font-weight: 900 !important;
+  border-radius: 7px !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .csvb-lae-percent-row span {
+  font-size: .80rem !important;
+  font-weight: 900 !important;
+  color: #062a5e !important;
+}

@@ -1,8 +1,23 @@
 const POST_INSPECTION_INDEX_BUILD =
-  "post_inspection_index_v16_compact_entry_risk_panel_2026-05-21";
+  "post_inspection_index_v17_lae_percent_editable_2026-05-22";
 
 const RISK_INCLUDE_LAE_KEY = "csvb_post_entry_include_largely_ae_risk";
+const RISK_LAE_PERCENT_KEY = "csvb_post_entry_largely_ae_percent";
 const RISK_PROFILE_SELECTION_KEY = "csvb_post_entry_visible_risk_profile_ids";
+
+function largelyAePercentValue() {
+  const raw = localStorage.getItem(RISK_LAE_PERCENT_KEY);
+  const n = Number(raw == null || raw === "" ? 50 : raw);
+  if (!Number.isFinite(n)) return 50;
+  return Math.max(0, Math.min(100, n));
+}
+
+function saveLargelyAePercentValue(value) {
+  const n = Number(value);
+  const clean = Number.isFinite(n) ? Math.max(0, Math.min(100, n)) : 50;
+  localStorage.setItem(RISK_LAE_PERCENT_KEY, String(clean));
+  return clean;
+}
 
 function el(id) {
   return document.getElementById(id);
@@ -427,6 +442,7 @@ async function loadCurrentRiskScoresForStoredReports() {
 
   const { data, error } = await state.supabase.rpc("csvb_post_inspection_all_profile_risk_scores_for_me_adjusted", {
     p_include_largely_as_expected: !!state.includeLargelyInEntryRisk,
+    p_largely_ae_percentage: largelyAePercentValue(),
   });
 
   if (error) {
@@ -833,6 +849,7 @@ function selectedProfileAverageBoxesHtml() {
 function renderRiskAveragePanel() {
   const panel = ensureRiskAveragePanel();
   const checked = !!state.includeLargelyInEntryRisk;
+  const laePct = largelyAePercentValue();
 
   panel.innerHTML = `
     <div class="csvb-risk-average-title">Risk / Inspection Average</div>
@@ -849,9 +866,13 @@ function renderRiskAveragePanel() {
         <span>Largely A.E. Display</span>
         <label class="csvb-risk-switch">
           <input id="includeLargelyRiskSwitch" type="checkbox" ${checked ? "checked" : ""} />
-          <b>Include at 50%</b>
+          <b>Include</b>
         </label>
-        <em>Display recalculation only. Does not store new snapshots.</em>
+        <div class="csvb-lae-percent-row">
+          <input id="largelyAePercentInput" type="number" min="0" max="100" step="1" value="${esc(laePct)}" />
+          <span>%</span>
+        </div>
+        <em>Independent display percentage. Does not store new snapshots.</em>
       </div>
 
       <div class="csvb-risk-average-box csvb-risk-bulk-refresh-box">
@@ -863,6 +884,21 @@ function renderRiskAveragePanel() {
   `;
 
   bindRiskProfileSelector();
+
+  const pctInput = el("largelyAePercentInput");
+  if (pctInput) {
+    pctInput.onchange = async () => {
+      saveLargelyAePercentValue(pctInput.value);
+      pctInput.value = String(largelyAePercentValue());
+
+      if (el("includeLargelyRiskSwitch")?.checked) {
+        await loadCurrentRiskScoresForStoredReports();
+        computeRiskAverages();
+        renderRiskAveragePanel();
+        renderStoredTable();
+      }
+    };
+  }
 
   const sw = el("includeLargelyRiskSwitch");
   if (sw) {

@@ -1,10 +1,19 @@
 import { loadLockedLibraryJson } from "./question_library_loader.js";
 
-const OBS_DETAIL_BUILD = "post_inspection_observation_detail_v24_esc_direct_hotfix_2026-05-21";
+const OBS_DETAIL_BUILD = "post_inspection_observation_detail_v26_lae_percent_detail_fix_2026-05-22";
 
 
 
 
+
+
+
+function csvbLargelyAeDisplayFactor() {
+  const raw = localStorage.getItem("csvb_post_entry_largely_ae_percent");
+  const n = Number(raw == null || raw === "" ? 50 : raw);
+  if (!Number.isFinite(n)) return 0.5;
+  return Math.max(0, Math.min(100, n)) / 100;
+}
 
 function esc(value) {
   return String(value ?? "")
@@ -542,7 +551,7 @@ function csvbDisplayedObservationRisk(row) {
       ageFactor != null &&
       repFactor != null
     ) {
-      return 0.5 * qWeight * nocScore * ageFactor * repFactor;
+      return csvbLargelyAeDisplayFactor() * qWeight * nocScore * ageFactor * repFactor;
     }
   }
 
@@ -1199,7 +1208,7 @@ async function init() {
       const repFactor = num(row?.repetition_factor);
 
       if (qWeight != null && nocScore != null && ageFactor != null && repFactor != null) {
-        return 0.5 * qWeight * nocScore * ageFactor * repFactor;
+        return csvbLargelyAeDisplayFactor() * qWeight * nocScore * ageFactor * repFactor;
       }
     }
 
