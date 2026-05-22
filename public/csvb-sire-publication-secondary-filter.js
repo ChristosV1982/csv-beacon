@@ -5,7 +5,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "SIRE-PUB-SECONDARY-FILTER-20260520_7";
+  const BUILD = "SIRE-PUB-SECONDARY-FILTER-20260520_8";
   window.CSVB_SIRE_PUBLICATION_SECONDARY_FILTER_BUILD = BUILD;
 
   const LS_SELECTED = "csvb_sire_publication_secondary_filter_selected_v1";
@@ -74,7 +74,7 @@
     if (document.querySelector('script[data-csvb-sire-filter-legend-loader="1"]')) return;
 
     const script = document.createElement("script");
-    script.src = "./csvb-sire-filter-and-legend-helper.js?v=20260520_2";
+    script.src = "./csvb-sire-filter-and-legend-helper.js?v=20260520_3";
     script.defer = true;
     script.dataset.csvbSireFilterLegendLoader = "1";
     document.body.appendChild(script);
