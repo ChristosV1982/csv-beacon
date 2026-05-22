@@ -1,6 +1,6 @@
 import { loadLockedLibraryJson } from "./question_library_loader.js";
 
-const OBS_DETAIL_BUILD = "post_inspection_observation_detail_v26_lae_percent_detail_fix_2026-05-22";
+const OBS_DETAIL_BUILD = "post_inspection_observation_detail_v31_visible_manual_save_2026-05-22";
 
 
 
@@ -681,6 +681,183 @@ function renderObservationRisk() {
   `;
 }
 
+
+/* CSVB_OBS_MANUAL_EDIT_CLEAN_V29_START */
+function csvbManualObsNocKey(value) {
+  return String(value || "")
+    .replace(/[–—]/g, "-")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
+function csvbManualObsEnsureControls() {
+  const nocField = el("nocField");
+  if (!nocField) return null;
+
+  const parent = nocField.closest(".pi-field") || nocField.parentElement;
+  if (!parent) return null;
+
+  let box = el("nocManualEditBox");
+  if (box) return box;
+
+  box = document.createElement("div");
+  box.id = "nocManualEditBox";
+  box.className = "csvb-noc-manual-box";
+  box.innerHTML = `
+    <label class="csvb-noc-manual-toggle">
+      <input id="nocManualToggle" type="checkbox" />
+      <span>Manual NOC selection</span>
+    </label>
+    <select id="nocManualSelect" class="csvb-noc-manual-select" style="display:none;">
+      <option value="">— Select NOC / PIF —</option>
+    </select>
+    <div class="csvb-noc-manual-help">
+      Dropdown is filtered by detected category: Human / Hardware / Process.
+    </div>
+  `;
+
+  parent.appendChild(box);
+  return box;
+}
+
+async function csvbManualObsLoadNocOptions() {
+  const item = state.item;
+  const designation = normDesignation(item?.designation);
+  const select = el("nocManualSelect");
+  const current = String(el("nocField")?.value || "").trim();
+
+  if (!select) return;
+
+  select.innerHTML = '<option value="">— Select NOC / PIF —</option>';
+
+  let options = [];
+
+  try {
+    const { data, error } = await state.supabase.rpc("csvb_post_inspection_noc_options_for_designation", {
+      p_designation: designation,
+    });
+
+    if (error) throw error;
+
+    options = [...new Set((data || [])
+      .map((r) => String(r.noc_text || "").trim())
+      .filter(Boolean))];
+  } catch (e) {
+    console.warn("NOC options RPC failed. Using Human fallback only.", e);
+    if (designation === "Human") {
+      options = HUMAN_PIF_OPTIONS.slice();
+    }
+  }
+
+  options.sort((a, b) => a.localeCompare(b));
+
+  for (const opt of options) {
+    const o = document.createElement("option");
+    o.value = opt;
+    o.textContent = opt;
+    select.appendChild(o);
+  }
+
+  const currentKey = csvbManualObsNocKey(current);
+  const match = options.find((x) => csvbManualObsNocKey(x) === currentKey);
+  select.value = match || "";
+}
+
+function csvbManualObsSetup() {
+  const socField = el("socField");
+  const obsTextField = el("supportingCommentField");
+  const nocField = el("nocField");
+
+  if (socField) {
+    socField.removeAttribute("readonly");
+    socField.readOnly = false;
+    socField.classList.add("csvb-manual-editable");
+    socField.oninput = () => setSaveStatus("Not saved");
+  }
+
+  if (obsTextField) {
+    obsTextField.removeAttribute("readonly");
+    obsTextField.readOnly = false;
+    obsTextField.classList.add("csvb-manual-editable");
+    obsTextField.oninput = () => setSaveStatus("Not saved");
+  }
+
+  if (nocField) {
+    nocField.readOnly = true;
+    nocField.setAttribute("readonly", "readonly");
+    nocField.classList.remove("csvb-manual-editable");
+  }
+
+  csvbManualObsEnsureControls();
+
+  const toggle = el("nocManualToggle");
+  const select = el("nocManualSelect");
+
+  if (!toggle || !select) return;
+
+  toggle.checked = false;
+  select.style.display = "none";
+
+  toggle.onchange = async () => {
+    const on = !!toggle.checked;
+    select.style.display = on ? "" : "none";
+    if (on) await csvbManualObsLoadNocOptions();
+  };
+
+  select.onchange = () => {
+    const val = String(select.value || "").trim();
+    if (val && nocField) {
+      nocField.value = val;
+      setSaveStatus("Not saved");
+    }
+  };
+}
+
+function csvbManualObsCollectPayload() {
+  const item = state.item || {};
+  const designation = normDesignation(item.designation);
+
+  const soc = String(el("socField")?.value || "").trim() || null;
+  const noc = String(el("nocField")?.value || "").trim() || null;
+  const observationText = String(el("supportingCommentField")?.value || "").trim() || null;
+
+  const payload = {
+    nature_of_concern: noc,
+    observation_text: observationText,
+  };
+
+  if (designation === "Human") {
+    payload.positive_rank = soc;
+    payload.classification_coding = noc;
+  } else {
+    payload.classification_coding = soc;
+  }
+
+  return payload;
+}
+
+async function csvbManualObsRefreshRisk() {
+  const reportId = state.report?.id || getUrlParam("report_id");
+  if (!reportId) return;
+
+  try {
+    await state.supabase.rpc("csvb_store_post_inspection_risk_snapshots_all_profiles", {
+      p_report_id: reportId,
+    });
+  } catch (e) {
+    console.warn("Risk refresh after manual observation edit failed.", e);
+  }
+
+  try {
+    await loadSelectedObservationRisks();
+  } catch (e) {
+    console.warn("Observation risk reload after manual observation edit failed.", e);
+  }
+}
+/* CSVB_OBS_MANUAL_EDIT_CLEAN_V29_END */
+
+
 function renderObservation() {
   const item = state.item;
   if (!item) return;
@@ -694,6 +871,7 @@ function renderObservation() {
   el("questionFullField").value = String(item.question_full || "").trim() || "";
   el("supportingCommentField").value = supportingCommentDisplay(item) || "";
 
+  csvbManualObsSetup();
   renderWorkflowBadges();
 }
 
@@ -963,6 +1141,8 @@ async function saveResponseFields() {
     preventative_action_subcomments: String(el("preventativeActionComments").value || "").trim() || null,
 
     pgno_selected: collectSelectedPgno(),
+
+    ...csvbManualObsCollectPayload(),
   };
 
   const { data, error } = await state.supabase
@@ -980,6 +1160,9 @@ async function saveResponseFields() {
   }
 
   state.item = data;
+
+  await csvbManualObsRefreshRisk();
+
   renderObservation();
   renderPgnoSelector();
   loadResponseFields();
@@ -1449,3 +1632,285 @@ async function init() {
 })();
  /* CSVB_OBS_DETAIL_FORCE_RENDER_V21_END */
 
+
+
+/* CSVB_OBS_MANUAL_SAVE_REFRESH_V30_START */
+function csvbManualObsEnsureSaveButtonV30() {
+  const box = document.getElementById("nocManualEditBox");
+  if (!box) return;
+
+  let btn = document.getElementById("csvbManualObsSaveRefreshBtn");
+  if (btn) return;
+
+  btn = document.createElement("button");
+  btn.id = "csvbManualObsSaveRefreshBtn";
+  btn.type = "button";
+  btn.className = "csvb-manual-obs-save-refresh-btn";
+  btn.textContent = "✓ Save + Refresh Risk";
+  btn.title = "Save SOC / NOC / Observation Text and refresh the risk calculation";
+
+  box.appendChild(btn);
+
+  btn.addEventListener("click", csvbManualObsSaveAndRefreshV30);
+}
+
+async function csvbManualObsSaveAndRefreshV30() {
+  const item = state.item;
+
+  if (!item) return;
+
+  if (String(item.id).startsWith("legacy-")) {
+    alert("This item comes from the legacy table and cannot be manually updated here. Re-import it into the new multi-item table first.");
+    return;
+  }
+
+  const btn = document.getElementById("csvbManualObsSaveRefreshBtn");
+
+  try {
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = "Saving…";
+    }
+
+    setSaveStatus("Saving manual fields…");
+
+    const select = document.getElementById("nocManualSelect");
+    const nocField = document.getElementById("nocField");
+
+    if (select && nocField && String(select.value || "").trim()) {
+      nocField.value = String(select.value || "").trim();
+    }
+
+    const designation = normDesignation(item.designation);
+
+    const soc = String(document.getElementById("socField")?.value || "").trim() || null;
+    const noc = String(document.getElementById("nocField")?.value || "").trim() || null;
+    const observationText = String(document.getElementById("supportingCommentField")?.value || "").trim() || null;
+
+    const payload = {
+      nature_of_concern: noc,
+      observation_text: observationText,
+    };
+
+    if (designation === "Human") {
+      payload.positive_rank = soc;
+      payload.classification_coding = noc;
+    } else {
+      payload.classification_coding = soc;
+    }
+
+    const { data, error } = await state.supabase
+      .from("post_inspection_observation_items")
+      .update(payload)
+      .eq("id", item.id)
+      .select("*")
+      .single();
+
+    if (error) throw error;
+
+    state.item = data;
+
+    setSaveStatus("Refreshing risk…");
+
+    try {
+      const reportId = state.report?.id || getUrlParam("report_id");
+
+      if (reportId) {
+        await state.supabase.rpc("csvb_store_post_inspection_risk_snapshots_all_profiles", {
+          p_report_id: reportId,
+        });
+      }
+    } catch (riskError) {
+      console.warn("Risk refresh failed after manual field save.", riskError);
+      alert("Manual fields were saved, but risk refresh failed: " + (riskError?.message || String(riskError)));
+    }
+
+    try {
+      await loadSelectedObservationRisks();
+    } catch (reloadError) {
+      console.warn("Risk reload failed after manual field save.", reloadError);
+    }
+
+    renderObservation();
+    renderPgnoSelector();
+    loadResponseFields();
+
+    setSaveStatus("Saved");
+  } catch (e) {
+    console.error(e);
+    setSaveStatus("Error");
+    alert("Manual save failed: " + (e?.message || String(e)));
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = "✓ Save + Refresh Risk";
+    }
+
+    csvbManualObsEnsureSaveButtonV30();
+  }
+}
+
+(function csvbManualObsSaveButtonBootV30() {
+  function tick() {
+    try {
+      csvbManualObsEnsureSaveButtonV30();
+    } catch (e) {
+      console.warn("Manual save button setup failed.", e);
+    }
+  }
+
+  document.addEventListener("DOMContentLoaded", tick);
+  window.addEventListener("load", tick);
+  setTimeout(tick, 250);
+  setTimeout(tick, 1000);
+  setTimeout(tick, 2500);
+})();
+ /* CSVB_OBS_MANUAL_SAVE_REFRESH_V30_END */
+
+
+/* CSVB_OBS_VISIBLE_MANUAL_SAVE_V31_START */
+function csvbObsEnsureVisibleManualSaveV31() {
+  const nocField = document.getElementById("nocField");
+  if (!nocField) return;
+
+  const parent = nocField.closest(".pi-field") || nocField.parentElement;
+  if (!parent) return;
+
+  let row = document.getElementById("csvbManualObsSaveRefreshRow");
+  if (!row) {
+    row = document.createElement("div");
+    row.id = "csvbManualObsSaveRefreshRow";
+    row.className = "csvb-manual-obs-save-refresh-row";
+    row.innerHTML = `
+      <button
+        id="csvbManualObsSaveRefreshBtn"
+        type="button"
+        class="csvb-manual-obs-save-refresh-btn"
+        title="Save SOC / NOC / Observation Text and refresh the risk calculation"
+      >
+        ✓ Save + Refresh Risk
+      </button>
+    `;
+
+    const manualBox = document.getElementById("nocManualEditBox");
+    if (manualBox && manualBox.parentElement === parent) {
+      manualBox.insertAdjacentElement("afterend", row);
+    } else {
+      parent.appendChild(row);
+    }
+  }
+
+  const btn = document.getElementById("csvbManualObsSaveRefreshBtn");
+  if (!btn || btn.dataset.csvbBound === "1") return;
+
+  btn.dataset.csvbBound = "1";
+  btn.addEventListener("click", csvbObsManualSaveRefreshV31);
+}
+
+async function csvbObsManualSaveRefreshV31() {
+  const item = state.item;
+
+  if (!item) return;
+
+  if (String(item.id).startsWith("legacy-")) {
+    alert("This item comes from the legacy table and cannot be manually updated here. Re-import it into the new multi-item table first.");
+    return;
+  }
+
+  const btn = document.getElementById("csvbManualObsSaveRefreshBtn");
+
+  try {
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = "Saving…";
+    }
+
+    setSaveStatus("Saving manual fields…");
+
+    const select = document.getElementById("nocManualSelect");
+    const nocField = document.getElementById("nocField");
+
+    if (select && nocField && String(select.value || "").trim()) {
+      nocField.value = String(select.value || "").trim();
+    }
+
+    const designation = normDesignation(item.designation);
+
+    const soc = String(document.getElementById("socField")?.value || "").trim() || null;
+    const noc = String(document.getElementById("nocField")?.value || "").trim() || null;
+    const observationText = String(document.getElementById("supportingCommentField")?.value || "").trim() || null;
+
+    const payload = {
+      nature_of_concern: noc,
+      observation_text: observationText,
+    };
+
+    if (designation === "Human") {
+      payload.positive_rank = soc;
+      payload.classification_coding = noc;
+    } else {
+      payload.classification_coding = soc;
+    }
+
+    const { data, error } = await state.supabase
+      .from("post_inspection_observation_items")
+      .update(payload)
+      .eq("id", item.id)
+      .select("*")
+      .single();
+
+    if (error) throw error;
+
+    state.item = data;
+
+    setSaveStatus("Refreshing risk…");
+
+    const reportId = state.report?.id || getUrlParam("report_id");
+
+    if (reportId) {
+      const { error: riskError } = await state.supabase.rpc("csvb_store_post_inspection_risk_snapshots_all_profiles", {
+        p_report_id: reportId,
+      });
+
+      if (riskError) throw riskError;
+    }
+
+    await loadSelectedObservationRisks();
+
+    renderObservation();
+    renderPgnoSelector();
+    loadResponseFields();
+
+    setSaveStatus("Saved");
+  } catch (e) {
+    console.error(e);
+    setSaveStatus("Error");
+    alert("Manual save / risk refresh failed: " + (e?.message || String(e)));
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = "✓ Save + Refresh Risk";
+      btn.dataset.csvbBound = "";
+    }
+
+    csvbObsEnsureVisibleManualSaveV31();
+  }
+}
+
+(function csvbObsVisibleManualSaveBootV31() {
+  function tick() {
+    try {
+      csvbObsEnsureVisibleManualSaveV31();
+    } catch (e) {
+      console.warn("Visible manual save button setup failed.", e);
+    }
+  }
+
+  document.addEventListener("DOMContentLoaded", tick);
+  window.addEventListener("load", tick);
+  setTimeout(tick, 250);
+  setTimeout(tick, 1000);
+  setTimeout(tick, 2500);
+  setTimeout(tick, 5000);
+})();
+ /* CSVB_OBS_VISIBLE_MANUAL_SAVE_V31_END */
