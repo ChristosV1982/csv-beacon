@@ -5,7 +5,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "SIRE-FILTER-LEGEND-HELPER-20260520_2";
+  const BUILD = "SIRE-FILTER-LEGEND-HELPER-20260520_3";
   window.CSVB_SIRE_FILTER_LEGEND_HELPER_BUILD = BUILD;
 
   const FILTER_NOTES = {
@@ -108,8 +108,29 @@
       .csvb-sire-legend-rot1 { background: #fdecec; }
       .csvb-sire-legend-rot2 { background: #fff2e0; }
 
+      #facet_chapter .facetBody {
+        width: max-content !important;
+        min-width: 430px !important;
+        max-width: none !important;
+      }
+
+      #facetOptions_chapter {
+        width: max-content !important;
+        min-width: 400px !important;
+        max-width: none !important;
+      }
+
+      #facetOptions_chapter .facetOpt {
+        width: max-content !important;
+        min-width: 390px !important;
+      }
+
+      #facetOptions_chapter .facetOpt label {
+        white-space: nowrap !important;
+      }
+
       #facetOptions_chapter .facetOpt label span {
-        white-space: normal;
+        white-space: nowrap !important;
         line-height: 1.25;
       }
     `;
