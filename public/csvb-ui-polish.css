@@ -297,7 +297,204 @@ tbody tr:hover td{
 .err,
 .error,
 .msg.err,
-.qa-msg.err,
-.qo-msg.err{
+.qo-msg.err,
+.qa-msg.err{
   font-weight: 500 !important;
+}
+
+/* ------------------------------------------------------------
+   9. C.S.V. BEACON module visual standard pass
+
+   Purpose:
+   - Harmonise module topbars.
+   - Standardise Dashboard navigation button.
+   - Keep modules compact and full-width.
+   - Visual-only; no business logic.
+------------------------------------------------------------ */
+
+body{
+  background: var(--bg-main, #eef3f9) !important;
+  color: var(--text-main, #062A5E) !important;
+}
+
+.topbar,
+.csvb-pi-topbar,
+header.topbar{
+  width: 100% !important;
+  max-width: none !important;
+  min-height: 56px !important;
+  padding: 8px 12px !important;
+  border-radius: 0 !important;
+  background: linear-gradient(90deg, var(--brand-navy-dark, #031B3F), var(--brand-navy, #062A5E)) !important;
+  color: #fff !important;
+  box-shadow: 0 8px 20px rgba(3, 27, 63, .18) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 10px !important;
+  flex-wrap: wrap !important;
+  box-sizing: border-box !important;
+}
+
+.topbar-left,
+.topbar-right,
+.csvb-pi-actions,
+.header-actions,
+.nav-actions{
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  flex-wrap: wrap !important;
+}
+
+.topbar-left{
+  min-width: 280px !important;
+}
+
+.topbar-right,
+.csvb-pi-actions{
+  justify-content: flex-end !important;
+}
+
+.brand,
+.csvb-brand-title,
+.pageTitle,
+.topbar .brand{
+  color: #fff !important;
+  font-weight: 800 !important;
+  line-height: 1.05 !important;
+  letter-spacing: .01em !important;
+}
+
+.topbar .muted,
+.topbar .small,
+.csvb-pi-mode-line,
+.csvb-brand-subtitle{
+  color: rgba(255,255,255,.78) !important;
+  font-weight: 500 !important;
+}
+
+.topbar .btn,
+.topbar button,
+.topbar .btn.light,
+.topbar .pi-pill,
+.topbar .badge,
+.csvb-pi-topbar .btn,
+.csvb-pi-topbar button,
+.csvb-pi-topbar .pi-pill{
+  min-height: 30px !important;
+  padding: 6px 10px !important;
+  border-radius: 10px !important;
+  border: 1px solid rgba(255,255,255,.28) !important;
+  background: rgba(255,255,255,.10) !important;
+  color: #fff !important;
+  font-weight: 700 !important;
+  white-space: nowrap !important;
+}
+
+.topbar .btn.primary,
+.topbar button.primary,
+.csvb-pi-topbar .btn.primary,
+.csvb-pi-topbar button.primary{
+  background: #00A6B7 !important;
+  border-color: #00A6B7 !important;
+  color: #fff !important;
+}
+
+.csvb-dashboard-btn{
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 5px !important;
+  min-height: 30px !important;
+  padding: 6px 10px !important;
+  border-radius: 10px !important;
+  border: 1px solid rgba(255,255,255,.35) !important;
+  background: rgba(255,255,255,.14) !important;
+  color: #fff !important;
+  font-weight: 800 !important;
+  white-space: nowrap !important;
+}
+
+.csvb-dashboard-btn:hover{
+  background: rgba(255,255,255,.22) !important;
+  transform: translateY(-1px);
+}
+
+.page,
+.wrap,
+.pi-wrap,
+.adminWrap,
+.dashboardWrap,
+.appWrap,
+.content,
+main{
+  max-width: none !important;
+  width: 100% !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+  box-sizing: border-box !important;
+}
+
+.page,
+.wrap,
+.pi-wrap,
+.adminWrap,
+.appWrap,
+.content{
+  padding-left: 8px !important;
+  padding-right: 8px !important;
+}
+
+.card,
+.pi-card,
+.panel,
+.response-block,
+.qa-panel,
+.qo-panel,
+.assignmentBox{
+  border: 1px solid var(--csvb-soft-border, #D6E4F5) !important;
+  background: #fff !important;
+  border-radius: 12px !important;
+  box-shadow: 0 8px 18px rgba(3,27,63,.06) !important;
+}
+
+.filterRibbon,
+.filters,
+.toolbar,
+.actionsBar,
+.facetWrap{
+  border-color: var(--csvb-soft-border, #D6E4F5) !important;
+  border-radius: 12px !important;
+  background: #F7FAFE !important;
+}
+
+.facet,
+details.facet,
+select,
+input,
+textarea{
+  border-color: #B8D8EA !important;
+}
+
+button:hover,
+.btn:hover,
+.btn2:hover,
+.qa-btn:hover,
+.qo-btn:hover{
+  filter: brightness(1.02);
+}
+
+@media (max-width: 900px){
+  .topbar,
+  .csvb-pi-topbar,
+  header.topbar{
+    align-items: flex-start !important;
+  }
+
+  .topbar-right,
+  .csvb-pi-actions{
+    width: 100% !important;
+    justify-content: flex-start !important;
+  }
 }
