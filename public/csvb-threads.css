@@ -660,3 +660,190 @@ tbody tr:hover td {
   font-size: .8rem;
   margin-top: 2px;
 }
+
+
+/* === Threads Phase 1 layout polish — 2026-05-22 === */
+
+.csvb-threads-topbar {
+  min-height: 54px;
+}
+
+.csvb-threads-wrap {
+  padding: 8px !important;
+}
+
+.csvb-threads-hero {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px 16px;
+  align-items: baseline;
+  padding: 9px 12px;
+}
+
+.csvb-threads-hero h1 {
+  margin: 0;
+  font-size: 1.18rem;
+}
+
+.csvb-threads-hero p {
+  margin: 0;
+  font-size: .88rem;
+}
+
+.csvb-threads-hero #msgBox {
+  grid-column: 1 / -1;
+}
+
+.csvb-threads-grid {
+  grid-template-columns: minmax(420px, .86fr) minmax(620px, 1.14fr);
+  align-items: start;
+}
+
+.csvb-thread-workspace {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.csvb-thread-list-card,
+.csvb-thread-detail-card,
+.csvb-thread-create-panel {
+  margin-bottom: 0;
+}
+
+.csvb-thread-list-head {
+  align-items: baseline;
+  border-bottom: 1px solid #E1ECF7;
+  padding-bottom: 6px;
+  margin-bottom: 6px;
+}
+
+.csvb-thread-filter-row {
+  display: grid;
+  grid-template-columns: minmax(140px, .75fr) minmax(150px, .8fr) minmax(220px, 1.1fr) auto;
+  gap: 8px;
+  align-items: end;
+}
+
+.csvb-field-action {
+  flex: 0 0 auto;
+  align-self: end;
+  min-width: auto;
+}
+
+.csvb-thread-table-wrap {
+  max-height: calc(100vh - 330px);
+  min-height: 360px;
+  overflow: auto;
+  border: 1px solid #E1ECF7;
+  border-radius: 10px;
+}
+
+.csvb-thread-table-wrap thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+.csvb-thread-detail-card {
+  min-height: 360px;
+}
+
+.csvb-thread-create-panel {
+  padding: 0;
+  overflow: visible;
+}
+
+.csvb-thread-create-summary {
+  cursor: pointer;
+  list-style: none;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+  color: #062A5E;
+  border-radius: 12px;
+  background: #F7FAFE;
+}
+
+.csvb-thread-create-summary::-webkit-details-marker {
+  display: none;
+}
+
+.csvb-thread-create-summary span {
+  font-weight: 800;
+  color: #062A5E;
+}
+
+.csvb-thread-create-summary small {
+  color: #5E6F86;
+  font-weight: 500;
+}
+
+.csvb-thread-create-panel[open] .csvb-thread-create-summary {
+  border-bottom: 1px solid #E1ECF7;
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.csvb-thread-create-body {
+  padding: 10px 12px 12px;
+}
+
+.message-list {
+  max-height: calc(100vh - 470px);
+  min-height: 220px;
+}
+
+#threadDetailActions > h2 {
+  border-top: 1px solid #E1ECF7;
+  padding-top: 8px;
+}
+
+#csvbThreadInboxCard .section-head,
+#csvbRelatedThreadsCard .section-head {
+  margin-bottom: 4px;
+}
+
+.thread-inbox-grid {
+  grid-template-columns: repeat(8, minmax(92px, 1fr));
+}
+
+.thread-inbox-tile {
+  padding: 7px 8px;
+}
+
+.thread-inbox-tile .n {
+  font-size: 1.12rem;
+}
+
+.thread-inbox-tile .t {
+  font-size: .76rem;
+}
+
+@media (max-width: 1300px) {
+  .csvb-threads-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .csvb-thread-table-wrap,
+  .message-list {
+    max-height: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .csvb-threads-hero {
+    grid-template-columns: 1fr;
+  }
+
+  .csvb-thread-filter-row {
+    grid-template-columns: 1fr;
+  }
+
+  .csvb-field-action button {
+    width: 100%;
+    justify-content: center;
+  }
+}
