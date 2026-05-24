@@ -5,7 +5,9 @@
   <title>C.S.V. BEACON — Threads</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-  <link rel="stylesheet" href="./csvb-threads.css?v=20260501_2" />
+  <link rel="stylesheet" href="./csv-beacon-theme.css?v=20260428_3" />
+  <link rel="stylesheet" href="./csvb-threads.css?v=20260522_threads_phase1" />
+  <link rel="stylesheet" href="./csvb-ui-polish.css?v=20260522_visual_standards" />
   <link rel="stylesheet" href="./csvb-help-tooltips.css?v=20260430_1" />
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -15,18 +17,18 @@
 </head>
 
 <body>
-  <header class="topbar">
+  <header class="topbar csvb-threads-topbar">
     <div class="brand">🧵 C.S.V. BEACON — Threads</div>
     <div class="topbar-spacer"></div>
     <button class="secondary" id="notificationsBtn" type="button" data-csvb-help="View unread thread alerts.">Alerts: 0</button>
     <span class="badge" id="userBadge">Loading…</span>
-    <button class="secondary" id="dashboardBtn" type="button" data-csvb-help="Return to the dashboard.">Dashboard</button>
+    <button class="secondary csvb-dashboard-btn" id="dashboardBtn" type="button" data-csvb-help="Return to the dashboard.">⌂ Dashboard</button>
     <button class="secondary" id="refreshBtn" type="button" data-csvb-help="Reload threads, participants and alerts.">Refresh</button>
     <button id="logoutBtn" type="button" data-csvb-help="Sign out of the current session.">Logout</button>
   </header>
 
-  <main class="wrap">
-    <section class="hero">
+  <main class="wrap csvb-threads-wrap">
+    <section class="hero csvb-threads-hero">
       <h1>Threads</h1>
       <p>
         Company-specific discussion threads for general matters, questions, PGNOs,
@@ -56,11 +58,14 @@
       </div>
     </section>
 
-    <div class="grid">
-      <section class="card">
-        <h2>Thread List</h2>
+    <div class="grid csvb-threads-grid">
+      <section class="card csvb-thread-list-card">
+        <div class="section-head csvb-thread-list-head">
+          <h2>Thread List</h2>
+          <span class="compact-note">Open, filter and control current discussion threads.</span>
+        </div>
 
-        <div class="row">
+        <div class="row csvb-thread-filter-row">
           <div class="field">
             <label for="statusFilter">Status</label>
             <select id="statusFilter">
@@ -85,12 +90,12 @@
             <input id="searchInput" placeholder="Title, question no., PGNO…" />
           </div>
 
-          <div class="field" style="flex:0 0 auto; align-self:end;">
+          <div class="field csvb-field-action">
             <button class="secondary" id="applyFilterBtn" type="button" data-csvb-help="Apply the selected filters.">Apply</button>
           </div>
         </div>
 
-        <div class="table-wrap">
+        <div class="table-wrap csvb-thread-table-wrap">
           <table>
             <thead>
               <tr>
@@ -111,121 +116,8 @@
         </div>
       </section>
 
-      <section>
-        <div class="card">
-          <h2>Create Thread</h2>
-
-          <div class="row">
-            <div class="field">
-              <label for="createVessel">Vessel</label>
-              <select id="createVessel"></select>
-            </div>
-
-            <div class="field">
-              <label for="createSourceMode">Source</label>
-              <select id="createSourceMode">
-                <option value="general">General / free text</option>
-                <option value="question">Specific question</option>
-                <option value="pgno">Specific PGNO</option>
-              </select>
-            </div>
-
-            <div class="field">
-              <label for="createPriority">Priority</label>
-              <select id="createPriority">
-                <option value="low">Low</option>
-                <option value="normal" selected>Normal</option>
-                <option value="high">High</option>
-                <option value="critical">Critical</option>
-              </select>
-            </div>
-
-            <div class="field">
-              <label for="createTargetDate">Target date</label>
-              <input id="createTargetDate" type="date" />
-            </div>
-          </div>
-
-          <div id="questionSelectorBlock" class="selector-block" style="display:none;">
-            <div class="row">
-              <div class="field wide">
-                <label for="questionSearchInput">Search company question library</label>
-                <input id="questionSearchInput" placeholder="Search question number or text…" />
-              </div>
-              <div class="field" style="flex:0 0 auto; align-self:end;">
-                <button class="secondary" id="questionSearchBtn" type="button" data-csvb-help="Search available questions for the selected company.">Search Questions</button>
-              </div>
-            </div>
-
-            <div class="table-wrap compact-table-wrap">
-              <table class="compact-table">
-                <thead>
-                  <tr>
-                    <th>Question</th>
-                    <th>Text</th>
-                    <th>Source</th>
-                    <th>Action</th>
-                  </tr>
-                </thead>
-                <tbody id="questionResultsTbody">
-                  <tr><td colspan="4" class="muted">Search or select source to load questions.</td></tr>
-                </tbody>
-              </table>
-            </div>
-
-            <div id="selectedQuestionBox" class="selected-box muted">No question selected.</div>
-          </div>
-
-          <div id="pgnoSelectorBlock" class="selector-block" style="display:none;">
-            <div class="row">
-              <div class="field wide">
-                <label for="pgnoSelect">Select PGNO</label>
-                <select id="pgnoSelect"></select>
-              </div>
-            </div>
-            <div id="selectedPgnoBox" class="selected-box muted">No PGNO selected.</div>
-          </div>
-
-          <div class="row">
-            <div class="field wide">
-              <label for="createTitle">Title</label>
-              <input id="createTitle" placeholder="Short thread title…" />
-            </div>
-          </div>
-
-          <div class="row">
-            <div class="field wide">
-              <label for="createInitialMessage">Initial Message</label>
-              <textarea id="createInitialMessage" placeholder="Write the opening discussion message…"></textarea>
-            </div>
-          </div>
-
-          <h2 style="margin-top:12px;">Participants</h2>
-          <div class="compact-note">Select users from the same company. Participants will receive thread alerts.</div>
-
-          <div class="row">
-            <div class="field">
-              <label for="responsibleSelect">Responsible</label>
-              <select id="responsibleSelect"></select>
-            </div>
-
-            <div class="field">
-              <label for="verifierSelect">Verifier</label>
-              <select id="verifierSelect"></select>
-            </div>
-          </div>
-
-          <div class="participant-box" id="participantList">
-            <div class="muted">Loading participants…</div>
-          </div>
-
-          <div class="row">
-            <button id="createThreadBtn" type="button" data-csvb-help="Create the thread and notify selected participants.">Create Thread</button>
-            <button class="secondary" id="clearCreateBtn" type="button" data-csvb-help="Clear the create-thread form.">Clear</button>
-          </div>
-        </div>
-
-        <div class="card" id="threadDetailCard">
+      <section class="csvb-thread-workspace">
+        <div class="card csvb-thread-detail-card" id="threadDetailCard">
           <h2>Thread Detail</h2>
           <div id="threadDetailBox" class="muted">Select a thread to open it.</div>
 
@@ -243,7 +135,7 @@
                   <option value="archived">Archived</option>
                 </select>
               </div>
-              <div class="field" style="flex:0 0 auto; align-self:end;">
+              <div class="field csvb-field-action">
                 <button class="secondary" id="updateStatusBtn" type="button" data-csvb-help="Update the selected thread status.">Update Status</button>
               </div>
             </div>
@@ -276,6 +168,124 @@
             </div>
           </div>
         </div>
+
+        <details class="card csvb-thread-create-panel" id="createThreadPanel">
+          <summary class="csvb-thread-create-summary">
+            <span>+ New Thread</span>
+            <small>Create a general thread, question thread or PGNO thread.</small>
+          </summary>
+
+          <div class="csvb-thread-create-body">
+            <div class="row">
+              <div class="field">
+                <label for="createVessel">Vessel</label>
+                <select id="createVessel"></select>
+              </div>
+
+              <div class="field">
+                <label for="createSourceMode">Source</label>
+                <select id="createSourceMode">
+                  <option value="general">General / free text</option>
+                  <option value="question">Specific question</option>
+                  <option value="pgno">Specific PGNO</option>
+                </select>
+              </div>
+
+              <div class="field">
+                <label for="createPriority">Priority</label>
+                <select id="createPriority">
+                  <option value="low">Low</option>
+                  <option value="normal" selected>Normal</option>
+                  <option value="high">High</option>
+                  <option value="critical">Critical</option>
+                </select>
+              </div>
+
+              <div class="field">
+                <label for="createTargetDate">Target date</label>
+                <input id="createTargetDate" type="date" />
+              </div>
+            </div>
+
+            <div id="questionSelectorBlock" class="selector-block" style="display:none;">
+              <div class="row">
+                <div class="field wide">
+                  <label for="questionSearchInput">Search company question library</label>
+                  <input id="questionSearchInput" placeholder="Search question number or text…" />
+                </div>
+                <div class="field csvb-field-action">
+                  <button class="secondary" id="questionSearchBtn" type="button" data-csvb-help="Search available questions for the selected company.">Search Questions</button>
+                </div>
+              </div>
+
+              <div class="table-wrap compact-table-wrap">
+                <table class="compact-table">
+                  <thead>
+                    <tr>
+                      <th>Question</th>
+                      <th>Text</th>
+                      <th>Source</th>
+                      <th>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody id="questionResultsTbody">
+                    <tr><td colspan="4" class="muted">Search or select source to load questions.</td></tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <div id="selectedQuestionBox" class="selected-box muted">No question selected.</div>
+            </div>
+
+            <div id="pgnoSelectorBlock" class="selector-block" style="display:none;">
+              <div class="row">
+                <div class="field wide">
+                  <label for="pgnoSelect">Select PGNO</label>
+                  <select id="pgnoSelect"></select>
+                </div>
+              </div>
+              <div id="selectedPgnoBox" class="selected-box muted">No PGNO selected.</div>
+            </div>
+
+            <div class="row">
+              <div class="field wide">
+                <label for="createTitle">Title</label>
+                <input id="createTitle" placeholder="Short thread title…" />
+              </div>
+            </div>
+
+            <div class="row">
+              <div class="field wide">
+                <label for="createInitialMessage">Initial Message</label>
+                <textarea id="createInitialMessage" placeholder="Write the opening discussion message…"></textarea>
+              </div>
+            </div>
+
+            <h2 style="margin-top:12px;">Participants</h2>
+            <div class="compact-note">Select users from the same company. Participants will receive thread alerts.</div>
+
+            <div class="row">
+              <div class="field">
+                <label for="responsibleSelect">Responsible</label>
+                <select id="responsibleSelect"></select>
+              </div>
+
+              <div class="field">
+                <label for="verifierSelect">Verifier</label>
+                <select id="verifierSelect"></select>
+              </div>
+            </div>
+
+            <div class="participant-box" id="participantList">
+              <div class="muted">Loading participants…</div>
+            </div>
+
+            <div class="row">
+              <button id="createThreadBtn" type="button" data-csvb-help="Create the thread and notify selected participants.">Create Thread</button>
+              <button class="secondary" id="clearCreateBtn" type="button" data-csvb-help="Clear the create-thread form.">Clear</button>
+            </div>
+          </div>
+        </details>
       </section>
     </div>
   </main>
