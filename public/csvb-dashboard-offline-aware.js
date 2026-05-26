@@ -6,7 +6,12 @@
 (() => {
   "use strict";
 
-  const BUILD = "DASHBOARD-OFFLINE-AWARE-2026-05-26-PHASE1-U02";
+  const BUILD = "DASHBOARD-OFFLINE-AWARE-2026-05-26-PHASE1-U03";
+  const CONTROLLED_ATTR = "data-csvb-offline-aware";
+
+  function isOfflineLike() {
+    return navigator.onLine === false;
+  }
 
   function isFetchOrServerWarning(text) {
     const s = String(text || "").toLowerCase();
@@ -15,7 +20,9 @@
       s.includes("supabase js not loaded") ||
       s.includes("check @supabase/supabase-js script tag") ||
       s.includes("networkerror") ||
-      s.includes("load failed");
+      s.includes("load failed") ||
+      s.includes("could not load company module access") ||
+      s.includes("could not load companies");
   }
 
   function controlledOfflineMessage() {
@@ -27,20 +34,41 @@
     ].join("\n");
   }
 
+  function ensureWarnBox() {
+    return document.getElementById("warnBox");
+  }
+
+  function setControlledWarnBox() {
+    const warn = ensureWarnBox();
+    if (!warn) return;
+
+    const wanted = controlledOfflineMessage();
+    if (String(warn.textContent || "") !== wanted) {
+      warn.textContent = wanted;
+    }
+
+    warn.style.display = "block";
+    warn.setAttribute(CONTROLLED_ATTR, "1");
+  }
+
   function normaliseWarnBox() {
-    const warn = document.getElementById("warnBox");
+    const warn = ensureWarnBox();
     if (!warn) return;
 
     const text = String(warn.textContent || "").trim();
-    if (!text || !isFetchOrServerWarning(text)) return;
 
-    warn.textContent = controlledOfflineMessage();
-    warn.style.display = "block";
-    warn.dataset.csvbOfflineAware = "1";
+    if (isOfflineLike()) {
+      setControlledWarnBox();
+      return;
+    }
+
+    if (text && isFetchOrServerWarning(text)) {
+      setControlledWarnBox();
+    }
   }
 
   function installWarnBoxObserver() {
-    const warn = document.getElementById("warnBox");
+    const warn = ensureWarnBox();
     if (!warn || warn.dataset.csvbOfflineObserver === "1") return;
 
     warn.dataset.csvbOfflineObserver = "1";
@@ -65,7 +93,7 @@
     const originalShowWarn = window.showWarn;
 
     const wrappedShowWarn = function csvbOfflineAwareShowWarn(message) {
-      if (isFetchOrServerWarning(message)) {
+      if (isOfflineLike() || isFetchOrServerWarning(message)) {
         return originalShowWarn(controlledOfflineMessage());
       }
       return originalShowWarn(message);
@@ -99,11 +127,14 @@
 
     tick();
 
-    // Dashboard may issue several delayed async requests. Keep the warning
-    // controlled if late offline/server fetch errors arrive after page load.
-    [250, 750, 1500, 3000, 6000, 10000, 15000, 30000].forEach((ms) => {
+    // Dashboard may issue several delayed async requests. While offline, keep
+    // enforcing the controlled message so raw async fetch errors cannot remain.
+    [100, 250, 500, 750, 1000, 1500, 2000, 3000, 5000, 8000, 12000, 20000, 30000, 45000, 60000].forEach((ms) => {
       setTimeout(tick, ms);
     });
+
+    window.addEventListener("offline", tick);
+    window.addEventListener("online", tick);
   }
 
   if (document.readyState === "loading") {
