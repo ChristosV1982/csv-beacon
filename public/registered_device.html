@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>C.S.V. BEACON — Registered Device</title>
+  <link rel="stylesheet" href="./csv-beacon-theme.css?v=20260428_3" />
+  <link rel="stylesheet" href="./style.css?v=20260428_3" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="./auth.js"></script>
+  <style>
+    body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#F4F8FC;color:#163457;}
+    .topbar{background:linear-gradient(90deg,#031B3F,#062A5E);color:#fff;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;box-shadow:0 8px 22px rgba(3,27,63,.18);}
+    .brand{display:flex;align-items:center;gap:10px;font-weight:950;}
+    .brand img{width:38px;height:38px;object-fit:contain;}
+    .sub{font-size:.78rem;color:rgba(255,255,255,.76);font-weight:700;margin-top:2px;}
+    .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+    .btn,.btn2{border-radius:10px;padding:9px 12px;font-weight:900;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;border:1px solid #AEE3F1;}
+    .btn{background:#062A5E;color:#fff;border-color:#062A5E;}
+    .btn2{background:#E9F7FB;color:#062A5E;}
+    .wrap{padding:14px;max-width:1400px;margin:0 auto;}
+    .pageTitle{border:1px solid #D6E4F5;background:#fff;border-radius:14px;padding:12px 14px;margin-bottom:12px;box-shadow:0 8px 22px rgba(3,27,63,.06);}
+    .pageTitle h1{margin:0;color:#062A5E;font-size:1.2rem;}
+    .pageTitle p{margin:5px 0 0;color:#5E6F86;font-weight:700;}
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <img src="./assets/csv-beacon-icon.png" alt="C.S.V. BEACON logo" />
+      <div>
+        <div>C.S.V. BEACON</div>
+        <div class="sub">Marine Assurance & Compliance Platform</div>
+      </div>
+    </div>
+    <div class="row">
+      <div id="userBadge" style="font-weight:850;opacity:.95;"></div>
+      <a class="btn2" href="./q-dashboard.html">Dashboard</a>
+      <button class="btn2" id="switchUserBtn" type="button">Switch User</button>
+      <button class="btn" id="logoutBtn" type="button">Logout</button>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="pageTitle">
+      <h1>Registered Device</h1>
+      <p>Device registration status for this browser/device profile. D1 foundation only; access blocking is not active yet.</p>
+    </section>
+    <div id="warnBox" style="display:none;"></div>
+  </main>
+
+  <script>
+    (async () => {
+      try {
+        if (window.AUTH?.setupAuthButtons) {
+          await window.AUTH.setupAuthButtons({ badgeId: "userBadge", logoutBtnId: "logoutBtn", switchBtnId: "switchUserBtn" });
+        }
+      } catch (_) {}
+    })();
+  </script>
+  <script src="./csvb-device-context.js?v=20260526_d1_u01"></script>
+  <script src="./csvb-offline-status.js?v=20260522_phase1_dashboard"></script>
+</body>
+</html>
