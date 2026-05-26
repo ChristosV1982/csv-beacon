@@ -1,20 +1,51 @@
 // public/service-worker.js
 // C.S.V. BEACON — Service Worker
-// Goal:
+// Phase 1 PWA foundation.
+//
+// Purpose:
 // - Keep HTML pages/scripts fresh enough to avoid stale UI.
 // - Preserve basic cached app-shell availability.
-// - Provide a safe offline fallback page for failed navigations.
+// - Provide a robust offline fallback for failed navigations.
 //
-// Current phase:
-// - Offline fallback only.
+// Explicit non-scope:
 // - No offline data writes.
-// - No sync queue.
+// - No sync execution.
 // - No module business logic.
 
 const CACHE_PREFIX = "sire-test-";
-const CACHE_VERSION = "v126-offline-fallback-20260522";
+const CACHE_VERSION = "v127-offline-fallback-hardened-20260526";
 const CACHE_NAME = `${CACHE_PREFIX}${CACHE_VERSION}`;
 const OFFLINE_FALLBACK_URL = "./offline.html";
+
+const INLINE_OFFLINE_HTML = `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>C.S.V. BEACON — Offline</title>
+  <style>
+    body{margin:0;min-height:100vh;background:#F4F8FC;color:#163457;font-family:Arial,Helvetica,sans-serif;}
+    .topbar{padding:12px 16px;background:#062A5E;color:#fff;font-weight:900;}
+    .wrap{width:min(900px,calc(100vw - 24px));margin:40px auto;}
+    .card{background:#fff;border:1px solid #D6E4F5;border-radius:16px;padding:20px;box-shadow:0 12px 30px rgba(3,27,63,.10);}
+    h1{margin:0 0 8px;color:#062A5E;}
+    p{line-height:1.45;}
+    .warn{margin:14px 0;padding:12px;border:1px solid #F6D58F;border-radius:12px;background:#FFF6E0;color:#8A5A00;font-weight:800;}
+    button{border:1px solid #062A5E;border-radius:10px;background:#062A5E;color:#fff;padding:9px 13px;font-weight:900;cursor:pointer;}
+  </style>
+</head>
+<body>
+  <div class="topbar">C.S.V. BEACON</div>
+  <main class="wrap">
+    <section class="card">
+      <h1>You are offline</h1>
+      <p>The device currently has no network connection.</p>
+      <div class="warn">Offline operational modules are not active yet. This is a safe fallback page only.</div>
+      <button onclick="location.href='./q-dashboard.html'">Go to Dashboard</button>
+    </section>
+  </main>
+</body>
+</html>`;
 
 const CORE_ASSETS = [
   "./",
@@ -60,6 +91,10 @@ const CORE_ASSETS = [
   "./csvb-dashboard-pla-extension.js",
   "./csvb-dashboard-marine-area-stabilizer.js",
   "./csvb-offline-status.js",
+  "./csvb-offline-db.js",
+  "./csvb-sync-queue.js",
+  "./csvb-sw-register.js",
+  "./csvb-offline-diagnostics.js",
   "./portable-lifting-appliances-wires.html",
   "./portable-lifting-appliances-wires.js",
   "./portable-lifting-appliances-wire-component.js",
@@ -97,16 +132,31 @@ self.addEventListener("install", (event) => {
     (async () => {
       const cache = await caches.open(CACHE_NAME);
 
-      // Cache assets individually so one missing/non-critical asset does not
-      // prevent the offline fallback page from being cached.
+      // Critical fallback: try to cache offline.html first.
+      // If the file is unexpectedly unavailable, store an inline fallback response.
+      try {
+        await cache.add(OFFLINE_FALLBACK_URL);
+      } catch (_) {
+        await cache.put(
+          OFFLINE_FALLBACK_URL,
+          new Response(INLINE_OFFLINE_HTML, {
+            status: 200,
+            headers: { "Content-Type": "text/html; charset=utf-8" }
+          })
+        );
+      }
+
+      // Non-critical app-shell assets. Missing files must not block activation.
       await Promise.allSettled(
-        CORE_ASSETS.map(async (asset) => {
-          try {
-            await cache.add(asset);
-          } catch (_) {
-            // Non-critical cache miss. Runtime network-first remains active.
-          }
-        })
+        CORE_ASSETS
+          .filter((asset) => asset !== OFFLINE_FALLBACK_URL)
+          .map(async (asset) => {
+            try {
+              await cache.add(asset);
+            } catch (_) {
+              // Non-critical cache miss. Runtime network-first remains active.
+            }
+          })
       );
 
       await self.skipWaiting();
@@ -128,7 +178,19 @@ self.addEventListener("activate", (event) => {
   );
 });
 
-async function networkFirst(request, fallbackUrl = null) {
+function inlineOfflineResponse() {
+  return new Response(INLINE_OFFLINE_HTML, {
+    status: 200,
+    headers: { "Content-Type": "text/html; charset=utf-8" }
+  });
+}
+
+async function offlineFallback(cache) {
+  const fallback = await cache.match(OFFLINE_FALLBACK_URL);
+  return fallback || inlineOfflineResponse();
+}
+
+async function networkFirst(request, useOfflineFallback = false) {
   const cache = await caches.open(CACHE_NAME);
 
   try {
@@ -143,9 +205,8 @@ async function networkFirst(request, fallbackUrl = null) {
     const cached = await cache.match(request);
     if (cached) return cached;
 
-    if (fallbackUrl) {
-      const fallback = await cache.match(fallbackUrl);
-      if (fallback) return fallback;
+    if (useOfflineFallback) {
+      return await offlineFallback(cache);
     }
 
     throw e;
@@ -182,7 +243,7 @@ self.addEventListener("fetch", (event) => {
     url.pathname.endsWith(".html");
 
   if (isHTML) {
-    event.respondWith(networkFirst(req, OFFLINE_FALLBACK_URL));
+    event.respondWith(networkFirst(req, true));
   } else {
     event.respondWith(staleWhileRevalidate(req));
   }
