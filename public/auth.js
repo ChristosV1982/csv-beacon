@@ -3,7 +3,7 @@
   "use strict";
 
   // Bump when you change auth behavior (helps confirm cache is cleared)
-  const AUTH_BUILD = "AUTH-2026-05-26-DEVICE-GATE-U09-KEYFIX";
+  const AUTH_BUILD = "AUTH-2026-05-12-ONBOARD-CONTEXT-U07B";
 
   const SUPABASE_URL = "https://bdidrcyufazskpuwmfca.supabase.co";
   const SUPABASE_ANON_KEY =
@@ -59,13 +59,6 @@
     "is_active",
   ].join(", ");
 
-  const DEVICE_GATE_SAFE_PAGES = new Set([
-    "login.html",
-    "offline.html",
-    "offline_diagnostics.html",
-    "registered_device.html",
-  ]);
-
   function roleToUi(role) {
     return UI_ROLE_MAP[role] || role || "";
   }
@@ -111,33 +104,6 @@
     try {
       alert(msg);
     } catch (_) {}
-  }
-
-  function pageName() {
-    return String(window.location.pathname || "").split("/").pop() || "q-dashboard.html";
-  }
-
-  function shouldAutoLoadDeviceGate() {
-    return !DEVICE_GATE_SAFE_PAGES.has(pageName());
-  }
-
-  function loadRegisteredDeviceGate() {
-    if (!shouldAutoLoadDeviceGate()) return Promise.resolve(null);
-    if (window.CSVB_DEVICE_GATE?.checkGate) return Promise.resolve(window.CSVB_DEVICE_GATE);
-    if (document.querySelector('script[data-csvb-device-gate="1"]')) return Promise.resolve(null);
-
-    return new Promise((resolve, reject) => {
-      const script = document.createElement("script");
-      script.src = "./csvb-device-gate.js?v=20260526_d1_u02";
-      script.defer = true;
-      script.dataset.csvbDeviceGate = "1";
-      script.onload = () => resolve(window.CSVB_DEVICE_GATE || null);
-      script.onerror = () => reject(new Error("Failed to load registered device gate."));
-      document.head.appendChild(script);
-    }).catch((e) => {
-      showPageMessage("Registered device gate failed to load.\n\n" + String(e?.message || e));
-      throw e;
-    });
   }
 
   function ensureSupabase() {
@@ -285,7 +251,6 @@
     }
 
     window.CSVB_CONTEXT = bundle;
-    loadRegisteredDeviceGate().catch(() => {});
     return bundle;
   }
 
@@ -365,7 +330,6 @@
     }
 
     fillUserBadge(bundle, badgeId);
-    if (loggedIn) loadRegisteredDeviceGate().catch(() => {});
     return bundle;
   }
 
@@ -394,6 +358,5 @@
     fillUserBadge,
     logoutAndGoLogin,
     setupAuthButtons,
-    loadRegisteredDeviceGate,
   };
 })();
