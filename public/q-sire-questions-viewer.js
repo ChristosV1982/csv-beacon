@@ -5,7 +5,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "SIRE-QUESTIONS-VIEWER-20260516_3";
+  const BUILD = "SIRE-QUESTIONS-VIEWER-20260526_OFFLINE_SAME_UI_1";
   window.CSVB_SIRE_QUESTIONS_VIEWER_BUILD = BUILD;
 
   const $ = (id) => document.getElementById(id);
@@ -155,6 +155,242 @@
     return "";
   }
 
+  const OFFLINE_PACKAGE_ID = "sire_questions_viewer_active_v1";
+  const OFFLINE_FORCE_KEY = "csvb_sire_viewer_force_offline";
+
+  function isTruthyFlag(value) {
+    const v = s(value).trim().toLowerCase();
+    return v === "1" || v === "true" || v === "yes" || v === "on";
+  }
+
+  function offlineRequestStatus() {
+    let queryValue = "";
+
+    try {
+      const params = new URLSearchParams(window.location.search || "");
+      queryValue =
+        params.get("offline") ||
+        params.get("csvb_offline") ||
+        params.get("offline_package") ||
+        "";
+    } catch (_) {}
+
+    let forced = false;
+    try {
+      forced = localStorage.getItem(OFFLINE_FORCE_KEY) === "1";
+    } catch (_) {}
+
+    if (navigator.onLine === false) {
+      return { requested: true, reason: "browser offline" };
+    }
+
+    if (isTruthyFlag(queryValue)) {
+      return { requested: true, reason: "URL offline flag" };
+    }
+
+    if (forced) {
+      return { requested: true, reason: "localStorage offline test flag" };
+    }
+
+    return { requested: false, reason: "online" };
+  }
+
+  function ensureOfflineUiStyles() {
+    if ($("csvbSireViewerOfflineSameUiStyles")) return;
+
+    const style = document.createElement("style");
+    style.id = "csvbSireViewerOfflineSameUiStyles";
+    style.textContent = `
+      html[data-csvb-sire-offline="1"] .csvb-ai-source-launcher,
+      html[data-csvb-sire-offline="1"] #csvbAiSourceModalBackdrop,
+      html[data-csvb-sire-offline="1"] #csvbAiAskBtn,
+      html[data-csvb-sire-offline="1"] #csvbAiCopyAnswerBtn {
+        display: none !important;
+      }
+
+      html[data-csvb-sire-offline="1"] #loginBtn,
+      html[data-csvb-sire-offline="1"] #switchUserBtn,
+      html[data-csvb-sire-offline="1"] #logoutBtn {
+        display: none !important;
+      }
+    `;
+
+    document.head.appendChild(style);
+  }
+
+  function setOfflineUiState(active) {
+    if (active) {
+      ensureOfflineUiStyles();
+      document.documentElement.setAttribute("data-csvb-sire-offline", "1");
+      window.CSVB_SIRE_VIEWER_OFFLINE_ACTIVE = true;
+    } else {
+      document.documentElement.removeAttribute("data-csvb-sire-offline");
+      window.CSVB_SIRE_VIEWER_OFFLINE_ACTIVE = false;
+    }
+  }
+
+  function clearOfflineData() {
+    offlineMode = false;
+    offlinePackage = null;
+    offlineModeReason = "";
+    offlinePgnoByQuestionId = {};
+    offlineEeByQuestionId = {};
+    offlineReferencesByQuestionId = {};
+    setOfflineUiState(false);
+  }
+
+  function offlineSourceSuffix() {
+    return offlineMode ? " from offline package" : "";
+  }
+
+  function offlineDbHelper() {
+    return window.CSVB_OFFLINE_DB || null;
+  }
+
+  async function readOfflinePackage() {
+    const offlineDb = offlineDbHelper();
+
+    if (!offlineDb?.get || !offlineDb?.STORES?.PACKAGES) {
+      throw new Error("Offline DB helper is not loaded.");
+    }
+
+    return await offlineDb.get(offlineDb.STORES.PACKAGES, OFFLINE_PACKAGE_ID);
+  }
+
+  function normalizeOfflineRows(pkg) {
+    const packageRows = Array.isArray(pkg?.rows) ? pkg.rows : [];
+
+    return packageRows
+      .filter(row => s(row?.source_type).trim() === "SIRE")
+      .filter(row => {
+        const status = s(row?.status).trim().toLowerCase();
+        return !status || status === "active";
+      });
+  }
+
+  function normalizePgnoItem(x) {
+    if (typeof x === "string") return { text: s(x), remarks: "" };
+
+    return {
+      text: s(x?.text ?? x?.pgno_text ?? ""),
+      remarks: s(x?.remarks ?? "")
+    };
+  }
+
+  function normalizeEeItem(x) {
+    if (typeof x === "string") {
+      return { text: s(x), esms_references: "", esms_forms: "", remarks: "" };
+    }
+
+    return {
+      text: s(x?.text ?? x?.evidence_text ?? x?.Evidence ?? ""),
+      esms_references: s(x?.esms_references ?? x?.["eSMS Reference(s)"] ?? x?.ch ?? ""),
+      esms_forms: s(x?.esms_forms ?? x?.["eSMS Form(s)"] ?? x?.form ?? ""),
+      remarks: s(x?.remarks ?? "")
+    };
+  }
+
+  function applyOfflinePackage(pkg, reason) {
+    const packageRows = normalizeOfflineRows(pkg);
+
+    if (!packageRows.length) {
+      throw new Error("Offline package exists but contains no active SIRE question rows.");
+    }
+
+    offlineMode = true;
+    offlinePackage = pkg;
+    offlineModeReason = reason || "offline package";
+    offlinePgnoByQuestionId = pkg.pgno_by_question_id || {};
+    offlineEeByQuestionId = pkg.ee_by_question_id || {};
+    offlineReferencesByQuestionId = pkg.references_by_question_id || {};
+
+    rows = packageRows.map(row => {
+      const copy = { ...row, payload: { ...(row?.payload || {}) } };
+      const qid = s(copy.id);
+
+      if (qid) {
+        if (!offlinePgnoByQuestionId[qid] && Array.isArray(copy.payload.__offline_pgno)) {
+          offlinePgnoByQuestionId[qid] = copy.payload.__offline_pgno;
+        }
+
+        if (!offlineEeByQuestionId[qid] && Array.isArray(copy.payload.__offline_ee)) {
+          offlineEeByQuestionId[qid] = copy.payload.__offline_ee;
+        }
+
+        if (!offlineReferencesByQuestionId[qid] && copy.payload.__offline_references) {
+          offlineReferencesByQuestionId[qid] = copy.payload.__offline_references;
+        }
+      }
+
+      return copy;
+    });
+
+    setOfflineUiState(true);
+    return rows;
+  }
+
+  async function tryActivateOfflineMode(options = {}) {
+    const allowOnlineFallback = options.allowOnlineFallback !== false;
+    const req = offlineRequestStatus();
+
+    if (!req.requested) {
+      clearOfflineData();
+      return false;
+    }
+
+    try {
+      const pkg = await readOfflinePackage();
+
+      if (!pkg || !Array.isArray(pkg.rows) || !pkg.rows.length) {
+        clearOfflineData();
+
+        const message =
+          "No local SIRE Questions Viewer offline package is downloaded on this device. " +
+          "Open the Viewer online and use Offline Package > Download Package first.";
+
+        if (!allowOnlineFallback || navigator.onLine === false) {
+          throw new Error(message);
+        }
+
+        console.warn(message);
+        return false;
+      }
+
+      applyOfflinePackage(pkg, req.reason);
+      return true;
+    } catch (error) {
+      clearOfflineData();
+
+      if (!allowOnlineFallback || navigator.onLine === false) {
+        throw error;
+      }
+
+      console.warn("Offline package could not be activated; falling back to online DB:", error);
+      return false;
+    }
+  }
+
+  function loadOfflinePgno(questionId) {
+    const key = s(questionId);
+    const items = offlinePgnoByQuestionId[key] || [];
+    return (Array.isArray(items) ? items : [])
+      .map(normalizePgnoItem)
+      .filter(x => x.text.trim());
+  }
+
+  function loadOfflineEe(questionId) {
+    const key = s(questionId);
+    const items = offlineEeByQuestionId[key] || [];
+    return (Array.isArray(items) ? items : [])
+      .map(normalizeEeItem)
+      .filter(x => x.text.trim());
+  }
+
+  function loadOfflineReferences(questionId) {
+    const key = s(questionId);
+    return offlineReferencesByQuestionId[key] || {};
+  }
+
   const FACETS = [
     ["version", "Version"],
     ["questionType", "Question Type"],
@@ -167,6 +403,12 @@
   let sb = null;
   let rows = [];
   let selected = null;
+  let offlineMode = false;
+  let offlinePackage = null;
+  let offlineModeReason = "";
+  let offlinePgnoByQuestionId = {};
+  let offlineEeByQuestionId = {};
+  let offlineReferencesByQuestionId = {};
   const chosen = Object.fromEntries(FACETS.map(([k]) => [k, new Set()]));
 
   // Stage 1 Viewer search index: PGNO + Expected Evidence child rows.
@@ -290,8 +532,8 @@
   }
 
   function updateIndexStatusLine() {
-    txt("loadedLine", `Loaded ${rows.length} active SIRE 2.0 questions${indexStatusText()}`);
-    txt("loadHint", `Loaded ${rows.length} active SIRE 2.0 question(s).${indexStatusText()}`);
+    txt("loadedLine", `Loaded ${rows.length} active SIRE 2.0 questions${offlineSourceSuffix()}${indexStatusText()}`);
+    txt("loadHint", `Loaded ${rows.length} active SIRE 2.0 question(s)${offlineSourceSuffix()}.${indexStatusText()}`);
   }
 
   async function buildChildSearchIndex() {
@@ -384,6 +626,10 @@
         try {
           if (!row.id) {
             referenceSearchIndex.set(id, "");
+          } else if (offlineMode) {
+            const refRow = loadOfflineReferences(row.id);
+            const text = referenceIndexTextFromRow(refRow).toLowerCase();
+            referenceSearchIndex.set(id, text);
           } else {
             const { data, error } = await sb.rpc("csvb_sire_question_references_for_question", {
               p_question_id: row.id
@@ -533,17 +779,21 @@
     });
 
     txt("countLine", `${data.length} questions`);
-    txt("loadedLine", `Loaded ${rows.length} active SIRE 2.0 questions${indexStatusText()}`);
+    txt("loadedLine", `Loaded ${rows.length} active SIRE 2.0 questions${offlineSourceSuffix()}${indexStatusText()}`);
     renderFacets();
   }
 
   async function loadPgno(questionId) {
+    if (offlineMode) return loadOfflinePgno(questionId);
+
     const { data, error } = await sb.rpc("csvb_pgno_master_for_question_for_me", { p_question_id: questionId });
     if (error) throw error;
     return (data || []).map(x => ({ text: s(x.pgno_text), remarks: s(x.remarks) })).filter(x => x.text.trim());
   }
 
   async function loadEe(questionId) {
+    if (offlineMode) return loadOfflineEe(questionId);
+
     const { data, error } = await sb.rpc("csvb_expected_evidence_for_question_for_me", { p_question_id: questionId });
     if (error) throw error;
     return (data || []).map(x => ({
@@ -661,6 +911,86 @@
     txt("loadHint", "Loading active SIRE 2.0 questions…");
 
     try {
+      const offlineReq = offlineRequestStatus();
+
+      if (offlineReq.requested || offlineMode) {
+        let offlineReady = false;
+
+        try {
+          offlineReady = offlineMode || await tryActivateOfflineMode({
+            allowOnlineFallback: navigator.onLine !== false
+          });
+        } catch (offlineError) {
+          if (navigator.onLine === false) {
+            throw new Error("Offline package mode failed: " + s(offlineError?.message || offlineError));
+          }
+
+          msg(
+            "warnBox",
+            "Offline package could not be used. Falling back to online database.\n\n" +
+            s(offlineError?.message || offlineError)
+          );
+        }
+
+        if (offlineReady) {
+          childSearchBuildToken += 1;
+          referenceSearchBuildToken += 1;
+          childSearchIndexed = 0;
+          childSearchTotal = rows.length;
+          childSearchErrors = 0;
+          referenceSearchIndexed = 0;
+          referenceSearchTotal = rows.length;
+          referenceSearchErrors = 0;
+          seedChildSearchIndexFromPayload();
+          seedReferenceSearchIndex();
+
+          txt(
+            "loadHint",
+            `Loaded ${rows.length} active SIRE 2.0 question(s) from local offline package. Building search indexes…`
+          );
+
+          txt(
+            "modeLine",
+            `Role: offline package • Mode: Read-only offline • Module: SIRE_QUESTIONS_VIEWER`
+          );
+
+          msg(
+            "okBox",
+            `Offline package mode active. Loaded ${rows.length} SIRE 2.0 question(s) from this device.`
+          );
+
+          renderList();
+
+          if (rows.length) {
+            await selectRow(
+              rows.slice().sort((a,b) =>
+                qkey(a)[0] - qkey(b)[0] ||
+                qkey(a)[1] - qkey(b)[1] ||
+                qkey(a)[2] - qkey(b)[2]
+              )[0]
+            );
+          } else {
+            selected = null;
+            if ($("emptyState")) $("emptyState").style.display = "block";
+            if ($("viewPanel")) $("viewPanel").style.display = "none";
+          }
+
+          buildChildSearchIndex().catch((e) => {
+            childSearchErrors += 1;
+            txt("loadHint", `Loaded ${rows.length} active SIRE 2.0 question(s) from offline package. EE/PGNO search index warning: ${s(e?.message || e)}`);
+          });
+
+          buildReferenceSearchIndex().catch((e) => {
+            referenceSearchErrors += 1;
+            txt("loadHint", `Loaded ${rows.length} active SIRE 2.0 question(s) from offline package. Reference search index warning: ${s(e?.message || e)}`);
+          });
+
+          return;
+        }
+      }
+
+      clearOfflineData();
+
       const { data, error } = await sb.rpc("csvb_questions_master_for_me");
       if (error) throw error;
 
@@ -722,8 +1052,75 @@
     });
   }
 
+  function exposeViewerApi() {
+    window.CSVB_SIRE_QUESTIONS_VIEWER = {
+      build: BUILD,
+      reload: loadQuestions,
+      getRows: () => rows.slice(),
+      getSelected: () => selected ? JSON.parse(JSON.stringify(selected)) : null,
+      isOfflineMode: () => offlineMode === true,
+      getOfflinePackageInfo: () => offlinePackage ? {
+        package_id: offlinePackage.package_id || OFFLINE_PACKAGE_ID,
+        package_version: offlinePackage.package_version || "",
+        downloaded_at: offlinePackage.downloaded_at || null,
+        question_count: offlinePackage.question_count || rows.length,
+        error_count: offlinePackage.error_count || 0,
+        reason: offlineModeReason || ""
+      } : null,
+      getChildSearchIndexStatus: () => ({
+        indexed: childSearchIndexed,
+        total: childSearchTotal,
+        errors: childSearchErrors
+      }),
+      getReferenceSearchIndexStatus: () => ({
+        indexed: referenceSearchIndexed,
+        total: referenceSearchTotal,
+        errors: referenceSearchErrors
+      })
+    };
+  }
+
   async function boot() {
     try {
+      const offlineReq = offlineRequestStatus();
+
+      if (offlineReq.requested) {
+        try {
+          const offlineReady = await tryActivateOfflineMode({
+            allowOnlineFallback: navigator.onLine !== false
+          });
+
+          if (offlineReady) {
+            txt("userBadge", "Offline package • SIRE_QUESTIONS_VIEWER");
+
+            ["loginBtn", "switchUserBtn", "logoutBtn"].forEach((id) => {
+              const el = $(id);
+              if (el) el.style.display = "none";
+            });
+
+            txt("modeLine", `Role: offline package • Mode: Read-only offline • Module: SIRE_QUESTIONS_VIEWER`);
+
+            wireUi();
+            document.querySelectorAll(".facet").forEach(d => { try { d.open = false; } catch {} });
+            await loadQuestions();
+            exposeViewerApi();
+            return;
+          }
+        } catch (offlineError) {
+          setOfflineUiState(true);
+          txt("userBadge", "Offline package unavailable");
+          txt("modeLine", `Role: — • Mode: Offline package unavailable • Module: SIRE_QUESTIONS_VIEWER`);
+          wireUi();
+          msg(
+            "warnBox",
+            "Offline Viewer could not start.\\n\\n" +
+            s(offlineError?.message || offlineError)
+          );
+          exposeViewerApi();
+          return;
+        }
+      }
+
       if (!window.supabase) throw new Error("Supabase JS not available.");
       if (!window.AUTH) throw new Error("AUTH helper not loaded.");
 
@@ -744,25 +1141,9 @@
       wireUi();
       document.querySelectorAll(".facet").forEach(d => { try { d.open = false; } catch {} });
       await loadQuestions();
-
-      window.CSVB_SIRE_QUESTIONS_VIEWER = {
-        build: BUILD,
-        reload: loadQuestions,
-        getRows: () => rows.slice(),
-        getSelected: () => selected ? JSON.parse(JSON.stringify(selected)) : null,
-        getChildSearchIndexStatus: () => ({
-          indexed: childSearchIndexed,
-          total: childSearchTotal,
-          errors: childSearchErrors
-        }),
-        getReferenceSearchIndexStatus: () => ({
-          indexed: referenceSearchIndexed,
-          total: referenceSearchTotal,
-          errors: referenceSearchErrors
-        })
-      };
+      exposeViewerApi();
     } catch (e) {
-      msg("warnBox", "Boot failed:\n\n" + s(e?.message || e));
+      msg("warnBox", "Boot failed:\\n\\n" + s(e?.message || e));
     }
   }
 
