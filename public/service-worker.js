@@ -1,18 +1,26 @@
 // public/service-worker.js
-// Goal: stop “stale” pages/scripts forcing multiple hard refreshes.
-// Strategy:
-// - Network-first for HTML navigations
-// - Stale-while-revalidate for static assets
-// - Bump cache version + clean old caches on activate
+// C.S.V. BEACON — Service Worker
+// Goal:
+// - Keep HTML pages/scripts fresh enough to avoid stale UI.
+// - Preserve basic cached app-shell availability.
+// - Provide a safe offline fallback page for failed navigations.
+//
+// Current phase:
+// - Offline fallback only.
+// - No offline data writes.
+// - No sync queue.
+// - No module business logic.
 
 const CACHE_PREFIX = "sire-test-";
-const CACHE_VERSION = "v125-hide-apply-onboard-setup"
+const CACHE_VERSION = "v126-offline-fallback-20260522";
 const CACHE_NAME = `${CACHE_PREFIX}${CACHE_VERSION}`;
+const OFFLINE_FALLBACK_URL = "./offline.html";
 
 const CORE_ASSETS = [
   "./",
   "./index.html",
   "./q-dashboard.html",
+  OFFLINE_FALLBACK_URL,
   "./su-admin.html",
   "./su-admin.js",
   "./csvb-onboard-personnel-admin.js",
@@ -42,13 +50,16 @@ const CORE_ASSETS = [
   "./csv-beacon-theme.css",
   "./auth.js",
   "./csvb-module-guard.js",
+  "./csvb-ui-polish.css",
   "./csvb-ui-polish.js",
   "./csvb-question-admin.js",
   "./csvb-question-overrides-admin.js",
+  "./csvb-dashboard-polish.css",
   "./csvb-dashboard-polish.js",
   "./csvb-dashboard-threads-badge.js",
   "./csvb-dashboard-pla-extension.js",
   "./csvb-dashboard-marine-area-stabilizer.js",
+  "./csvb-offline-status.js",
   "./portable-lifting-appliances-wires.html",
   "./portable-lifting-appliances-wires.js",
   "./portable-lifting-appliances-wire-component.js",
@@ -84,14 +95,21 @@ const CORE_ASSETS = [
 self.addEventListener("install", (event) => {
   event.waitUntil(
     (async () => {
-      try {
-        const cache = await caches.open(CACHE_NAME);
-        await cache.addAll(CORE_ASSETS);
-      } catch (e) {
-        // If any asset fails to cache, still proceed.
-      } finally {
-        await self.skipWaiting();
-      }
+      const cache = await caches.open(CACHE_NAME);
+
+      // Cache assets individually so one missing/non-critical asset does not
+      // prevent the offline fallback page from being cached.
+      await Promise.allSettled(
+        CORE_ASSETS.map(async (asset) => {
+          try {
+            await cache.add(asset);
+          } catch (_) {
+            // Non-critical cache miss. Runtime network-first remains active.
+          }
+        })
+      );
+
+      await self.skipWaiting();
     })()
   );
 });
@@ -110,7 +128,7 @@ self.addEventListener("activate", (event) => {
   );
 });
 
-async function networkFirst(request) {
+async function networkFirst(request, fallbackUrl = null) {
   const cache = await caches.open(CACHE_NAME);
 
   try {
@@ -124,6 +142,12 @@ async function networkFirst(request) {
   } catch (e) {
     const cached = await cache.match(request);
     if (cached) return cached;
+
+    if (fallbackUrl) {
+      const fallback = await cache.match(fallbackUrl);
+      if (fallback) return fallback;
+    }
+
     throw e;
   }
 }
@@ -158,7 +182,7 @@ self.addEventListener("fetch", (event) => {
     url.pathname.endsWith(".html");
 
   if (isHTML) {
-    event.respondWith(networkFirst(req));
+    event.respondWith(networkFirst(req, OFFLINE_FALLBACK_URL));
   } else {
     event.respondWith(staleWhileRevalidate(req));
   }

@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>C.S.V. BEACON — Offline</title>
+
+  <link rel="stylesheet" href="./csv-beacon-theme.css?v=20260428_3" />
+  <link rel="stylesheet" href="./csvb-ui-polish.css?v=20260522_visual_standards" />
+
+  <style>
+    :root{
+      --csvb-navy:#062A5E;
+      --csvb-cyan:#00A6B7;
+      --csvb-bg:#F4F8FC;
+      --csvb-border:#D6E4F5;
+      --csvb-text:#163457;
+      --csvb-muted:#5E6F86;
+      --csvb-warn-bg:#FFF6E0;
+      --csvb-warn-border:#F6D58F;
+      --csvb-warn-text:#8A5A00;
+    }
+
+    html,
+    body{
+      margin:0;
+      min-height:100vh;
+      background:var(--csvb-bg);
+      color:var(--csvb-text);
+      font-family:Arial, Helvetica, sans-serif;
+    }
+
+    .topbar{
+      min-height:56px;
+      padding:10px 14px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      flex-wrap:wrap;
+      color:#fff;
+      background:linear-gradient(90deg,#031B3F,var(--csvb-navy));
+      box-shadow:0 8px 22px rgba(3,27,63,.18);
+    }
+
+    .brand{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      font-weight:900;
+      letter-spacing:.01em;
+    }
+
+    .brand img{
+      width:38px;
+      height:38px;
+      object-fit:contain;
+    }
+
+    .brand-sub{
+      margin-top:2px;
+      color:rgba(255,255,255,.78);
+      font-size:.78rem;
+      font-weight:700;
+    }
+
+    .wrap{
+      width:min(920px,calc(100vw - 24px));
+      margin:38px auto;
+    }
+
+    .card{
+      border:1px solid var(--csvb-border);
+      border-radius:18px;
+      background:#fff;
+      box-shadow:0 14px 36px rgba(3,27,63,.10);
+      padding:22px;
+    }
+
+    h1{
+      margin:0 0 8px;
+      color:var(--csvb-navy);
+      font-size:1.55rem;
+    }
+
+    p{
+      margin:8px 0;
+      line-height:1.45;
+      color:var(--csvb-text);
+    }
+
+    .warn{
+      margin:14px 0;
+      border:1px solid var(--csvb-warn-border);
+      border-radius:14px;
+      background:var(--csvb-warn-bg);
+      color:var(--csvb-warn-text);
+      padding:12px 14px;
+      font-weight:850;
+      line-height:1.35;
+    }
+
+    .actions{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      margin-top:18px;
+    }
+
+    .btn{
+      border:1px solid var(--csvb-navy);
+      border-radius:10px;
+      padding:9px 13px;
+      background:var(--csvb-navy);
+      color:#fff;
+      font-weight:900;
+      cursor:pointer;
+    }
+
+    .btn.secondary{
+      background:#E9F7FB;
+      color:var(--csvb-navy);
+      border-color:#AEE3F1;
+    }
+
+    .muted{
+      color:var(--csvb-muted);
+      font-size:.9rem;
+      font-weight:650;
+    }
+
+    ul{
+      margin:10px 0 0 18px;
+      padding:0;
+      line-height:1.45;
+    }
+
+    li{
+      margin:5px 0;
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <img src="./assets/csv-beacon-icon.png" alt="C.S.V. BEACON logo" />
+      <div>
+        <div>C.S.V. BEACON</div>
+        <div class="brand-sub">Marine Assurance & Compliance Platform</div>
+      </div>
+    </div>
+    <div class="muted" style="color:rgba(255,255,255,.78);">Offline fallback page</div>
+  </header>
+
+  <main class="wrap">
+    <section class="card">
+      <h1>You are offline</h1>
+      <p>
+        This device currently has no network connection. C.S.V. BEACON cannot reach the server from this page.
+      </p>
+
+      <div class="warn">
+        Offline operation is not yet active for operational modules. This page is part of the controlled PWA/offline foundation only.
+      </div>
+
+      <p>When connection is restored, return to the Dashboard and continue normal operation.</p>
+
+      <ul>
+        <li>Do not assume unsynced module changes are saved unless the module clearly shows an offline/sync status.</li>
+        <li>Do not close out operational actions while offline unless the relevant module has been explicitly made offline-capable.</li>
+        <li>For now, use online mode for all write operations.</li>
+      </ul>
+
+      <div class="actions">
+        <button class="btn" type="button" onclick="location.href='./q-dashboard.html'">Go to Dashboard</button>
+        <button class="btn secondary" type="button" onclick="location.reload()">Retry</button>
+      </div>
+    </section>
+  </main>
+</body>
+</html>
