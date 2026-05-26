@@ -13,9 +13,13 @@
 // - No module business logic.
 
 const CACHE_PREFIX = "sire-test-";
-const CACHE_VERSION = "v127-offline-fallback-hardened-20260526";
+const CACHE_VERSION = "v128-cache-supabase-cdn-20260526";
 const CACHE_NAME = `${CACHE_PREFIX}${CACHE_VERSION}`;
 const OFFLINE_FALLBACK_URL = "./offline.html";
+
+const EXTERNAL_RUNTIME_ASSETS = [
+  "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"
+];
 
 const INLINE_OFFLINE_HTML = `<!doctype html>
 <html lang="en">
@@ -159,6 +163,18 @@ self.addEventListener("install", (event) => {
           })
       );
 
+      // External runtime assets used by the Dashboard shell.
+      // These are cached so the already-installed app shell can still load offline.
+      await Promise.allSettled(
+        EXTERNAL_RUNTIME_ASSETS.map(async (asset) => {
+          try {
+            await cache.add(asset);
+          } catch (_) {
+            // If CDN is unavailable during install, runtime cache will try later.
+          }
+        })
+      );
+
       await self.skipWaiting();
     })()
   );
@@ -183,6 +199,10 @@ function inlineOfflineResponse() {
     status: 200,
     headers: { "Content-Type": "text/html; charset=utf-8" }
   });
+}
+
+function isExternalRuntimeAsset(url) {
+  return EXTERNAL_RUNTIME_ASSETS.includes(url.href);
 }
 
 async function offlineFallback(cache) {
@@ -224,7 +244,7 @@ async function staleWhileRevalidate(request) {
     })
     .catch(() => null);
 
-  return cached || (await fetchPromise) || cached;
+  return cached || (await fetchPromise) || Response.error();
 }
 
 self.addEventListener("fetch", (event) => {
@@ -233,6 +253,11 @@ self.addEventListener("fetch", (event) => {
   if (req.method !== "GET") return;
 
   const url = new URL(req.url);
+
+  if (isExternalRuntimeAsset(url)) {
+    event.respondWith(staleWhileRevalidate(req));
+    return;
+  }
 
   if (url.origin !== self.location.origin) return;
 
