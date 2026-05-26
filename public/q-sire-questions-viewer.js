@@ -5,7 +5,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "SIRE-QUESTIONS-VIEWER-20260526_OFFLINE_SAME_UI_1";
+  const BUILD = "SIRE-QUESTIONS-VIEWER-20260526_OFFLINE_SAME_UI_3";
   window.CSVB_SIRE_QUESTIONS_VIEWER_BUILD = BUILD;
 
   const $ = (id) => document.getElementById(id);
@@ -366,6 +366,58 @@
       }
 
       console.warn("Offline package could not be activated; falling back to online DB:", error);
+      return false;
+    }
+  }
+
+  function isNetworkFetchFailure(error) {
+    const msg = s(error?.message || error).toLowerCase();
+
+    return msg.includes("failed to fetch") ||
+      msg.includes("networkerror") ||
+      msg.includes("network error") ||
+      msg.includes("load failed") ||
+      msg.includes("fetch failed") ||
+      msg.includes("internet disconnected") ||
+      msg.includes("supabase js not available") ||
+      navigator.onLine === false;
+  }
+
+  async function bootOfflinePackageAfterOnlineFailure(error) {
+    const req = offlineRequestStatus();
+    const networkLike = isNetworkFetchFailure(error);
+
+    if (!req.requested && !networkLike) return false;
+
+    try {
+      const pkg = await readOfflinePackage();
+
+      if (!pkg || !Array.isArray(pkg.rows) || !pkg.rows.length) {
+        return false;
+      }
+
+      applyOfflinePackage(pkg, "online/network load failed; local package fallback");
+
+      txt("userBadge", "Offline package • SIRE_QUESTIONS_VIEWER");
+
+      ["loginBtn", "switchUserBtn", "logoutBtn"].forEach((id) => {
+        const el = $(id);
+        if (el) el.style.display = "none";
+      });
+
+      txt("modeLine", "Role: offline package • Mode: Read-only offline • Module: SIRE_QUESTIONS_VIEWER");
+
+      msg(
+        "okBox",
+        "Offline package mode active. Online/auth/database loading failed, so the Viewer loaded the local read-only package."
+      );
+      msg("warnBox", "");
+
+      await loadQuestions();
+      exposeViewerApi();
+      return true;
+    } catch (offlineError) {
+      console.warn("Offline fallback after online/network failure failed:", offlineError);
       return false;
     }
   }
@@ -1032,6 +1084,9 @@
         txt("loadHint", `Loaded ${rows.length} active SIRE 2.0 question(s). Reference search index warning: ${s(e?.message || e)}`);
       });
     } catch (e) {
+      const recoveredOffline = await bootOfflinePackageAfterOnlineFailure(e);
+      if (recoveredOffline) return;
+
       txt("loadHint", "");
       msg("warnBox", "Failed to load SIRE 2.0 questions from DB:\n\n" + s(e?.message || e));
     }
@@ -1143,7 +1198,10 @@
       await loadQuestions();
       exposeViewerApi();
     } catch (e) {
-      msg("warnBox", "Boot failed:\\n\\n" + s(e?.message || e));
+      const recoveredOffline = await bootOfflinePackageAfterOnlineFailure(e);
+      if (recoveredOffline) return;
+
+      msg("warnBox", "Boot failed:\n\n" + s(e?.message || e));
     }
   }
 
