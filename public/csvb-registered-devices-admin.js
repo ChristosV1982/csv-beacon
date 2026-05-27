@@ -7,7 +7,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "REGISTERED-DEVICES-ADMIN-20260527-CHECKBOX-FILTERS-1";
+  const BUILD = "REGISTERED-DEVICES-ADMIN-20260527-DROPDOWN-CHECKBOX-FILTERS-1";
   const TAB_KEY = "registered_devices";
   const PANEL_ID = "tab-registered-devices";
   const TABS = ["companies", "users", "vessels", "rights", TAB_KEY];
@@ -110,40 +110,72 @@
         max-height:620px;
       }
       #${PANEL_ID} .csvb-dev-checkbox-filters {
-        display:grid;
-        grid-template-columns:repeat(auto-fit,minmax(210px,1fr));
-        gap:10px;
-        margin:10px 0 12px;
+        display:flex;
+        align-items:center;
+        gap:8px;
+        flex-wrap:wrap;
+        margin:8px 0 10px;
       }
-      #${PANEL_ID} .csvb-dev-checkgroup {
-        border:1px solid #D6E4F5;
-        background:#F7FAFE;
+      #${PANEL_ID} .csvb-dev-dd {
+        position:relative;
+        min-width:170px;
+      }
+      #${PANEL_ID} .csvb-dev-dd-btn {
+        width:100%;
+        display:flex;
+        align-items:center;
+        justify-content:space-between;
+        gap:8px;
+        border:1px solid #AEE3F1;
+        background:#E9F7FB;
+        color:#062A5E;
+        border-radius:10px;
+        padding:8px 10px;
+        font-weight:900;
+        cursor:pointer;
+      }
+      #${PANEL_ID} .csvb-dev-dd-btn span {
+        color:#5E6F86;
+        font-weight:850;
+        font-size:.78rem;
+      }
+      #${PANEL_ID} .csvb-dev-dd-panel {
+        display:none;
+        position:absolute;
+        top:calc(100% + 5px);
+        left:0;
+        z-index:1000;
+        width:280px;
+        max-height:280px;
+        overflow:auto;
+        border:1px solid #BFD3EF;
+        background:#FFFFFF;
         border-radius:12px;
         padding:9px 10px;
+        box-shadow:0 14px 36px rgba(3,27,63,.18);
       }
-      #${PANEL_ID} .csvb-dev-checkgroup-title {
-        color:#062A5E;
-        font-weight:950;
-        font-size:.86rem;
-        margin-bottom:7px;
+      #${PANEL_ID} .csvb-dev-dd.open .csvb-dev-dd-panel {
+        display:block;
       }
       #${PANEL_ID} .csvb-dev-checks {
-        display:flex;
-        flex-wrap:wrap;
-        gap:6px 10px;
+        display:grid;
+        grid-template-columns:1fr;
+        gap:7px;
       }
       #${PANEL_ID} .csvb-dev-checks label {
-        display:inline-flex;
+        display:flex;
         align-items:center;
-        gap:5px;
-        font-size:.82rem;
-        font-weight:800;
+        gap:7px;
+        font-size:.84rem;
+        font-weight:850;
         color:#243B5A;
         cursor:pointer;
+        line-height:1.25;
       }
       #${PANEL_ID} .csvb-dev-checks input {
         width:14px;
         height:14px;
+        flex:0 0 auto;
       }
       #${PANEL_ID} table { min-width:1450px; }
       #${PANEL_ID} .csvb-dev-pill {
@@ -387,6 +419,8 @@
     return panel;
   }
 
+  let rdDropdownOutsideHandlerWired = false;
+
   function filterLabel(value) {
     const map = {
       pending: "Pending",
@@ -434,11 +468,67 @@
     return `<label><input type="checkbox" data-rd-filter-group="${esc(group)}" value="${esc(value)}"${checkedAttr(group, value)} /> ${esc(label)}</label>`;
   }
 
+  function dropdownSummary(group, defaultText) {
+    const selected = state.filters[group + "_values"] || [];
+    if (!selected.length) return defaultText;
+    if (selected.length === 1) return filterLabel(selected[0]);
+    return `${selected.length} selected`;
+  }
+
+  function filterDropdown(group, title, summary, bodyHtml) {
+    return `
+      <div class="csvb-dev-dd" data-rd-dropdown="${esc(group)}">
+        <button class="csvb-dev-dd-btn" type="button" data-rd-filter-toggle="${esc(group)}">
+          ${esc(title)} <span data-rd-filter-summary="${esc(group)}">${esc(summary)}</span>
+        </button>
+        <div class="csvb-dev-dd-panel">
+          <div class="csvb-dev-checks">${bodyHtml}</div>
+        </div>
+      </div>
+    `;
+  }
+
   function hideLegacySelectFilters() {
     ["rdStatusFilter", "rdCompanyFilter", "rdOfflineFilter", "rdDeviceTypeFilter", "rdLastSeenFilter"].forEach((id) => {
       const el = document.getElementById(id);
       const field = el?.closest?.(".csvb-dev-field");
       if (field) field.style.display = "none";
+    });
+  }
+
+  function closeFilterDropdowns(except = null) {
+    document.querySelectorAll(`#${PANEL_ID} [data-rd-dropdown]`).forEach((node) => {
+      if (except && node === except) return;
+      node.classList.remove("open");
+    });
+  }
+
+  function updateDropdownSummaries() {
+    const values = {
+      status: dropdownSummary("status", "All statuses"),
+      company: dropdownSummary("company", "All companies"),
+      offline: dropdownSummary("offline", "All offline"),
+      device_type: dropdownSummary("device_type", "All types"),
+      last_seen: dropdownSummary("last_seen", "Any time")
+    };
+
+    Object.entries(values).forEach(([group, text]) => {
+      const el = document.querySelector(`[data-rd-filter-summary="${group}"]`);
+      if (el) el.textContent = text;
+    });
+  }
+
+  function wireDropdownOutsideClose() {
+    if (rdDropdownOutsideHandlerWired) return;
+    rdDropdownOutsideHandlerWired = true;
+
+    document.addEventListener("click", (ev) => {
+      const inside = ev.target?.closest?.(`#${PANEL_ID} [data-rd-dropdown]`);
+      if (!inside) closeFilterDropdowns();
+    });
+
+    document.addEventListener("keydown", (ev) => {
+      if (ev.key === "Escape") closeFilterDropdowns();
     });
   }
 
@@ -457,44 +547,65 @@
       ))
     ].join("");
 
-    host.innerHTML = `
-      <div class="csvb-dev-checkgroup">
-        <div class="csvb-dev-checkgroup-title">Status</div>
-        <div class="csvb-dev-checks">
-          ${["pending", "approved", "blocked", "revoked"].map((x) => checkItem("status", x, filterLabel(x))).join("")}
-        </div>
-      </div>
-      <div class="csvb-dev-checkgroup">
-        <div class="csvb-dev-checkgroup-title">Company</div>
-        <div class="csvb-dev-checks">${companyItems}</div>
-      </div>
-      <div class="csvb-dev-checkgroup">
-        <div class="csvb-dev-checkgroup-title">Offline</div>
-        <div class="csvb-dev-checks">
-          ${["yes", "no"].map((x) => checkItem("offline", x, filterLabel(x))).join("")}
-        </div>
-      </div>
-      <div class="csvb-dev-checkgroup">
-        <div class="csvb-dev-checkgroup-title">Device Type</div>
-        <div class="csvb-dev-checks">
-          ${["desktop", "laptop", "tablet", "smartphone", "shared_workstation", "unknown"].map((x) => checkItem("device_type", x, filterLabel(x))).join("")}
-        </div>
-      </div>
-      <div class="csvb-dev-checkgroup">
-        <div class="csvb-dev-checkgroup-title">Last Seen</div>
-        <div class="csvb-dev-checks">
-          ${["24h", "7d", "30d", "never"].map((x) => checkItem("last_seen", x, filterLabel(x))).join("")}
-        </div>
-      </div>
-    `;
+    host.innerHTML = [
+      filterDropdown(
+        "status",
+        "Status",
+        dropdownSummary("status", "All statuses"),
+        ["pending", "approved", "blocked", "revoked"].map((x) => checkItem("status", x, filterLabel(x))).join("")
+      ),
+      filterDropdown(
+        "company",
+        "Company",
+        dropdownSummary("company", "All companies"),
+        companyItems
+      ),
+      filterDropdown(
+        "offline",
+        "Offline",
+        dropdownSummary("offline", "All offline"),
+        ["yes", "no"].map((x) => checkItem("offline", x, filterLabel(x))).join("")
+      ),
+      filterDropdown(
+        "device_type",
+        "Device Type",
+        dropdownSummary("device_type", "All types"),
+        ["desktop", "laptop", "tablet", "smartphone", "shared_workstation", "unknown"].map((x) => checkItem("device_type", x, filterLabel(x))).join("")
+      ),
+      filterDropdown(
+        "last_seen",
+        "Last Seen",
+        dropdownSummary("last_seen", "Any time"),
+        ["24h", "7d", "30d", "never"].map((x) => checkItem("last_seen", x, filterLabel(x))).join("")
+      )
+    ].join("");
+
+    host.querySelectorAll("[data-rd-filter-toggle]").forEach((btn) => {
+      btn.addEventListener("click", (ev) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+
+        const dd = btn.closest("[data-rd-dropdown]");
+        if (!dd) return;
+
+        const willOpen = !dd.classList.contains("open");
+        closeFilterDropdowns(dd);
+        dd.classList.toggle("open", willOpen);
+      });
+    });
 
     host.querySelectorAll("input[type='checkbox'][data-rd-filter-group]").forEach((box) => {
+      box.addEventListener("click", (ev) => ev.stopPropagation());
       box.addEventListener("change", () => {
         syncCheckboxFiltersFromDom();
+        updateDropdownSummaries();
         renderSummary();
         renderTable();
       });
     });
+
+    updateDropdownSummaries();
+    wireDropdownOutsideClose();
   }
 
   function clearCheckboxFilters() {
@@ -507,6 +618,9 @@
     document.querySelectorAll("#rdCheckboxFilters input[type='checkbox']").forEach((box) => {
       box.checked = false;
     });
+
+    updateDropdownSummaries();
+    closeFilterDropdowns();
   }
 
   function activateTab() {
