@@ -5,7 +5,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "SIRE-QUESTIONS-VIEWER-20260526_OFFLINE_SAME_UI_3";
+  const BUILD = "SIRE-QUESTIONS-VIEWER-20260527_OFFLINE_SAME_UI_4";
   window.CSVB_SIRE_QUESTIONS_VIEWER_BUILD = BUILD;
 
   const $ = (id) => document.getElementById(id);
@@ -218,14 +218,73 @@
     document.head.appendChild(style);
   }
 
+  let offlineSupabaseWarningSuppressTimer = null;
+
+  function offlineModeDomActive() {
+    return window.CSVB_SIRE_VIEWER_OFFLINE_ACTIVE === true ||
+      document.documentElement.getAttribute("data-csvb-sire-offline") === "1";
+  }
+
+  function isOfflineSupabaseWarning(value) {
+    const msg = s(value).toLowerCase();
+
+    return msg.includes("supabase js not loaded") ||
+      msg.includes("@supabase/supabase-js") ||
+      msg.includes("supabase js not available");
+  }
+
+  function suppressOfflineSupabaseWarningOnce() {
+    if (!offlineModeDomActive()) return;
+
+    ["warnBox", "errBox", "loginError"].forEach((id) => {
+      const el = $(id);
+      if (!el) return;
+
+      if (isOfflineSupabaseWarning(el.textContent || "")) {
+        el.textContent = "";
+        el.style.display = "none";
+        el.dataset.csvbSuppressedOfflineSupabaseWarning = "1";
+      }
+    });
+  }
+
+  function stopOfflineSupabaseWarningSuppressor() {
+    if (offlineSupabaseWarningSuppressTimer) {
+      clearInterval(offlineSupabaseWarningSuppressTimer);
+      offlineSupabaseWarningSuppressTimer = null;
+    }
+  }
+
+  function startOfflineSupabaseWarningSuppressor() {
+    stopOfflineSupabaseWarningSuppressor();
+    suppressOfflineSupabaseWarningOnce();
+
+    let ticks = 0;
+    offlineSupabaseWarningSuppressTimer = setInterval(() => {
+      ticks += 1;
+      suppressOfflineSupabaseWarningOnce();
+
+      if (ticks >= 120) {
+        stopOfflineSupabaseWarningSuppressor();
+      }
+    }, 250);
+
+    setTimeout(suppressOfflineSupabaseWarningOnce, 1000);
+    setTimeout(suppressOfflineSupabaseWarningOnce, 3000);
+    setTimeout(suppressOfflineSupabaseWarningOnce, 8000);
+    setTimeout(suppressOfflineSupabaseWarningOnce, 15000);
+  }
+
   function setOfflineUiState(active) {
     if (active) {
       ensureOfflineUiStyles();
       document.documentElement.setAttribute("data-csvb-sire-offline", "1");
       window.CSVB_SIRE_VIEWER_OFFLINE_ACTIVE = true;
+      startOfflineSupabaseWarningSuppressor();
     } else {
       document.documentElement.removeAttribute("data-csvb-sire-offline");
       window.CSVB_SIRE_VIEWER_OFFLINE_ACTIVE = false;
+      stopOfflineSupabaseWarningSuppressor();
     }
   }
 
