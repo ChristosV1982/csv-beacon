@@ -7,7 +7,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "REGISTERED-DEVICES-ADMIN-20260527-DROPDOWN-CHECKBOX-FILTERS-1";
+  const BUILD = "REGISTERED-DEVICES-ADMIN-20260527-TRUST-DISPLAY-1";
   const TAB_KEY = "registered_devices";
   const PANEL_ID = "tab-registered-devices";
   const TABS = ["companies", "users", "vessels", "rights", TAB_KEY];
@@ -83,6 +83,28 @@
     if (s === "blocked") return "csvb-dev-blocked";
     if (s === "revoked") return "csvb-dev-revoked";
     return "";
+  }
+
+  function trustProfileLabel(value) {
+    const v = String(value || "standard_device");
+    const map = {
+      standard_device: "Standard device",
+      vessel_onboard_device: "Vessel onboard device",
+      superintendent_field_mobile: "Superintendent field mobile",
+      superintendent_field_tablet: "Superintendent field tablet",
+      superintendent_office_laptop: "Superintendent office laptop",
+      company_admin_device: "Company admin device",
+      super_admin_device: "Super admin device",
+      third_party_device: "Third-party device"
+    };
+    return map[v] || v;
+  }
+
+  function offlineGrantDaysLabel(value) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return "—";
+    if (n <= 0) return "No offline grant";
+    return `${n} day${n === 1 ? "" : "s"}`;
   }
 
   function ensureStyles() {
@@ -705,6 +727,9 @@
       d.last_user_username,
       d.last_user_id,
       d.user_agent_summary,
+      d.device_trust_profile,
+      trustProfileLabel(d.device_trust_profile),
+      d.offline_grant_validity_days,
       Array.isArray(d.offline_allowed_modules) ? d.offline_allowed_modules.join(" ") : ""
     ].map((x) => String(x || "")).join(" ").toLowerCase();
   }
@@ -808,6 +833,8 @@
           <td>
             <div>${d.offline_allowed ? "Yes" : "No"}</div>
             <div class="csvb-dev-small">${esc(offlineModules || "—")}</div>
+            <div class="csvb-dev-small"><b>Trust:</b> ${esc(trustProfileLabel(d.device_trust_profile))}</div>
+            <div class="csvb-dev-small"><b>Grant:</b> ${esc(offlineGrantDaysLabel(d.offline_grant_validity_days))}</div>
           </td>
           <td>
             <div class="csvb-dev-small"><b>Requested:</b> ${esc(d.requested_at || "—")}</div>
