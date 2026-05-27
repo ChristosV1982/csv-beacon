@@ -7,7 +7,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "REGISTERED-DEVICES-ADMIN-20260527-UNBLOCK-1";
+  const BUILD = "REGISTERED-DEVICES-ADMIN-20260527-FILTERS-1";
   const TAB_KEY = "registered_devices";
   const PANEL_ID = "tab-registered-devices";
   const TABS = ["companies", "users", "vessels", "rights", TAB_KEY];
@@ -17,7 +17,11 @@
     companies: [],
     filters: {
       status: "",
-      company_id: ""
+      company_id: "",
+      offline: "",
+      device_type: "",
+      last_seen: "",
+      search: ""
     }
   };
 
@@ -208,8 +212,43 @@
             <option value="">All / own company</option>
           </select>
         </div>
+        <div class="csvb-dev-field">
+          <label>Offline</label>
+          <select id="rdOfflineFilter">
+            <option value="">All offline permissions</option>
+            <option value="yes">Offline allowed</option>
+            <option value="no">Offline not allowed</option>
+          </select>
+        </div>
+        <div class="csvb-dev-field">
+          <label>Device Type</label>
+          <select id="rdDeviceTypeFilter">
+            <option value="">All types</option>
+            <option value="desktop">Desktop</option>
+            <option value="laptop">Laptop</option>
+            <option value="tablet">Tablet</option>
+            <option value="smartphone">Smartphone</option>
+            <option value="shared_workstation">Shared workstation</option>
+            <option value="unknown">Unknown</option>
+          </select>
+        </div>
+        <div class="csvb-dev-field">
+          <label>Last Seen</label>
+          <select id="rdLastSeenFilter">
+            <option value="">Any time</option>
+            <option value="24h">Last 24 hours</option>
+            <option value="7d">Last 7 days</option>
+            <option value="30d">Last 30 days</option>
+            <option value="never">Never seen</option>
+          </select>
+        </div>
+        <div class="csvb-dev-field" style="min-width:260px;">
+          <label>Search</label>
+          <input id="rdSearchInput" type="text" placeholder="Device / ID / user / platform..." />
+        </div>
         <div class="actions">
           <button class="btn" type="button" id="rdRefreshBtn">Refresh</button>
+          <button class="btn2" type="button" id="rdResetFiltersBtn">Reset filters</button>
         </div>
       </div>
 
@@ -249,6 +288,55 @@
     });
     document.getElementById("rdCompanyFilter")?.addEventListener("change", () => {
       state.filters.company_id = document.getElementById("rdCompanyFilter")?.value || "";
+      loadDevices();
+    });
+
+    document.getElementById("rdOfflineFilter")?.addEventListener("change", () => {
+      state.filters.offline = document.getElementById("rdOfflineFilter")?.value || "";
+      renderSummary();
+      renderTable();
+    });
+
+    document.getElementById("rdDeviceTypeFilter")?.addEventListener("change", () => {
+      state.filters.device_type = document.getElementById("rdDeviceTypeFilter")?.value || "";
+      renderSummary();
+      renderTable();
+    });
+
+    document.getElementById("rdLastSeenFilter")?.addEventListener("change", () => {
+      state.filters.last_seen = document.getElementById("rdLastSeenFilter")?.value || "";
+      renderSummary();
+      renderTable();
+    });
+
+    document.getElementById("rdSearchInput")?.addEventListener("input", () => {
+      state.filters.search = document.getElementById("rdSearchInput")?.value || "";
+      renderSummary();
+      renderTable();
+    });
+
+    document.getElementById("rdResetFiltersBtn")?.addEventListener("click", () => {
+      state.filters.status = "";
+      state.filters.company_id = "";
+      state.filters.offline = "";
+      state.filters.device_type = "";
+      state.filters.last_seen = "";
+      state.filters.search = "";
+
+      const status = document.getElementById("rdStatusFilter");
+      const company = document.getElementById("rdCompanyFilter");
+      const offline = document.getElementById("rdOfflineFilter");
+      const type = document.getElementById("rdDeviceTypeFilter");
+      const lastSeen = document.getElementById("rdLastSeenFilter");
+      const search = document.getElementById("rdSearchInput");
+
+      if (status) status.value = "";
+      if (company) company.value = "";
+      if (offline) offline.value = "";
+      if (type) type.value = "";
+      if (lastSeen) lastSeen.value = "";
+      if (search) search.value = "";
+
       loadDevices();
     });
 
@@ -310,16 +398,72 @@
     renderTable();
   }
 
+  function parseDate(value) {
+    if (!value) return null;
+    const d = new Date(value);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+
+  function isWithinDays(value, days) {
+    const d = parseDate(value);
+    if (!d) return false;
+    const ageMs = Date.now() - d.getTime();
+    return ageMs >= 0 && ageMs <= days * 24 * 60 * 60 * 1000;
+  }
+
+  function deviceSearchText(d) {
+    return [
+      d.device_label,
+      d.device_public_id,
+      d.device_type,
+      d.platform,
+      companyLabel(d.company_id),
+      d.vessel_id,
+      d.requested_by_username,
+      d.requested_by,
+      d.approved_by_username,
+      d.approved_by,
+      d.last_user_username,
+      d.last_user_id,
+      d.user_agent_summary,
+      Array.isArray(d.offline_allowed_modules) ? d.offline_allowed_modules.join(" ") : ""
+    ].map((x) => String(x || "")).join(" ").toLowerCase();
+  }
+
+  function getFilteredDevices() {
+    const offline = state.filters.offline || "";
+    const deviceType = state.filters.device_type || "";
+    const lastSeen = state.filters.last_seen || "";
+    const q = String(state.filters.search || "").trim().toLowerCase();
+
+    return (state.devices || []).filter((d) => {
+      if (offline === "yes" && d.offline_allowed !== true) return false;
+      if (offline === "no" && d.offline_allowed === true) return false;
+
+      if (deviceType && String(d.device_type || "") !== deviceType) return false;
+
+      if (lastSeen === "never" && d.last_seen_at) return false;
+      if (lastSeen === "24h" && !isWithinDays(d.last_seen_at, 1)) return false;
+      if (lastSeen === "7d" && !isWithinDays(d.last_seen_at, 7)) return false;
+      if (lastSeen === "30d" && !isWithinDays(d.last_seen_at, 30)) return false;
+
+      if (q && !deviceSearchText(d).includes(q)) return false;
+
+      return true;
+    });
+  }
+
   function renderSummary() {
     const host = document.getElementById("rdSummary");
     if (!host) return;
-    const counts = { all: state.devices.length, pending: 0, approved: 0, blocked: 0, revoked: 0, offline: 0 };
-    for (const d of state.devices) {
+    const visible = getFilteredDevices();
+    const counts = { all: visible.length, pending: 0, approved: 0, blocked: 0, revoked: 0, offline: 0 };
+    for (const d of visible) {
       if (counts[d.status] !== undefined) counts[d.status] += 1;
       if (d.offline_allowed) counts.offline += 1;
     }
     host.innerHTML = [
-      ['All', counts.all],
+      ['Shown', counts.all],
       ['Pending', counts.pending],
       ['Approved', counts.approved],
       ['Blocked', counts.blocked],
@@ -332,12 +476,14 @@
     const tbody = document.getElementById("rdTbody");
     if (!tbody) return;
 
-    if (!state.devices.length) {
+    const visible = getFilteredDevices();
+
+    if (!visible.length) {
       tbody.innerHTML = '<tr><td colspan="10" class="muted small">No devices found for the selected filters.</td></tr>';
       return;
     }
 
-    tbody.innerHTML = state.devices.map((d) => {
+    tbody.innerHTML = visible.map((d) => {
       const offlineModules = Array.isArray(d.offline_allowed_modules) ? d.offline_allowed_modules.join(", ") : "";
       return `
         <tr data-device-id="${esc(d.device_id)}">
