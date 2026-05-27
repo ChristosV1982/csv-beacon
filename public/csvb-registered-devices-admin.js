@@ -7,7 +7,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "REGISTERED-DEVICES-ADMIN-20260527-OFFLINE-GRANT-DISPLAY-1";
+  const BUILD = "REGISTERED-DEVICES-ADMIN-20260527-OFFLINE-GRANT-ISSUE-1";
   const TAB_KEY = "registered_devices";
   const PANEL_ID = "tab-registered-devices";
   const TABS = ["companies", "users", "vessels", "rights", TAB_KEY];
@@ -916,6 +916,7 @@
               <button class="btn2" type="button" data-rd-action="approve">Approve</button>
               <button class="btn2" type="button" data-rd-action="approve_offline">Approve + SIRE Offline</button>
               <button class="btn2" type="button" data-rd-action="set_trust">Set Trust</button>
+              ${canIssueSireGrant(d) ? '<button class="btn2" type="button" data-rd-action="issue_sire_grant">Issue SIRE Grant</button>' : ""}
               <button class="btn2" type="button" data-rd-action="block">Block</button>
               ${String(d.status || "") === "blocked" ? '<button class="btn2" type="button" data-rd-action="unblock">Unblock</button>' : ""}
               <button class="btnDanger" type="button" data-rd-action="revoke">Revoke</button>
@@ -973,6 +974,17 @@
       standard_device: 7
     };
     return map[profile] ?? 7;
+  }
+
+  function hasOfflineModule(device, moduleCode) {
+    const modules = Array.isArray(device?.offline_allowed_modules) ? device.offline_allowed_modules : [];
+    return modules.map((x) => String(x || "").toUpperCase()).includes(String(moduleCode || "").toUpperCase());
+  }
+
+  function canIssueSireGrant(device) {
+    return String(device?.status || "") === "approved" &&
+      device?.offline_allowed === true &&
+      hasOfflineModule(device, "SIRE_QUESTIONS_VIEWER");
   }
 
   async function handleDeviceAction(deviceId, action) {
@@ -1033,6 +1045,33 @@
         `Update trust profile for this device?\n\n${label}\n\n` +
         `Trust profile: ${profile}\n` +
         `Offline grant validity: ${days} day(s)`;
+    } else if (action === "issue_sire_grant") {
+      if (!canIssueSireGrant(d)) {
+        showWarnLocal("This device is not eligible for a SIRE offline grant. It must be approved, offline allowed, and include SIRE_QUESTIONS_VIEWER.");
+        return;
+      }
+
+      const days = Number.isInteger(Number(d?.offline_grant_validity_days))
+        ? Number(d.offline_grant_validity_days)
+        : 7;
+
+      rpc = "csvb_admin_issue_device_offline_grant";
+      args = {
+        p_device_id: deviceId,
+        p_module_code: "SIRE_QUESTIONS_VIEWER",
+        p_grant_type: "readonly_package",
+        p_validity_days: days,
+        p_package_id: "SIRE_QUESTIONS_VIEWER",
+        p_package_hash: null,
+        p_notes: `Issued SIRE_QUESTIONS_VIEWER read-only offline grant for ${days} day(s).`
+      };
+
+      confirmText =
+        `Issue SIRE Questions Viewer offline grant?\n\n${label}\n\n` +
+        `Module: SIRE_QUESTIONS_VIEWER\n` +
+        `Grant type: readonly_package\n` +
+        `Validity: ${days} day(s)\n\n` +
+        `This does not enable device-gate enforcement.`;
     } else if (action === "block") {
       rpc = "csvb_admin_block_registered_device";
       args = { p_device_id: deviceId, p_notes: "Blocked by administrator." };
