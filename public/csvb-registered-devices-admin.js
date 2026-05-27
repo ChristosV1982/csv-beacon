@@ -7,7 +7,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "REGISTERED-DEVICES-ADMIN-20260527-TRUST-DISPLAY-1";
+  const BUILD = "REGISTERED-DEVICES-ADMIN-20260527-TRUST-EDIT-1";
   const TAB_KEY = "registered_devices";
   const PANEL_ID = "tab-registered-devices";
   const TABS = ["companies", "users", "vessels", "rights", TAB_KEY];
@@ -845,6 +845,7 @@
             <div class="csvb-dev-actions">
               <button class="btn2" type="button" data-rd-action="approve">Approve</button>
               <button class="btn2" type="button" data-rd-action="approve_offline">Approve + SIRE Offline</button>
+              <button class="btn2" type="button" data-rd-action="set_trust">Set Trust</button>
               <button class="btn2" type="button" data-rd-action="block">Block</button>
               ${String(d.status || "") === "blocked" ? '<button class="btn2" type="button" data-rd-action="unblock">Unblock</button>' : ""}
               <button class="btnDanger" type="button" data-rd-action="revoke">Revoke</button>
@@ -865,6 +866,45 @@
     });
   }
 
+  const TRUST_PROFILE_OPTIONS = [
+    "standard_device",
+    "vessel_onboard_device",
+    "superintendent_field_mobile",
+    "superintendent_field_tablet",
+    "superintendent_office_laptop",
+    "company_admin_device",
+    "super_admin_device",
+    "third_party_device"
+  ];
+
+  function trustProfilePromptText(currentProfile, currentDays) {
+    return [
+      "Set Device Trust Profile",
+      "",
+      "Allowed values:",
+      ...TRUST_PROFILE_OPTIONS.map((x) => `- ${x}`),
+      "",
+      `Current profile: ${currentProfile || "standard_device"}`,
+      `Current offline grant days: ${currentDays ?? 7}`,
+      "",
+      "Enter one allowed value exactly:"
+    ].join("\n");
+  }
+
+  function defaultOfflineDaysForTrustProfile(profile) {
+    const map = {
+      vessel_onboard_device: 14,
+      superintendent_field_mobile: 14,
+      superintendent_field_tablet: 14,
+      superintendent_office_laptop: 7,
+      company_admin_device: 3,
+      super_admin_device: 0,
+      third_party_device: 3,
+      standard_device: 7
+    };
+    return map[profile] ?? 7;
+  }
+
   async function handleDeviceAction(deviceId, action) {
     const d = state.devices.find((x) => String(x.device_id) === String(deviceId));
     const label = d?.device_label || shortId(d?.device_public_id) || deviceId;
@@ -881,6 +921,48 @@
       rpc = "csvb_admin_approve_registered_device";
       args = { p_device_id: deviceId, p_offline_allowed: true, p_offline_allowed_modules: ["SIRE_QUESTIONS_VIEWER"], p_notes: "Approved for online access and SIRE Questions Viewer offline package." };
       confirmText = `Approve device and allow SIRE Questions Viewer offline package?\n\n${label}`;
+    } else if (action === "set_trust") {
+      const currentProfile = d?.device_trust_profile || "standard_device";
+      const currentDays = Number.isFinite(Number(d?.offline_grant_validity_days))
+        ? Number(d.offline_grant_validity_days)
+        : defaultOfflineDaysForTrustProfile(currentProfile);
+
+      const profileInput = prompt(trustProfilePromptText(currentProfile, currentDays), currentProfile);
+      if (profileInput === null) return;
+
+      const profile = String(profileInput || "").trim();
+
+      if (!TRUST_PROFILE_OPTIONS.includes(profile)) {
+        showWarnLocal("Invalid trust profile. No changes were made.");
+        return;
+      }
+
+      const defaultDays = defaultOfflineDaysForTrustProfile(profile);
+      const daysInput = prompt(
+        `Offline grant validity days for ${profile}:\n\n0 = no offline grant\nMaximum currently allowed = 30 days`,
+        String(defaultDays)
+      );
+
+      if (daysInput === null) return;
+
+      const days = Number(daysInput);
+
+      if (!Number.isInteger(days) || days < 0 || days > 30) {
+        showWarnLocal("Invalid offline grant validity days. Enter a whole number from 0 to 30.");
+        return;
+      }
+
+      rpc = "csvb_admin_update_registered_device_trust_profile";
+      args = {
+        p_device_id: deviceId,
+        p_device_trust_profile: profile,
+        p_offline_grant_validity_days: days,
+        p_notes: `Trust profile set to ${profile}; offline grant validity set to ${days} day(s).`
+      };
+      confirmText =
+        `Update trust profile for this device?\n\n${label}\n\n` +
+        `Trust profile: ${profile}\n` +
+        `Offline grant validity: ${days} day(s)`;
     } else if (action === "block") {
       rpc = "csvb_admin_block_registered_device";
       args = { p_device_id: deviceId, p_notes: "Blocked by administrator." };
