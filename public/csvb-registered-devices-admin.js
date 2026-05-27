@@ -7,13 +7,14 @@
 (() => {
   "use strict";
 
-  const BUILD = "REGISTERED-DEVICES-ADMIN-20260527-TRUST-EDIT-1";
+  const BUILD = "REGISTERED-DEVICES-ADMIN-20260527-OFFLINE-GRANT-DISPLAY-1";
   const TAB_KEY = "registered_devices";
   const PANEL_ID = "tab-registered-devices";
   const TABS = ["companies", "users", "vessels", "rights", TAB_KEY];
 
   const state = {
     devices: [],
+    grants: [],
     companies: [],
     filters: {
       status: "",
@@ -695,8 +696,76 @@
 
     if (error) throw error;
     state.devices = data || [];
+    await loadOfflineGrants();
     renderSummary();
     renderTable();
+  }
+
+  function parseDateTime(value) {
+    if (!value) return null;
+    const d = new Date(value);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+
+  function formatDateTimeShort(value) {
+    const d = parseDateTime(value);
+    if (!d) return "—";
+    return d.toLocaleString();
+  }
+
+  function grantEffectiveStatus(grant) {
+    if (!grant) return "none";
+    if (grant.revoked_at) return "revoked";
+    const expires = parseDateTime(grant.expires_at);
+    if (expires && expires.getTime() <= Date.now()) return "expired";
+    return grant.effective_status || "active";
+  }
+
+  function grantForDevice(deviceId, moduleCode = "SIRE_QUESTIONS_VIEWER") {
+    const list = (state.grants || [])
+      .filter((g) => String(g.device_id || "") === String(deviceId || ""))
+      .filter((g) => String(g.module_code || "").toUpperCase() === String(moduleCode || "").toUpperCase());
+
+    if (!list.length) return null;
+
+    const active = list
+      .filter((g) => grantEffectiveStatus(g) === "active")
+      .sort((a, b) => String(b.expires_at || "").localeCompare(String(a.expires_at || "")));
+
+    if (active.length) return active[0];
+
+    return list.sort((a, b) => String(b.issued_at || "").localeCompare(String(a.issued_at || "")))[0] || null;
+  }
+
+  function offlineGrantHtml(device) {
+    const grant = grantForDevice(device?.device_id, "SIRE_QUESTIONS_VIEWER");
+    if (!grant) {
+      return `<div class="csvb-dev-small"><b>Offline Grant:</b> None</div>`;
+    }
+
+    const status = grantEffectiveStatus(grant);
+    const packageText = grant.package_id ? ` • Package: ${grant.package_id}` : "";
+
+    return `
+      <div class="csvb-dev-small"><b>Offline Grant:</b> ${esc(status)} • ${esc(grant.module_code || "—")}</div>
+      <div class="csvb-dev-small"><b>Expires:</b> ${esc(formatDateTimeShort(grant.expires_at))}${esc(packageText)}</div>
+    `;
+  }
+
+  async function loadOfflineGrants() {
+    try {
+      const { data, error } = await sb().rpc("csvb_admin_list_device_offline_grants", {
+        p_device_id: null,
+        p_module_code: null,
+        p_include_revoked: true
+      });
+
+      if (error) throw error;
+      state.grants = Array.isArray(data) ? data : [];
+    } catch (error) {
+      console.warn("Registered Devices: offline grants could not be loaded:", error);
+      state.grants = [];
+    }
   }
 
   function parseDate(value) {
@@ -831,10 +900,11 @@
             <div class="csvb-dev-small">${esc(d.last_user_id || "")}</div>
           </td>
           <td>
-            <div>${d.offline_allowed ? "Yes" : "No"}</div>
+            <div><b>Offline:</b> ${d.offline_allowed ? "Yes" : "No"}</div>
             <div class="csvb-dev-small">${esc(offlineModules || "—")}</div>
             <div class="csvb-dev-small"><b>Trust:</b> ${esc(trustProfileLabel(d.device_trust_profile))}</div>
-            <div class="csvb-dev-small"><b>Grant:</b> ${esc(offlineGrantDaysLabel(d.offline_grant_validity_days))}</div>
+            <div class="csvb-dev-small"><b>Max Grant:</b> ${esc(offlineGrantDaysLabel(d.offline_grant_validity_days))}</div>
+            ${offlineGrantHtml(d)}
           </td>
           <td>
             <div class="csvb-dev-small"><b>Requested:</b> ${esc(d.requested_at || "—")}</div>
