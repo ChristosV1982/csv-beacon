@@ -6,8 +6,11 @@
 (() => {
   "use strict";
 
-  const BUILD = "DEVICE-CONTEXT-2026-05-26-D1-U01";
+  const BUILD = "DEVICE-CONTEXT-2026-05-27-STABLE-ID-1";
   const STORAGE_KEY = "csvb_device_public_id";
+  const BACKUP_STORAGE_KEY = "csvb_device_public_id_backup";
+  const LAST_APPROVED_STORAGE_KEY = "csvb_device_public_id_last_approved";
+  const COOKIE_NAME = "csvb_device_public_id";
   const PANEL_ID = "csvbDeviceContextCard";
   const BODY_ID = "csvbDeviceContextBody";
   const STATUS_ID = "csvbDeviceContextStatus";
@@ -39,13 +42,85 @@
     return "csvbdev_" + Date.now() + "_" + Math.random().toString(36).slice(2, 12);
   }
 
-  function getDevicePublicId() {
-    let id = localStorage.getItem(STORAGE_KEY);
-    if (!id) {
-      id = makeId();
-      localStorage.setItem(STORAGE_KEY, id);
+  function isValidDevicePublicId(value) {
+    return /^csvbdev_[A-Za-z0-9][A-Za-z0-9_-]{6,}$/.test(String(value || "").trim());
+  }
+
+  function readCookie(name) {
+    try {
+      const prefix = encodeURIComponent(name) + "=";
+      const parts = String(document.cookie || "").split(";").map((x) => x.trim());
+      const found = parts.find((x) => x.startsWith(prefix));
+      return found ? decodeURIComponent(found.slice(prefix.length)) : "";
+    } catch (_) {
+      return "";
     }
+  }
+
+  function writeCookie(name, value) {
+    try {
+      const maxAge = 60 * 60 * 24 * 365;
+      document.cookie =
+        encodeURIComponent(name) + "=" + encodeURIComponent(value) +
+        "; Max-Age=" + maxAge +
+        "; Path=/" +
+        "; SameSite=Lax";
+    } catch (_) {}
+  }
+
+  function rememberDevicePublicId(id, reason = "") {
+    const value = String(id || "").trim();
+    if (!isValidDevicePublicId(value)) return "";
+
+    localStorage.setItem(STORAGE_KEY, value);
+    localStorage.setItem(BACKUP_STORAGE_KEY, value);
+    writeCookie(COOKIE_NAME, value);
+
+    if (reason === "approved" || !isValidDevicePublicId(localStorage.getItem(LAST_APPROVED_STORAGE_KEY))) {
+      localStorage.setItem(LAST_APPROVED_STORAGE_KEY, value);
+    }
+
+    return value;
+  }
+
+  function storedDeviceCandidates() {
+    const values = [
+      localStorage.getItem(STORAGE_KEY),
+      localStorage.getItem(LAST_APPROVED_STORAGE_KEY),
+      localStorage.getItem(BACKUP_STORAGE_KEY),
+      readCookie(COOKIE_NAME)
+    ];
+
+    return [...new Set(values.map((x) => String(x || "").trim()).filter(isValidDevicePublicId))];
+  }
+
+  function getDevicePublicId() {
+    const candidates = storedDeviceCandidates();
+
+    if (candidates.length) {
+      const id = candidates[0];
+      rememberDevicePublicId(id);
+      return id;
+    }
+
+    const id = makeId();
+    localStorage.setItem(STORAGE_KEY, id);
     return id;
+  }
+
+  function restoreDevicePublicId(id) {
+    const value = rememberDevicePublicId(id, "approved");
+    if (!value) throw new Error("Invalid device public ID.");
+    return value;
+  }
+
+  function autoRestoreLastApprovedDevice(currentId) {
+    const lastApproved = localStorage.getItem(LAST_APPROVED_STORAGE_KEY) || readCookie(COOKIE_NAME);
+    if (!isValidDevicePublicId(lastApproved)) return "";
+    if (String(lastApproved) === String(currentId)) return "";
+
+    rememberDevicePublicId(lastApproved, "approved");
+    return lastApproved;
   }
 
   function detectDeviceType() {
@@ -331,6 +406,35 @@
 
       if (error) throw error;
       const row = Array.isArray(data) ? (data[0] || {}) : (data || {});
+
+      if (row.access_allowed && isValidDevicePublicId(row.device_public_id || id)) {
+        rememberDevicePublicId(row.device_public_id || id, "approved");
+      }
+
+      if (row.status === "not_registered") {
+        const restored = autoRestoreLastApprovedDevice(id);
+        if (restored) {
+          setStatus("Restored approved device ID. Rechecking…", "warn");
+
+          const { data: data2, error: error2 } = await sb.rpc("csvb_my_device_status", {
+            p_device_public_id: restored
+          });
+
+          if (error2) throw error2;
+
+          const row2 = Array.isArray(data2) ? (data2[0] || {}) : (data2 || {});
+          if (row2.access_allowed && isValidDevicePublicId(row2.device_public_id || restored)) {
+            rememberDevicePublicId(row2.device_public_id || restored, "approved");
+          }
+
+          renderServerStatus(row2);
+          applyStatusToWindow(row2);
+          if (row2.access_allowed) setStatus("Device approved after ID recovery.", "ok");
+          else setStatus("Device recovery attempted but not approved.", "warn");
+          return row2;
+        }
+      }
+
       renderServerStatus(row);
       applyStatusToWindow(row);
 
@@ -411,7 +515,13 @@
     window.CSVB_DEVICE = {
       BUILD,
       STORAGE_KEY,
+      BACKUP_STORAGE_KEY,
+      LAST_APPROVED_STORAGE_KEY,
+      COOKIE_NAME,
       getDevicePublicId,
+      restoreDevicePublicId,
+      rememberDevicePublicId,
+      storedDeviceCandidates,
       detectDeviceType,
       detectPlatform,
       checkStatus,
