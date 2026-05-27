@@ -7,7 +7,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "REGISTERED-DEVICES-ADMIN-2026-05-26-D1-U01";
+  const BUILD = "REGISTERED-DEVICES-ADMIN-20260527-UNBLOCK-1";
   const TAB_KEY = "registered_devices";
   const PANEL_ID = "tab-registered-devices";
   const TABS = ["companies", "users", "vessels", "rights", TAB_KEY];
@@ -380,6 +380,7 @@
               <button class="btn2" type="button" data-rd-action="approve">Approve</button>
               <button class="btn2" type="button" data-rd-action="approve_offline">Approve + SIRE Offline</button>
               <button class="btn2" type="button" data-rd-action="block">Block</button>
+              ${String(d.status || "") === "blocked" ? '<button class="btn2" type="button" data-rd-action="unblock">Unblock</button>' : ""}
               <button class="btnDanger" type="button" data-rd-action="revoke">Revoke</button>
             </div>
           </td>
@@ -418,6 +419,13 @@
       rpc = "csvb_admin_block_registered_device";
       args = { p_device_id: deviceId, p_notes: "Blocked by administrator." };
       confirmText = `Block this device?\n\n${label}`;
+    } else if (action === "unblock") {
+        rpc = "csvb_admin_unblock_registered_device";
+        args = {
+          p_device_id: deviceId,
+          p_notes: "Unblocked by administrator. Offline access remains disabled until explicitly approved again."
+        };
+        confirmText = "Unblock this device for online access only?\n\n" + label + "\n\nOffline access will remain disabled.";
     } else if (action === "revoke") {
       rpc = "csvb_admin_revoke_registered_device";
       args = { p_device_id: deviceId, p_notes: "Revoked by administrator." };
