@@ -6,12 +6,20 @@
 (() => {
   "use strict";
 
-  const BUILD = "SIRE-VIEWER-OFFLINE-PACKAGE-2026-05-26-PHASE2A";
+  const BUILD = "SIRE-VIEWER-OFFLINE-PACKAGE-20260527-GRANT-WARNING-1";
   const PACKAGE_ID = "sire_questions_viewer_active_v1";
   const MODULE_CODE = "SIRE_QUESTIONS_VIEWER";
   const PANEL_ID = "csvbSireViewerOfflinePanel";
   const STATUS_ID = "csvbSireViewerOfflineStatus";
   const BODY_ID = "csvbSireViewerOfflineBody";
+
+  let lastGrantCheck = {
+    checked_at: null,
+    device_public_id: "",
+    active_grant: null,
+    grants: [],
+    error: ""
+  };
 
   function esc(value) {
     return String(value ?? "")
@@ -46,6 +54,108 @@
     }
     return window.AUTH.ensureSupabase();
   }
+
+  function getDevicePublicId() {
+    try {
+      return window.CSVB_DEVICE?.getDevicePublicId?.() ||
+        localStorage.getItem("csvb_device_public_id") ||
+        "";
+    } catch (_) {
+      return "";
+    }
+  }
+
+  function parseDate(value) {
+    if (!value) return null;
+    const d = new Date(value);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+
+  function formatDateTime(value) {
+    const d = parseDate(value);
+    return d ? d.toLocaleString() : "—";
+  }
+
+  function isGrantActive(grant) {
+    if (!grant) return false;
+    if (String(grant.effective_status || "").toLowerCase() !== "active") return false;
+    const expires = parseDate(grant.expires_at);
+    return !expires || expires.getTime() > Date.now();
+  }
+
+  function selectActiveSireGrant(grants) {
+    return (grants || [])
+      .filter((g) => String(g.module_code || "").toUpperCase() === MODULE_CODE)
+      .filter(isGrantActive)
+      .sort((a, b) => String(b.expires_at || "").localeCompare(String(a.expires_at || "")))[0] || null;
+  }
+
+  async function refreshGrantStatus() {
+    const deviceId = getDevicePublicId();
+    lastGrantCheck = {
+      checked_at: nowIso(),
+      device_public_id: deviceId,
+      active_grant: null,
+      grants: [],
+      error: ""
+    };
+
+    if (!navigator.onLine) {
+      lastGrantCheck.error = "Offline. Grant status cannot be refreshed.";
+      return lastGrantCheck;
+    }
+
+    if (!deviceId) {
+      lastGrantCheck.error = "No registered device ID found in this browser.";
+      return lastGrantCheck;
+    }
+
+    try {
+      const sb = requireSupabase();
+      const { data, error } = await sb.rpc("csvb_my_device_offline_grants", {
+        p_device_public_id: deviceId
+      });
+
+      if (error) throw error;
+
+      const grants = Array.isArray(data) ? data : [];
+      const active = selectActiveSireGrant(grants);
+
+      lastGrantCheck = {
+        checked_at: nowIso(),
+        device_public_id: deviceId,
+        active_grant: active,
+        grants,
+        error: active ? "" : "No active SIRE_QUESTIONS_VIEWER offline grant found for this device."
+      };
+
+      return lastGrantCheck;
+    } catch (error) {
+      lastGrantCheck.error = error?.message || String(error);
+      return lastGrantCheck;
+    }
+  }
+
+  function grantSummaryTiles() {
+    const active = lastGrantCheck.active_grant;
+    const err = lastGrantCheck.error;
+
+    if (active) {
+      return [
+        tile("Offline Grant", "Active"),
+        tile("Grant Module", active.module_code || MODULE_CODE),
+        tile("Grant Expires", formatDateTime(active.expires_at)),
+        tile("Grant ID", active.grant_id || "—")
+      ].join("");
+    }
+
+    return [
+      tile("Offline Grant", err ? "Warning" : "None"),
+      tile("Grant Note", err || "No active grant loaded yet."),
+      tile("Device ID", lastGrantCheck.device_public_id || getDevicePublicId() || "—")
+    ].join("");
+  }
+
 
   function ensureStyles() {
     if (document.getElementById("csvbSireViewerOfflineStyles")) return;
@@ -134,6 +244,7 @@
         font-weight: 800;
       }
       #${PANEL_ID} .csvb-sire-offline-status.ok { color: #087334; }
+      #${PANEL_ID} .csvb-sire-offline-status.warn { color: #8A5A00; }
       #${PANEL_ID} .csvb-sire-offline-status.err { color: #9B1C1C; }
     `;
 
@@ -212,6 +323,7 @@
       return [
         tile("Package", "Not downloaded"),
         tile("Module", MODULE_CODE),
+        ...[grantSummaryTiles()],
         tile("Pending Sync", "Not applicable")
       ].join("");
     }
@@ -224,6 +336,8 @@
       tile("Evidence Sets", Object.keys(pkg.ee_by_question_id || {}).length),
       tile("Reference Sets", Object.keys(pkg.references_by_question_id || {}).length),
       tile("Package Version", pkg.package_version || "v1"),
+      tile("Package Grant", pkg.payload_json?.offline_grant?.grant_id ? "Linked" : "Not linked"),
+      tile("Grant Expires", pkg.payload_json?.offline_grant?.expires_at ? formatDateTime(pkg.payload_json.offline_grant.expires_at) : "—"),
       tile("Build", BUILD)
     ].join("");
   }
@@ -236,9 +350,16 @@
     if (!body) return null;
 
     try {
+      await refreshGrantStatus();
       const pkg = await getPackage();
       body.innerHTML = packageSummary(pkg);
-      setStatus(pkg ? "Package available." : "No local package.", pkg ? "ok" : "");
+
+      if (lastGrantCheck.active_grant) {
+        setStatus(pkg ? "Package available. Active offline grant found." : "Active offline grant found. No local package.", "ok");
+      } else {
+        setStatus(pkg ? "Package available. Grant warning." : "No local package. Grant warning.", "warn");
+      }
+
       return pkg;
     } catch (error) {
       body.innerHTML = tile("Error", error?.message || String(error));
@@ -280,6 +401,23 @@
     }
 
     try {
+      const grantCheck = await refreshGrantStatus();
+
+      if (!grantCheck.active_grant) {
+        const proceed = confirm(
+          "No active SIRE_QUESTIONS_VIEWER offline grant was found for this device.\n\n" +
+          "This is warning-only at this stage, so the download can continue.\n\n" +
+          "Grant warning:\n" + (grantCheck.error || "No active grant.") + "\n\n" +
+          "Proceed with package download?"
+        );
+
+        if (!proceed) {
+          setStatus("Download cancelled. No active offline grant.", "warn");
+          await renderPackageStatus();
+          return;
+        }
+      }
+
       const sb = requireSupabase();
       const offlineDb = requireOfflineDb();
 
@@ -363,7 +501,16 @@
         payload_json: {
           purpose: "SIRE Questions Viewer read-only offline package",
           no_offline_editing: true,
-          no_sync_execution: true
+          no_sync_execution: true,
+          offline_grant: lastGrantCheck.active_grant ? {
+            grant_id: lastGrantCheck.active_grant.grant_id || null,
+            module_code: lastGrantCheck.active_grant.module_code || MODULE_CODE,
+            grant_type: lastGrantCheck.active_grant.grant_type || "readonly_package",
+            issued_at: lastGrantCheck.active_grant.issued_at || null,
+            expires_at: lastGrantCheck.active_grant.expires_at || null,
+            checked_at: lastGrantCheck.checked_at || nowIso()
+          } : null,
+          offline_grant_warning: lastGrantCheck.active_grant ? "" : (lastGrantCheck.error || "No active offline grant found at download time.")
         }
       };
 
@@ -396,7 +543,9 @@
       renderPackageStatus,
       downloadPackage,
       deletePackage,
-      healthCheck
+      healthCheck,
+      refreshGrantStatus,
+      getLastGrantCheck: () => JSON.parse(JSON.stringify(lastGrantCheck))
     };
 
     ensureStyles();
