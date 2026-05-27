@@ -7,7 +7,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "REGISTERED-DEVICES-ADMIN-20260527-FILTERS-1";
+  const BUILD = "REGISTERED-DEVICES-ADMIN-20260527-CHECKBOX-FILTERS-1";
   const TAB_KEY = "registered_devices";
   const PANEL_ID = "tab-registered-devices";
   const TABS = ["companies", "users", "vessels", "rights", TAB_KEY];
@@ -21,7 +21,12 @@
       offline: "",
       device_type: "",
       last_seen: "",
-      search: ""
+      search: "",
+      status_values: [],
+      company_values: [],
+      offline_values: [],
+      device_type_values: [],
+      last_seen_values: []
     }
   };
 
@@ -103,6 +108,42 @@
         border:1px solid #E1ECF7;
         border-radius:12px;
         max-height:620px;
+      }
+      #${PANEL_ID} .csvb-dev-checkbox-filters {
+        display:grid;
+        grid-template-columns:repeat(auto-fit,minmax(210px,1fr));
+        gap:10px;
+        margin:10px 0 12px;
+      }
+      #${PANEL_ID} .csvb-dev-checkgroup {
+        border:1px solid #D6E4F5;
+        background:#F7FAFE;
+        border-radius:12px;
+        padding:9px 10px;
+      }
+      #${PANEL_ID} .csvb-dev-checkgroup-title {
+        color:#062A5E;
+        font-weight:950;
+        font-size:.86rem;
+        margin-bottom:7px;
+      }
+      #${PANEL_ID} .csvb-dev-checks {
+        display:flex;
+        flex-wrap:wrap;
+        gap:6px 10px;
+      }
+      #${PANEL_ID} .csvb-dev-checks label {
+        display:inline-flex;
+        align-items:center;
+        gap:5px;
+        font-size:.82rem;
+        font-weight:800;
+        color:#243B5A;
+        cursor:pointer;
+      }
+      #${PANEL_ID} .csvb-dev-checks input {
+        width:14px;
+        height:14px;
       }
       #${PANEL_ID} table { min-width:1450px; }
       #${PANEL_ID} .csvb-dev-pill {
@@ -252,6 +293,8 @@
         </div>
       </div>
 
+      <div class="csvb-dev-checkbox-filters" id="rdCheckboxFilters"></div>
+
       <div class="csvb-dev-summary" id="rdSummary"></div>
 
       <div class="csvb-dev-table-wrap">
@@ -337,10 +380,133 @@
       if (lastSeen) lastSeen.value = "";
       if (search) search.value = "";
 
+      clearCheckboxFilters();
       loadDevices();
     });
 
     return panel;
+  }
+
+  function filterLabel(value) {
+    const map = {
+      pending: "Pending",
+      approved: "Approved",
+      blocked: "Blocked",
+      revoked: "Revoked",
+      yes: "Offline allowed",
+      no: "Offline not allowed",
+      desktop: "Desktop",
+      laptop: "Laptop",
+      tablet: "Tablet",
+      smartphone: "Smartphone",
+      shared_workstation: "Shared workstation",
+      unknown: "Unknown",
+      "24h": "Last 24h",
+      "7d": "Last 7 days",
+      "30d": "Last 30 days",
+      never: "Never seen",
+      __platform__: "Platform / none"
+    };
+
+    return map[value] || value || "—";
+  }
+
+  function selectedValues(group) {
+    return Array.from(document.querySelectorAll(`[data-rd-filter-group="${group}"]:checked`))
+      .map((x) => x.value)
+      .filter(Boolean);
+  }
+
+  function syncCheckboxFiltersFromDom() {
+    state.filters.status_values = selectedValues("status");
+    state.filters.company_values = selectedValues("company");
+    state.filters.offline_values = selectedValues("offline");
+    state.filters.device_type_values = selectedValues("device_type");
+    state.filters.last_seen_values = selectedValues("last_seen");
+  }
+
+  function checkedAttr(group, value) {
+    const list = state.filters[group + "_values"] || [];
+    return list.includes(value) ? " checked" : "";
+  }
+
+  function checkItem(group, value, label) {
+    return `<label><input type="checkbox" data-rd-filter-group="${esc(group)}" value="${esc(value)}"${checkedAttr(group, value)} /> ${esc(label)}</label>`;
+  }
+
+  function hideLegacySelectFilters() {
+    ["rdStatusFilter", "rdCompanyFilter", "rdOfflineFilter", "rdDeviceTypeFilter", "rdLastSeenFilter"].forEach((id) => {
+      const el = document.getElementById(id);
+      const field = el?.closest?.(".csvb-dev-field");
+      if (field) field.style.display = "none";
+    });
+  }
+
+  function renderCheckboxFilters() {
+    const host = document.getElementById("rdCheckboxFilters");
+    if (!host) return;
+
+    hideLegacySelectFilters();
+
+    const companyItems = [
+      checkItem("company", "__platform__", "Platform / none"),
+      ...state.companies.map((c) => checkItem(
+        "company",
+        String(c.id || ""),
+        c.company_name || c.short_name || c.company_code || c.id
+      ))
+    ].join("");
+
+    host.innerHTML = `
+      <div class="csvb-dev-checkgroup">
+        <div class="csvb-dev-checkgroup-title">Status</div>
+        <div class="csvb-dev-checks">
+          ${["pending", "approved", "blocked", "revoked"].map((x) => checkItem("status", x, filterLabel(x))).join("")}
+        </div>
+      </div>
+      <div class="csvb-dev-checkgroup">
+        <div class="csvb-dev-checkgroup-title">Company</div>
+        <div class="csvb-dev-checks">${companyItems}</div>
+      </div>
+      <div class="csvb-dev-checkgroup">
+        <div class="csvb-dev-checkgroup-title">Offline</div>
+        <div class="csvb-dev-checks">
+          ${["yes", "no"].map((x) => checkItem("offline", x, filterLabel(x))).join("")}
+        </div>
+      </div>
+      <div class="csvb-dev-checkgroup">
+        <div class="csvb-dev-checkgroup-title">Device Type</div>
+        <div class="csvb-dev-checks">
+          ${["desktop", "laptop", "tablet", "smartphone", "shared_workstation", "unknown"].map((x) => checkItem("device_type", x, filterLabel(x))).join("")}
+        </div>
+      </div>
+      <div class="csvb-dev-checkgroup">
+        <div class="csvb-dev-checkgroup-title">Last Seen</div>
+        <div class="csvb-dev-checks">
+          ${["24h", "7d", "30d", "never"].map((x) => checkItem("last_seen", x, filterLabel(x))).join("")}
+        </div>
+      </div>
+    `;
+
+    host.querySelectorAll("input[type='checkbox'][data-rd-filter-group]").forEach((box) => {
+      box.addEventListener("change", () => {
+        syncCheckboxFiltersFromDom();
+        renderSummary();
+        renderTable();
+      });
+    });
+  }
+
+  function clearCheckboxFilters() {
+    state.filters.status_values = [];
+    state.filters.company_values = [];
+    state.filters.offline_values = [];
+    state.filters.device_type_values = [];
+    state.filters.last_seen_values = [];
+
+    document.querySelectorAll("#rdCheckboxFilters input[type='checkbox']").forEach((box) => {
+      box.checked = false;
+    });
   }
 
   function activateTab() {
@@ -373,6 +539,8 @@
         return `<option value="${esc(c.id)}">${esc(label)}</option>`;
       }).join("");
     if (current) sel.value = current;
+
+    renderCheckboxFilters();
   }
 
   async function loadDevices() {
@@ -384,12 +552,9 @@
 
     await loadCompanies();
 
-    const status = state.filters.status || null;
-    const companyId = state.filters.company_id || null;
-
     const { data, error } = await sb().rpc("csvb_admin_list_registered_devices", {
-      p_status: status,
-      p_company_id: companyId
+      p_status: null,
+      p_company_id: null
     });
 
     if (error) throw error;
@@ -431,21 +596,35 @@
   }
 
   function getFilteredDevices() {
-    const offline = state.filters.offline || "";
-    const deviceType = state.filters.device_type || "";
-    const lastSeen = state.filters.last_seen || "";
+    const statusValues = state.filters.status_values || [];
+    const companyValues = state.filters.company_values || [];
+    const offlineValues = state.filters.offline_values || [];
+    const deviceTypeValues = state.filters.device_type_values || [];
+    const lastSeenValues = state.filters.last_seen_values || [];
     const q = String(state.filters.search || "").trim().toLowerCase();
 
     return (state.devices || []).filter((d) => {
-      if (offline === "yes" && d.offline_allowed !== true) return false;
-      if (offline === "no" && d.offline_allowed === true) return false;
+      const statusKey = String(d.status || "");
+      const companyKey = d.company_id ? String(d.company_id) : "__platform__";
+      const offlineKey = d.offline_allowed === true ? "yes" : "no";
+      const typeKey = String(d.device_type || "unknown");
 
-      if (deviceType && String(d.device_type || "") !== deviceType) return false;
+      if (statusValues.length && !statusValues.includes(statusKey)) return false;
+      if (companyValues.length && !companyValues.includes(companyKey)) return false;
+      if (offlineValues.length && !offlineValues.includes(offlineKey)) return false;
+      if (deviceTypeValues.length && !deviceTypeValues.includes(typeKey)) return false;
 
-      if (lastSeen === "never" && d.last_seen_at) return false;
-      if (lastSeen === "24h" && !isWithinDays(d.last_seen_at, 1)) return false;
-      if (lastSeen === "7d" && !isWithinDays(d.last_seen_at, 7)) return false;
-      if (lastSeen === "30d" && !isWithinDays(d.last_seen_at, 30)) return false;
+      if (lastSeenValues.length) {
+        const ok = lastSeenValues.some((value) => {
+          if (value === "never") return !d.last_seen_at;
+          if (value === "24h") return isWithinDays(d.last_seen_at, 1);
+          if (value === "7d") return isWithinDays(d.last_seen_at, 7);
+          if (value === "30d") return isWithinDays(d.last_seen_at, 30);
+          return false;
+        });
+
+        if (!ok) return false;
+      }
 
       if (q && !deviceSearchText(d).includes(q)) return false;
 
