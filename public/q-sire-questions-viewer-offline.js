@@ -6,7 +6,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "SIRE-VIEWER-OFFLINE-PACKAGE-20260527-GRANT-WARNING-1";
+  const BUILD = "SIRE-VIEWER-OFFLINE-PACKAGE-20260527-GRANT-SOFT-ENFORCE-1";
   const PACKAGE_ID = "sire_questions_viewer_active_v1";
   const MODULE_CODE = "SIRE_QUESTIONS_VIEWER";
   const PANEL_ID = "csvbSireViewerOfflinePanel";
@@ -18,7 +18,9 @@
     device_public_id: "",
     active_grant: null,
     grants: [],
-    error: ""
+    error: "",
+    override_used: false,
+    override_role: ""
   };
 
   function esc(value) {
@@ -90,6 +92,29 @@
       .sort((a, b) => String(b.expires_at || "").localeCompare(String(a.expires_at || "")))[0] || null;
   }
 
+  async function getCurrentAuthContext() {
+    try {
+      if (window.AUTH?.getSessionUserProfile) {
+        return await window.AUTH.getSessionUserProfile();
+      }
+      return window.CSVB_CONTEXT || {};
+    } catch (_) {
+      return window.CSVB_CONTEXT || {};
+    }
+  }
+
+  function isPlatformAdminContext(ctx) {
+    const role = String(ctx?.profile?.role || ctx?.role || "").trim();
+    return ctx?.isPlatformAdmin === true ||
+      role === "super_admin" ||
+      role === "platform_owner";
+  }
+
+  async function canOverrideMissingOfflineGrant() {
+    const ctx = await getCurrentAuthContext();
+    return isPlatformAdminContext(ctx) ? ctx : null;
+  }
+
   async function refreshGrantStatus() {
     const deviceId = getDevicePublicId();
     lastGrantCheck = {
@@ -97,7 +122,9 @@
       device_public_id: deviceId,
       active_grant: null,
       grants: [],
-      error: ""
+      error: "",
+      override_used: false,
+      override_role: ""
     };
 
     if (!navigator.onLine) {
@@ -355,9 +382,9 @@
       body.innerHTML = packageSummary(pkg);
 
       if (lastGrantCheck.active_grant) {
-        setStatus(pkg ? "Package available. Active offline grant found." : "Active offline grant found. No local package.", "ok");
+        setStatus(pkg ? "Local package available. Active offline grant found." : "Active offline grant found. No local package.", "ok");
       } else {
-        setStatus(pkg ? "Package available. Grant warning." : "No local package. Grant warning.", "warn");
+        setStatus(pkg ? "Local package available. No active grant for current device." : "No local package. Active grant required for download.", "warn");
       }
 
       return pkg;
@@ -404,11 +431,26 @@
       const grantCheck = await refreshGrantStatus();
 
       if (!grantCheck.active_grant) {
+        const overrideCtx = await canOverrideMissingOfflineGrant();
+
+        if (!overrideCtx) {
+          alert(
+            "SIRE offline package download blocked.\n\n" +
+            "No active SIRE_QUESTIONS_VIEWER offline grant was found for this registered device.\n\n" +
+            "Ask a Super Admin / Company Admin to issue a SIRE offline grant from Registered Devices."
+          );
+
+          setStatus("Download blocked. Active SIRE offline grant required.", "err");
+          await renderPackageStatus();
+          return;
+        }
+
         const proceed = confirm(
           "No active SIRE_QUESTIONS_VIEWER offline grant was found for this device.\n\n" +
-          "This is warning-only at this stage, so the download can continue.\n\n" +
+          "You are allowed to override because you are a platform administrator.\n\n" +
+          "This override will be recorded inside the local package metadata.\n\n" +
           "Grant warning:\n" + (grantCheck.error || "No active grant.") + "\n\n" +
-          "Proceed with package download?"
+          "Proceed with administrator override?"
         );
 
         if (!proceed) {
@@ -416,6 +458,9 @@
           await renderPackageStatus();
           return;
         }
+
+        lastGrantCheck.override_used = true;
+        lastGrantCheck.override_role = String(overrideCtx?.profile?.role || "platform_admin");
       }
 
       const sb = requireSupabase();
@@ -510,7 +555,12 @@
             expires_at: lastGrantCheck.active_grant.expires_at || null,
             checked_at: lastGrantCheck.checked_at || nowIso()
           } : null,
-          offline_grant_warning: lastGrantCheck.active_grant ? "" : (lastGrantCheck.error || "No active offline grant found at download time.")
+          offline_grant_warning: lastGrantCheck.active_grant ? "" : (lastGrantCheck.error || "No active offline grant found at download time."),
+          offline_grant_override: lastGrantCheck.override_used ? {
+            override_used: true,
+            override_role: lastGrantCheck.override_role || "",
+            override_at: nowIso()
+          } : null
         }
       };
 
