@@ -6,7 +6,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "SIRE-VIEWER-AI-SOURCE-PACK-20260519_3";
+  const BUILD = "SIRE-VIEWER-AI-SOURCE-PACK-20260527_OFFLINE_DISABLED_1";
   window.CSVB_SIRE_VIEWER_AI_SOURCE_PACK_BUILD = BUILD;
 
   const state = {
@@ -38,7 +38,14 @@
     return safeStr(state.me?.profile?.role || "");
   }
 
+  function offlinePackageModeActive() {
+    return window.CSVB_SIRE_VIEWER_OFFLINE_ACTIVE === true ||
+      document.documentElement.getAttribute("data-csvb-sire-offline") === "1";
+  }
+
   function isAllowedRole() {
+    if (offlinePackageModeActive()) return false;
+
     const r = role();
     return r === "super_admin" || r === "platform_owner" || r === "company_admin" || r === "company_superintendent";
   }
@@ -304,6 +311,15 @@
         padding-top: 9px;
       }
 
+      html[data-csvb-page="q-sire-questions-viewer.html"][data-csvb-sire-offline="1"] #csvbAiSourceLauncher,
+      html[data-csvb-page="q-sire-questions-viewer.html"][data-csvb-sire-offline="1"] #csvbAiSourceModalBackdrop,
+      html[data-csvb-page="q-sire-questions-viewer.html"][data-csvb-sire-offline="1"] .csvb-ai-source-launcher,
+      html[data-csvb-page="q-sire-questions-viewer.html"][data-csvb-sire-offline="1"] .csvb-ai-source-modal-backdrop {
+        display: none !important;
+        visibility: hidden !important;
+        pointer-events: none !important;
+      }
+
       html[data-csvb-page="q-sire-questions-viewer.html"] .csvb-ai-source-result {
         border: 1px solid #D6E4F5;
         background: #fff;
@@ -435,12 +451,17 @@
 
     if (!launcher || !modal) return;
 
-    if (!isAllowedRole()) {
+    if (offlinePackageModeActive() || !isAllowedRole()) {
+      state.open = false;
       launcher.style.display = "none";
+      launcher.setAttribute("aria-hidden", "true");
       modal.style.display = "none";
+      modal.setAttribute("aria-hidden", "true");
       return;
     }
 
+    launcher.removeAttribute("aria-hidden");
+    modal.removeAttribute("aria-hidden");
     launcher.style.display = "block";
     modal.style.display = state.open ? "flex" : "none";
   }
@@ -533,6 +554,12 @@
   }
 
   async function buildSourcePack() {
+    if (offlinePackageModeActive()) {
+      setStatus("AI Search is disabled in offline package mode.");
+      clearPack();
+      return;
+    }
+
     try {
       const resultsHost = $("csvbAiSourceResults");
       const query = normalizeText($("csvbAiSourceQuery")?.value || "");
@@ -626,6 +653,11 @@
     try {
       injectStyles();
       ensurePanel();
+
+      if (offlinePackageModeActive()) {
+        renderShell();
+        return;
+      }
 
       if (!window.AUTH?.ensureSupabase || !window.AUTH?.getSessionUserProfile) return;
       state.sb = window.AUTH.ensureSupabase();

@@ -6,7 +6,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "SIRE-VIEWER-AI-ANSWER-20260519_1";
+  const BUILD = "SIRE-VIEWER-AI-ANSWER-20260527_OFFLINE_DISABLED_1";
   window.CSVB_SIRE_VIEWER_AI_ANSWER_BUILD = BUILD;
 
   const state = {
@@ -34,6 +34,11 @@
 
   function normalizeText(value) {
     return safeStr(value).replace(/\s+/g, " ").trim();
+  }
+
+  function offlinePackageModeActive() {
+    return window.CSVB_SIRE_VIEWER_OFFLINE_ACTIVE === true ||
+      document.documentElement.getAttribute("data-csvb-sire-offline") === "1";
   }
 
   function setStatus(message) {
@@ -152,6 +157,14 @@
   async function askAi() {
     if (state.busy) return;
 
+    if (offlinePackageModeActive()) {
+      setStatus("AI Search is disabled in offline package mode.");
+      renderAnswer("", "AI Search disabled while offline.");
+      const text = $("csvbAiAnswerText");
+      if (text) text.textContent = "Reconnect and reload the Viewer to use AI Search.";
+      return;
+    }
+
     try {
       state.busy = true;
 
@@ -241,6 +254,8 @@
 
   function boot() {
     try {
+      if (offlinePackageModeActive()) return;
+
       injectStyles();
       if (!ensureUi()) {
         setTimeout(boot, 700);
