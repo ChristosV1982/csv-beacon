@@ -6,7 +6,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "DASHBOARD-STATUS-PILLS-2026-05-26-U01";
+  const BUILD = "DASHBOARD-STATUS-PILLS-2026-05-28-RECOVERY-1";
   const ROW_ID = "csvbDashboardStatusPillsRow";
   const DIAG_PILL_ID = "csvbDashboardDiagnosticsPill";
   const DEV_PILL_ID = "csvbDashboardDevicePill";
@@ -181,9 +181,13 @@
     const modules = tileValue("csvbDeviceContextCard", "Offline Modules") || "—";
     const s = status.toLowerCase();
     const cls = s === "approved" ? "ok" : s === "pending" || s === "not checked" || s === "not_registered" ? "warn" : "err";
+    const needsRecovery = s === "not_registered";
     return {
       cls,
-      meta: `${status} • Access ${access} • Offline ${offline}${offline === "Yes" && modules !== "—" ? " " + modules : ""}`
+      meta: needsRecovery
+        ? `${status} • click to recover in Registered Devices`
+        : `${status} • Access ${access} • Offline ${offline}${offline === "Yes" && modules !== "—" ? " " + modules : ""}`,
+      href: needsRecovery ? "./su-admin.html" : "./registered_device.html"
     };
   }
 
@@ -197,7 +201,7 @@
 
     row.innerHTML = [
       pillHtml(DIAG_PILL_ID, diag.cls, "Offline Diagnostics", diag.meta, "./offline_diagnostics.html"),
-      pillHtml(DEV_PILL_ID, dev.cls, "Registered Device", dev.meta, "./registered_device.html")
+      pillHtml(DEV_PILL_ID, dev.cls, "Registered Device", dev.meta, dev.href || "./registered_device.html")
     ].join("");
 
     row.querySelectorAll("button[data-href]").forEach((btn) => {
