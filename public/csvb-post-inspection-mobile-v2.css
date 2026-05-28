@@ -1,0 +1,176 @@
+/* public/csvb-post-inspection-mobile-v2.css
+   C.S.V. BEACON — Post-Inspection mobile polish v2.
+   CSS only. No data, auth, device, grant, or Supabase logic. */
+
+@media (max-width: 760px) {
+  body {
+    overflow-x: hidden;
+  }
+
+  .wrap,
+  .pi-wrap {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 auto 28px !important;
+    padding-left: 8px !important;
+    padding-right: 8px !important;
+  }
+
+  .hero,
+  .pi-hero,
+  .card,
+  .pi-card {
+    border-radius: 14px !important;
+    padding: 12px !important;
+    overflow: visible !important;
+  }
+
+  .hero h1,
+  .pi-hero h1 {
+    font-size: 20px !important;
+    line-height: 1.18 !important;
+  }
+
+  .toprow,
+  .pi-toprow,
+  .pi-actions,
+  .dlg-actions,
+  .tableTop {
+    align-items: stretch !important;
+    justify-content: flex-start !important;
+    gap: 8px !important;
+  }
+
+  .toprow .btn,
+  .pi-toprow .btn,
+  .pi-actions .btn,
+  .dlg-actions .btn,
+  .tableTop .btn {
+    flex: 1 1 150px;
+    text-align: center;
+  }
+
+  .pi-fields,
+  .form-grid,
+  .grid2,
+  .grid3 {
+    grid-template-columns: 1fr !important;
+  }
+
+  .pi-span2,
+  .pi-span3,
+  .pi-span6 {
+    grid-column: 1 / -1 !important;
+  }
+
+  .tbl-wrap,
+  .table-wrap,
+  .tableContainer,
+  .csvb-table-wrap,
+  .risk-table-wrap {
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: auto !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch;
+    border-radius: 14px !important;
+  }
+
+  .pi-table,
+  .tbl-wrap table,
+  .table-wrap table,
+  .tableContainer table,
+  .csvb-table-wrap table,
+  .risk-table-wrap table {
+    min-width: 920px !important;
+    table-layout: auto !important;
+  }
+
+  .pi-table th,
+  .pi-table td,
+  .tbl-wrap th,
+  .tbl-wrap td,
+  .table-wrap th,
+  .table-wrap td,
+  .tableContainer th,
+  .tableContainer td,
+  .csvb-table-wrap th,
+  .csvb-table-wrap td,
+  .risk-table-wrap th,
+  .risk-table-wrap td {
+    white-space: normal !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+    vertical-align: top !important;
+  }
+
+  .pi-table th,
+  .tbl-wrap th,
+  .table-wrap th,
+  .tableContainer th,
+  .csvb-table-wrap th,
+  .risk-table-wrap th {
+    min-width: 120px;
+  }
+
+  .pi-table td,
+  .tbl-wrap td,
+  .table-wrap td,
+  .tableContainer td,
+  .csvb-table-wrap td,
+  .risk-table-wrap td {
+    min-width: 120px;
+  }
+
+  .obs-badge,
+  .pill,
+  .pi-pill {
+    white-space: normal !important;
+    text-align: center;
+  }
+
+  .risk-pill,
+  .risk-badge,
+  .score-pill,
+  .score-badge {
+    min-width: 92px !important;
+    max-width: 130px !important;
+  }
+
+  textarea {
+    min-height: 96px !important;
+  }
+
+  dialog {
+    width: calc(100vw - 20px) !important;
+    max-width: calc(100vw - 20px) !important;
+  }
+}
+
+@media (max-width: 520px) {
+  .pi-table,
+  .tbl-wrap table,
+  .table-wrap table,
+  .tableContainer table,
+  .csvb-table-wrap table,
+  .risk-table-wrap table {
+    min-width: 840px !important;
+  }
+
+  .pi-table th,
+  .pi-table td,
+  .tbl-wrap th,
+  .tbl-wrap td,
+  .table-wrap th,
+  .table-wrap td,
+  .tableContainer th,
+  .tableContainer td,
+  .csvb-table-wrap th,
+  .csvb-table-wrap td,
+  .risk-table-wrap th,
+  .risk-table-wrap td {
+    min-width: 105px;
+    padding-left: 8px !important;
+    padding-right: 8px !important;
+  }
+}
