@@ -6,7 +6,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "SIRE-VIEWER-OFFLINE-PACKAGE-20260527-GRANT-SOFT-ENFORCE-1";
+  const BUILD = "SIRE-VIEWER-OFFLINE-PACKAGE-20260528-DDMMYYYY-1";
   const PACKAGE_ID = "sire_questions_viewer_active_v1";
   const MODULE_CODE = "SIRE_QUESTIONS_VIEWER";
   const PANEL_ID = "csvbSireViewerOfflinePanel";
@@ -73,9 +73,14 @@
     return Number.isNaN(d.getTime()) ? null : d;
   }
 
+  function pad2(value) {
+    return String(value).padStart(2, "0");
+  }
+
   function formatDateTime(value) {
     const d = parseDate(value);
-    return d ? d.toLocaleString() : "—";
+    if (!d) return "—";
+    return `${pad2(d.getDate())}/${pad2(d.getMonth() + 1)}/${d.getFullYear()}, ${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;
   }
 
   function isGrantActive(grant) {
@@ -357,7 +362,7 @@
 
     return [
       tile("Package", "Downloaded"),
-      tile("Downloaded At", pkg.downloaded_at || "—"),
+      tile("Downloaded At", formatDateTime(pkg.downloaded_at)),
       tile("Questions", pkg.question_count ?? 0),
       tile("PGNO Sets", Object.keys(pkg.pgno_by_question_id || {}).length),
       tile("Evidence Sets", Object.keys(pkg.ee_by_question_id || {}).length),

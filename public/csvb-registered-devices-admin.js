@@ -7,7 +7,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "REGISTERED-DEVICES-ADMIN-20260527-OFFLINE-GRANT-ISSUE-1";
+  const BUILD = "REGISTERED-DEVICES-ADMIN-20260528-DDMMYYYY-1";
   const TAB_KEY = "registered_devices";
   const PANEL_ID = "tab-registered-devices";
   const TABS = ["companies", "users", "vessels", "rights", TAB_KEY];
@@ -707,10 +707,14 @@
     return Number.isNaN(d.getTime()) ? null : d;
   }
 
+  function pad2(value) {
+    return String(value).padStart(2, "0");
+  }
+
   function formatDateTimeShort(value) {
     const d = parseDateTime(value);
     if (!d) return "—";
-    return d.toLocaleString();
+    return `${pad2(d.getDate())}/${pad2(d.getMonth() + 1)}/${d.getFullYear()}, ${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;
   }
 
   function grantEffectiveStatus(grant) {
@@ -907,9 +911,9 @@
             ${offlineGrantHtml(d)}
           </td>
           <td>
-            <div class="csvb-dev-small"><b>Requested:</b> ${esc(d.requested_at || "—")}</div>
-            <div class="csvb-dev-small"><b>Approved:</b> ${esc(d.approved_at || "—")}</div>
-            <div class="csvb-dev-small"><b>Last seen:</b> ${esc(d.last_seen_at || "—")}</div>
+            <div class="csvb-dev-small"><b>Requested:</b> ${esc(formatDateTimeShort(d.requested_at))}</div>
+            <div class="csvb-dev-small"><b>Approved:</b> ${esc(formatDateTimeShort(d.approved_at))}</div>
+            <div class="csvb-dev-small"><b>Last seen:</b> ${esc(formatDateTimeShort(d.last_seen_at))}</div>
           </td>
           <td>
             <div class="csvb-dev-actions">
