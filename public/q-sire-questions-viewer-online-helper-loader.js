@@ -1,15 +1,15 @@
 // public/q-sire-questions-viewer-online-helper-loader.js
 // C.S.V. BEACON — SIRE Viewer online-only helper loader.
-// Loads online-only helper scripts only after the Viewer confirms online mode.
+// Loads online-only helper scripts only after the main Viewer exposes a confirmed online state.
 
 (() => {
   "use strict";
 
-  const BUILD = "SIRE-VIEWER-ONLINE-HELPER-LOADER-20260527_1";
+  const BUILD = "SIRE-VIEWER-ONLINE-HELPER-LOADER-20260528_1";
   window.CSVB_SIRE_VIEWER_ONLINE_HELPER_LOADER_BUILD = BUILD;
 
-  const MAX_TICKS = 40;
   const INTERVAL_MS = 250;
+  const MAX_TICKS = 240;
 
   function isTruthyFlag(value) {
     const v = String(value || "").trim().toLowerCase();
@@ -33,6 +33,30 @@
   function offlineActive() {
     return window.CSVB_SIRE_VIEWER_OFFLINE_ACTIVE === true ||
       document.documentElement.getAttribute("data-csvb-sire-offline") === "1";
+  }
+
+  function modeLineText() {
+    return String(document.getElementById("modeLine")?.textContent || "");
+  }
+
+  function viewerReady() {
+    return !!window.CSVB_SIRE_QUESTIONS_VIEWER;
+  }
+
+  function viewerIsConfirmedOnline() {
+    const mode = modeLineText().toLowerCase();
+    return viewerReady() &&
+      !offlineRequested() &&
+      !offlineActive() &&
+      mode.includes("mode: read-only") &&
+      !mode.includes("offline");
+  }
+
+  function viewerIsConfirmedOffline() {
+    const mode = modeLineText().toLowerCase();
+    return offlineRequested() ||
+      offlineActive() ||
+      (viewerReady() && mode.includes("offline"));
   }
 
   function helperNodes() {
@@ -65,10 +89,7 @@
   }
 
   async function loadOnlineHelpers() {
-    if (offlineRequested() || offlineActive()) {
-      console.info("SIRE Viewer online helper loader: offline mode detected; online-only helpers not loaded.");
-      return;
-    }
+    if (!viewerIsConfirmedOnline()) return;
 
     const nodes = helperNodes();
     for (const node of nodes) {
@@ -77,7 +98,7 @@
       await loadScript(src);
     }
 
-    console.info("SIRE Viewer online helper loader: online-only helpers loaded.");
+    console.info("SIRE Viewer online helper loader: confirmed online mode; online-only helpers loaded.");
   }
 
   function waitForViewerDecision() {
@@ -86,17 +107,23 @@
     const timer = setInterval(() => {
       ticks += 1;
 
-      if (offlineRequested() || offlineActive()) {
+      if (viewerIsConfirmedOffline()) {
         clearInterval(timer);
-        console.info("SIRE Viewer online helper loader: offline decision reached; helpers suppressed.");
+        console.info("SIRE Viewer online helper loader: confirmed offline package mode; online-only helpers suppressed.");
         return;
       }
 
-      if (window.CSVB_SIRE_QUESTIONS_VIEWER || ticks >= MAX_TICKS) {
+      if (viewerIsConfirmedOnline()) {
         clearInterval(timer);
         loadOnlineHelpers().catch((error) => {
           console.warn("SIRE Viewer online helper loader failed:", error);
         });
+        return;
+      }
+
+      if (ticks >= MAX_TICKS) {
+        clearInterval(timer);
+        console.warn("SIRE Viewer online helper loader: no confirmed online/offline Viewer decision; online-only helpers suppressed.");
       }
     }, INTERVAL_MS);
   }
