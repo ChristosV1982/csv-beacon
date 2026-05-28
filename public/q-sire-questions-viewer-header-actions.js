@@ -6,7 +6,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "SIRE-VIEWER-HEADER-ACTIONS-20260519_1";
+  const BUILD = "SIRE-VIEWER-HEADER-ACTIONS-20260528_SECTION_ORDER_1";
   window.CSVB_SIRE_VIEWER_HEADER_ACTIONS_BUILD = BUILD;
 
   function $(id) {
@@ -99,6 +99,23 @@
     return true;
   }
 
+  function restoreQuestionSectionOrder() {
+    const questionBox = $("vQuestion");
+    const attrs = $("vCollAttrs");
+    if (!questionBox || !attrs) return false;
+
+    const qStack = questionBox.closest(".qstack");
+    const questionWrapper = questionBox.parentElement;
+    if (!qStack || !questionWrapper) return false;
+
+    if (attrs.parentElement !== qStack || attrs.previousElementSibling !== questionWrapper) {
+      qStack.insertBefore(attrs, questionWrapper.nextElementSibling);
+      return true;
+    }
+
+    return false;
+  }
+
   function alignActions() {
     const wrap = ensureHeaderActionWrap();
     if (!wrap) return false;
@@ -116,6 +133,7 @@
     const timer = setInterval(() => {
       tries += 1;
       const moved = alignActions();
+      restoreQuestionSectionOrder();
       const hasChange = !!$("csvbSireViewerChangeLogTrigger");
       const hasUsage = !!$("csvbAiUsageLogTrigger");
 
@@ -127,6 +145,10 @@
     setTimeout(alignActions, 1200);
     setTimeout(alignActions, 2500);
     setTimeout(alignActions, 5000);
+    setTimeout(restoreQuestionSectionOrder, 400);
+    setTimeout(restoreQuestionSectionOrder, 1200);
+    setTimeout(restoreQuestionSectionOrder, 2500);
+    setTimeout(restoreQuestionSectionOrder, 5000);
   }
 
   if (document.readyState === "loading") {
