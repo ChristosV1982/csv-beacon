@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>C.S.V. BEACON — SIRE Offline Launcher</title>
+
+  <link rel="stylesheet" href="./csv-beacon-theme.css?v=20260428_3" />
+  <link rel="stylesheet" href="./csvb-ui-polish.css?v=20260430_1" />
+
+  <style>
+    body {
+      margin: 0;
+      font-family: Segoe UI, Arial, sans-serif;
+      background: #F4F8FC;
+      color: #062A5E;
+    }
+
+    .topbar {
+      background: #062A5E;
+      color: #fff;
+      padding: 12px 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .brand {
+      font-weight: 950;
+      font-size: 1rem;
+    }
+
+    .wrap {
+      max-width: 1120px;
+      margin: 0 auto;
+      padding: 18px;
+    }
+
+    .card {
+      background: #fff;
+      border: 1px solid #D6E4F5;
+      border-radius: 14px;
+      padding: 14px;
+      box-shadow: 0 10px 26px rgba(3,27,63,.06);
+      margin-bottom: 12px;
+    }
+
+    .title {
+      font-weight: 950;
+      font-size: 1.15rem;
+      margin-bottom: 6px;
+    }
+
+    .muted {
+      color: #5E6F86;
+      font-weight: 700;
+      line-height: 1.35;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .tile {
+      border: 1px solid #E1ECF7;
+      background: #F7FAFE;
+      border-radius: 12px;
+      padding: 10px;
+    }
+
+    .tile .label {
+      color: #5E6F86;
+      font-size: .78rem;
+      font-weight: 850;
+      margin-bottom: 5px;
+    }
+
+    .tile .value {
+      color: #062A5E;
+      font-size: .95rem;
+      font-weight: 950;
+      overflow-wrap: anywhere;
+    }
+
+    .actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 14px;
+    }
+
+    button {
+      border: 1px solid #AEE3F1;
+      background: #E9F7FB;
+      color: #062A5E;
+      border-radius: 10px;
+      padding: 9px 12px;
+      font-weight: 900;
+      cursor: pointer;
+    }
+
+    button.primary {
+      border-color: #062A5E;
+      background: #062A5E;
+      color: #fff;
+    }
+
+    button.danger {
+      border-color: #F2B7B7;
+      background: #FFEAEA;
+      color: #9B1C1C;
+    }
+
+    .status {
+      margin-top: 12px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      font-weight: 850;
+      white-space: pre-wrap;
+    }
+
+    .status.ok {
+      background: #EAF9EF;
+      border: 1px solid #B8E7C8;
+      color: #087334;
+    }
+
+    .status.warn {
+      background: #FFF6E0;
+      border: 1px solid #F6D58F;
+      color: #8A5A00;
+    }
+
+    .status.err {
+      background: #FFEAEA;
+      border: 1px solid #F2B7B7;
+      color: #9B1C1C;
+    }
+
+    .small {
+      font-size: .86rem;
+    }
+  </style>
+</head>
+
+<body>
+  <header class="topbar">
+    <div>
+      <div class="brand">C.S.V. BEACON — SIRE Offline Launcher</div>
+      <div class="small">Safe launcher for the local SIRE Questions Viewer offline package.</div>
+    </div>
+
+    <div class="actions" style="margin:0;">
+      <button type="button" onclick="location.href='./q-dashboard.html'">Dashboard</button>
+      <button type="button" onclick="location.href='./q-sire-questions-viewer.html'">SIRE Viewer</button>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="card">
+      <div class="title">Offline Package Status</div>
+      <div class="muted">
+        This page does not boot the full SIRE Viewer. It only checks the local package and controls whether the Viewer opens in online or offline mode.
+      </div>
+
+      <div id="statusTiles" class="grid">
+        <div class="tile">
+          <div class="label">Status</div>
+          <div class="value">Loading…</div>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button id="refreshBtn" type="button">Refresh Status</button>
+        <button id="openOfflineBtn" class="primary" type="button">Open SIRE Viewer Offline</button>
+        <button id="openOnlineBtn" type="button">Open SIRE Viewer Online</button>
+        <button id="clearFlagBtn" class="danger" type="button">Clear Offline Mode Flag</button>
+      </div>
+
+      <div id="statusBox" class="status warn" style="display:none;"></div>
+    </section>
+
+    <section class="card">
+      <div class="title">Operating rules</div>
+      <div class="muted">
+        Offline mode requires a downloaded local package. If no package is present, open the normal SIRE Viewer online, confirm an active SIRE grant, and use Download Package first.
+      </div>
+    </section>
+  </main>
+
+  <script defer src="./csvb-offline-db.js?v=20260522_phase1_inactive"></script>
+  <script defer src="./q-sire-offline-launcher.js?v=20260528_1"></script>
+</body>
+</html>
