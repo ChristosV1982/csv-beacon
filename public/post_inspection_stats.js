@@ -8,6 +8,9 @@ import { loadLockedLibraryJson } from "./question_library_loader.js";
 
 const LOCKED_LIBRARY_JSON = "./sire_questions_all_columns_named.json";
 
+const STATS_BUILD = "post_inspection_stats_v01_build_marker_2026-05-29";
+window.CSVB_POST_INSPECTION_STATS_BUILD = STATS_BUILD;
+
 const OBS_TYPES = [
   { value: "negative", label: "Negative" },
   { value: "largely", label: "Largely as expected" },
@@ -1678,6 +1681,8 @@ function refreshYearControls() {
 }
 
 async function init() {
+  setText("buildPill", `build: ${STATS_BUILD}`);
+
   const R = window.AUTH?.ROLES;
   state.me = await window.AUTH.requireAuth([R.SUPER_ADMIN, R.COMPANY_ADMIN, R.COMPANY_SUPERINTENDENT].filter(Boolean));
   if (!state.me) return;
