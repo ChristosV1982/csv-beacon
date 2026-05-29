@@ -1,0 +1,124 @@
+/* public/csvb-post-inspection-stats-colours-v01.css
+   C.S.V. BEACON — Post-Inspection Stats colour system v01.
+   CSS only. No calculations, data, auth, Supabase, device, grant, or offline logic. */
+
+html body:has(script[src*="post_inspection_stats.js"]) {
+  --csvb-stats-blue: #295eb0;
+  --csvb-stats-blue-soft: #eaf1fb;
+  --csvb-stats-red: #c62828;
+  --csvb-stats-red-soft: #fff1f1;
+  --csvb-stats-amber: #b36b00;
+  --csvb-stats-amber-soft: #fff7e6;
+  --csvb-stats-green: #16803a;
+  --csvb-stats-green-soft: #ecfdf3;
+  --csvb-stats-purple: #6d28d9;
+  --csvb-stats-purple-soft: #f4efff;
+  --csvb-stats-warn: #8a4b00;
+  --csvb-stats-warn-soft: #fff8e8;
+}
+
+/* Summary cards: colour-coded left rail only; layout and numbers unchanged. */
+html body:has(script[src*="post_inspection_stats.js"]) .stat {
+  position: relative;
+  overflow: hidden;
+  border-left: 7px solid var(--csvb-stats-blue);
+}
+
+html body:has(script[src*="post_inspection_stats.js"]) .stat:has(#sumReports) {
+  border-left-color: var(--csvb-stats-blue);
+  background: linear-gradient(90deg, var(--csvb-stats-blue-soft), #ffffff 42%);
+}
+
+html body:has(script[src*="post_inspection_stats.js"]) .stat:has(#sumObs) {
+  border-left-color: var(--csvb-stats-purple);
+  background: linear-gradient(90deg, var(--csvb-stats-purple-soft), #ffffff 42%);
+}
+
+html body:has(script[src*="post_inspection_stats.js"]) .stat:has(#sumMissing) {
+  border-left-color: var(--csvb-stats-warn);
+  background: linear-gradient(90deg, var(--csvb-stats-warn-soft), #ffffff 42%);
+}
+
+html body:has(script[src*="post_inspection_stats.js"]) .stat:has(#sumDistinct) {
+  border-left-color: var(--csvb-stats-green);
+  background: linear-gradient(90deg, var(--csvb-stats-green-soft), #ffffff 42%);
+}
+
+/* Existing bar visuals: keep renderer intact, add semantic colours. */
+html body:has(script[src*="post_inspection_stats.js"]) #chartNegCategory .barFill,
+html body:has(script[src*="post_inspection_stats.js"]) #chartNegMonthly .barFill,
+html body:has(script[src*="post_inspection_stats.js"]) #chartNegQuarterly .barFill,
+html body:has(script[src*="post_inspection_stats.js"]) #chartNegAnnual .barFill {
+  background: var(--csvb-stats-red) !important;
+}
+
+html body:has(script[src*="post_inspection_stats.js"]) #chartLargelyCategory .barFill,
+html body:has(script[src*="post_inspection_stats.js"]) #chartLargelyMonthly .barFill,
+html body:has(script[src*="post_inspection_stats.js"]) #chartLargelyQuarterly .barFill,
+html body:has(script[src*="post_inspection_stats.js"]) #chartLargelyAnnual .barFill {
+  background: var(--csvb-stats-amber) !important;
+}
+
+html body:has(script[src*="post_inspection_stats.js"]) #chartPositiveMonthly .barFill,
+html body:has(script[src*="post_inspection_stats.js"]) #chartPositiveQuarterly .barFill,
+html body:has(script[src*="post_inspection_stats.js"]) #chartPositiveAnnual .barFill {
+  background: var(--csvb-stats-green) !important;
+}
+
+html body:has(script[src*="post_inspection_stats.js"]) #chartPgno .barFill,
+html body:has(script[src*="post_inspection_stats.js"]) #chartPgnoQuestion .barFill {
+  background: var(--csvb-stats-purple) !important;
+}
+
+html body:has(script[src*="post_inspection_stats.js"]) #chartPgnoMissing .barFill {
+  background: var(--csvb-stats-warn) !important;
+}
+
+/* Chart cards: subtle top accent, not a layout change. */
+html body:has(script[src*="post_inspection_stats.js"]) .chartBox:has(#chartNegCategory),
+html body:has(script[src*="post_inspection_stats.js"]) .chartBox:has(#chartNegMonthly),
+html body:has(script[src*="post_inspection_stats.js"]) .chartBox:has(#chartNegQuarterly),
+html body:has(script[src*="post_inspection_stats.js"]) .chartBox:has(#chartNegAnnual) {
+  border-top: 5px solid var(--csvb-stats-red);
+}
+
+html body:has(script[src*="post_inspection_stats.js"]) .chartBox:has(#chartLargelyCategory),
+html body:has(script[src*="post_inspection_stats.js"]) .chartBox:has(#chartLargelyMonthly),
+html body:has(script[src*="post_inspection_stats.js"]) .chartBox:has(#chartLargelyQuarterly),
+html body:has(script[src*="post_inspection_stats.js"]) .chartBox:has(#chartLargelyAnnual) {
+  border-top: 5px solid var(--csvb-stats-amber);
+}
+
+html body:has(script[src*="post_inspection_stats.js"]) .chartBox:has(#chartPositiveMonthly),
+html body:has(script[src*="post_inspection_stats.js"]) .chartBox:has(#chartPositiveQuarterly),
+html body:has(script[src*="post_inspection_stats.js"]) .chartBox:has(#chartPositiveAnnual) {
+  border-top: 5px solid var(--csvb-stats-green);
+}
+
+html body:has(script[src*="post_inspection_stats.js"]) .chartBox:has(#chartPgno),
+html body:has(script[src*="post_inspection_stats.js"]) .chartBox:has(#chartPgnoQuestion) {
+  border-top: 5px solid var(--csvb-stats-purple);
+}
+
+html body:has(script[src*="post_inspection_stats.js"]) .chartBox:has(#chartPgnoMissing) {
+  border-top: 5px solid var(--csvb-stats-warn);
+}
+
+/* Compact legend for human reading, without adding JS. */
+html body:has(script[src*="post_inspection_stats.js"]) .statGrid::after {
+  content: "Colour guide: Negative = red • Largely as expected = amber • Positive = green • PGNO = purple • Reports/inspections = blue";
+  grid-column: 1 / -1;
+  color: #dbeafe;
+  background: rgba(12,33,58,0.58);
+  border: 1px solid rgba(213,222,239,0.28);
+  border-radius: 12px;
+  padding: 8px 10px;
+  font-weight: 850;
+  line-height: 1.35;
+}
+
+@media (max-width: 760px) {
+  html body:has(script[src*="post_inspection_stats.js"]) .statGrid::after {
+    font-size: 0.84rem;
+  }
+}
