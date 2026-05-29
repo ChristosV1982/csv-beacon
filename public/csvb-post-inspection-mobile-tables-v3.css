@@ -1,0 +1,120 @@
+/* public/csvb-post-inspection-mobile-tables-v3.css
+   C.S.V. BEACON — Post-Inspection mobile table polish v3.
+   CSS only. No JS, auth, Supabase, device, grant, or offline logic. */
+
+@media (max-width: 760px) {
+  html body:has(script[src*="post_inspection"]) {
+    overflow-x: hidden;
+  }
+
+  /* Make primary table containers scroll cleanly instead of clipping. */
+  .tbl-wrap,
+  .table-wrap,
+  .tableContainer,
+  .csvb-table-wrap,
+  .risk-table-wrap,
+  .stat-table-wrap,
+  .statTableScroll,
+  .csvb-stats-table-wrap {
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: auto !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    border-radius: 14px !important;
+  }
+
+  /* Post-Inspection index/detail tables: keep horizontal scroll, reduce excessive fixed width. */
+  .tbl-wrap > table,
+  .table-wrap > table,
+  .tableContainer > table,
+  .csvb-table-wrap > table,
+  .risk-table-wrap > table,
+  .stat-table-wrap > table,
+  .statTableScroll > table,
+  .csvb-stats-table-wrap > table {
+    width: max-content !important;
+    min-width: 820px !important;
+    max-width: none !important;
+    table-layout: auto !important;
+  }
+
+  /* Stats pages have some unwrapped tables. Make those tables self-scrollable on mobile. */
+  table {
+    max-width: 100% !important;
+  }
+
+  table:not(.no-mobile-scroll) {
+    table-layout: auto !important;
+  }
+
+  th,
+  td {
+    white-space: normal !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+    vertical-align: top !important;
+  }
+
+  th {
+    min-width: 105px !important;
+  }
+
+  td {
+    min-width: 105px !important;
+  }
+
+  /* Preserve compact columns for KPI/action cells. */
+  th[data-stored-kpi-col],
+  td:has(.stored-kpi-btn),
+  td:has(button) {
+    min-width: 92px !important;
+  }
+
+  .vessel-bold,
+  td[title],
+  .obs-badge,
+  .pill,
+  .pi-pill,
+  .csvb-risk-mini,
+  .csvb-risk-score-pill {
+    white-space: normal !important;
+  }
+
+  .csvb-risk-mini-stack,
+  .csvb-risk-score-stack {
+    min-width: 130px !important;
+  }
+
+  /* Dialog tables/KPI grids should fit phone width. */
+  dialog {
+    width: calc(100vw - 20px) !important;
+    max-width: calc(100vw - 20px) !important;
+  }
+
+  .csvb-kpi-grid-3,
+  .csvb-kpi-summary-grid,
+  .date-filter-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+@media (max-width: 520px) {
+  .tbl-wrap > table,
+  .table-wrap > table,
+  .tableContainer > table,
+  .csvb-table-wrap > table,
+  .risk-table-wrap > table,
+  .stat-table-wrap > table,
+  .statTableScroll > table,
+  .csvb-stats-table-wrap > table {
+    min-width: 760px !important;
+  }
+
+  th,
+  td {
+    min-width: 96px !important;
+    padding-left: 8px !important;
+    padding-right: 8px !important;
+  }
+}
