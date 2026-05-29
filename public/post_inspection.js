@@ -1,5 +1,5 @@
 const POST_INSPECTION_INDEX_BUILD =
-  "post_inspection_index_v17_lae_percent_editable_2026-05-22";
+  "post_inspection_index_v18_ddmmyyyy_display_2026-05-29";
 
 const RISK_INCLUDE_LAE_KEY = "csvb_post_entry_include_largely_ae_risk";
 const RISK_LAE_PERCENT_KEY = "csvb_post_entry_largely_ae_percent";
@@ -37,10 +37,22 @@ function parseDateParts(anyDate) {
   let m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (m) return { year: m[1], month: m[2], day: m[3], iso: s };
 
+  m = s.match(/^(\d{4})-(\d{2})-(\d{2})T/);
+  if (m) return { year: m[1], month: m[2], day: m[3], iso: `${m[1]}-${m[2]}-${m[3]}` };
+
   m = s.match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
   if (m) return { year: m[3], month: m[2], day: m[1], iso: `${m[3]}-${m[2]}-${m[1]}` };
 
+  m = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (m) return { year: m[3], month: m[2], day: m[1], iso: `${m[3]}-${m[2]}-${m[1]}` };
+
   return { year: "", month: "", day: "", iso: "" };
+}
+
+function displayDate(value) {
+  const p = parseDateParts(value);
+  if (!p.year || !p.month || !p.day) return String(value || "").trim() || "—";
+  return `${p.day}/${p.month}/${p.year}`;
 }
 
 function sleep(ms) {
@@ -312,7 +324,7 @@ function renderStoredKpiDialog(report, items) {
 
   const title = String(report?.report_ref || "").trim() || "Inspection";
   const vessel = String(report?.vessel_name || "").trim() || "—";
-  const date = String(report?.inspection_date || "").trim() || "—";
+  const date = displayDate(report?.inspection_date);
   const company = String(report?.ocimf_inspecting_company || "").trim() || "—";
 
   el("storedKpiTitle").textContent = `Single Inspection KPIs — ${title}`;
@@ -936,7 +948,7 @@ function renderStoredTable() {
     .map((r) => `
       <tr class="stored-row" data-id="${esc(r.id)}">
         <td class="vessel-bold" title="${esc(r.vessel_name || "")}">${esc(r.vessel_name || "—")}</td>
-        <td>${esc(r.inspection_date || "—")}</td>
+        <td title="${esc(r.inspection_date || "")}">${esc(displayDate(r.inspection_date))}</td>
         <td title="${esc(r.report_ref || "")}">${esc(r.report_ref || "—")}</td>
         <td title="${esc(r.title || "")}">${esc(r.title || "—")}</td>
         <td title="${esc(r.ocimf_inspecting_company || "")}">${esc(r.ocimf_inspecting_company || "—")}</td>
