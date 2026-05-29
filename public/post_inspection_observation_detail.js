@@ -1,6 +1,6 @@
 import { loadLockedLibraryJson } from "./question_library_loader.js";
 
-const OBS_DETAIL_BUILD = "post_inspection_observation_detail_v32_response_tracking_expanded_2026-05-28";
+const OBS_DETAIL_BUILD = "post_inspection_observation_detail_v33_remove_orphan_response_toggle_2026-05-29";
 
 
 
@@ -1189,6 +1189,32 @@ function forceCollapseResponseTracking() {
   // added a collapse arrow, and required extra clicks.
 }
 
+function removeOrphanResponseTrackingToggle() {
+  // Exact cleanup only.
+  // If an older cached execution left the former collapse button in the DOM,
+  // remove that one known button. Do not touch form fields, selects, dates,
+  // subcomment buttons, or any other section.
+  const btn = document.getElementById("csvbResponseTrackingToggle");
+  if (btn) btn.remove();
+
+  const responseStatus = document.getElementById("responseStatus");
+  const card = responseStatus?.closest(".pi-card");
+  if (!card) return;
+
+  const titles = Array.from(card.querySelectorAll("h1,h2,h3,h4"))
+    .filter((x) => String(x.textContent || "").trim() === "Response Tracking");
+
+  // Keep the first real title only if a stale wrapper created another title.
+  titles.slice(1).forEach((x) => x.remove());
+
+  const body = card.querySelector(".csvb-response-collapse-body");
+  if (body) {
+    body.style.removeProperty("display");
+    body.hidden = false;
+    body.removeAttribute("aria-hidden");
+  }
+}
+
 async function init() {
   el("buildPill").textContent = `build: ${OBS_DETAIL_BUILD}`;
 
@@ -1258,6 +1284,9 @@ async function init() {
   loadResponseFields();
   await loadSelectedObservationRisks();
   // Response Tracking remains expanded; no forced collapse wrapper.
+  removeOrphanResponseTrackingToggle();
+  setTimeout(removeOrphanResponseTrackingToggle, 250);
+  setTimeout(removeOrphanResponseTrackingToggle, 1000);
   setSaveStatus("Loaded");
 
   el("responseStatus").addEventListener("change", renderWorkflowBadges);
