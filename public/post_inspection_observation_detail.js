@@ -1,6 +1,6 @@
 import { loadLockedLibraryJson } from "./question_library_loader.js";
 
-const OBS_DETAIL_BUILD = "post_inspection_observation_detail_v33_remove_orphan_response_toggle_2026-05-29";
+const OBS_DETAIL_BUILD = "post_inspection_observation_detail_v34_ddmmyyyy_datetime_display_2026-05-29";
 
 
 
@@ -149,6 +149,22 @@ function setSaveStatus(text) {
 
 function todayIsoDate() {
   return new Date().toISOString().slice(0, 10);
+}
+
+function displayDateTime(value) {
+  const s = String(value || "").trim();
+  if (!s) return "—";
+
+  let m = s.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T\s](\d{2}:\d{2}(?::\d{2})?))?/);
+  if (m) return `${m[3]}/${m[2]}/${m[1]}${m[4] ? " " + m[4] : ""}`;
+
+  m = s.match(/^(\d{2})\.(\d{2})\.(\d{4})(?:[T\s](\d{2}:\d{2}(?::\d{2})?))?/);
+  if (m) return `${m[1]}/${m[2]}/${m[3]}${m[4] ? " " + m[4] : ""}`;
+
+  m = s.match(/^(\d{2})\/(\d{2})\/(\d{4})(?:[T\s](\d{2}:\d{2}(?::\d{2})?))?/);
+  if (m) return `${m[1]}/${m[2]}/${m[3]}${m[4] ? " " + m[4] : ""}`;
+
+  return s;
 }
 
 function parseIsoDateOnly(value) {
@@ -636,9 +652,7 @@ function renderObservationRisk() {
     return;
   }
 
-  const calculated = risks[0]?.calculated_at
-    ? String(risks[0].calculated_at).replace("T", " ").slice(0, 19)
-    : "—";
+  const calculated = displayDateTime(risks[0]?.calculated_at);
 
   line.textContent = `Selected risk profiles: ${risks.length} • Current snapshot • ${calculated}`;
 
@@ -904,9 +918,9 @@ function getClosedMetaText(item) {
 
   if (!username && !closedAt) return "";
 
-  if (username && closedAt) return `${username} / ${closedAt}`;
+  if (username && closedAt) return `${username} / ${displayDateTime(closedAt)}`;
   if (username) return username;
-  return closedAt;
+  return displayDateTime(closedAt);
 }
 
 function loadResponseFields() {

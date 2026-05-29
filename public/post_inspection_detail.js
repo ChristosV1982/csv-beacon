@@ -1,6 +1,6 @@
 import { loadLockedLibraryJson } from "./question_library_loader.js";
 
-const DETAIL_BUILD = "post_inspection_detail_v24_lae_percent_detail_fix_2026-05-22";
+const DETAIL_BUILD = "post_inspection_detail_v25_ddmmyyyy_datetime_display_2026-05-29";
 const PDF_BUCKET_DEFAULT = "inspection-reports";
 const PDF_FOLDER_PREFIX = "post_inspections";
 const HUMAN_POSITIVE_FIXED_NOC = "Exceeded normal expectation.";
@@ -42,6 +42,22 @@ function ddmmyyyyToIso(ddmmyyyy) {
   const m = s.match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
   if (!m) return "";
   return `${m[3]}-${m[2]}-${m[1]}`;
+}
+
+function displayDateTime(value) {
+  const s = String(value || "").trim();
+  if (!s) return "—";
+
+  let m = s.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T\s](\d{2}:\d{2}(?::\d{2})?))?/);
+  if (m) return `${m[3]}/${m[2]}/${m[1]}${m[4] ? " " + m[4] : ""}`;
+
+  m = s.match(/^(\d{2})\.(\d{2})\.(\d{4})(?:[T\s](\d{2}:\d{2}(?::\d{2})?))?/);
+  if (m) return `${m[1]}/${m[2]}/${m[3]}${m[4] ? " " + m[4] : ""}`;
+
+  m = s.match(/^(\d{2})\/(\d{2})\/(\d{4})(?:[T\s](\d{2}:\d{2}(?::\d{2})?))?/);
+  if (m) return `${m[1]}/${m[2]}/${m[3]}${m[4] ? " " + m[4] : ""}`;
+
+  return s;
 }
 
 function canonicalQno(qno) {
@@ -654,8 +670,8 @@ function renderRiskCard() {
     return;
   }
 
-  const calculated = String(risks[0]?.calculated_at || "").replace("T", " ").slice(0, 19);
-  setTextIfPresent("riskProfileLine", `Selected risk profiles: ${risks.length} • Current snapshot • ${calculated || "—"}`);
+  const calculated = displayDateTime(risks[0]?.calculated_at);
+  setTextIfPresent("riskProfileLine", `Selected risk profiles: ${risks.length} • Current snapshot • ${calculated}`);
 
   strip.innerHTML = risks.map((risk) => {
     const profile = String(risk.profile_name || "Risk").trim();
