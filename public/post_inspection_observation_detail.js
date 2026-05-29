@@ -1,6 +1,6 @@
 import { loadLockedLibraryJson } from "./question_library_loader.js";
 
-const OBS_DETAIL_BUILD = "post_inspection_observation_detail_v31_visible_manual_save_2026-05-22";
+const OBS_DETAIL_BUILD = "post_inspection_observation_detail_v32_response_tracking_expanded_2026-05-28";
 
 
 
@@ -1183,51 +1183,10 @@ async function reloadItemFromDb() {
 }
 
 function forceCollapseResponseTracking() {
-  const headings = Array.from(document.querySelectorAll("h1,h2,h3,h4"));
-  const h = headings.find((x) => /^\s*Response Tracking\s*$/i.test(x.textContent || ""));
-  if (!h) return;
-
-  const card = h.closest(".pi-card") || h.parentElement;
-  if (!card || card.dataset.csvbResponseCollapseReady === "1") return;
-
-  card.dataset.csvbResponseCollapseReady = "1";
-  card.classList.add("csvb-response-collapsed-card");
-
-  const body = document.createElement("div");
-  body.className = "csvb-response-collapse-body";
-
-  const children = Array.from(card.children).filter((child) => child !== h);
-  children.forEach((child) => body.appendChild(child));
-
-  const header = document.createElement("div");
-  header.className = "csvb-response-collapse-header";
-
-  const title = document.createElement("h2");
-  title.textContent = "Response Tracking";
-
-  const btn = document.createElement("button");
-  btn.type = "button";
-  btn.id = "csvbResponseTrackingToggle";
-  btn.className = "csvb-mini-toggle-btn";
-  btn.textContent = "▸";
-  btn.title = "Expand / collapse Response Tracking";
-  btn.setAttribute("aria-expanded", "false");
-
-  header.appendChild(title);
-  header.appendChild(btn);
-
-  card.innerHTML = "";
-  card.appendChild(header);
-  card.appendChild(body);
-
-  body.style.display = "none";
-
-  btn.onclick = () => {
-    const expanded = btn.getAttribute("aria-expanded") === "true";
-    btn.setAttribute("aria-expanded", expanded ? "false" : "true");
-    btn.textContent = expanded ? "▸" : "▾";
-    body.style.display = expanded ? "none" : "";
-  };
+  // Disabled by design.
+  // Response Tracking must remain a normal, always-open form section.
+  // The previous implementation injected a second "Response Tracking" title,
+  // added a collapse arrow, and required extra clicks.
 }
 
 async function init() {
@@ -1298,7 +1257,7 @@ async function init() {
   renderPgnoSelector();
   loadResponseFields();
   await loadSelectedObservationRisks();
-  forceCollapseResponseTracking();
+  // Response Tracking remains expanded; no forced collapse wrapper.
   setSaveStatus("Loaded");
 
   el("responseStatus").addEventListener("change", renderWorkflowBadges);
