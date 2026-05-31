@@ -8,7 +8,7 @@ import { loadLockedLibraryJson } from "./question_library_loader.js";
 
 const LOCKED_LIBRARY_JSON = "./sire_questions_all_columns_named.json";
 
-const STATS_BUILD = "post_inspection_stats_v01_build_marker_2026-05-29";
+const STATS_BUILD = "post_inspection_stats_v02_snapshot_export_2026-05-31";
 window.CSVB_POST_INSPECTION_STATS_BUILD = STATS_BUILD;
 
 const OBS_TYPES = [
@@ -104,6 +104,71 @@ const state = {
   currentDrillRows: [],
   currentDrillTitle: "records",
 };
+
+
+function cloneSnapshotValue(value) {
+  return JSON.parse(JSON.stringify(value ?? null));
+}
+
+function snapshotQuestionMeta(row) {
+  const qno = String(row?.question_no || "").trim();
+  const q = qno ? state.libByNo.get(qno) : null;
+
+  return {
+    qno,
+    chapter: q ? getChap(q) : (qno.split(".")[0] || ""),
+    section: q ? getSection(q) : "",
+    short_text: q ? getShort(q) : "",
+  };
+}
+
+function snapshotRows(rows) {
+  return (rows || []).map((row) => {
+    const cloned = cloneSnapshotValue(row) || {};
+    cloned.question_meta = snapshotQuestionMeta(row);
+    return cloned;
+  });
+}
+
+function exposeStatsSnapshot() {
+  const rows = snapshotRows(state.currentRows);
+  const rowsIgnoreType = snapshotRows(state.currentRowsIgnoreType);
+  const reportRows = cloneSnapshotValue(state.currentReportRows || []) || [];
+
+  const qnos = new Set(
+    [...rows, ...rowsIgnoreType]
+      .map((row) => String(row?.question_no || row?.question_meta?.qno || "").trim())
+      .filter(Boolean)
+  );
+
+  const questionMetaByNo = {};
+  qnos.forEach((qno) => {
+    const q = state.libByNo.get(qno);
+    questionMetaByNo[qno] = {
+      qno,
+      chapter: q ? getChap(q) : (qno.split(".")[0] || ""),
+      section: q ? getSection(q) : "",
+      short_text: q ? getShort(q) : "",
+    };
+  });
+
+  window.CSVB_POST_STATS_SNAPSHOT = Object.freeze({
+    snapshot_build: "POST-STATS-SNAPSHOT-V01-20260531",
+    stats_build: STATS_BUILD,
+    generated_at: new Date().toISOString(),
+    mode: getMode(),
+    rows,
+    rowsIgnoreType,
+    reportRows,
+    questionMetaByNo,
+  });
+
+  window.CSVB_POST_STATS_GET_SNAPSHOT = () => window.CSVB_POST_STATS_SNAPSHOT;
+
+  window.dispatchEvent(new CustomEvent("csvb:post-stats-snapshot", {
+    detail: { snapshot: window.CSVB_POST_STATS_SNAPSHOT },
+  }));
+}
 
 function setStatus(text) {
   setText("statusPill", text || "Ready");
@@ -1448,6 +1513,8 @@ async function renderAllStats(rows, rowsIgnoreTypeFilter, reportRows) {
   state.currentRows = rows;
   state.currentRowsIgnoreType = rowsIgnoreTypeFilter;
   state.currentReportRows = reportRows;
+
+  exposeStatsSnapshot();
 
   renderSummaryFromRows(rows, reportRows);
 
