@@ -1,0 +1,77 @@
+/* public/csvb-post-inspection-stats-chapter-share-fonts-v01.css
+   C.S.V. BEACON — SIRE Chapter Share readability v01.
+   CSS only. Enlarges fonts inside the SIRE Chapter Share panel.
+   No calculations, filters, drilldowns, exports, auth, Supabase, device, grant, or offline logic. */
+
+html body:has(script[src*="post_inspection_stats.js"]) #csvbStatsChapterSharePanelV01 {
+  font-size: 1.04rem !important;
+}
+
+html body:has(script[src*="post_inspection_stats.js"]) #csvbStatsChapterSharePanelV01 .csvb-chapter-share-title {
+  font-size: 1.18rem !important;
+  line-height: 1.25 !important;
+}
+
+html body:has(script[src*="post_inspection_stats.js"]) #csvbStatsChapterSharePanelV01 .csvb-chapter-share-sub {
+  font-size: 0.92rem !important;
+  line-height: 1.4 !important;
+}
+
+html body:has(script[src*="post_inspection_stats.js"]) #csvbStatsChapterSharePanelV01 .csvb-chapter-share-field label {
+  font-size: 0.92rem !important;
+  line-height: 1.25 !important;
+}
+
+html body:has(script[src*="post_inspection_stats.js"]) #csvbStatsChapterSharePanelV01 .csvb-chapter-share-field select {
+  font-size: 1rem !important;
+  min-height: 42px !important;
+}
+
+html body:has(script[src*="post_inspection_stats.js"]) #csvbStatsChapterSharePanelV01 .csvb-chapter-share-check {
+  font-size: 0.96rem !important;
+  line-height: 1.25 !important;
+}
+
+html body:has(script[src*="post_inspection_stats.js"]) #csvbStatsChapterSharePanelV01 .csvb-chapter-share-check input {
+  transform: scale(1.08) !important;
+  margin-right: 2px !important;
+}
+
+html body:has(script[src*="post_inspection_stats.js"]) #csvbStatsChapterSharePanelV01 .csvb-chapter-share-total {
+  font-size: 1.48rem !important;
+}
+
+html body:has(script[src*="post_inspection_stats.js"]) #csvbStatsChapterSharePanelV01 .csvb-chapter-share-total-label {
+  font-size: 0.78rem !important;
+}
+
+html body:has(script[src*="post_inspection_stats.js"]) #csvbStatsChapterSharePanelV01 .csvb-chapter-share-legend-row {
+  font-size: 0.96rem !important;
+  line-height: 1.28 !important;
+  grid-template-columns: 14px 1fr auto !important;
+  gap: 8px !important;
+}
+
+html body:has(script[src*="post_inspection_stats.js"]) #csvbStatsChapterSharePanelV01 .csvb-chapter-share-swatch {
+  width: 12px !important;
+  height: 12px !important;
+}
+
+html body:has(script[src*="post_inspection_stats.js"]) #csvbStatsChapterSharePanelV01 .csvb-chapter-share-value {
+  font-size: 0.96rem !important;
+}
+
+html body:has(script[src*="post_inspection_stats.js"]) #csvbStatsChapterSharePanelV01 .csvb-chapter-share-note {
+  font-size: 0.9rem !important;
+  line-height: 1.38 !important;
+}
+
+@media (max-width: 760px) {
+  html body:has(script[src*="post_inspection_stats.js"]) #csvbStatsChapterSharePanelV01 .csvb-chapter-share-legend-row {
+    font-size: 0.92rem !important;
+  }
+
+  html body:has(script[src*="post_inspection_stats.js"]) #csvbStatsChapterSharePanelV01 .csvb-chapter-share-check {
+    font-size: 0.92rem !important;
+  }
+}
