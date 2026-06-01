@@ -1,0 +1,236 @@
+<!-- public/inspection-question-sets.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>C.S.V. BEACON - Inspection & Assurance Question Sets</title>
+
+  <link rel="stylesheet" href="./csv-beacon-theme.css?v=20260428_3" />
+  <link rel="stylesheet" href="style.css?v=20260428_3" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="./auth.js"></script>
+  <script src="./csvb-module-guard.js?v=20260522_dashboard_button_guard"></script>
+
+  <style>
+    body{
+      min-height:100vh;
+      margin:0;
+      padding:16px 12px;
+      background:#eef4fb;
+      font-family:"Segoe UI", Arial, sans-serif;
+      color:#06305c;
+    }
+    .wrap{max-width:1700px;margin:0 auto;}
+    .topbar{
+      display:flex;
+      gap:12px;
+      flex-wrap:wrap;
+      align-items:center;
+      justify-content:space-between;
+      background:#062b55;
+      color:#fff;
+      border-radius:14px;
+      padding:12px 14px;
+      box-shadow:0 4px 18px rgba(18,44,87,.16);
+      margin-bottom:12px;
+    }
+    .title{font-size:1.18rem;font-weight:950;margin:0;line-height:1.25;}
+    .sub{font-size:.9rem;font-weight:800;color:rgba(255,255,255,.82);line-height:1.3;margin-top:3px;}
+    .top-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+    .btn{
+      border:1px solid #b9d4ee;
+      border-radius:10px;
+      padding:9px 12px;
+      font-weight:950;
+      cursor:pointer;
+      text-decoration:none;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      gap:6px;
+      background:#063b71;
+      color:#fff;
+      white-space:nowrap;
+    }
+    .btn:hover{filter:brightness(.96);}
+    .btn.secondary{background:#eef7ff;color:#07345f;}
+    .btn.danger{background:#fff0f0;color:#8a1f1f;border-color:#f1c7c7;}
+    .btn:disabled{opacity:.55;cursor:not-allowed;filter:none;}
+    .build{display:inline-block;border:1px solid rgba(255,255,255,.35);border-radius:999px;padding:4px 9px;font-size:.78rem;font-weight:900;color:#d9ecff;}
+    .grid{display:grid;grid-template-columns:440px 1fr;gap:12px;align-items:start;}
+    @media(max-width:1180px){.grid{grid-template-columns:1fr;}}
+    .card{
+      background:#fff;
+      border:1px solid #d5deef;
+      border-radius:16px;
+      padding:14px;
+      box-shadow:0 4px 18px rgba(18,44,87,.12);
+    }
+    .card h2{font-size:1.05rem;margin:0 0 8px;color:#06305c;}
+    .note{border:1px solid #d5deef;border-radius:12px;background:#f7fbff;color:#35507b;font-weight:800;line-height:1.35;padding:10px;margin:8px 0;}
+    .warn{display:none;border:1px solid #f1c7c7;border-radius:12px;background:#fff2f2;color:#7a1f1f;font-weight:900;line-height:1.35;padding:10px;margin:8px 0;white-space:pre-wrap;}
+    .ok{display:none;border:1px solid #bce9c9;border-radius:12px;background:#effff4;color:#11612b;font-weight:900;line-height:1.35;padding:10px;margin:8px 0;white-space:pre-wrap;}
+    label{display:block;margin:11px 0 5px;font-size:.9rem;font-weight:950;color:#1a4170;}
+    input,select,textarea{
+      width:100%;box-sizing:border-box;border:1px solid #cbd7ee;border-radius:10px;padding:9px 11px;background:#fff;color:#1a4170;font-family:"Segoe UI", Arial, sans-serif;font-size:.96rem;outline:none;
+    }
+    textarea{min-height:86px;resize:vertical;}
+    input:focus,select:focus,textarea:focus{border-color:#2e68c7;box-shadow:0 0 0 3px rgba(46,104,199,.15);}
+    .row{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+    @media(max-width:720px){.row{grid-template-columns:1fr;}}
+    .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;}
+    .toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between;margin-bottom:10px;}
+    .toolbar .left,.toolbar .right{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+    .tableWrap{overflow:auto;border:1px solid #d5deef;border-radius:12px;background:#fff;}
+    table{width:100%;border-collapse:collapse;min-width:1080px;}
+    th,td{padding:9px 10px;border-bottom:1px solid #e6eefb;vertical-align:top;}
+    th{background:#f2f7ff;color:#1a4170;font-weight:950;text-align:left;position:sticky;top:0;z-index:1;}
+    td{color:#223a66;font-weight:800;}
+    .small{font-size:.85rem;color:#48628e;font-weight:800;line-height:1.32;}
+    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;}
+    .pill{display:inline-block;border:1px solid #d5deef;border-radius:999px;padding:3px 9px;background:#eaf1fb;color:#1a4170;font-weight:950;font-size:.78rem;white-space:nowrap;}
+    .pill.active{background:#e9fff0;border-color:#bce9c9;color:#11612b;}
+    .pill.archived{background:#fff0f0;border-color:#f1c7c7;color:#7a1f1f;}
+    .pill.draft{background:#fff4df;border-color:#f0d39a;color:#7a4a00;}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <div>
+        <h1 class="title">Inspection & Assurance - Question Sets</h1>
+        <div class="sub" id="subLine">Checking session...</div>
+      </div>
+      <div class="top-actions">
+        <span class="build" id="buildPill">build: assurance_question_sets_v01_20260601</span>
+        <a class="btn" href="./q-dashboard.html">Dashboard</a>
+        <a class="btn" href="./q-company.html">Legacy Company Builder</a>
+        <a class="btn" href="./post_inspection_stats.html">Post-Inspection Stats</a>
+        <button class="btn" id="logoutBtn" type="button">Logout</button>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <h2>Create Question Set Template</h2>
+        <div class="note">
+          This creates a reusable Inspection & Assurance question set template. Question items will be added in the next build step.
+        </div>
+        <div id="warnBox" class="warn"></div>
+        <div id="okBox" class="ok"></div>
+
+        <label for="qsName">Question set name</label>
+        <input id="qsName" type="text" placeholder="e.g. Marine Superintendent Onboard Inspection" />
+
+        <label for="qsCode">Code / short reference</label>
+        <input id="qsCode" type="text" placeholder="e.g. MS-ONBOARD-INSPECTION" />
+
+        <div class="row">
+          <div>
+            <label for="qsType">Question set type</label>
+            <select id="qsType">
+              <option value="pre_vetting">Pre-vetting</option>
+              <option value="superintendent_inspection">Superintendent inspection</option>
+              <option value="vessel_self_assessment">Vessel self-assessment</option>
+              <option value="internal_audit">Internal audit</option>
+              <option value="company_specific">Company specific</option>
+              <option value="risq_preparation">RISQ preparation</option>
+              <option value="mixed">Mixed</option>
+            </select>
+          </div>
+          <div>
+            <label for="sourceScope">Source scope</label>
+            <select id="sourceScope">
+              <option value="SIRE_2_0">SIRE 2.0</option>
+              <option value="RISQ_3">RISQ 3</option>
+              <option value="COMPANY_SPECIFIC">Company specific</option>
+              <option value="MIXED">Mixed</option>
+              <option value="FREE_TEXT">Free text</option>
+            </select>
+          </div>
+        </div>
+
+        <label for="defaultInspectionType">Default inspection type</label>
+        <select id="defaultInspectionType">
+          <option value="pre_sire_2_prep">Pre-SIRE 2.0 Preparation</option>
+          <option value="marine_superintendent_inspection">Marine Superintendent Onboard Inspection</option>
+          <option value="technical_superintendent_inspection">Technical Superintendent Onboard Inspection</option>
+          <option value="hsqe_inspection">HSQE Inspection / Audit</option>
+          <option value="vessel_self_assessment">Vessel Self-Assessment</option>
+          <option value="company_internal_audit">Company Internal Audit</option>
+          <option value="cargo_operation_attendance">Cargo Operation Attendance</option>
+          <option value="mooring_inspection">Mooring Inspection</option>
+          <option value="navigation_inspection">Navigation Inspection</option>
+          <option value="engine_room_inspection">Engine Room Inspection</option>
+          <option value="risq_preparation">RISQ Preparation</option>
+          <option value="company_specific_inspection">Company Specific Inspection</option>
+        </select>
+
+        <div class="row">
+          <div>
+            <label for="versionInput">Version</label>
+            <input id="versionInput" type="text" value="1.0" />
+          </div>
+          <div>
+            <label for="statusInput">Status</label>
+            <select id="statusInput">
+              <option value="draft">Draft</option>
+              <option value="active">Active</option>
+              <option value="archived">Archived</option>
+            </select>
+          </div>
+        </div>
+
+        <label for="descInput">Description</label>
+        <textarea id="descInput" placeholder="Purpose / scope / notes..."></textarea>
+
+        <div class="actions">
+          <button class="btn" id="createBtn" type="button">Create Question Set</button>
+          <button class="btn secondary" id="clearBtn" type="button">Clear</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="toolbar">
+          <div class="left">
+            <h2 style="margin:0;">Existing Question Sets</h2>
+            <span class="pill" id="countPill">0 records</span>
+          </div>
+          <div class="right">
+            <input id="searchInput" type="text" placeholder="Search name / code / type / source..." style="min-width:300px;" />
+            <button class="btn secondary" id="refreshBtn" type="button">Refresh</button>
+          </div>
+        </div>
+
+        <div class="note">
+          Phase 3 foundation: list/create/archive question set templates. Question item selection will follow after this page is verified.
+        </div>
+
+        <div class="tableWrap">
+          <table>
+            <thead>
+              <tr>
+                <th style="width:110px;">Status</th>
+                <th style="width:270px;">Question set</th>
+                <th style="width:180px;">Type</th>
+                <th style="width:130px;">Source</th>
+                <th style="width:90px;">Items</th>
+                <th style="width:170px;">Updated</th>
+                <th style="width:250px;">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="setsBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./inspection-question-sets.js?v=20260601_1"></script>
+  <script src="./csvb-ui-polish.js?v=20260430_1"></script>
+  <script src="./csvb-help-tooltips.js?v=20260430_1"></script>
+  <script src="./csvb-100pct-fit.js?v=20260430_1"></script>
+  <script src="./csvb-build-badge.js?v=20260528_01"></script>
+</body>
+</html>
