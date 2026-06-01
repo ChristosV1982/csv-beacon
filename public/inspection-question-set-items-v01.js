@@ -44,12 +44,6 @@
     const box = el("okBox");
     if (!box) return;
     box.textContent = message || "";
- }
-
-  function showOk(message) {
-    const box = el("okBox");
-    if (!box) return;
-    box.textContent = message || "";
     box.style.display = message ? "block" : "none";
   }
 
