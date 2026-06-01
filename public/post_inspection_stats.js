@@ -8,7 +8,7 @@ import { loadLockedLibraryJson } from "./question_library_loader.js";
 
 const LOCKED_LIBRARY_JSON = "./sire_questions_all_columns_named.json";
 
-const STATS_BUILD = "post_inspection_stats_v02_snapshot_export_2026-05-31";
+const STATS_BUILD = "post_inspection_stats_v03_report_meta_match_2026-06-01";
 window.CSVB_POST_INSPECTION_STATS_BUILD = STATS_BUILD;
 
 const OBS_TYPES = [
@@ -251,6 +251,79 @@ function reportKeyFromReport(row) {
     String(row.title || "").trim(),
   ].join("|");
 }
+
+
+function reportMetaKeyParts(recordSource, reportId, vesselName, inspectionDate, reportRef, title) {
+  return [
+    String(recordSource || "vetting_inspection").trim(),
+    String(reportId || "").trim(),
+    String(vesselName || "").trim(),
+    String(inspectionDate || "").trim(),
+    String(reportRef || "").trim(),
+    String(title || "").trim(),
+  ].join("|");
+}
+
+function reportMetaFallbackKey(recordSource, vesselName, inspectionDate, reportRef, title) {
+  return [
+    String(recordSource || "vetting_inspection").trim(),
+    String(vesselName || "").trim(),
+    String(inspectionDate || "").trim(),
+    String(reportRef || "").trim(),
+    String(title || "").trim(),
+  ].join("|");
+}
+
+function reportMetaKeysFromReport(row) {
+  const recordSource = String(row?.record_source || "vetting_inspection").trim();
+  const vesselName = String(row?.vessel_name || vesselNameById(row?.vessel_id) || "").trim();
+  const inspectionDate = String(row?.inspection_date || "").trim();
+  const reportRef = String(row?.report_ref || "").trim();
+  const title = String(row?.title || "").trim();
+
+  const ids = [
+    row?.id,
+    row?.source_report_id,
+    row?.report_id,
+    "",
+  ].map((x) => String(x || "").trim());
+
+  const keys = new Set();
+  ids.forEach((id) => keys.add(reportMetaKeyParts(recordSource, id, vesselName, inspectionDate, reportRef, title)));
+  keys.add(reportMetaFallbackKey(recordSource, vesselName, inspectionDate, reportRef, title));
+
+  return [...keys].filter(Boolean);
+}
+
+function reportMetaKeysFromObservation(row) {
+  const recordSource = String(row?.record_source || "vetting_inspection").trim();
+  const vesselName = String(row?.vessel_name || "").trim();
+  const inspectionDate = String(row?.inspection_date || "").trim();
+  const reportRef = String(row?.report_ref || "").trim();
+  const title = String(row?.title || "").trim();
+
+  const ids = [
+    row?.source_report_id,
+    row?.report_id,
+    row?.post_inspection_report_id,
+    "",
+  ].map((x) => String(x || "").trim());
+
+  const keys = new Set();
+  ids.forEach((id) => keys.add(reportMetaKeyParts(recordSource, id, vesselName, inspectionDate, reportRef, title)));
+  keys.add(reportMetaFallbackKey(recordSource, vesselName, inspectionDate, reportRef, title));
+
+  return [...keys].filter(Boolean);
+}
+
+function findReportMetaForObservation(row) {
+  for (const key of reportMetaKeysFromObservation(row)) {
+    const meta = state.reportMetaByKey.get(key);
+    if (meta) return meta;
+  }
+  return null;
+}
+
 
 function monthKey(row) {
   return String(row.inspection_date || "").slice(0, 7) || "—";
@@ -558,38 +631,32 @@ function rebuildReportMetaMap() {
   state.reportMetaByKey = new Map();
 
   for (const r of state.postReportRows || []) {
-    const k = reportKeyFromReport(r);
-    if (!k) continue;
-    state.reportMetaByKey.set(k, {
+    const vesselName = String(r.vessel_name || vesselNameById(r.vessel_id) || "").trim();
+
+    const meta = {
       vessel_id: r.vessel_id,
-      vessel_name: vesselNameById(r.vessel_id),
+      vessel_name: vesselName,
       ocimf_inspecting_company: String(r.ocimf_inspecting_company || "").trim() || "—",
       inspector_name: String(r.inspector_name || "").trim() || "—",
       inspector_company: String(r.inspector_company || "").trim() || "—",
-    });
+    };
+
+    for (const key of reportMetaKeysFromReport({
+      ...r,
+      vessel_name: vesselName,
+      record_source: "vetting_inspection",
+    })) {
+      if (key) state.reportMetaByKey.set(key, meta);
+    }
   }
 }
 
 function enrichRowsWithReportMeta(rows) {
   return (rows || []).map((r) => {
-    const key = [
-      "vetting_inspection",
-      "",
-      String(r.vessel_name || "").trim(),
-      String(r.inspection_date || "").trim(),
-      String(r.report_ref || "").trim(),
-      String(r.title || "").trim(),
-    ].join("|");
-
-    const fallbackKey = [
-      "vetting_inspection",
-      String(r.vessel_name || "").trim(),
-      String(r.inspection_date || "").trim(),
-      String(r.report_ref || "").trim(),
-      String(r.title || "").trim(),
-    ].join("|");
-
-    const meta = state.reportMetaByKey.get(key) || state.reportMetaByKey.get(fallbackKey) || {};
+    const meta = findReportMetaForObservation({
+      ...r,
+      record_source: "vetting_inspection",
+    }) || {};
 
     return {
       ...r,
@@ -604,6 +671,7 @@ function enrichRowsWithReportMeta(rows) {
     };
   });
 }
+
 
 function enrichReports(reportRows) {
   return (reportRows || []).map((r) => ({
