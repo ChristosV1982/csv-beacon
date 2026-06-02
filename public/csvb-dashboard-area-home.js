@@ -211,6 +211,13 @@
               cardKey: "audit_observations",
               icon: "📝",
             },
+            {
+              label: "TMSA Office Inspection Manager",
+              text: "Manage TMSA KPI handling, evidence readiness and Oil Major office inspection preparation.",
+              href: "./tmsa-office.html",
+              cardKey: "tmsa_office_manager",
+              icon: "📋",
+            },
           ],
         },
       ],

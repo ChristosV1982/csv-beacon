@@ -66,7 +66,7 @@
       icon: "📝",
       description:
         "Audit observations, internal/external audits and future vessel/office audit workflows.",
-      cards: ["audit_observations"],
+      cards: ["audit_observations", "tmsa_office_manager"],
       placeholder:
         "Audit Observations is currently the first module in this area. Additional audit modules can be added later.",
     },

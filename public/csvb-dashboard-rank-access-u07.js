@@ -20,6 +20,7 @@
     poststats: "POST_INSPECTION_STATS",
     inspector_intelligence: "INSPECTOR_INTELLIGENCE",
     audit_observations: "AUDIT_OBSERVATIONS",
+    tmsa_office_manager: "TMSA_OFFICE_MANAGER",
     reports: "REPORTS",
     inspector: "INSPECTOR_THIRD_PARTY",
     qeditor: "QUESTIONS_EDITOR",

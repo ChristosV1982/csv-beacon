@@ -25,6 +25,7 @@
     { key: "threads", label: "Threads" },
 
     { key: "audit_observations", label: "Audit Observations" },
+    { key: "tmsa_office_manager", label: "TMSA Office Inspection Manager" },
 
     { key: "suadmin", label: "Superuser Administration" },
   ];

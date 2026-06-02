@@ -38,6 +38,7 @@
 
     "inspector_intelligence.html": "inspector_intelligence",
     "audit_observations.html": "audit_observations",
+    "tmsa-office.html": "tmsa_office_manager",
 
     "q-report.html": "fleet_reports",
 
@@ -269,6 +270,7 @@
       post_inspection_stats: "POST_INSPECTION_STATS",
       inspector_intelligence: "INSPECTOR_INTELLIGENCE",
       audit_observations: "AUDIT_OBSERVATIONS",
+      tmsa_office_manager: "TMSA_OFFICE_MANAGER",
       fleet_reports: "REPORTS",
       sire_2_vetting: "INSPECTOR_THIRD_PARTY",
       questions_editor: "QUESTIONS_EDITOR",
