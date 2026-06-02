@@ -1,0 +1,42 @@
+<!-- public/inspection-question-set-create.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>C.S.V. BEACON - Create Assurance Question Set</title>
+  <link rel="stylesheet" href="./csv-beacon-theme.css?v=20260428_3" />
+  <link rel="stylesheet" href="./style.css?v=20260428_3" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="./auth.js"></script>
+  <style>
+    body{margin:0;padding:10px;background:#eef4fb;font-family:"Segoe UI",Arial,sans-serif;color:#06305c}.wrap{width:min(1500px,calc(100vw - 20px));margin:0 auto}.topbar{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;background:#062b55;color:#fff;border-radius:14px;padding:9px 12px;box-shadow:0 4px 18px rgba(18,44,87,.16);margin-bottom:10px}.brand{display:flex;gap:10px;align-items:center}.brand img{width:40px;height:40px;object-fit:contain}.title{font-size:1.04rem;font-weight:700;line-height:1.2}.sub{font-size:.82rem;font-weight:450;color:#d9ecff}.actions{display:flex;gap:7px;flex-wrap:wrap}.btn{border:1px solid #b9d4ee;border-radius:9px;padding:7px 10px;font-weight:650;text-decoration:none;background:#063b71;color:#fff;min-height:34px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer}.btn.secondary{background:#eef7ff;color:#07345f}.btn:disabled{opacity:.55;cursor:not-allowed}.card{background:#fff;border:1px solid #d5deef;border-radius:14px;padding:12px;box-shadow:0 3px 14px rgba(18,44,87,.10)}.card h2{font-size:1rem;font-weight:700;margin:0 0 6px}.note{border:1px solid #d5deef;border-radius:12px;background:#f7fbff;color:#35507b;font-weight:450;line-height:1.3;padding:8px;margin:8px 0}.warn{display:none;border:1px solid #f1c7c7;border-radius:12px;background:#fff2f2;color:#7a1f1f;font-weight:600;line-height:1.35;padding:9px;margin:8px 0;white-space:pre-wrap}.ok{display:none;border:1px solid #bce9c9;border-radius:12px;background:#effff4;color:#11612b;font-weight:600;line-height:1.35;padding:9px;margin:8px 0;white-space:pre-wrap}.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.full{grid-column:1/-1}label{display:block;margin:8px 0 4px;font-size:.85rem;font-weight:600;color:#1a4170}input,select,textarea{width:100%;box-sizing:border-box;border:1px solid #cbd7ee;border-radius:9px;padding:7px 9px;background:#fff;color:#1a4170;font-family:"Segoe UI",Arial,sans-serif;font-size:.92rem;font-weight:400;outline:none;min-height:36px}textarea{min-height:76px;resize:vertical}.formActions{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}@media(max-width:760px){.grid{grid-template-columns:1fr}.actions,.btn{width:100%}.btn{justify-content:center}}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <div class="brand"><img src="./assets/csv-beacon-icon.png" alt="C.S.V. BEACON" /><div><div class="title">Create Assurance Question Set</div><div class="sub" id="subLine">Checking session...</div></div></div>
+      <div class="actions"><a class="btn" href="./inspection-assurance.html">Assurance Home</a><a class="btn" href="./inspection-question-sets.html">Question Sets</a><button class="btn" id="logoutBtn" type="button">Logout</button></div>
+    </div>
+    <div class="card">
+      <h2>Question Set Details</h2>
+      <div class="note">Create the template first. Questions/items are managed on the dedicated item page after creation.</div>
+      <div id="warnBox" class="warn"></div><div id="okBox" class="ok"></div>
+      <div class="grid">
+        <div id="companyWrap" class="full" style="display:none;"><label for="companySelect">Company</label><select id="companySelect"><option value="">Select company...</option></select></div>
+        <div class="full"><label for="qsName">Question set name</label><input id="qsName" placeholder="e.g. Marine Superintendent Onboard Inspection" /></div>
+        <div><label for="qsCode">Code / short reference</label><input id="qsCode" placeholder="e.g. MS-ONBOARD-INSPECTION" /></div>
+        <div><label for="versionInput">Version</label><input id="versionInput" value="1.0" /></div>
+        <div><label for="qsType">Question set type</label><select id="qsType"><option value="pre_vetting">Pre-vetting</option><option value="superintendent_inspection">Superintendent inspection</option><option value="vessel_self_assessment">Vessel self-assessment</option><option value="internal_audit">Internal audit</option><option value="company_specific">Company specific</option><option value="risq_preparation">RISQ preparation</option><option value="mixed">Mixed</option></select></div>
+        <div><label for="sourceScope">Source scope</label><select id="sourceScope"><option value="SIRE_2_0">SIRE 2.0</option><option value="RISQ_3">RISQ 3</option><option value="COMPANY_SPECIFIC">Company specific</option><option value="MIXED">Mixed</option><option value="FREE_TEXT">Free text</option></select></div>
+        <div><label for="defaultInspectionType">Default inspection type</label><select id="defaultInspectionType"><option value="pre_sire_2_prep">Pre-SIRE 2.0 Preparation</option><option value="marine_superintendent_inspection">Marine Superintendent Onboard Inspection</option><option value="technical_superintendent_inspection">Technical Superintendent Onboard Inspection</option><option value="hsqe_inspection">HSQE Inspection / Audit</option><option value="vessel_self_assessment">Vessel Self-Assessment</option><option value="company_internal_audit">Company Internal Audit</option><option value="cargo_operation_attendance">Cargo Operation Attendance</option><option value="mooring_inspection">Mooring Inspection</option><option value="navigation_inspection">Navigation Inspection</option><option value="engine_room_inspection">Engine Room Inspection</option><option value="risq_preparation">RISQ Preparation</option><option value="company_specific_inspection">Company Specific Inspection</option></select></div>
+        <div><label for="statusInput">Status</label><select id="statusInput"><option value="draft">Draft</option><option value="active">Active</option><option value="archived">Archived</option></select></div>
+        <div class="full"><label for="descInput">Description</label><textarea id="descInput" placeholder="Purpose / scope / notes..."></textarea></div>
+      </div>
+      <div class="formActions"><button class="btn" id="createBtn" type="button">Create Question Set</button><button class="btn secondary" id="clearBtn" type="button">Clear</button></div>
+    </div>
+  </div>
+  <script type="module" src="./inspection-question-set-create.js?v=20260601_1"></script>
+</body>
+</html>
