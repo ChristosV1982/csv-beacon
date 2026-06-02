@@ -1,7 +1,7 @@
 // public/tmsa-office-v01.js
 // C.S.V. BEACON - TMSA Office Inspection Manager v02
 
-const BUILD = "tmsa_office_manager_v02_20260602";
+const BUILD = "tmsa_office_manager_v03_20260602";
 
 const sb = window.AUTH.ensureSupabase();
 const TMSA_COMPANY_KEY = "csvb_tmsa_selected_company_id";
@@ -142,16 +142,35 @@ function renderElementCards(){
     const ready=Number(e.oil_major_ready_count||0);
 
     return `<button class="elementCard" type="button" data-open-element="${esc(e.element_code)}">
+      <div class="elementTop">
+        <span class="elementCodeBadge">Element ${esc(e.element_code)}</span>
+        <span class="elementOpen">Open →</span>
+      </div>
+
       <div>
-        <div class="elementCode">Chapter / Element ${esc(e.element_code)}</div>
         <div class="elementTitle">${esc(e.element_title||"-")}</div>
       </div>
-      <div class="elementMeta">
-        <span class="pill">${esc(kpiCount)} KPI(s)</span>
-        <span class="pill">${esc(handled)} handled</span>
-        <span class="pill okp">${esc(verified)} verified</span>
-        <span class="pill gap">${esc(gaps)} gap(s)</span>
-        <span class="pill okp">${esc(ready)} ready</span>
+
+      <div class="elementMetricGrid">
+        <div class="elementMetric">
+          <strong>${esc(kpiCount)}</strong>
+          <span>KPI records</span>
+        </div>
+
+        <div class="elementMetric">
+          <strong>${esc(handled)}</strong>
+          <span>Handled</span>
+        </div>
+
+        <div class="elementMetric good">
+          <strong>${esc(verified)}</strong>
+          <span>Verified</span>
+        </div>
+
+        <div class="elementMetric ${gaps ? "gap" : "good"}">
+          <strong>${esc(gaps)}</strong>
+          <span>Gaps</span>
+        </div>
       </div>
     </button>`;
   }).join("");
