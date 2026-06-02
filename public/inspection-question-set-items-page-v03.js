@@ -45,7 +45,7 @@ function injectDetailsStyle(){
   const style=document.createElement("style");
   style.id="csvbQuestionPreviewDetailsStyle";
   style.textContent=`
-    .q-detail-toggle{margin-top:7px;border:1px solid #d5deef;border-radius:10px;background:#f7fbff;overflow:hidden}.q-detail-toggle>summary{cursor:pointer;padding:7px 9px;font-weight:650;color:#06305c}.q-detail-body{padding:8px 9px;border-top:1px solid #d5deef;background:#fff}.q-detail-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.q-detail-field{border:1px solid #e1eaf7;border-radius:9px;background:#fbfdff;padding:7px}.q-detail-label{font-size:.76rem;font-weight:700;color:#48628e;margin-bottom:3px}.q-detail-value{font-size:.84rem;color:#173a68;line-height:1.35;white-space:pre-wrap}.q-detail-raw>summary{font-size:.82rem;font-weight:650;cursor:pointer;margin-top:8px;color:#06305c}.q-preview-question{margin-top:3px;line-height:1.35}.q-preview-main-title{font-weight:700}.q-preview-mini{font-size:.82rem;color:#48628e;margin-top:3px}
+    .q-detail-toggle{margin-top:7px;border:1px solid #d5deef;border-radius:10px;background:#f7fbff;overflow:hidden}.q-detail-toggle>summary{cursor:pointer;padding:7px 9px;font-weight:650;color:#06305c}.q-detail-body{padding:8px 9px;border-top:1px solid #d5deef;background:#fff}.q-detail-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.q-detail-field{border:1px solid #e1eaf7;border-radius:9px;background:#fbfdff;padding:7px}.q-detail-label{font-size:.76rem;font-weight:700;color:#48628e;margin-bottom:3px}.q-detail-value{font-size:.84rem;color:#173a68;line-height:1.35;white-space:pre-wrap} .q-preview-question{margin-top:3px;line-height:1.35}.q-preview-main-title{font-weight:700}.q-preview-mini{font-size:.82rem;color:#48628e;margin-top:3px}
     @media(max-width:900px){.q-detail-grid{grid-template-columns:1fr}}
   `;
   document.head.appendChild(style);
@@ -111,9 +111,7 @@ function detailsHtml(row){
     field("Answer type / options",[pget(sourcePayload,["answer_type"]),pget(sourcePayload,["answer_options"])].filter(Boolean).join("\n")),
     field("Status",row.is_active===false?"Inactive":"Active")
   ].filter(Boolean).join("");
-  const raw=Object.keys(sourcePayload).length?`<details class="q-detail-raw"><summary>Raw source details</summary><pre class="q-detail-value">${esc(JSON.stringify(sourcePayload,null,2))}</pre></details>`:"";
-  const sourceRowRaw=Object.keys(sourceRow).length?`<details class="q-detail-raw"><summary>Source row identifiers</summary><pre class="q-detail-value">${esc(JSON.stringify(sourceRow,null,2))}</pre></details>`:"";
-  return `<details class="q-detail-toggle"><summary>More question information</summary><div class="q-detail-body"><div class="q-detail-grid">${fields||field("Information","No additional stored details.")}</div>${raw}${sourceRowRaw}</div></details>`;
+  return `<details class="q-detail-toggle"><summary>More question information</summary><div class="q-detail-body"><div class="q-detail-grid">${fields||field("Information","No additional stored details.")}</div></div></details>`;
 }
 function renderItems(){
   const body=el("itemsBody");
