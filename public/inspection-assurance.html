@@ -1,0 +1,59 @@
+<!-- public/inspection-assurance.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>C.S.V. BEACON - Inspection & Assurance</title>
+  <link rel="stylesheet" href="./csv-beacon-theme.css?v=20260428_3" />
+  <link rel="stylesheet" href="./style.css?v=20260428_3" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="./auth.js"></script>
+  <style>
+    body{margin:0;padding:10px;background:#eef4fb;font-family:"Segoe UI",Arial,sans-serif;color:#06305c}.wrap{width:min(1920px,calc(100vw - 20px));margin:0 auto}.topbar{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;background:#062b55;color:#fff;border-radius:14px;padding:9px 12px;box-shadow:0 4px 18px rgba(18,44,87,.16);margin-bottom:10px}.brand{display:flex;gap:10px;align-items:center}.brand img{width:40px;height:40px;object-fit:contain}.title{font-size:1.05rem;font-weight:700;line-height:1.2}.sub{font-size:.83rem;font-weight:450;color:#d9ecff}.actions{display:flex;gap:7px;flex-wrap:wrap}.btn{border:1px solid #b9d4ee;border-radius:9px;padding:7px 10px;font-weight:650;text-decoration:none;background:#063b71;color:#fff;min-height:34px;display:inline-flex;align-items:center}.btn.secondary{background:#eef7ff;color:#07345f}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:10px}.card{background:#fff;border:1px solid #d5deef;border-radius:14px;padding:12px;box-shadow:0 3px 14px rgba(18,44,87,.10)}.card h2{font-size:1rem;font-weight:700;margin:0 0 6px}.muted{font-size:.88rem;line-height:1.35;color:#48628e;font-weight:400}.card .btn{margin-top:12px}.warn{display:none;border:1px solid #f1c7c7;border-radius:12px;background:#fff2f2;color:#7a1f1f;font-weight:600;line-height:1.35;padding:9px;margin-bottom:10px;white-space:pre-wrap}.build{display:inline-block;border:1px solid #bfe0f5;border-radius:999px;background:#eaf7ff;color:#06305c;font-size:.74rem;font-weight:600;padding:3px 8px;margin-top:8px}.planned{opacity:.7}@media(max-width:620px){.actions,.btn{width:100%}.btn{justify-content:center}}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <div class="brand">
+        <img src="./assets/csv-beacon-icon.png" alt="C.S.V. BEACON" />
+        <div><div class="title">Inspection & Assurance</div><div class="sub" id="subLine">Checking session...</div></div>
+      </div>
+      <div class="actions">
+        <a class="btn" href="./q-dashboard.html">Dashboard</a>
+        <a class="btn" href="./post_inspection_stats.html">Post-Inspection Stats</a>
+        <button class="btn" id="logoutBtn" type="button">Logout</button>
+      </div>
+    </div>
+
+    <div id="warnBox" class="warn"></div>
+
+    <div class="grid">
+      <div class="card">
+        <h2>Question Sets</h2>
+        <div class="muted">View reusable question set templates used for onboard inspections, pre-vetting preparation, self-assessments and company-specific audits.</div>
+        <a class="btn secondary" href="./inspection-question-sets.html">Open List</a>
+      </div>
+      <div class="card">
+        <h2>Create Question Set</h2>
+        <div class="muted">Create a new template and assign it to a company. Super Admin users select the target company during creation.</div>
+        <a class="btn secondary" href="./inspection-question-set-create.html">Create New</a>
+      </div>
+      <div class="card planned">
+        <h2>Inspection Events</h2>
+        <div class="muted">Create and assign actual onboard inspections or preparation events using an approved question set. Planned next.</div>
+        <span class="build">planned</span>
+      </div>
+      <div class="card planned">
+        <h2>Inspection Analytics</h2>
+        <div class="muted">Analyze internal assurance findings and compare them with post-inspection/vetting records. Planned after event execution.</div>
+        <span class="build">planned</span>
+      </div>
+    </div>
+  </div>
+  <script>
+    (async()=>{try{const b=await AUTH.setupAuthButtons({logoutBtnId:'logoutBtn'});document.getElementById('subLine').textContent=b?.profile?.username?`${b.profile.username} · ${b.profile.role}`:'Inspection & Assurance Module';}catch(e){const w=document.getElementById('warnBox');w.textContent=e.message||String(e);w.style.display='block';}})();
+  </script>
+</body>
+</html>
