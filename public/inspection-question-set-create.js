@@ -1,7 +1,7 @@
 // public/inspection-question-set-create.js
 // C.S.V. BEACON - Create Inspection & Assurance Question Set
 
-const BUILD = "assurance_question_set_create_v01_20260601";
+const BUILD = "assurance_question_set_create_v02_rpc_20260601";
 const sb = window.AUTH.ensureSupabase();
 let SESSION = null;
 let PROFILE = null;
@@ -54,21 +54,16 @@ function collectPayload(){
   if(!company_id) throw new Error("Company is required.");
   const question_set_name=String(el("qsName")?.value||"").trim();
   if(!question_set_name) throw new Error("Question set name is required.");
-  const status=String(el("statusInput")?.value||"draft").trim();
   return {
-    company_id,
-    question_set_name,
-    question_set_code:String(el("qsCode")?.value||"").trim().toUpperCase()||null,
-    question_set_type:String(el("qsType")?.value||"company_specific").trim(),
-    source_scope:String(el("sourceScope")?.value||"MIXED").trim(),
-    default_inspection_type:String(el("defaultInspectionType")?.value||"company_specific_inspection").trim(),
-    version:String(el("versionInput")?.value||"1.0").trim()||"1.0",
-    status,
-    description:String(el("descInput")?.value||"").trim()||null,
-    is_active:status!=="archived",
-    created_by:SESSION.user.id,
-    updated_by:SESSION.user.id,
-    metadata:{created_from:"inspection-question-set-create.html",build:BUILD}
+    p_company_id: company_id,
+    p_question_set_name: question_set_name,
+    p_question_set_code: String(el("qsCode")?.value||"").trim().toUpperCase()||null,
+    p_question_set_type: String(el("qsType")?.value||"company_specific").trim(),
+    p_source_scope: String(el("sourceScope")?.value||"MIXED").trim(),
+    p_default_inspection_type: String(el("defaultInspectionType")?.value||"company_specific_inspection").trim(),
+    p_version: String(el("versionInput")?.value||"1.0").trim()||"1.0",
+    p_status: String(el("statusInput")?.value||"draft").trim(),
+    p_description: String(el("descInput")?.value||"").trim()||null
   };
 }
 
@@ -83,10 +78,12 @@ async function createSet(){
   clearMessages();
   if(!canCreate()) throw new Error("You do not have permission to create question sets.");
   const payload=collectPayload();
-  const {data,error}=await sb.from("assurance_question_sets").insert(payload).select("id").single();
+  const {data,error}=await sb.rpc("csvb_assurance_create_question_set", payload);
   if(error) throw error;
+  const newId=Array.isArray(data)?data[0]:data;
+  if(!newId) throw new Error("Question set was created but no id was returned.");
   showOk("Question set created. Opening item management page...");
-  window.setTimeout(()=>{location.href=`./inspection-question-set-items.html?id=${encodeURIComponent(data.id)}`},500);
+  window.setTimeout(()=>{location.href=`./inspection-question-set-items.html?id=${encodeURIComponent(newId)}`},500);
 }
 
 async function init(){
