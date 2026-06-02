@@ -1,10 +1,9 @@
 // public/tmsa-office-v01.js
-// C.S.V. BEACON - TMSA Office Inspection Manager v01
+// C.S.V. BEACON - TMSA Office Inspection Manager v02
 
-const BUILD = "tmsa_office_manager_v01_20260602";
+const BUILD = "tmsa_office_manager_v02_20260602";
 
 const sb = window.AUTH.ensureSupabase();
-
 const TMSA_COMPANY_KEY = "csvb_tmsa_selected_company_id";
 
 let PROFILE = null;
@@ -12,6 +11,7 @@ let COMPANIES = [];
 let DASHBOARD = null;
 let ROWS = [];
 let CURRENT = null;
+let SELECTED_ELEMENT = null;
 
 function el(id){return document.getElementById(id)}
 function esc(v){return String(v??"").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#039;")}
@@ -51,12 +51,14 @@ function selectedCompanyId(){
 
 async function setupCompanyFilter(){
   const n=el("companyFilter");
+
   if(!n || !PROFILE || !isPlatformRole(PROFILE.role)){
     if(n)n.style.display="none";
     return;
   }
 
   const {data,error}=await sb.rpc("csvb_admin_list_companies");
+
   if(error){
     showWarn("Could not load company selector: " + (error.message || String(error)));
     n.style.display="none";
@@ -72,6 +74,7 @@ async function setupCompanyFilter(){
   }).join("");
 
   const saved=localStorage.getItem(TMSA_COMPANY_KEY)||"";
+
   if(saved && COMPANIES.some(c=>String(c.id)===String(saved))){
     n.value=saved;
   }else if(COMPANIES.length){
@@ -81,11 +84,14 @@ async function setupCompanyFilter(){
 }
 
 function rowsFiltered(){
-  const element=String(el("elementFilter")?.value||"").trim();
+  if(!SELECTED_ELEMENT) return [];
+
+  const element=String(SELECTED_ELEMENT.element_code || "").trim();
   const term=String(el("searchInput")?.value||"").trim().toLowerCase();
 
   return ROWS.filter(r=>{
     if(element && r.element_code!==element) return false;
+
     if(!term) return true;
 
     const hay=[
@@ -107,20 +113,6 @@ function rowsFiltered(){
   });
 }
 
-function renderElementFilter(){
-  const n=el("elementFilter");
-  if(!n)return;
-
-  const existing=n.value||"";
-  const elements=DASHBOARD?.elements||[];
-
-  n.innerHTML=`<option value="">All elements</option>`+elements.map(e=>{
-    return `<option value="${esc(e.element_code)}">${esc(e.element_code)} - ${esc(e.element_title)}</option>`;
-  }).join("");
-
-  n.value=existing;
-}
-
 function renderStats(){
   if(!DASHBOARD)return;
 
@@ -131,16 +123,56 @@ function renderStats(){
   setText("eventCount", DASHBOARD.office_event_count||0);
 }
 
+function renderElementCards(){
+  const grid=el("elementsGrid");
+  if(!grid)return;
+
+  const elements=DASHBOARD?.elements||[];
+
+  if(!elements.length){
+    grid.innerHTML=`<div class="note">No TMSA elements found.</div>`;
+    return;
+  }
+
+  grid.innerHTML=elements.map(e=>{
+    const kpiCount=Number(e.kpi_count||0);
+    const handled=Number(e.matrix_count||0);
+    const verified=Number(e.verified_count||0);
+    const gaps=Number(e.gap_count||0);
+    const ready=Number(e.oil_major_ready_count||0);
+
+    return `<button class="elementCard" type="button" data-open-element="${esc(e.element_code)}">
+      <div>
+        <div class="elementCode">Chapter / Element ${esc(e.element_code)}</div>
+        <div class="elementTitle">${esc(e.element_title||"-")}</div>
+      </div>
+      <div class="elementMeta">
+        <span class="pill">${esc(kpiCount)} KPI(s)</span>
+        <span class="pill">${esc(handled)} handled</span>
+        <span class="pill okp">${esc(verified)} verified</span>
+        <span class="pill gap">${esc(gaps)} gap(s)</span>
+        <span class="pill okp">${esc(ready)} ready</span>
+      </div>
+    </button>`;
+  }).join("");
+}
+
 function renderRows(){
   const body=el("matrixBody");
   const count=el("rowCount");
   if(!body)return;
 
   const data=rowsFiltered();
+
   if(count)count.textContent=`${data.length} row${data.length===1?"":"s"}`;
 
+  if(!SELECTED_ELEMENT){
+    body.innerHTML=`<tr><td colspan="10">Select a chapter.</td></tr>`;
+    return;
+  }
+
   if(!data.length){
-    body.innerHTML=`<tr><td colspan="10">No TMSA KPI rows found.</td></tr>`;
+    body.innerHTML=`<tr><td colspan="10">No TMSA KPI rows found for this chapter.</td></tr>`;
     return;
   }
 
@@ -173,24 +205,78 @@ function renderRows(){
   }).join("");
 }
 
+function showElementHome(){
+  SELECTED_ELEMENT=null;
+  closeEdit();
+
+  const home=el("elementHome");
+  const matrix=el("matrixSection");
+
+  if(home)home.style.display="block";
+  if(matrix)matrix.style.display="none";
+
+  renderRows();
+}
+
+function openElement(elementCode){
+  const elements=DASHBOARD?.elements||[];
+  const found=elements.find(e=>String(e.element_code)===String(elementCode));
+
+  if(!found){
+    showWarn("Selected TMSA element was not found.");
+    return;
+  }
+
+  SELECTED_ELEMENT=found;
+  closeEdit();
+
+  const home=el("elementHome");
+  const matrix=el("matrixSection");
+
+  if(home)home.style.display="none";
+  if(matrix)matrix.style.display="block";
+
+  setText("selectedElementTitle", `Chapter / Element ${found.element_code} - ${found.element_title}`);
+  setText("selectedElementSub", `${Number(found.kpi_count||0)} KPI(s) · ${Number(found.matrix_count||0)} handled · ${Number(found.gap_count||0)} gap(s)`);
+
+  if(el("searchInput"))el("searchInput").value="";
+
+  renderRows();
+
+  matrix?.scrollIntoView({behavior:"smooth",block:"start"});
+}
+
 async function loadAll(){
   clearMessages();
 
   const dash=await sb.rpc("csvb_tmsa_dashboard_for_me");
   if(dash.error) throw dash.error;
+
   DASHBOARD=dash.data||{};
+
   renderStats();
-  renderElementFilter();
+  renderElementCards();
 
   const rows=await sb.rpc("csvb_tmsa_kpi_matrix_for_me",{
     p_element_code: null,
     p_search: null,
     p_company_id: selectedCompanyId()
   });
+
   if(rows.error) throw rows.error;
 
   ROWS=rows.data||[];
-  renderRows();
+
+  if(SELECTED_ELEMENT){
+    const code=SELECTED_ELEMENT.element_code;
+    SELECTED_ELEMENT=(DASHBOARD.elements||[]).find(e=>String(e.element_code)===String(code))||null;
+  }
+
+  if(SELECTED_ELEMENT){
+    openElement(SELECTED_ELEMENT.element_code);
+  }else{
+    showElementHome();
+  }
 
   window.CSVB_TMSA_OFFICE_MANAGER={
     build: BUILD,
@@ -199,12 +285,14 @@ async function loadAll(){
     kpi_count: DASHBOARD.kpi_count||0,
     row_count: ROWS.length,
     selected_company_id: selectedCompanyId(),
+    selected_element_code: SELECTED_ELEMENT?.element_code || null,
     profile: DASHBOARD.profile||null
   };
 }
 
 function openEdit(row){
   CURRENT=row;
+
   const box=el("editBox");
   if(box)box.style.display="block";
 
@@ -228,6 +316,7 @@ function openEdit(row){
 
 function closeEdit(){
   CURRENT=null;
+
   const box=el("editBox");
   if(box)box.style.display="none";
 }
@@ -255,6 +344,7 @@ async function saveHandling(){
   };
 
   const {data,error}=await sb.rpc("csvb_tmsa_save_kpi_handling",payload);
+
   if(error) throw error;
 
   showOk(`TMSA KPI handling saved. Matrix ID: ${data}`);
@@ -264,15 +354,25 @@ async function saveHandling(){
 
 function bind(){
   el("logoutBtn")?.addEventListener("click",async()=>window.AUTH.logout());
+
+  el("refreshHomeBtn")?.addEventListener("click",()=>loadAll().catch(e=>showWarn(e.message||String(e))));
   el("refreshBtn")?.addEventListener("click",()=>loadAll().catch(e=>showWarn(e.message||String(e))));
+
   el("companyFilter")?.addEventListener("change",()=>{
     localStorage.setItem(TMSA_COMPANY_KEY,el("companyFilter").value||"");
     loadAll().catch(e=>showWarn(e.message||String(e)));
   });
-  el("elementFilter")?.addEventListener("change",renderRows);
+
   el("searchInput")?.addEventListener("input",renderRows);
+  el("backToElementsBtn")?.addEventListener("click",showElementHome);
   el("closeEditBtn")?.addEventListener("click",closeEdit);
   el("saveHandlingBtn")?.addEventListener("click",()=>saveHandling().catch(e=>showWarn(e.message||String(e))));
+
+  el("elementsGrid")?.addEventListener("click",e=>{
+    const btn=e.target.closest("[data-open-element]");
+    if(!btn)return;
+    openElement(btn.dataset.openElement||"");
+  });
 
   el("matrixBody")?.addEventListener("click",e=>{
     const btn=e.target.closest("button[data-edit-kpi]");
