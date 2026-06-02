@@ -9,6 +9,7 @@ let PROFILE = null;
 let QUESTION_SET = null;
 let ITEMS = [];
 let EVENT_USAGE_COUNT = 0;
+let SELECTED_ITEM_IDS = new Set();
 
 function el(id){return document.getElementById(id)}
 function qsParam(){return new URLSearchParams(location.search).get("id")||""}
@@ -19,6 +20,49 @@ function clearMessages(){showWarn("");showOk("")}
 function canManage(){return ["super_admin","company_admin"].includes(String(PROFILE?.role||""))}
 function sourceLabel(v){return {SIRE_2_0:"SIRE 2.0",RISQ_3:"RISQ 3",COMPANY_SPECIFIC:"Company",FREE_TEXT:"Free text",MIXED:"Mixed",SIRE:"SIRE 2.0"}[v]||v||"-"}
 function isUnusedTemplate(){return Number(EVENT_USAGE_COUNT||0)===0}
+
+function selectedItemIds(){
+  const valid=new Set(ITEMS.map(r=>String(r.id)));
+  return Array.from(SELECTED_ITEM_IDS).filter(id=>valid.has(String(id)));
+}
+function pruneSelectedItems(){
+  const valid=new Set(ITEMS.map(r=>String(r.id)));
+  SELECTED_ITEM_IDS=new Set(Array.from(SELECTED_ITEM_IDS).filter(id=>valid.has(String(id))));
+}
+function updateBulkControls(){
+  const ids=selectedItemIds();
+  const count=ids.length;
+  const can=canManage();
+  const allIds=ITEMS.map(r=>String(r.id));
+  const selectAll=el("previewSelectAll");
+  if(selectAll){
+    selectAll.disabled=!can||!ITEMS.length;
+    selectAll.checked=!!ITEMS.length&&count===ITEMS.length;
+    selectAll.indeterminate=count>0&&count<ITEMS.length;
+  }
+  const line=el("bulkLine");
+  if(line){
+    if(!can){
+      line.textContent="Bulk actions are not available for your role.";
+      line.className="small bulk-muted";
+    }else if(count){
+      line.textContent=`${count} preview item(s) selected.`;
+      line.className="small";
+    }else{
+      line.textContent="No preview items selected.";
+      line.className="small bulk-muted";
+    }
+  }
+  const activate=el("bulkActivateBtn");
+  const deactivate=el("bulkDeactivateBtn");
+  const remove=el("bulkRemoveBtn");
+  if(activate)activate.disabled=!can||count===0;
+  if(deactivate)deactivate.disabled=!can||count===0;
+  if(remove){
+    remove.disabled=!can||count===0||!isUnusedTemplate();
+    remove.title=isUnusedTemplate()?"Remove selected questions from this unused template.":"This question set has been used. Remove is blocked; deactivate selected questions instead.";
+  }
+}
 function textify(v){
   if(v===null||v===undefined)return "";
   if(Array.isArray(v))return v.map(textify).filter(Boolean).join("\n");
@@ -90,6 +134,7 @@ async function loadItems(){
   const {data,error}=await sb.from("assurance_question_set_items").select("id,item_no,order_index,source_library,source_question_no,chapter,section,short_text,custom_question_text,expected_evidence,inspector_guidance,criticality,is_active,metadata").eq("question_set_id",QUESTION_SET.id).order("order_index",{ascending:true}).order("item_no",{ascending:true});
   if(error) throw error;
   ITEMS=data||[];
+  pruneSelectedItems();
   renderItems();
   window.CSVB_INSPECTION_QS_ITEMS_PAGE={build:BUILD,question_set_id:QUESTION_SET.id,item_count:ITEMS.length,event_usage_count:EVENT_USAGE_COUNT};
 }
@@ -116,15 +161,16 @@ function detailsHtml(row){
 function renderItems(){
   const body=el("itemsBody");
   if(!body)return;
-  if(!ITEMS.length){body.innerHTML='<tr><td colspan="7">No items in this question set yet.</td></tr>';return;}
+  if(!ITEMS.length){body.innerHTML='<tr><td colspan="8">No items in this question set yet.</td></tr>';updateBulkControls();return;}
   body.innerHTML=ITEMS.map(row=>{
     const title=row.short_text||row.custom_question_text||row.expected_evidence||"-";
     const question=row.custom_question_text&&row.custom_question_text!==title?row.custom_question_text:"";
     const mini=[row.chapter?`Ch. ${row.chapter}`:"",row.section||""].filter(Boolean).join(" · ");
     const pill=row.is_active===false?'<span class="pill off">Inactive</span>':'<span class="pill">Active</span>';
     const removeBtn=isUnusedTemplate()?`<button class="btn danger" data-action="remove" data-id="${esc(row.id)}" ${!canManage()?"disabled":""}>Remove</button>`:"";
-    return `<tr><td class="mono">${esc(row.item_no||"-")}</td><td>${esc(sourceLabel(row.source_library))}</td><td class="mono">${esc(row.source_question_no||"-")}</td><td><div class="q-preview-main-title">${esc(title)}</div>${question?`<div class="q-preview-question">${esc(question)}</div>`:""}${mini?`<div class="q-preview-mini">${esc(mini)}</div>`:""}${detailsHtml(row)}</td><td>${esc(row.criticality||"normal")}</td><td>${pill}</td><td><div class="actions"><button class="btn secondary" data-action="toggle" data-id="${esc(row.id)}" ${!canManage()?"disabled":""}>${row.is_active===false?"Activate":"Deactivate"}</button>${removeBtn}</div></td></tr>`;
+    return `<tr><td style="text-align:center;"><input class="preview-check" type="checkbox" data-preview-check="${esc(row.id)}" ${SELECTED_ITEM_IDS.has(String(row.id))?"checked":""} ${!canManage()?"disabled":""} /></td><td class="mono">${esc(row.item_no||"-")}</td><td>${esc(sourceLabel(row.source_library))}</td><td class="mono">${esc(row.source_question_no||"-")}</td><td><div class="q-preview-main-title">${esc(title)}</div>${question?`<div class="q-preview-question">${esc(question)}</div>`:""}${mini?`<div class="q-preview-mini">${esc(mini)}</div>`:""}${detailsHtml(row)}</td><td>${esc(row.criticality||"normal")}</td><td>${pill}</td><td><div class="actions"><button class="btn secondary" data-action="toggle" data-id="${esc(row.id)}" ${!canManage()?"disabled":""}>${row.is_active===false?"Activate":"Deactivate"}</button>${removeBtn}</div></td></tr>`;
   }).join("");
+  updateBulkControls();
 }
 function clearForm(){["questionNo","chapter","section","shortText","questionText","expectedEvidence","guidance"].forEach(id=>{const n=el(id); if(n)n.value=""});el("sourceLibrary").value="COMPANY_SPECIFIC";el("criticality").value="normal";el("isRequired").checked=true;el("answerRequired").checked=true;el("findingAllowed").checked=true;}
 function payload(){
@@ -148,6 +194,71 @@ async function removeItem(id){
   showOk("Question removed from unused template.");
   await loadItems();
 }
-function bind(){el("logoutBtn")?.addEventListener("click",async()=>{await window.AUTH.logout()});el("addBtn")?.addEventListener("click",()=>addItem().catch(e=>showWarn(e.message||String(e))));el("clearBtn")?.addEventListener("click",clearForm);el("refreshBtn")?.addEventListener("click",()=>loadItems().catch(e=>showWarn(e.message||String(e))));el("itemsBody")?.addEventListener("click",e=>{const b=e.target.closest("button[data-action]");if(!b)return;const action=b.dataset.action;if(action==="toggle")toggleItem(b.dataset.id).catch(err=>showWarn(err.message||String(err)));if(action==="remove")removeItem(b.dataset.id).catch(err=>showWarn(err.message||String(err)));});}
+
+async function bulkSetActive(isActive){
+  clearMessages();
+  if(!canManage()) throw new Error("You do not have permission to modify preview items.");
+  const ids=selectedItemIds();
+  if(!ids.length) throw new Error("No preview items selected.");
+  const {error}=await sb.from("assurance_question_set_items")
+    .update({is_active:!!isActive,updated_by:SESSION.user.id})
+    .eq("question_set_id",QUESTION_SET.id)
+    .in("id",ids);
+  if(error)throw error;
+  showOk(`${ids.length} selected question(s) ${isActive?"activated":"deactivated"}.`);
+  SELECTED_ITEM_IDS.clear();
+  await loadItems();
+}
+async function bulkRemove(){
+  clearMessages();
+  if(!canManage()) throw new Error("You do not have permission to remove preview items.");
+  if(!isUnusedTemplate()) throw new Error("This question set has been used. Questions cannot be removed; deactivate instead.");
+  const ids=selectedItemIds();
+  if(!ids.length) throw new Error("No preview items selected.");
+  const ok=confirm(`Remove ${ids.length} selected question(s) completely from this unused template?`);
+  if(!ok)return;
+  const {error}=await sb.from("assurance_question_set_items")
+    .delete()
+    .eq("question_set_id",QUESTION_SET.id)
+    .in("id",ids);
+  if(error)throw error;
+  showOk(`${ids.length} selected question(s) removed from unused template.`);
+  SELECTED_ITEM_IDS.clear();
+  await loadItems();
+}
+
+function bind(){
+  el("logoutBtn")?.addEventListener("click",async()=>{await window.AUTH.logout()});
+  el("addBtn")?.addEventListener("click",()=>addItem().catch(e=>showWarn(e.message||String(e))));
+  el("clearBtn")?.addEventListener("click",clearForm);
+  el("refreshBtn")?.addEventListener("click",()=>loadItems().catch(e=>showWarn(e.message||String(e))));
+  el("bulkActivateBtn")?.addEventListener("click",()=>bulkSetActive(true).catch(e=>showWarn(e.message||String(e))));
+  el("bulkDeactivateBtn")?.addEventListener("click",()=>bulkSetActive(false).catch(e=>showWarn(e.message||String(e))));
+  el("bulkRemoveBtn")?.addEventListener("click",()=>bulkRemove().catch(e=>showWarn(e.message||String(e))));
+  el("previewSelectAll")?.addEventListener("change",e=>{
+    if(e.target.checked){
+      SELECTED_ITEM_IDS=new Set(ITEMS.map(r=>String(r.id)));
+    }else{
+      SELECTED_ITEM_IDS.clear();
+    }
+    renderItems();
+  });
+  el("itemsBody")?.addEventListener("change",e=>{
+    const cb=e.target.closest("input[data-preview-check]");
+    if(!cb)return;
+    const id=String(cb.dataset.previewCheck||"");
+    if(!id)return;
+    if(cb.checked)SELECTED_ITEM_IDS.add(id);
+    else SELECTED_ITEM_IDS.delete(id);
+    updateBulkControls();
+  });
+  el("itemsBody")?.addEventListener("click",e=>{
+    const b=e.target.closest("button[data-action]");
+    if(!b)return;
+    const action=b.dataset.action;
+    if(action==="toggle")toggleItem(b.dataset.id).catch(err=>showWarn(err.message||String(err)));
+    if(action==="remove")removeItem(b.dataset.id).catch(err=>showWarn(err.message||String(err)));
+  });
+}
 async function init(){try{injectDetailsStyle();bind();SESSION=await getSession();PROFILE=await getProfile();await loadQuestionSet();if(!canManage()){el("manualItemDetails").style.display="none";}await loadItems();}catch(e){showWarn(e.message||String(e));if(el("subLine"))el("subLine").textContent="Not ready."}}
 init();
