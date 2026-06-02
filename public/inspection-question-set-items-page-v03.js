@@ -215,8 +215,13 @@ async function bulkRemove(){
   if(!isUnusedTemplate()) throw new Error("This question set has been used. Questions cannot be removed; deactivate instead.");
   const ids=selectedItemIds();
   if(!ids.length) throw new Error("No preview items selected.");
-  const ok=confirm(`Remove ${ids.length} selected question(s) completely from this unused template?`);
+  const ok=confirm(`Remove ${ids.length} selected question(s) completely from this unused template?\n\nThis action cannot be undone.`);
   if(!ok)return;
+  const typed=prompt(`Type REMOVE to confirm deletion of ${ids.length} selected question(s).`);
+  if(String(typed||"").trim()!=="REMOVE"){
+    showWarn("Bulk remove cancelled. Confirmation text did not match REMOVE.");
+    return;
+  }
   const {error}=await sb.from("assurance_question_set_items")
     .delete()
     .eq("question_set_id",QUESTION_SET.id)
