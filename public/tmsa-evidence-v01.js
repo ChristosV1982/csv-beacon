@@ -1,14 +1,17 @@
 // public/tmsa-evidence-v01.js
-// C.S.V. BEACON - TMSA Evidence Register v01
+// C.S.V. BEACON - TMSA Evidence Register v02
+// Adds Evidence ↔ KPI link management.
 
-const BUILD = "tmsa_evidence_register_v01_20260610";
+const BUILD = "tmsa_evidence_register_v02_20260610";
 const sb = window.AUTH.ensureSupabase();
 const TMSA_EVIDENCE_COMPANY_KEY = "csvb_tmsa_evidence_selected_company_id";
 
 let PROFILE = null;
 let COMPANIES = [];
 let ROWS = [];
+let KPI_ROWS = [];
 let CURRENT = null;
+let LINK_EVIDENCE = null;
 
 function el(id){return document.getElementById(id)}
 function esc(v){return String(v??"").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#039;")}
@@ -137,6 +140,7 @@ function openEdit(row){
   el("confidentialityLevel").value=row.confidentiality_level||"internal";
   el("remarks").value=row.remarks||"";
 
+  openLinkPanel(row);
   window.scrollTo({top:0,behavior:"smooth"});
 }
 
@@ -148,7 +152,7 @@ async function saveEvidence(){
 
   showOk(`Evidence record saved. ID: ${data}`);
   clearForm();
-  await loadEvidence();
+  await loadAll();
 }
 
 async function setActive(row,isActive){
@@ -165,12 +169,10 @@ async function setActive(row,isActive){
   if(error) throw error;
 
   showOk(`Evidence record ${isActive?"reactivated":"deactivated"}.`);
-  await loadEvidence();
+  await loadAll();
 }
 
 async function loadEvidence(){
-  clearMessages();
-
   const {data,error}=await sb.rpc("csvb_tmsa_evidence_for_me",{
     p_company_id: selectedCompanyId(),
     p_search: el("searchInput").value || null,
@@ -182,11 +184,40 @@ async function loadEvidence(){
   ROWS=data||[];
   renderRows();
 
+  if(LINK_EVIDENCE){
+    const refreshed=ROWS.find(r=>String(r.id)===String(LINK_EVIDENCE.id));
+    if(refreshed)openLinkPanel(refreshed);
+    else clearLinkPanel();
+  }
+}
+
+async function loadKpis(){
+  const {data,error}=await sb.rpc("csvb_tmsa_kpi_matrix_for_me",{
+    p_element_code: null,
+    p_search: null,
+    p_company_id: selectedCompanyId()
+  });
+
+  if(error) throw error;
+
+  KPI_ROWS=data||[];
+  renderLinkElementFilter();
+  renderKpiSelect();
+}
+
+async function loadAll(){
+  clearMessages();
+
+  await loadKpis();
+  await loadEvidence();
+
   window.CSVB_TMSA_EVIDENCE_REGISTER={
     build: BUILD,
     loaded: true,
     row_count: ROWS.length,
+    kpi_count: KPI_ROWS.length,
     selected_company_id: selectedCompanyId(),
+    link_evidence_id: LINK_EVIDENCE?.id || null,
     profile: PROFILE
   };
 }
@@ -241,6 +272,7 @@ function renderRows(){
       <td>
         <div class="actions">
           <button class="btn secondary" type="button" data-edit-id="${esc(row.id)}">Edit</button>
+          <button class="btn secondary" type="button" data-link-id="${esc(row.id)}">Link KPI</button>
           ${row.is_active===false
             ? `<button class="btn secondary" type="button" data-reactivate-id="${esc(row.id)}">Reactivate</button>`
             : `<button class="btn danger" type="button" data-deactivate-id="${esc(row.id)}">Deactivate</button>`
@@ -251,27 +283,167 @@ function renderRows(){
   }).join("");
 }
 
+function renderLinkElementFilter(){
+  const n=el("linkElementFilter");
+  if(!n)return;
+
+  const existing=n.value||"";
+  const seen=new Set();
+  const opts=[];
+
+  KPI_ROWS.forEach(r=>{
+    const code=String(r.element_code||"");
+    if(!code || seen.has(code))return;
+    seen.add(code);
+    opts.push({code,title:r.element_title||""});
+  });
+
+  n.innerHTML=`<option value="">All elements</option>`+opts.map(x=>{
+    return `<option value="${esc(x.code)}">${esc(x.code)} - ${esc(x.title)}</option>`;
+  }).join("");
+
+  n.value=existing;
+}
+
+function renderKpiSelect(){
+  const n=el("linkKpiId");
+  if(!n)return;
+
+  const element=String(el("linkElementFilter")?.value||"").trim();
+  const rows=KPI_ROWS.filter(r=>!element || r.element_code===element);
+
+  n.innerHTML=`<option value="">Select KPI...</option>`+rows.map(r=>{
+    return `<option value="${esc(r.kpi_id)}">${esc(r.kpi_code)} · L${esc(r.kpi_level)} · ${esc(r.element_title)}</option>`;
+  }).join("");
+}
+
+function renderLinkedKpis(){
+  const list=el("linkedKpisList");
+  if(!list)return;
+
+  if(!LINK_EVIDENCE){
+    list.innerHTML=`<div class="small">No evidence selected.</div>`;
+    return;
+  }
+
+  const links=Array.isArray(LINK_EVIDENCE.linked_kpis)?LINK_EVIDENCE.linked_kpis:[];
+
+  if(!links.length){
+    list.innerHTML=`<div class="small">No KPIs linked to this evidence record yet.</div>`;
+    return;
+  }
+
+  list.innerHTML=links.map(l=>{
+    return `<div class="linkItem">
+      <div class="linkItemText">
+        <strong>${esc(l.kpi_code||"-")}</strong>
+        ${l.element_code?` · Element ${esc(l.element_code)}`:""}
+        ${l.kpi_level?` · L${esc(l.kpi_level)}`:""}
+        ${l.is_primary?` · Primary`:""}
+        ${l.link_note?`<div>${esc(l.link_note)}</div>`:""}
+      </div>
+      <button class="btn danger" type="button" data-unlink-id="${esc(l.link_id)}">Unlink</button>
+    </div>`;
+  }).join("");
+}
+
+function openLinkPanel(row){
+  LINK_EVIDENCE=row;
+  el("linkEvidenceTitle").textContent=`Selected evidence: ${row.evidence_title}`;
+  renderLinkedKpis();
+
+  window.CSVB_TMSA_EVIDENCE_REGISTER={
+    ...(window.CSVB_TMSA_EVIDENCE_REGISTER||{}),
+    link_evidence_id: row.id,
+    selected_linked_kpi_count: Number(row.linked_kpi_count||0)
+  };
+}
+
+function clearLinkPanel(){
+  LINK_EVIDENCE=null;
+  el("linkEvidenceTitle").textContent="No evidence selected.";
+  el("linkNote").value="";
+  el("linkPrimary").checked=false;
+  renderLinkedKpis();
+}
+
+async function linkSelectedKpi(){
+  clearMessages();
+
+  if(!LINK_EVIDENCE)throw new Error("Select an evidence record first.");
+  if(!el("linkKpiId").value)throw new Error("Select a KPI to link.");
+
+  const {data,error}=await sb.rpc("csvb_tmsa_link_evidence_to_kpi",{
+    p_evidence_id: LINK_EVIDENCE.id,
+    p_kpi_id: el("linkKpiId").value,
+    p_company_id: LINK_EVIDENCE.company_id || selectedCompanyId(),
+    p_link_note: el("linkNote").value || null,
+    p_is_primary: el("linkPrimary").checked
+  });
+
+  if(error)throw error;
+
+  showOk(`Evidence linked to KPI. Link ID: ${data}`);
+  el("linkNote").value="";
+  el("linkPrimary").checked=false;
+
+  await loadAll();
+}
+
+async function unlinkKpi(linkId){
+  clearMessages();
+
+  const ok=confirm("Remove this evidence/KPI link?");
+  if(!ok)return;
+
+  const {error}=await sb.rpc("csvb_tmsa_unlink_evidence_from_kpi",{
+    p_link_id: linkId
+  });
+
+  if(error)throw error;
+
+  showOk("Evidence/KPI link removed.");
+  await loadAll();
+}
+
 function bind(){
   el("logoutBtn")?.addEventListener("click",async()=>window.AUTH.logout());
   el("newBtn")?.addEventListener("click",clearForm);
   el("clearBtn")?.addEventListener("click",clearForm);
   el("saveBtn")?.addEventListener("click",()=>saveEvidence().catch(e=>showWarn(e.message||String(e))));
-  el("refreshBtn")?.addEventListener("click",()=>loadEvidence().catch(e=>showWarn(e.message||String(e))));
+  el("refreshBtn")?.addEventListener("click",()=>loadAll().catch(e=>showWarn(e.message||String(e))));
   el("searchInput")?.addEventListener("input",()=>loadEvidence().catch(e=>showWarn(e.message||String(e))));
   el("includeInactive")?.addEventListener("change",()=>loadEvidence().catch(e=>showWarn(e.message||String(e))));
   el("companyFilter")?.addEventListener("change",()=>{
     localStorage.setItem(TMSA_EVIDENCE_COMPANY_KEY,el("companyFilter").value||"");
-    loadEvidence().catch(e=>showWarn(e.message||String(e)));
+    clearLinkPanel();
+    loadAll().catch(e=>showWarn(e.message||String(e)));
+  });
+
+  el("linkElementFilter")?.addEventListener("change",renderKpiSelect);
+  el("linkKpiBtn")?.addEventListener("click",()=>linkSelectedKpi().catch(e=>showWarn(e.message||String(e))));
+  el("clearLinkBtn")?.addEventListener("click",clearLinkPanel);
+
+  el("linkedKpisList")?.addEventListener("click",e=>{
+    const btn=e.target.closest("button[data-unlink-id]");
+    if(!btn)return;
+    unlinkKpi(btn.dataset.unlinkId||"").catch(err=>showWarn(err.message||String(err)));
   });
 
   el("evidenceBody")?.addEventListener("click",e=>{
     const edit=e.target.closest("button[data-edit-id]");
+    const link=e.target.closest("button[data-link-id]");
     const deact=e.target.closest("button[data-deactivate-id]");
     const react=e.target.closest("button[data-reactivate-id]");
 
     if(edit){
       const row=ROWS.find(r=>String(r.id)===String(edit.dataset.editId));
       if(row)openEdit(row);
+    }
+
+    if(link){
+      const row=ROWS.find(r=>String(r.id)===String(link.dataset.linkId));
+      if(row)openLinkPanel(row);
     }
 
     if(deact){
@@ -300,7 +472,7 @@ async function init(){
     }
 
     await setupCompanyFilter();
-    await loadEvidence();
+    await loadAll();
   }catch(e){
     showWarn(e.message||String(e));
     if(el("subLine"))el("subLine").textContent="Not ready.";
