@@ -1,0 +1,356 @@
+<!-- public/tmsa-office-events.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>C.S.V. BEACON - TMSA Office Inspection Events</title>
+
+  <link rel="stylesheet" href="./csv-beacon-theme.css?v=20260428_3" />
+  <link rel="stylesheet" href="./style.css?v=20260428_3" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="./auth.js"></script>
+  <script src="./csvb-module-guard.js?v=20260610_tmsa_office_events_1"></script>
+
+  <style>
+    body{margin:0;padding:10px;background:#eef4fb;font-family:"Segoe UI",Arial,sans-serif;color:#06305c}
+    .wrap{width:calc(100vw - 20px);max-width:none;margin:0 auto}
+    .topbar{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;background:#062b55;color:#fff;border-radius:14px;padding:9px 12px;margin-bottom:10px}
+    .brand{display:flex;gap:10px;align-items:center}.brand img{width:40px;height:40px;object-fit:contain}
+    .title{font-size:1.04rem;font-weight:800;line-height:1.2}.sub{font-size:.82rem;color:#d9ecff}
+    .actions{display:flex;gap:7px;flex-wrap:wrap}
+    .btn{border:1px solid #b9d4ee;border-radius:9px;padding:7px 10px;font-weight:700;text-decoration:none;background:#063b71;color:#fff;min-height:34px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer}
+    .btn.secondary{background:#eef7ff;color:#07345f}.btn.danger{background:#fff0f0;color:#8a1f1f;border-color:#f1c7c7}.btn:disabled{opacity:.55;cursor:not-allowed}
+    .warn,.ok{display:none;border-radius:12px;font-weight:700;line-height:1.35;padding:9px;margin:8px 0;white-space:pre-wrap}
+    .warn{border:1px solid #f1c7c7;background:#fff2f2;color:#7a1f1f}.ok{border:1px solid #bce9c9;background:#effff4;color:#11612b}
+    .grid{display:grid;grid-template-columns:.85fr 1.15fr;gap:10px}.card{background:#fff;border:1px solid #d5deef;border-radius:14px;padding:10px;box-shadow:0 3px 14px rgba(18,44,87,.10);margin-bottom:10px}
+    .note{border:1px solid #d5deef;border-radius:12px;background:#f7fbff;color:#35507b;padding:8px;margin:8px 0;line-height:1.35}
+    .toolbar{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}.toolbar .left,.toolbar .right{display:flex;gap:7px;align-items:center;flex-wrap:wrap}
+    input,select,textarea{box-sizing:border-box;border:1px solid #cbd7ee;border-radius:9px;padding:7px 9px;min-height:36px;color:#1a4170;font-family:"Segoe UI",Arial,sans-serif;font-size:.9rem}
+    textarea{width:100%;min-height:78px;resize:vertical}
+    label{display:block;font-size:.82rem;font-weight:750;color:#1a4170;margin:6px 0 3px}
+    .formGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.full{grid-column:1/-1}
+    .tableWrap{overflow:auto;border:1px solid #d5deef;border-radius:10px;background:#fff;max-height:520px}table{width:100%;border-collapse:collapse;min-width:1180px}th,td{padding:7px 8px;border-bottom:1px solid #e6eefb;vertical-align:top}th{background:#f2f7ff;color:#1a4170;text-align:left;position:sticky;top:0;z-index:1}td{font-size:.84rem;color:#223a66}
+    .small{font-size:.82rem;color:#48628e;line-height:1.32}.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+    .pill{display:inline-block;border:1px solid #d5deef;border-radius:999px;padding:2px 8px;background:#eaf1fb;color:#1a4170;font-weight:750;font-size:.74rem;white-space:nowrap}.pill.green{background:#e9fff0;border-color:#bce9c9;color:#11612b}.pill.amber{background:#fff8e6;border-color:#f0d28b;color:#7a5200}.pill.red{background:#fff0f0;border-color:#f1c7c7;color:#7a1f1f}
+    .selected{outline:2px solid #063b71;background:#f5faff}
+    @media(max-width:1100px){.grid{grid-template-columns:1fr}.formGrid{grid-template-columns:1fr}.actions,.btn{width:100%}.btn{justify-content:center}.toolbar .left,.toolbar .right,.toolbar input,.toolbar select{width:100%}table{min-width:1000px}}
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <div class="brand">
+        <img src="./assets/csv-beacon-icon.png" alt="C.S.V. BEACON" />
+        <div>
+          <div class="title">TMSA Office Inspection Events</div>
+          <div class="sub" id="subLine">Checking session...</div>
+        </div>
+      </div>
+
+      <div class="actions">
+        <a class="btn" href="./tmsa-office.html">TMSA Manager</a>
+        <a class="btn secondary" href="./tmsa-kpi-presentation.html">Audit Presentation</a>
+        <a class="btn secondary" href="./tmsa-evidence.html">Evidence Register</a>
+        <a class="btn secondary" href="./tmsa-kpi-config-import.html">Bulk KPI Config</a>
+        <a class="btn" href="./q-dashboard.html">Dashboard</a>
+        <button class="btn" id="logoutBtn" type="button">Logout</button>
+      </div>
+    </div>
+
+    <div id="warnBox" class="warn"></div>
+    <div id="okBox" class="ok"></div>
+
+    <div class="grid">
+      <div class="card">
+        <div class="toolbar">
+          <div class="left">
+            <h2 id="eventFormTitle" style="margin:0;">New TMSA Office Event</h2>
+          </div>
+          <div class="right">
+            <button class="btn secondary" id="newEventBtn" type="button">New Event</button>
+          </div>
+        </div>
+
+        <div class="formGrid">
+          <div class="full">
+            <label for="eventTitle">Event title</label>
+            <input id="eventTitle" placeholder="e.g. Oil Major TMSA Office Review - June 2026" />
+          </div>
+
+          <div>
+            <label for="companyFilter">Company</label>
+            <select id="companyFilter" style="display:none;"><option value="">Company</option></select>
+          </div>
+
+          <div>
+            <label for="statusFilter">List status filter</label>
+            <select id="statusFilter">
+              <option value="">All active</option>
+              <option value="planned">Planned</option>
+              <option value="in_progress">In progress</option>
+              <option value="completed">Completed</option>
+              <option value="cancelled">Cancelled</option>
+              <option value="archived">Archived</option>
+            </select>
+          </div>
+
+          <div>
+            <label for="oilMajorName">Oil Major / Customer</label>
+            <input id="oilMajorName" />
+          </div>
+
+          <div>
+            <label for="inspectionType">Inspection type</label>
+            <select id="inspectionType">
+              <option value="oil_major_tmsa">Oil Major TMSA</option>
+              <option value="internal_tmsa_review">Internal TMSA Review</option>
+              <option value="pre_tmsa_review">Pre-TMSA Review</option>
+              <option value="customer_office_audit">Customer Office Audit</option>
+              <option value="management_review">Management Review</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+
+          <div>
+            <label for="inspectionReference">Reference</label>
+            <input id="inspectionReference" />
+          </div>
+
+          <div>
+            <label for="officeLocation">Office location</label>
+            <input id="officeLocation" />
+          </div>
+
+          <div>
+            <label for="scheduledDate">Scheduled date</label>
+            <input id="scheduledDate" type="date" />
+          </div>
+
+          <div>
+            <label for="startDatetime">Start date/time</label>
+            <input id="startDatetime" type="datetime-local" />
+          </div>
+
+          <div>
+            <label for="endDatetime">End date/time</label>
+            <input id="endDatetime" type="datetime-local" />
+          </div>
+
+          <div>
+            <label for="leadInspector">Lead inspector</label>
+            <input id="leadInspector" />
+          </div>
+
+          <div>
+            <label for="companyLead">Company lead</label>
+            <input id="companyLead" />
+          </div>
+
+          <div>
+            <label for="eventStatus">Event status</label>
+            <select id="eventStatus">
+              <option value="planned">Planned</option>
+              <option value="in_progress">In progress</option>
+              <option value="completed">Completed</option>
+              <option value="cancelled">Cancelled</option>
+              <option value="archived">Archived</option>
+            </select>
+          </div>
+
+          <div>
+            <label for="overallResult">Overall result</label>
+            <select id="overallResult">
+              <option value="not_assessed">Not assessed</option>
+              <option value="satisfactory">Satisfactory</option>
+              <option value="observations">Observations</option>
+              <option value="major_gaps">Major gaps</option>
+              <option value="not_ready">Not ready</option>
+            </select>
+          </div>
+
+          <div class="full">
+            <label for="scopeSummary">Scope summary</label>
+            <textarea id="scopeSummary"></textarea>
+          </div>
+
+          <div class="full">
+            <label for="readinessSummary">Readiness / result summary</label>
+            <textarea id="readinessSummary"></textarea>
+          </div>
+        </div>
+
+        <div class="actions" style="margin-top:10px;">
+          <button class="btn" id="saveEventBtn" type="button">Save Event</button>
+          <button class="btn secondary" id="refreshBtn" type="button">Refresh</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="toolbar">
+          <div class="left">
+            <h2 style="margin:0;">Events</h2>
+            <span class="pill" id="eventCountPill">0 events</span>
+          </div>
+          <div class="right">
+            <input id="eventSearch" placeholder="Search events..." style="min-width:260px;" />
+            <label style="display:flex;gap:6px;align-items:center;margin:0;"><input id="includeArchived" type="checkbox" style="width:auto;min-height:auto;" /> Include archived</label>
+          </div>
+        </div>
+
+        <div class="tableWrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Event</th>
+                <th>Oil Major / Type</th>
+                <th>Schedule</th>
+                <th>Status</th>
+                <th>Items</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="eventsBody"><tr><td colspan="6">Loading...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" id="itemsCard">
+      <div class="toolbar">
+        <div class="left">
+          <h2 style="margin:0;">Event Items</h2>
+          <span class="pill" id="selectedEventPill">No event selected</span>
+          <span class="pill" id="itemCountPill">0 items</span>
+        </div>
+        <div class="right">
+          <button class="btn secondary" id="newItemBtn" type="button">New Item</button>
+        </div>
+      </div>
+
+      <div class="note">
+        Use event items to record questions, documents requested, comments, findings, positive observations and follow-up actions. Items may be linked to a TMSA KPI and/or an evidence record.
+      </div>
+
+      <div class="grid">
+        <div>
+          <h3 id="itemFormTitle" style="margin:0;">New Event Item</h3>
+          <div class="formGrid">
+            <div>
+              <label for="itemType">Item type</label>
+              <select id="itemType">
+                <option value="question">Question</option>
+                <option value="document_request">Document request</option>
+                <option value="finding">Finding</option>
+                <option value="positive_observation">Positive observation</option>
+                <option value="comment">Comment</option>
+                <option value="action">Action</option>
+              </select>
+            </div>
+
+            <div>
+              <label for="itemStatus">Item status</label>
+              <select id="itemStatus">
+                <option value="open">Open</option>
+                <option value="in_progress">In progress</option>
+                <option value="closed">Closed</option>
+                <option value="not_applicable">Not applicable</option>
+              </select>
+            </div>
+
+            <div>
+              <label for="severity">Severity</label>
+              <select id="severity">
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+                <option value="critical">Critical</option>
+              </select>
+            </div>
+
+            <div>
+              <label for="sortOrder">Sort order</label>
+              <input id="sortOrder" type="number" step="1" value="1000" />
+            </div>
+
+            <div class="full">
+              <label for="kpiSelect">Linked KPI</label>
+              <select id="kpiSelect"><option value="">No KPI link</option></select>
+            </div>
+
+            <div class="full">
+              <label for="evidenceSelect">Linked evidence</label>
+              <select id="evidenceSelect"><option value="">No evidence link</option></select>
+            </div>
+
+            <div class="full">
+              <label for="questionText">Question / comment</label>
+              <textarea id="questionText"></textarea>
+            </div>
+
+            <div class="full">
+              <label for="documentRequested">Document requested</label>
+              <textarea id="documentRequested"></textarea>
+            </div>
+
+            <div class="full">
+              <label for="responseSummary">Response summary</label>
+              <textarea id="responseSummary"></textarea>
+            </div>
+
+            <div class="full">
+              <label for="findingText">Finding / observation</label>
+              <textarea id="findingText"></textarea>
+            </div>
+
+            <div class="full">
+              <label for="actionRequired">Action required</label>
+              <textarea id="actionRequired"></textarea>
+            </div>
+
+            <div>
+              <label for="actionOwner">Action owner</label>
+              <input id="actionOwner" />
+            </div>
+
+            <div>
+              <label for="dueDate">Due date</label>
+              <input id="dueDate" type="date" />
+            </div>
+
+            <div class="full">
+              <label for="closureNotes">Closure notes</label>
+              <textarea id="closureNotes"></textarea>
+            </div>
+          </div>
+
+          <div class="actions" style="margin-top:10px;">
+            <button class="btn" id="saveItemBtn" type="button">Save Item</button>
+          </div>
+        </div>
+
+        <div>
+          <div class="tableWrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Type / Status</th>
+                  <th>KPI / Evidence</th>
+                  <th>Content</th>
+                  <th>Action / Due</th>
+                  <th>Edit</th>
+                </tr>
+              </thead>
+              <tbody id="itemsBody"><tr><td colspan="5">Select an event.</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./tmsa-office-events-v01.js?v=20260610_1"></script>
+</body>
+</html>
