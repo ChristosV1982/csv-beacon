@@ -1,7 +1,7 @@
 // public/tmsa-office-v01.js
 // C.S.V. BEACON - TMSA Office Inspection Manager v02
 
-const BUILD = "tmsa_office_manager_v03_20260602";
+const BUILD = "tmsa_office_manager_targets_v01_20260610";
 
 const sb = window.AUTH.ensureSupabase();
 const TMSA_COMPANY_KEY = "csvb_tmsa_selected_company_id";
@@ -198,10 +198,18 @@ function renderRows(){
   body.innerHTML=data.map(r=>{
     const claim=[
       r.claimed_level?`Claimed L${r.claimed_level}`:"",
-      r.target_level?`Target L${r.target_level}`:""
+      r.target_level?`Target L${r.target_level}`:"",
+      r.readiness_status?`Readiness: ${label(r.readiness_status)}`:"",
+      r.input_method?`Input: ${label(r.input_method)}`:"",
+      r.target_value!==null&&r.target_value!==undefined?`Target: ${r.target_value}${r.measurement_unit?" "+r.measurement_unit:""}`:"",
+      r.actual_value!==null&&r.actual_value!==undefined?`Actual: ${r.actual_value}${r.measurement_unit?" "+r.measurement_unit:""}`:""
     ].filter(Boolean).join("<br>")||"-";
 
-    const response=[r.sms_reference,r.company_response].filter(Boolean).join("\n\n");
+    const response=[
+      r.sms_reference?`SMS: ${r.sms_reference}`:"",
+      r.audit_answer_summary?`Audit answer: ${r.audit_answer_summary}`:"",
+      r.company_response?`Handling: ${r.company_response}`:""
+    ].filter(Boolean).join("\n\n");
     const evidence=label(r.evidence_strength||"no_evidence");
     const sens=label(r.oil_major_sensitivity||"medium");
 
@@ -330,6 +338,26 @@ function openEdit(row){
   el("actionRequired").value=row.action_required||"";
   el("internalRemarks").value=row.internal_remarks||"";
 
+  el("inputMethod").value=row.input_method||"narrative";
+  el("readinessStatus").value=row.readiness_status||"not_assessed";
+  el("responsiblePresenter").value=row.responsible_presenter||"";
+  el("auditAnswerSummary").value=row.audit_answer_summary||"";
+  el("evidenceToPresent").value=row.evidence_to_present||"";
+  el("weaknessToAvoid").value=row.weakness_to_avoid||"";
+  el("measurementUnit").value=row.measurement_unit||"";
+  el("measurementFrequency").value=row.measurement_frequency||"";
+  el("metricDirection").value=row.metric_direction||"not_applicable";
+  el("targetValue").value=row.target_value ?? "";
+  el("actualValue").value=row.actual_value ?? "";
+  el("minimumAcceptableValue").value=row.minimum_acceptable_value ?? "";
+  el("maximumAcceptableValue").value=row.maximum_acceptable_value ?? "";
+  el("greenThreshold").value=row.green_threshold ?? "";
+  el("amberThreshold").value=row.amber_threshold ?? "";
+  el("redThreshold").value=row.red_threshold ?? "";
+  el("lastMeasuredAt").value=row.last_measured_at?String(row.last_measured_at).slice(0,10):"";
+  el("lastReviewedAt").value=row.last_reviewed_at?String(row.last_reviewed_at).slice(0,10):"";
+  el("nextReviewDue").value=row.next_review_due?String(row.next_review_due).slice(0,10):"";
+
   box?.scrollIntoView({behavior:"smooth",block:"start"});
 }
 
@@ -359,7 +387,28 @@ async function saveHandling(){
     p_oil_major_sensitivity: el("oilMajorSensitivity").value,
     p_gap_summary: el("gapSummary").value||null,
     p_action_required: el("actionRequired").value||null,
-    p_internal_remarks: el("internalRemarks").value||null
+    p_internal_remarks: el("internalRemarks").value||null,
+
+    p_input_method: el("inputMethod").value,
+    p_readiness_status: el("readinessStatus").value,
+    p_audit_answer_summary: el("auditAnswerSummary").value||null,
+    p_evidence_to_present: el("evidenceToPresent").value||null,
+    p_weakness_to_avoid: el("weaknessToAvoid").value||null,
+    p_responsible_presenter: el("responsiblePresenter").value||null,
+
+    p_measurement_unit: el("measurementUnit").value||null,
+    p_measurement_frequency: el("measurementFrequency").value||null,
+    p_metric_direction: el("metricDirection").value,
+    p_target_value: el("targetValue").value===""?null:Number(el("targetValue").value),
+    p_actual_value: el("actualValue").value===""?null:Number(el("actualValue").value),
+    p_minimum_acceptable_value: el("minimumAcceptableValue").value===""?null:Number(el("minimumAcceptableValue").value),
+    p_maximum_acceptable_value: el("maximumAcceptableValue").value===""?null:Number(el("maximumAcceptableValue").value),
+    p_green_threshold: el("greenThreshold").value===""?null:Number(el("greenThreshold").value),
+    p_amber_threshold: el("amberThreshold").value===""?null:Number(el("amberThreshold").value),
+    p_red_threshold: el("redThreshold").value===""?null:Number(el("redThreshold").value),
+    p_last_measured_at: el("lastMeasuredAt").value||null,
+    p_last_reviewed_at: el("lastReviewedAt").value||null,
+    p_next_review_due: el("nextReviewDue").value||null
   };
 
   const {data,error}=await sb.rpc("csvb_tmsa_save_kpi_handling",payload);

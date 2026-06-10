@@ -657,6 +657,132 @@
             <label for="internalRemarks">Internal remarks</label>
             <textarea id="internalRemarks"></textarea>
           </div>
+
+          <div class="full">
+            <div class="note" style="margin-top:10px;">
+              <strong>Audit Presentation / Input Method / Targets & Limits</strong><br>
+              Define how this KPI will be answered and demonstrated during a TMSA office audit.
+            </div>
+          </div>
+
+          <div>
+            <label for="inputMethod">Input method</label>
+            <select id="inputMethod">
+              <option value="narrative">Narrative</option>
+              <option value="yes_no">Yes / No</option>
+              <option value="level_claim">Level claim</option>
+              <option value="numeric_metric">Numeric metric</option>
+              <option value="percentage_metric">Percentage metric</option>
+              <option value="date_based">Date-based</option>
+              <option value="frequency_based">Frequency-based</option>
+              <option value="document_reference">Document reference</option>
+              <option value="evidence_checklist">Evidence checklist</option>
+              <option value="action_plan">Action plan</option>
+              <option value="mixed">Mixed</option>
+            </select>
+          </div>
+
+          <div>
+            <label for="readinessStatus">Readiness status</label>
+            <select id="readinessStatus">
+              <option value="not_assessed">Not assessed</option>
+              <option value="not_ready">Not ready</option>
+              <option value="partly_ready">Partly ready</option>
+              <option value="ready">Ready</option>
+              <option value="oil_major_ready">Oil Major-ready</option>
+            </select>
+          </div>
+
+          <div>
+            <label for="responsiblePresenter">Responsible presenter</label>
+            <input id="responsiblePresenter" placeholder="Person / role presenting this KPI" />
+          </div>
+
+          <div class="full">
+            <label for="auditAnswerSummary">Audit answer summary</label>
+            <textarea id="auditAnswerSummary" placeholder="What we will say during the TMSA audit."></textarea>
+          </div>
+
+          <div class="full">
+            <label for="evidenceToPresent">Evidence to present</label>
+            <textarea id="evidenceToPresent" placeholder="Documents, records, forms, reports, screenshots, minutes, etc."></textarea>
+          </div>
+
+          <div class="full">
+            <label for="weaknessToAvoid">Weakness / risk to avoid</label>
+            <textarea id="weaknessToAvoid" placeholder="Known weak points, missing proof, outdated record, inconsistent practice, etc."></textarea>
+          </div>
+
+          <div>
+            <label for="measurementUnit">Measurement unit</label>
+            <input id="measurementUnit" placeholder="% / days / count / per vessel per year..." />
+          </div>
+
+          <div>
+            <label for="measurementFrequency">Measurement frequency</label>
+            <input id="measurementFrequency" placeholder="monthly / quarterly / annual / per inspection..." />
+          </div>
+
+          <div>
+            <label for="metricDirection">Metric direction</label>
+            <select id="metricDirection">
+              <option value="not_applicable">Not applicable</option>
+              <option value="higher_is_better">Higher is better</option>
+              <option value="lower_is_better">Lower is better</option>
+              <option value="range">Range</option>
+              <option value="exact">Exact</option>
+            </select>
+          </div>
+
+          <div>
+            <label for="targetValue">Target value</label>
+            <input id="targetValue" type="number" step="any" />
+          </div>
+
+          <div>
+            <label for="actualValue">Actual/current value</label>
+            <input id="actualValue" type="number" step="any" />
+          </div>
+
+          <div>
+            <label for="minimumAcceptableValue">Minimum acceptable</label>
+            <input id="minimumAcceptableValue" type="number" step="any" />
+          </div>
+
+          <div>
+            <label for="maximumAcceptableValue">Maximum acceptable</label>
+            <input id="maximumAcceptableValue" type="number" step="any" />
+          </div>
+
+          <div>
+            <label for="greenThreshold">Green threshold</label>
+            <input id="greenThreshold" type="number" step="any" />
+          </div>
+
+          <div>
+            <label for="amberThreshold">Amber threshold</label>
+            <input id="amberThreshold" type="number" step="any" />
+          </div>
+
+          <div>
+            <label for="redThreshold">Red threshold</label>
+            <input id="redThreshold" type="number" step="any" />
+          </div>
+
+          <div>
+            <label for="lastMeasuredAt">Last measured</label>
+            <input id="lastMeasuredAt" type="date" />
+          </div>
+
+          <div>
+            <label for="lastReviewedAt">Last reviewed</label>
+            <input id="lastReviewedAt" type="date" />
+          </div>
+
+          <div>
+            <label for="nextReviewDue">Next review due</label>
+            <input id="nextReviewDue" type="date" />
+          </div>
         </div>
 
         <div class="actions" style="margin-top:10px;">
@@ -687,6 +813,6 @@
     </section>
   </div>
 
-  <script type="module" src="./tmsa-office-v01.js?v=20260610_1"></script>
+  <script type="module" src="./tmsa-office-v01.js?v=20260610_targets_1"></script>
 </body>
 </html>
