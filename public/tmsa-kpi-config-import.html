@@ -11,7 +11,7 @@
   <link rel="stylesheet" href="./style.css?v=20260428_3" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="./auth.js"></script>
-  <script src="./csvb-module-guard.js?v=20260610_tmsa_config_import_1"></script>
+  <script src="./csvb-module-guard.js?v=20260610_tmsa_config_import_2"></script>
 
   <style>
     body{margin:0;padding:10px;background:#eef4fb;font-family:"Segoe UI",Arial,sans-serif;color:#06305c}
@@ -26,14 +26,23 @@
     .warn{border:1px solid #f1c7c7;background:#fff2f2;color:#7a1f1f}.ok{border:1px solid #bce9c9;background:#effff4;color:#11612b}
     .grid{display:grid;grid-template-columns:.85fr 1.15fr;gap:10px}.card{background:#fff;border:1px solid #d5deef;border-radius:14px;padding:10px;box-shadow:0 3px 14px rgba(18,44,87,.10)}
     .note{border:1px solid #d5deef;border-radius:12px;background:#f7fbff;color:#35507b;padding:8px;margin:8px 0;line-height:1.35}
+    .note.warning{background:#fff8e6;border-color:#f0d28b;color:#684600}
+    .note.error{background:#fff2f2;border-color:#f1c7c7;color:#7a1f1f}
+    .note.oknote{background:#effff4;border-color:#bce9c9;color:#11612b}
     label{display:block;font-size:.82rem;font-weight:750;color:#1a4170;margin:7px 0 3px}
     input,select,textarea{box-sizing:border-box;border:1px solid #cbd7ee;border-radius:9px;padding:7px 9px;min-height:36px;color:#1a4170;font-family:"Segoe UI",Arial,sans-serif;font-size:.9rem}
-    textarea{width:100%;min-height:380px;resize:vertical;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.82rem}
+    textarea{width:100%;min-height:330px;resize:vertical;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.82rem}
     .toolbar{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}.toolbar .left,.toolbar .right{display:flex;gap:7px;align-items:center;flex-wrap:wrap}
     .small{font-size:.82rem;color:#48628e;line-height:1.32}.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
     .pill{display:inline-block;border:1px solid #d5deef;border-radius:999px;padding:2px 8px;background:#eaf1fb;color:#1a4170;font-weight:750;font-size:.74rem;white-space:nowrap}
+    .pill.green{background:#e9fff0;border-color:#bce9c9;color:#11612b}.pill.red{background:#fff0f0;border-color:#f1c7c7;color:#7a1f1f}.pill.amber{background:#fff8e6;border-color:#f0d28b;color:#7a5200}
     .tableWrap{overflow:auto;border:1px solid #d5deef;border-radius:10px;background:#fff;max-height:650px}table{width:100%;border-collapse:collapse;min-width:1200px}th,td{padding:7px 8px;border-bottom:1px solid #e6eefb;vertical-align:top}th{background:#f2f7ff;color:#1a4170;text-align:left;position:sticky;top:0;z-index:1}td{font-size:.84rem;color:#223a66}
-    @media(max-width:1100px){.grid{grid-template-columns:1fr}.actions,.btn{width:100%}.btn{justify-content:center}.toolbar .left,.toolbar .right,.toolbar input,.toolbar select{width:100%}}
+    .allowedValues{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin-top:8px}
+    .allowedItem{border:1px solid #dbe6f6;border-radius:10px;background:#fff;padding:7px;font-size:.8rem;color:#243f6c}
+    .allowedItem strong{color:#06305c}
+    .validationList{max-height:230px;overflow:auto;border-top:1px solid #d5deef;margin-top:7px;padding-top:7px}
+    .validationList div{font-size:.82rem;line-height:1.35;margin-bottom:4px}
+    @media(max-width:1100px){.grid,.allowedValues{grid-template-columns:1fr}.actions,.btn{width:100%}.btn{justify-content:center}.toolbar .left,.toolbar .right,.toolbar input,.toolbar select{width:100%}}
   </style>
 </head>
 
@@ -67,11 +76,18 @@
           <div class="left">
             <h2 style="margin:0;">Import Controls</h2>
             <span class="pill" id="templateCountPill">0 KPIs</span>
+            <span class="pill" id="previewCountPill">0 preview</span>
+            <span class="pill green" id="validCountPill">0 valid</span>
+            <span class="pill red" id="errorCountPill">0 errors</span>
           </div>
         </div>
 
         <div class="note">
-          Paste either JSON array or CSV content based on the downloaded template. This imports company KPI configuration only. It does not import OCIMF KPI text.
+          Workflow: download the CSV template, edit it in Excel, save/export as CSV, paste the CSV here, preview/validate, then import only after validation is clean.
+        </div>
+
+        <div class="note warning">
+          This page imports company KPI configuration only. It does not import OCIMF KPI text or Best Practice Guidance.
         </div>
 
         <label for="companyFilter">Company</label>
@@ -89,19 +105,35 @@
         <div class="actions" style="margin-top:10px;">
           <button class="btn secondary" id="downloadCsvBtn" type="button">Download CSV Template</button>
           <button class="btn secondary" id="downloadJsonBtn" type="button">Download JSON Template</button>
-          <button class="btn secondary" id="previewBtn" type="button">Preview Paste</button>
+          <button class="btn secondary" id="downloadHelpBtn" type="button">Download Column Help</button>
+          <button class="btn secondary" id="previewBtn" type="button">Preview / Validate</button>
           <button class="btn danger" id="importBtn" type="button">Import Configuration</button>
+        </div>
+
+        <div class="note" id="allowedValues">
+          <strong>Allowed values summary</strong>
+          <div class="allowedValues">
+            <div class="allowedItem"><strong>coverage_status</strong><br><span class="mono">not_reviewed, not_covered, partly_covered, covered_weak_evidence, covered_acceptable_evidence, verified</span></div>
+            <div class="allowedItem"><strong>input_method</strong><br><span class="mono">narrative, yes_no, level_claim, numeric_metric, percentage_metric, date_based, frequency_based, document_reference, evidence_checklist, action_plan, mixed</span></div>
+            <div class="allowedItem"><strong>readiness_status</strong><br><span class="mono">not_assessed, not_ready, partly_ready, ready, oil_major_ready</span></div>
+            <div class="allowedItem"><strong>evidence_strength</strong><br><span class="mono">no_evidence, weak, moderate, strong, oil_major_ready</span></div>
+            <div class="allowedItem"><strong>oil_major_sensitivity</strong><br><span class="mono">low, medium, high, critical</span></div>
+            <div class="allowedItem"><strong>metric_direction</strong><br><span class="mono">not_applicable, higher_is_better, lower_is_better, range, exact</span></div>
+          </div>
         </div>
 
         <label for="pasteBox">Paste JSON or CSV here</label>
         <textarea id="pasteBox" placeholder="Paste edited CSV or JSON configuration here..."></textarea>
+
+        <div id="validationBox" class="note">
+          No preview loaded.
+        </div>
       </div>
 
       <div class="card">
         <div class="toolbar">
           <div class="left">
             <h2 style="margin:0;">Template / Preview</h2>
-            <span class="pill" id="previewCountPill">0 preview rows</span>
           </div>
           <div class="right">
             <input id="templateSearch" placeholder="Search template..." style="min-width:260px;" />
@@ -129,6 +161,6 @@
     </div>
   </div>
 
-  <script type="module" src="./tmsa-kpi-config-import-v01.js?v=20260610_1"></script>
+  <script type="module" src="./tmsa-kpi-config-import-v01.js?v=20260610_2"></script>
 </body>
 </html>

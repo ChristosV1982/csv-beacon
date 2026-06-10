@@ -1,7 +1,8 @@
 // public/tmsa-kpi-config-import-v01.js
-// C.S.V. BEACON - TMSA Bulk KPI Configuration Import v01
+// C.S.V. BEACON - TMSA Bulk KPI Configuration Import v02
+// Adds front-end validation and Excel workflow help.
 
-const BUILD = "tmsa_kpi_config_import_v01_20260610";
+const BUILD = "tmsa_kpi_config_import_validation_v02_20260610";
 const sb = window.AUTH.ensureSupabase();
 const COMPANY_KEY = "csvb_tmsa_config_import_selected_company_id";
 
@@ -9,6 +10,7 @@ let PROFILE = null;
 let COMPANIES = [];
 let TEMPLATE = [];
 let PREVIEW = [];
+let VALIDATION = { validRows: [], errors: [] };
 
 const EXPORT_COLUMNS = [
   "element_code",
@@ -47,6 +49,62 @@ const EXPORT_COLUMNS = [
   "next_review_due"
 ];
 
+const ALLOWED = {
+  coverage_status: ["not_reviewed","not_covered","partly_covered","covered_weak_evidence","covered_acceptable_evidence","verified"],
+  input_method: ["narrative","yes_no","level_claim","numeric_metric","percentage_metric","date_based","frequency_based","document_reference","evidence_checklist","action_plan","mixed"],
+  readiness_status: ["not_assessed","not_ready","partly_ready","ready","oil_major_ready"],
+  evidence_strength: ["no_evidence","weak","moderate","strong","oil_major_ready"],
+  oil_major_sensitivity: ["low","medium","high","critical"],
+  metric_direction: ["not_applicable","higher_is_better","lower_is_better","range","exact"]
+};
+
+const NUMERIC_COLUMNS = [
+  "target_value",
+  "actual_value",
+  "minimum_acceptable_value",
+  "maximum_acceptable_value",
+  "green_threshold",
+  "amber_threshold",
+  "red_threshold"
+];
+
+const INTEGER_LEVEL_COLUMNS = ["claimed_level","target_level"];
+const DATE_COLUMNS = ["last_measured_at","last_reviewed_at","next_review_due"];
+
+const COLUMN_HELP = [
+  ["element_code","Optional when kpi_id is used. Useful when matching by kpi_code.","No","1",""],
+  ["kpi_code","KPI code. Used to match KPI if kpi_id is blank.","Required if kpi_id blank","1.1.1",""],
+  ["kpi_id","Database KPI UUID. Safest matching field.","Recommended","uuid",""],
+  ["coverage_status","Company coverage status.","No","not_reviewed",ALLOWED.coverage_status.join(" | ")],
+  ["claimed_level","Company claimed TMSA level for this KPI.","No","1 to 4",""],
+  ["target_level","Company target TMSA level for this KPI.","No","1 to 4",""],
+  ["input_method","How the KPI is answered/presented.","No","narrative",ALLOWED.input_method.join(" | ")],
+  ["readiness_status","Audit readiness status.","No","not_assessed",ALLOWED.readiness_status.join(" | ")],
+  ["company_response","Internal company response/handling.","No","Free text",""],
+  ["sms_reference","SMS reference to be shown.","No","SMS Ch. X.X",""],
+  ["forms_records","Forms/records references.","No","Form A / Report B",""],
+  ["owner_department","Department responsible.","No","Marine / HSQE / Technical",""],
+  ["evidence_strength","Strength of evidence.","No","no_evidence",ALLOWED.evidence_strength.join(" | ")],
+  ["oil_major_sensitivity","Risk/sensitivity for Oil Major audit.","No","medium",ALLOWED.oil_major_sensitivity.join(" | ")],
+  ["audit_answer_summary","What the presenter will say during the audit.","No","Free text",""],
+  ["evidence_to_present","What documents/records will be shown.","No","Free text",""],
+  ["weakness_to_avoid","Known weak points to avoid.","No","Free text",""],
+  ["responsible_presenter","Person/role presenting.","No","Marine Superintendent",""],
+  ["measurement_unit","Unit for target/actual.","No","%, days, count",""],
+  ["measurement_frequency","Measurement frequency.","No","monthly / quarterly / annual",""],
+  ["metric_direction","How actual value is assessed.","No","not_applicable",ALLOWED.metric_direction.join(" | ")],
+  ["target_value","Target numeric value.","No","90","Numeric"],
+  ["actual_value","Actual/current numeric value.","No","88","Numeric"],
+  ["minimum_acceptable_value","Minimum acceptable value.","No","85","Numeric"],
+  ["maximum_acceptable_value","Maximum acceptable value.","No","30","Numeric"],
+  ["green_threshold","Green traffic-light threshold.","No","90","Numeric"],
+  ["amber_threshold","Amber traffic-light threshold.","No","85","Numeric"],
+  ["red_threshold","Red threshold/reference.","No","80","Numeric"],
+  ["last_measured_at","Last measurement date.","No","2026-06-10","YYYY-MM-DD"],
+  ["last_reviewed_at","Last review date.","No","2026-06-10","YYYY-MM-DD"],
+  ["next_review_due","Next review due date.","No","2026-09-10","YYYY-MM-DD"]
+];
+
 function el(id){return document.getElementById(id)}
 function esc(v){return String(v??"").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#039;")}
 function showWarn(msg){const n=el("warnBox"); if(!n)return; n.textContent=msg||""; n.style.display=msg?"block":"none"}
@@ -55,6 +113,7 @@ function clearMessages(){showWarn("");showOk("")}
 function isPlatformRole(role){return role==="super_admin" || role==="platform_owner"}
 function label(v){return String(v||"-").replaceAll("_"," ").replace(/\b\w/g,c=>c.toUpperCase())}
 function val(v){return v===null||v===undefined?"":String(v)}
+function trimVal(v){return String(v??"").trim()}
 function companyId(){
   const n=el("companyFilter");
   if(n && n.style.display!=="none" && n.value) return n.value;
@@ -67,10 +126,10 @@ function csvEscape(v){
   return s;
 }
 
-function toCsv(rows){
-  const lines=[EXPORT_COLUMNS.join(",")];
+function toCsv(rows, columns=EXPORT_COLUMNS){
+  const lines=[columns.join(",")];
   rows.forEach(r=>{
-    lines.push(EXPORT_COLUMNS.map(c=>csvEscape(r[c])).join(","));
+    lines.push(columns.map(c=>csvEscape(r[c])).join(","));
   });
   return lines.join("\n");
 }
@@ -92,7 +151,6 @@ function parseCsv(text){
   let row=[];
   let cell="";
   let inQuotes=false;
-
   const src=String(text||"").replace(/^\uFEFF/,"");
 
   for(let i=0;i<src.length;i++){
@@ -129,7 +187,6 @@ function parseCsv(text){
 
   row.push(cell);
   if(row.length>1 || row.some(x=>String(x).trim()!=="")) rows.push(row);
-
   if(!rows.length)return [];
 
   const headers=rows[0].map(h=>String(h||"").trim());
@@ -156,6 +213,161 @@ function parsePaste(){
   }
 
   return parseCsv(raw);
+}
+
+function isUuid(s){
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(s||"").trim());
+}
+
+function isNumeric(s){
+  if(trimVal(s)==="")return true;
+  return Number.isFinite(Number(s));
+}
+
+function isDateYYYYMMDD(s){
+  const v=trimVal(s);
+  if(v==="")return true;
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(v))return false;
+  const d=new Date(v+"T00:00:00Z");
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0,10)===v;
+}
+
+function templateKpiExists(row){
+  const kpiId=trimVal(row.kpi_id);
+  const kpiCode=trimVal(row.kpi_code);
+  const elementCode=trimVal(row.element_code);
+
+  if(kpiId && TEMPLATE.some(t=>String(t.kpi_id)===kpiId))return true;
+
+  if(kpiCode){
+    return TEMPLATE.some(t=>{
+      const codeOk=String(t.kpi_code)===kpiCode;
+      const elementOk=!elementCode || String(t.element_code)===elementCode;
+      return codeOk && elementOk;
+    });
+  }
+
+  return false;
+}
+
+function validateRows(rows){
+  const validRows=[];
+  const errors=[];
+
+  rows.forEach((row,idx)=>{
+    const rowNum=idx+1;
+    const rowErrors=[];
+
+    const kpiId=trimVal(row.kpi_id);
+    const kpiCode=trimVal(row.kpi_code);
+
+    if(!kpiId && !kpiCode){
+      rowErrors.push("Provide either kpi_id or kpi_code.");
+    }
+
+    if(kpiId && !isUuid(kpiId)){
+      rowErrors.push("kpi_id is not a valid UUID.");
+    }
+
+    if((kpiId || kpiCode) && !templateKpiExists(row)){
+      rowErrors.push("KPI could not be matched against the current template/company view.");
+    }
+
+    Object.keys(ALLOWED).forEach(col=>{
+      const v=trimVal(row[col]);
+      if(v && !ALLOWED[col].includes(v)){
+        rowErrors.push(`${col} has invalid value "${v}". Allowed: ${ALLOWED[col].join(", ")}.`);
+      }
+    });
+
+    INTEGER_LEVEL_COLUMNS.forEach(col=>{
+      const v=trimVal(row[col]);
+      if(v){
+        const n=Number(v);
+        if(!Number.isInteger(n) || n<1 || n>4){
+          rowErrors.push(`${col} must be an integer from 1 to 4.`);
+        }
+      }
+    });
+
+    NUMERIC_COLUMNS.forEach(col=>{
+      if(!isNumeric(row[col])){
+        rowErrors.push(`${col} must be numeric.`);
+      }
+    });
+
+    DATE_COLUMNS.forEach(col=>{
+      if(!isDateYYYYMMDD(row[col])){
+        rowErrors.push(`${col} must be in YYYY-MM-DD format.`);
+      }
+    });
+
+    if(rowErrors.length){
+      errors.push({
+        row_number: rowNum,
+        kpi_code: kpiCode || "",
+        element_code: trimVal(row.element_code),
+        errors: rowErrors
+      });
+    }else{
+      validRows.push(row);
+    }
+  });
+
+  return {validRows, errors};
+}
+
+function renderValidation(result){
+  const box=el("validationBox");
+  if(!box)return;
+
+  if(!result){
+    box.className="note";
+    box.innerHTML="No preview loaded.";
+    el("previewCountPill").textContent="0 preview";
+    el("validCountPill").textContent="0 valid";
+    el("errorCountPill").textContent="0 errors";
+    return;
+  }
+
+  const total=PREVIEW.length;
+  const valid=result.validRows.length;
+  const errorCount=result.errors.length;
+
+  el("previewCountPill").textContent=`${total} preview`;
+  el("validCountPill").textContent=`${valid} valid`;
+  el("errorCountPill").textContent=`${errorCount} errors`;
+
+  if(!errorCount){
+    box.className="note oknote";
+    box.innerHTML=`Validation clean. ${valid} row(s) ready for import.`;
+    return;
+  }
+
+  box.className="note error";
+  box.innerHTML=`
+    <strong>Validation failed.</strong> ${errorCount} row(s) contain errors. Import is blocked until corrected.
+    <div class="validationList">
+      ${result.errors.slice(0,80).map(e=>{
+        return `<div><strong>Row ${esc(e.row_number)}</strong>${e.kpi_code?` · KPI ${esc(e.kpi_code)}`:""}: ${esc(e.errors.join(" | "))}</div>`;
+      }).join("")}
+      ${result.errors.length>80?`<div>Only first 80 errors shown.</div>`:""}
+    </div>
+  `;
+}
+
+function updateGlobalState(extra={}){
+  window.CSVB_TMSA_KPI_CONFIG_IMPORT={
+    build: BUILD,
+    loaded: true,
+    template_count: TEMPLATE.length,
+    preview_count: PREVIEW.length,
+    valid_count: VALIDATION.validRows.length,
+    error_count: VALIDATION.errors.length,
+    selected_company_id: companyId(),
+    profile: PROFILE,
+    ...extra
+  };
 }
 
 async function setupCompanyFilter(){
@@ -200,18 +412,13 @@ async function loadTemplate(){
 
   TEMPLATE=data||[];
   PREVIEW=[];
+  VALIDATION={validRows:[],errors:[]};
+
   renderTemplate();
+  renderValidation(null);
 
   el("templateCountPill").textContent=`${TEMPLATE.length} KPI${TEMPLATE.length===1?"":"s"}`;
-
-  window.CSVB_TMSA_KPI_CONFIG_IMPORT={
-    build: BUILD,
-    loaded: true,
-    template_count: TEMPLATE.length,
-    preview_count: 0,
-    selected_company_id: companyId(),
-    profile: PROFILE
-  };
+  updateGlobalState();
 }
 
 function filteredTemplate(){
@@ -234,7 +441,6 @@ function filteredTemplate(){
 function renderTemplate(rows=null){
   const body=el("templateBody");
   const data=rows || filteredTemplate();
-  el("previewCountPill").textContent=`${rows?rows.length:0} preview row${rows&&rows.length===1?"":"s"}`;
 
   if(!data.length){
     body.innerHTML=`<tr><td colspan="7">No rows.</td></tr>`;
@@ -258,15 +464,16 @@ function previewPaste(){
   clearMessages();
   const rows=parsePaste();
   PREVIEW=rows;
+  VALIDATION=validateRows(PREVIEW);
   renderTemplate(PREVIEW);
-  el("previewCountPill").textContent=`${PREVIEW.length} preview row${PREVIEW.length===1?"":"s"}`;
+  renderValidation(VALIDATION);
+  updateGlobalState();
 
-  window.CSVB_TMSA_KPI_CONFIG_IMPORT={
-    ...(window.CSVB_TMSA_KPI_CONFIG_IMPORT||{}),
-    preview_count: PREVIEW.length
-  };
-
-  showOk(`Preview loaded: ${PREVIEW.length} row(s). Nothing imported yet.`);
+  if(VALIDATION.errors.length){
+    showWarn(`Preview loaded with ${VALIDATION.errors.length} validation error row(s). Import is blocked.`);
+  }else{
+    showOk(`Preview loaded: ${PREVIEW.length} row(s). Validation clean. Nothing imported yet.`);
+  }
 }
 
 async function importConfig(){
@@ -277,10 +484,20 @@ async function importConfig(){
   }
 
   const rows=PREVIEW.length ? PREVIEW : parsePaste();
-
   if(!rows.length)throw new Error("No rows to import.");
 
-  const ok=confirm(`Import ${rows.length} KPI configuration row(s)? This will update existing company KPI handling records.`);
+  const validation=validateRows(rows);
+  PREVIEW=rows;
+  VALIDATION=validation;
+  renderTemplate(PREVIEW);
+  renderValidation(VALIDATION);
+  updateGlobalState();
+
+  if(VALIDATION.errors.length){
+    throw new Error(`Import blocked. ${VALIDATION.errors.length} row(s) have validation errors.`);
+  }
+
+  const ok=confirm(`Import ${rows.length} validated KPI configuration row(s)? This will update existing company KPI handling records.`);
   if(!ok)return;
 
   const {data,error}=await sb.rpc("csvb_tmsa_import_kpi_configuration",{
@@ -301,7 +518,7 @@ async function importConfig(){
   ].join("\n");
 
   if(Number(result.error_count||0)>0){
-    showWarn(msg+"\n\nErrors:\n"+JSON.stringify(result.errors||[],null,2));
+    showWarn(msg+"\n\nDatabase-side errors:\n"+JSON.stringify(result.errors||[],null,2));
   }else{
     showOk(msg);
   }
@@ -327,6 +544,17 @@ function bind(){
       EXPORT_COLUMNS.forEach(c=>o[c]=r[c] ?? "");
       return o;
     }),null,2),"application/json");
+  });
+
+  el("downloadHelpBtn")?.addEventListener("click",()=>{
+    const rows=COLUMN_HELP.map(x=>({
+      column:x[0],
+      purpose:x[1],
+      required:x[2],
+      example:x[3],
+      allowed_values_or_format:x[4]
+    }));
+    download("tmsa_kpi_configuration_column_help.csv",toCsv(rows,["column","purpose","required","example","allowed_values_or_format"]),"text/csv");
   });
 
   el("companyFilter")?.addEventListener("change",()=>{
