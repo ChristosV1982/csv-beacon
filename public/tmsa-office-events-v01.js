@@ -17,7 +17,7 @@ let CURRENT_ITEM = null;
 function el(id){return document.getElementById(id)}
 function esc(v){return String(v??"").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#039;")}
 function showWarn(msg){const n=el("warnBox"); if(!n)return; n.textContent=msg||""; n.style.display=msg?"block":"none"}
-function showOk(msg){const n=el("okBox"); if(!n)return; n.textContent=msg?"block":"none"; n.textContent=msg||""}
+function showOk(msg){const n=el("okBox"); if(!n)return; n.textContent=msg||""; n.style.display=msg?"block":"none"}
 function clearMessages(){showWarn("");showOk("")}
 function isPlatformRole(role){return role==="super_admin" || role==="platform_owner"}
 function label(v){return String(v||"-").replaceAll("_"," ").replace(/\b\w/g,c=>c.toUpperCase())}
