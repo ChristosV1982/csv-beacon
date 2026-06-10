@@ -39,6 +39,7 @@
     "inspector_intelligence.html": "inspector_intelligence",
     "audit_observations.html": "audit_observations",
     "tmsa-office.html": "tmsa_office_manager",
+    "tmsa-kpi-import.html": "tmsa_office_manager",
 
     "q-report.html": "fleet_reports",
 
