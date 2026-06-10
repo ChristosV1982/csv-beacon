@@ -42,6 +42,7 @@
     "tmsa-kpi-import.html": "tmsa_office_manager",
     "tmsa-evidence.html": "tmsa_office_manager",
     "tmsa-kpi-presentation.html": "tmsa_office_manager",
+    "tmsa-kpi-config-import.html": "tmsa_office_manager",
 
     "q-report.html": "fleet_reports",
 

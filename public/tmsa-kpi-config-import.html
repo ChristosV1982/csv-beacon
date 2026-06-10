@@ -1,0 +1,134 @@
+<!-- public/tmsa-kpi-config-import.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>C.S.V. BEACON - TMSA Bulk KPI Configuration Import</title>
+
+  <link rel="stylesheet" href="./csv-beacon-theme.css?v=20260428_3" />
+  <link rel="stylesheet" href="./style.css?v=20260428_3" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="./auth.js"></script>
+  <script src="./csvb-module-guard.js?v=20260610_tmsa_config_import_1"></script>
+
+  <style>
+    body{margin:0;padding:10px;background:#eef4fb;font-family:"Segoe UI",Arial,sans-serif;color:#06305c}
+    .wrap{width:calc(100vw - 20px);max-width:none;margin:0 auto}
+    .topbar{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;background:#062b55;color:#fff;border-radius:14px;padding:9px 12px;margin-bottom:10px}
+    .brand{display:flex;gap:10px;align-items:center}.brand img{width:40px;height:40px;object-fit:contain}
+    .title{font-size:1.04rem;font-weight:800;line-height:1.2}.sub{font-size:.82rem;color:#d9ecff}
+    .actions{display:flex;gap:7px;flex-wrap:wrap}
+    .btn{border:1px solid #b9d4ee;border-radius:9px;padding:7px 10px;font-weight:700;text-decoration:none;background:#063b71;color:#fff;min-height:34px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer}
+    .btn.secondary{background:#eef7ff;color:#07345f}.btn.danger{background:#fff0f0;color:#8a1f1f;border-color:#f1c7c7}.btn:disabled{opacity:.55;cursor:not-allowed}
+    .warn,.ok{display:none;border-radius:12px;font-weight:700;line-height:1.35;padding:9px;margin:8px 0;white-space:pre-wrap}
+    .warn{border:1px solid #f1c7c7;background:#fff2f2;color:#7a1f1f}.ok{border:1px solid #bce9c9;background:#effff4;color:#11612b}
+    .grid{display:grid;grid-template-columns:.85fr 1.15fr;gap:10px}.card{background:#fff;border:1px solid #d5deef;border-radius:14px;padding:10px;box-shadow:0 3px 14px rgba(18,44,87,.10)}
+    .note{border:1px solid #d5deef;border-radius:12px;background:#f7fbff;color:#35507b;padding:8px;margin:8px 0;line-height:1.35}
+    label{display:block;font-size:.82rem;font-weight:750;color:#1a4170;margin:7px 0 3px}
+    input,select,textarea{box-sizing:border-box;border:1px solid #cbd7ee;border-radius:9px;padding:7px 9px;min-height:36px;color:#1a4170;font-family:"Segoe UI",Arial,sans-serif;font-size:.9rem}
+    textarea{width:100%;min-height:380px;resize:vertical;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.82rem}
+    .toolbar{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}.toolbar .left,.toolbar .right{display:flex;gap:7px;align-items:center;flex-wrap:wrap}
+    .small{font-size:.82rem;color:#48628e;line-height:1.32}.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+    .pill{display:inline-block;border:1px solid #d5deef;border-radius:999px;padding:2px 8px;background:#eaf1fb;color:#1a4170;font-weight:750;font-size:.74rem;white-space:nowrap}
+    .tableWrap{overflow:auto;border:1px solid #d5deef;border-radius:10px;background:#fff;max-height:650px}table{width:100%;border-collapse:collapse;min-width:1200px}th,td{padding:7px 8px;border-bottom:1px solid #e6eefb;vertical-align:top}th{background:#f2f7ff;color:#1a4170;text-align:left;position:sticky;top:0;z-index:1}td{font-size:.84rem;color:#223a66}
+    @media(max-width:1100px){.grid{grid-template-columns:1fr}.actions,.btn{width:100%}.btn{justify-content:center}.toolbar .left,.toolbar .right,.toolbar input,.toolbar select{width:100%}}
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <div class="brand">
+        <img src="./assets/csv-beacon-icon.png" alt="C.S.V. BEACON" />
+        <div>
+          <div class="title">TMSA Bulk KPI Configuration Import</div>
+          <div class="sub" id="subLine">Checking session...</div>
+        </div>
+      </div>
+
+      <div class="actions">
+        <a class="btn" href="./tmsa-office.html">TMSA Manager</a>
+        <a class="btn secondary" href="./tmsa-kpi-presentation.html">Audit Presentation</a>
+        <a class="btn secondary" href="./tmsa-evidence.html">Evidence Register</a>
+        <a class="btn secondary" href="./tmsa-kpi-import.html">KPI Text Import</a>
+        <a class="btn" href="./q-dashboard.html">Dashboard</a>
+        <button class="btn" id="logoutBtn" type="button">Logout</button>
+      </div>
+    </div>
+
+    <div id="warnBox" class="warn"></div>
+    <div id="okBox" class="ok"></div>
+
+    <div class="grid">
+      <div class="card">
+        <div class="toolbar">
+          <div class="left">
+            <h2 style="margin:0;">Import Controls</h2>
+            <span class="pill" id="templateCountPill">0 KPIs</span>
+          </div>
+        </div>
+
+        <div class="note">
+          Paste either JSON array or CSV content based on the downloaded template. This imports company KPI configuration only. It does not import OCIMF KPI text.
+        </div>
+
+        <label for="companyFilter">Company</label>
+        <select id="companyFilter" style="display:none;"><option value="">Company</option></select>
+
+        <label for="sourceLabel">Source label</label>
+        <input id="sourceLabel" placeholder="e.g. TMSA office preparation baseline Jun 2026" />
+
+        <label for="importNote">Import note</label>
+        <input id="importNote" placeholder="Optional note for traceability" />
+
+        <label for="confirmText">Confirmation</label>
+        <input id="confirmText" placeholder="Type IMPORT before import" />
+
+        <div class="actions" style="margin-top:10px;">
+          <button class="btn secondary" id="downloadCsvBtn" type="button">Download CSV Template</button>
+          <button class="btn secondary" id="downloadJsonBtn" type="button">Download JSON Template</button>
+          <button class="btn secondary" id="previewBtn" type="button">Preview Paste</button>
+          <button class="btn danger" id="importBtn" type="button">Import Configuration</button>
+        </div>
+
+        <label for="pasteBox">Paste JSON or CSV here</label>
+        <textarea id="pasteBox" placeholder="Paste edited CSV or JSON configuration here..."></textarea>
+      </div>
+
+      <div class="card">
+        <div class="toolbar">
+          <div class="left">
+            <h2 style="margin:0;">Template / Preview</h2>
+            <span class="pill" id="previewCountPill">0 preview rows</span>
+          </div>
+          <div class="right">
+            <input id="templateSearch" placeholder="Search template..." style="min-width:260px;" />
+            <button class="btn secondary" id="refreshBtn" type="button">Refresh Template</button>
+          </div>
+        </div>
+
+        <div class="tableWrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Element</th>
+                <th>KPI</th>
+                <th>Input / Readiness</th>
+                <th>Levels</th>
+                <th>Audit Answer / Evidence</th>
+                <th>Targets / Actual</th>
+                <th>Owner / Review</th>
+              </tr>
+            </thead>
+            <tbody id="templateBody"><tr><td colspan="7">Loading...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./tmsa-kpi-config-import-v01.js?v=20260610_1"></script>
+</body>
+</html>
