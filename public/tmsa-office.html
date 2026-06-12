@@ -511,6 +511,7 @@
         <a class="btn" href="./audit_observations.html">Audit Observations</a>
         <a class="btn secondary" href="./tmsa-kpi-import.html">KPI Text Import</a>
         <a class="btn secondary" href="./tmsa-evidence.html">Evidence Register</a>
+        <a class="btn secondary" href="./tmsa-element.html?element_code=1">Element Workspace</a>
         <a class="btn secondary" href="./tmsa-kpi-presentation.html">Audit Presentation</a>
         <a class="btn secondary" href="./tmsa-office-events.html">Office Events</a>
         <a class="btn secondary" href="./tmsa-kpi-config-import.html">Bulk KPI Config</a>
@@ -817,5 +818,19 @@
   </div>
 
   <script type="module" src="./tmsa-office-v01.js?v=20260610_targets_1"></script>
+
+  <script>
+    /* TMSA Element Workspace redirect handler */
+    document.addEventListener("click", function(e){
+      const target = e.target && e.target.closest ? e.target.closest("[data-open-element]") : null;
+      if (!target) return;
+      const code = target.getAttribute("data-open-element");
+      if (!code) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      window.location.href = "./tmsa-element.html?element_code=" + encodeURIComponent(code);
+    }, true);
+  </script>
+
 </body>
 </html>
