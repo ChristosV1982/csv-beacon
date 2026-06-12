@@ -439,7 +439,11 @@ function bind(){
   el("elementsGrid")?.addEventListener("click",e=>{
     const btn=e.target.closest("[data-open-element]");
     if(!btn)return;
-    openElement(btn.dataset.openElement||"");
+
+    const code = btn.dataset.openElement || "";
+    if(!code)return;
+
+    window.location.href = "./tmsa-element.html?element_code=" + encodeURIComponent(code);
   });
 
   el("matrixBody")?.addEventListener("click",e=>{
