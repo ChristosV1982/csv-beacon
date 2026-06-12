@@ -5,13 +5,13 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-  <title>C.S.V. BEACON - TMSA KPI Text Import</title>
+  <title>C.S.V. BEACON - TMSA Exact KPI Text Import</title>
 
   <link rel="stylesheet" href="./csv-beacon-theme.css?v=20260428_3" />
   <link rel="stylesheet" href="./style.css?v=20260428_3" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="./auth.js"></script>
-  <script src="./csvb-module-guard.js?v=20260602_tmsa_import_1"></script>
+  <script src="./csvb-module-guard.js?v=20260612_tmsa_text_import_2"></script>
 
   <style>
     body{margin:0;padding:10px;background:#eef4fb;font-family:"Segoe UI",Arial,sans-serif;color:#06305c}
@@ -24,14 +24,26 @@
     .btn.secondary{background:#eef7ff;color:#07345f}.btn.danger{background:#fff0f0;color:#8a1f1f;border-color:#f1c7c7}.btn:disabled{opacity:.55;cursor:not-allowed}
     .warn,.ok{display:none;border-radius:12px;font-weight:700;line-height:1.35;padding:9px;margin:8px 0;white-space:pre-wrap}
     .warn{border:1px solid #f1c7c7;background:#fff2f2;color:#7a1f1f}.ok{border:1px solid #bce9c9;background:#effff4;color:#11612b}
-    .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.card{background:#fff;border:1px solid #d5deef;border-radius:14px;padding:10px;box-shadow:0 3px 14px rgba(18,44,87,.10)}
+    .grid{display:grid;grid-template-columns:.85fr 1.15fr;gap:10px}
+    .card{background:#fff;border:1px solid #d5deef;border-radius:14px;padding:10px;box-shadow:0 3px 14px rgba(18,44,87,.10)}
     .note{border:1px solid #d5deef;border-radius:12px;background:#f7fbff;color:#35507b;padding:8px;margin:8px 0;line-height:1.35}
-    textarea{width:100%;min-height:430px;box-sizing:border-box;border:1px solid #cbd7ee;border-radius:10px;padding:9px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.86rem;color:#1a4170}
-    .small{font-size:.82rem;color:#48628e;line-height:1.3}.pill{display:inline-block;border:1px solid #d5deef;border-radius:999px;padding:2px 8px;background:#eaf1fb;color:#1a4170;font-weight:750;font-size:.74rem;white-space:nowrap}
+    .note.warning{background:#fff8e6;border-color:#f0d28b;color:#684600}
+    .note.error{background:#fff2f2;border-color:#f1c7c7;color:#7a1f1f}
+    .note.oknote{background:#effff4;border-color:#bce9c9;color:#11612b}
+    label{display:block;font-size:.82rem;font-weight:750;color:#1a4170;margin:7px 0 3px}
+    input,select,textarea{box-sizing:border-box;border:1px solid #cbd7ee;border-radius:9px;padding:7px 9px;min-height:36px;color:#1a4170;font-family:"Segoe UI",Arial,sans-serif;font-size:.9rem}
+    textarea{width:100%;min-height:360px;resize:vertical;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.82rem}
     .toolbar{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}.toolbar .left,.toolbar .right{display:flex;gap:7px;align-items:center;flex-wrap:wrap}
-    .tableWrap{max-height:520px;overflow:auto;border:1px solid #d5deef;border-radius:10px;background:#fff}table{width:100%;border-collapse:collapse;min-width:900px}th,td{padding:7px 8px;border-bottom:1px solid #e6eefb;vertical-align:top}th{background:#f2f7ff;color:#1a4170;text-align:left;position:sticky;top:0;z-index:1}td{font-size:.86rem;color:#223a66}
-    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
-    @media(max-width:1000px){.grid{grid-template-columns:1fr}.actions,.btn{width:100%}.btn{justify-content:center}textarea{min-height:300px}}
+    .small{font-size:.82rem;color:#48628e;line-height:1.32}.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+    .pill{display:inline-block;border:1px solid #d5deef;border-radius:999px;padding:2px 8px;background:#eaf1fb;color:#1a4170;font-weight:750;font-size:.74rem;white-space:nowrap;margin:1px}
+    .pill.green{background:#e9fff0;border-color:#bce9c9;color:#11612b}.pill.red{background:#fff0f0;border-color:#f1c7c7;color:#7a1f1f}.pill.amber{background:#fff8e6;border-color:#f0d28b;color:#7a5200}
+    .tableWrap{overflow:auto;border:1px solid #d5deef;border-radius:10px;background:#fff;max-height:680px}table{width:100%;border-collapse:collapse;min-width:1250px}th,td{padding:7px 8px;border-bottom:1px solid #e6eefb;vertical-align:top}th{background:#f2f7ff;color:#1a4170;text-align:left;position:sticky;top:0;z-index:1}td{font-size:.84rem;color:#223a66}
+    .progressGrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;margin-bottom:8px}
+    .progressBox{border:1px solid #d5deef;border-radius:12px;background:#f7fbff;padding:8px}
+    .progressBox strong{font-size:1.1rem;color:#06305c}
+    .validationList{max-height:220px;overflow:auto;border-top:1px solid #d5deef;margin-top:7px;padding-top:7px}
+    .validationList div{font-size:.82rem;line-height:1.35;margin-bottom:4px}
+    @media(max-width:1100px){.grid,.progressGrid{grid-template-columns:1fr}.actions,.btn{width:100%}.btn{justify-content:center}.toolbar .left,.toolbar .right,.toolbar input,.toolbar select{width:100%}}
   </style>
 </head>
 
@@ -41,13 +53,15 @@
       <div class="brand">
         <img src="./assets/csv-beacon-icon.png" alt="C.S.V. BEACON" />
         <div>
-          <div class="title">TMSA KPI Text Import</div>
+          <div class="title">TMSA Exact KPI Text Import</div>
           <div class="sub" id="subLine">Checking session...</div>
         </div>
       </div>
 
       <div class="actions">
-        <a class="btn" href="./tmsa-office.html">TMSA Manager</a>
+        <a class="btn" href="./tmsa-office.html">TMSA Home</a>
+        <a class="btn secondary" href="./tmsa-element.html?element_code=1">Element Workspace</a>
+        <a class="btn secondary" href="./tmsa-kpi-config-import.html">Bulk KPI Config</a>
         <a class="btn" href="./q-dashboard.html">Dashboard</a>
         <button class="btn" id="logoutBtn" type="button">Logout</button>
       </div>
@@ -56,63 +70,79 @@
     <div id="warnBox" class="warn"></div>
     <div id="okBox" class="ok"></div>
 
-    <div class="card">
-      <div class="toolbar">
-        <div class="left">
-          <h2 style="margin:0;">Controlled Import</h2>
-          <span class="pill" id="templateCount">0 skeleton rows</span>
-          <span class="pill" id="previewCount">0 import rows</span>
+    <div class="grid">
+      <div class="card">
+        <h2 style="margin-top:0;">Controlled Exact-Text Import</h2>
+
+        <div class="note warning">
+          This tool imports user-provided exact TMSA KPI text and Best Practice Guidance into the private app database. It does not generate or provide OCIMF text.
         </div>
-        <div class="right">
-          <button class="btn secondary" id="loadTemplateBtn" type="button">Load Template</button>
+
+        <label for="sourceLabel">Source label</label>
+        <input id="sourceLabel" placeholder="e.g. TMSA 3rd Edition 2017 company copy" />
+
+        <label for="importNote">Import note</label>
+        <input id="importNote" placeholder="Optional traceability note" />
+
+        <label for="confirmText">Confirmation</label>
+        <input id="confirmText" placeholder="Type IMPORT before importing" />
+
+        <div class="actions" style="margin-top:10px;">
           <button class="btn secondary" id="downloadCsvBtn" type="button">Download CSV Template</button>
-          <button class="btn secondary" id="previewJsonBtn" type="button">Preview JSON</button>
-          <button class="btn" id="importBtn" type="button">Import Exact Text</button>
+          <button class="btn secondary" id="downloadJsonBtn" type="button">Download JSON Template</button>
+          <button class="btn secondary" id="previewBtn" type="button">Preview / Validate</button>
+          <button class="btn danger" id="importBtn" type="button">Import Exact Text</button>
+        </div>
+
+        <label for="pasteBox">Paste edited CSV or JSON here</label>
+        <textarea id="pasteBox" placeholder="Paste CSV/JSON rows containing exact_kpi_statement and exact_best_practice_guidance..."></textarea>
+
+        <div id="validationBox" class="note">
+          No preview loaded.
         </div>
       </div>
 
-      <div class="note">
-        Paste a JSON array with fields: <span class="mono">kpi_code</span>, <span class="mono">kpi_statement</span>, <span class="mono">best_practice_guidance</span>, <span class="mono">source_page</span>, <span class="mono">source_publication</span>.
-        Only Super Admin / Platform Owner can import. This page does not contain OCIMF text by itself.
-      </div>
-    </div>
-
-    <div class="grid" style="margin-top:10px;">
       <div class="card">
-        <h3 style="margin:0 0 8px;">JSON Import Payload</h3>
-        <textarea id="jsonInput" spellcheck="false">[
-  {
-    "kpi_code": "1.1.1",
-    "kpi_statement": "",
-    "best_practice_guidance": "",
-    "source_page": "",
-    "source_publication": "OCIMF TMSA 3rd Edition 2017"
-  }
-]</textarea>
-      </div>
+        <div class="toolbar">
+          <div class="left">
+            <h2 style="margin:0;">Template / Progress</h2>
+            <span class="pill" id="templateCountPill">0 KPIs</span>
+            <span class="pill" id="previewCountPill">0 preview</span>
+            <span class="pill green" id="validCountPill">0 valid</span>
+            <span class="pill red" id="errorCountPill">0 errors</span>
+          </div>
+          <div class="right">
+            <input id="templateSearch" placeholder="Search template/progress..." style="min-width:260px;" />
+            <button class="btn secondary" id="refreshBtn" type="button">Refresh</button>
+          </div>
+        </div>
 
-      <div class="card">
-        <h3 style="margin:0 0 8px;">Import Template Preview</h3>
+        <div class="progressGrid">
+          <div class="progressBox"><strong id="totalKpis">0</strong><div class="small">Total KPIs</div></div>
+          <div class="progressBox"><strong id="importedKpis">0</strong><div class="small">Exact text imported</div></div>
+          <div class="progressBox"><strong id="guidanceKpis">0</strong><div class="small">Guidance imported</div></div>
+          <div class="progressBox"><strong id="pendingKpis">0</strong><div class="small">Pending</div></div>
+        </div>
+
         <div class="tableWrap">
           <table>
             <thead>
               <tr>
                 <th>Element</th>
                 <th>KPI</th>
-                <th>Level</th>
-                <th>Import Status</th>
-                <th>Current Text</th>
+                <th>Status</th>
+                <th>Current text</th>
+                <th>Guidance</th>
+                <th>Source</th>
               </tr>
             </thead>
-            <tbody id="templateBody">
-              <tr><td colspan="5">Load template.</td></tr>
-            </tbody>
+            <tbody id="templateBody"><tr><td colspan="6">Loading...</td></tr></tbody>
           </table>
         </div>
       </div>
     </div>
   </div>
 
-  <script type="module" src="./tmsa-kpi-import-v01.js?v=20260602_1"></script>
+  <script type="module" src="./tmsa-kpi-import-v01.js?v=20260612_2"></script>
 </body>
 </html>
