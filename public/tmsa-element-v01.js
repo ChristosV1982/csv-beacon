@@ -1,7 +1,7 @@
 // public/tmsa-element-v01.js
 // C.S.V. BEACON - TMSA Element / KPI Workspace v04B
 
-const BUILD = "tmsa_element_workspace_v04b_20260612";
+const BUILD = "tmsa_element_workspace_v04c_20260612";
 const sb = window.AUTH.ensureSupabase();
 const COMPANY_KEY = "csvb_tmsa_element_workspace_selected_company_id";
 
@@ -323,15 +323,23 @@ function renderKpiCard(r, idx){
         <div class="miniRow" style="margin-top:5px;">
           <input data-field="new_department_name" placeholder="Add department..." />
           <button class="miniBtn" data-add-department="${esc(r.kpi_id)}" type="button">Add</button>
+          <button class="miniBtn danger" data-remove-department="${esc(r.kpi_id)}" type="button">Delete selected</button>
         </div>
+        <div class="small">Department deletion is guarded. It is blocked if assigned to any KPI.</div>
       </div>
 
       <div class="full">
         <label>Responsible presenter(s)</label>
-        <select data-field="presenter_ids" multiple size="5">
-          ${presenterOptions(support.personnel,selectedPresenterIds)}
-        </select>
-        <div class="small">Select one or more company personnel.</div>
+        <div class="supportList">
+          ${renderPresenterList(r.kpi_id,support.presenters)}
+        </div>
+        <div class="miniRow" style="margin-top:7px;">
+          <select data-field="presenter_add_id">
+            ${presenterAddOptions(support.personnel,selectedPresenterIds)}
+          </select>
+          <button class="miniBtn" data-add-presenter="${esc(r.kpi_id)}" type="button">Add presenter</button>
+        </div>
+        <div class="small">Choose a presenter from the dropdown, then add. Existing presenters can be removed.</div>
       </div>
 
       <div class="full">
@@ -523,10 +531,26 @@ function departmentOptions(departments,current){
   }).join("");
 }
 
-function presenterOptions(personnel,selectedIds){
-  return arr(personnel).map(p=>{
-    const id=String(p.profile_id);
-    return `<option value="${esc(id)}" ${selectedIds.has(id)?"selected":""}>${esc(p.display_label||p.username||id)}</option>`;
+function presenterAddOptions(personnel,selectedIds){
+  return `<option value="">Select presenter...</option>` + arr(personnel)
+    .filter(p=>!selectedIds.has(String(p.profile_id)))
+    .map(p=>{
+      const id=String(p.profile_id);
+      return `<option value="${esc(id)}">${esc(p.display_label||p.username||id)}</option>`;
+    }).join("");
+}
+
+function renderPresenterList(kpiId,presenters){
+  const list=arr(presenters);
+  if(!list.length){
+    return `<div class="small">No responsible presenter selected yet.</div>`;
+  }
+
+  return list.map(p=>{
+    return `<div class="supportItem">
+      <strong>${esc(p.presenter_label||p.profile_id||"-")}</strong>
+      <button class="miniBtn danger" data-remove-presenter="${esc(kpiId)}" data-profile-id="${esc(p.profile_id)}" type="button">Remove</button>
+    </div>`;
   }).join("");
 }
 
@@ -539,11 +563,15 @@ function levelOptions(current){
 }
 
 function selectedPresenterIds(card){
-  return Array.from(card.querySelector('[data-field="presenter_ids"]')?.selectedOptions || []).map(o=>o.value).filter(Boolean);
+  return arr(supportFor(card.dataset.kpiCard).presenters)
+    .map(p=>String(p.profile_id))
+    .filter(Boolean);
 }
 
 function selectedPresenterLabels(card){
-  return Array.from(card.querySelector('[data-field="presenter_ids"]')?.selectedOptions || []).map(o=>o.textContent.trim()).filter(Boolean);
+  return arr(supportFor(card.dataset.kpiCard).presenters)
+    .map(p=>p.presenter_label || p.profile_id)
+    .filter(Boolean);
 }
 
 function policyLabels(card,kind){
@@ -659,6 +687,73 @@ async function addDepartment(kpiId){
   await loadWorkspace();
 }
 
+async function removeDepartment(kpiId){
+  clearMessages();
+
+  const card=document.querySelector(`[data-kpi-card="${CSS.escape(kpiId)}"]`);
+  if(!card)throw new Error("KPI card not found.");
+
+  const departmentId=nval(card,"owner_department_id");
+  if(!departmentId)throw new Error("Select a department to delete.");
+
+  const selectedName=card.querySelector('[data-field="owner_department_id"]')?.selectedOptions?.[0]?.textContent?.trim() || "selected department";
+  const ok=confirm(`Delete department "${selectedName}"? This will be blocked if the department is assigned to any KPI.`);
+  if(!ok)return;
+
+  const {error}=await sb.rpc("csvb_tmsa_archive_department",{
+    p_department_id: departmentId
+  });
+
+  if(error)throw error;
+
+  showOk("Department deleted.");
+  await loadWorkspace();
+}
+
+async function addPresenter(kpiId){
+  clearMessages();
+
+  const card=document.querySelector(`[data-kpi-card="${CSS.escape(kpiId)}"]`);
+  if(!card)throw new Error("KPI card not found.");
+
+  const newId=nval(card,"presenter_add_id");
+  if(!newId)throw new Error("Select a presenter first.");
+
+  const current=selectedPresenterIds(card);
+  const next=[...new Set([...current,newId])];
+
+  const {error}=await sb.rpc("csvb_tmsa_save_kpi_presenters",{
+    p_kpi_id: kpiId,
+    p_company_id: companyId(),
+    p_presenter_ids: next
+  });
+
+  if(error)throw error;
+
+  showOk("Presenter added.");
+  await loadWorkspace();
+}
+
+async function removePresenter(kpiId,profileId){
+  clearMessages();
+
+  const card=document.querySelector(`[data-kpi-card="${CSS.escape(kpiId)}"]`);
+  if(!card)throw new Error("KPI card not found.");
+
+  const next=selectedPresenterIds(card).filter(id=>String(id)!==String(profileId));
+
+  const {error}=await sb.rpc("csvb_tmsa_save_kpi_presenters",{
+    p_kpi_id: kpiId,
+    p_company_id: companyId(),
+    p_presenter_ids: next
+  });
+
+  if(error)throw error;
+
+  showOk("Presenter removed.");
+  await loadWorkspace();
+}
+
 async function addPolicyLink(card,kind){
   clearMessages();
 
@@ -761,6 +856,27 @@ function bind(){
     const addDept=e.target.closest("button[data-add-department]");
     if(addDept){
       addDepartment(addDept.dataset.addDepartment).catch(err=>showWarn(err.message||String(err)));
+      return;
+    }
+
+    const removeDept=e.target.closest("button[data-remove-department]");
+    if(removeDept){
+      removeDepartment(removeDept.dataset.removeDepartment).catch(err=>showWarn(err.message||String(err)));
+      return;
+    }
+
+    const addPresenterBtn=e.target.closest("button[data-add-presenter]");
+    if(addPresenterBtn){
+      addPresenter(addPresenterBtn.dataset.addPresenter).catch(err=>showWarn(err.message||String(err)));
+      return;
+    }
+
+    const removePresenterBtn=e.target.closest("button[data-remove-presenter]");
+    if(removePresenterBtn){
+      removePresenter(
+        removePresenterBtn.dataset.removePresenter,
+        removePresenterBtn.dataset.profileId
+      ).catch(err=>showWarn(err.message||String(err)));
       return;
     }
 

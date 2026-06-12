@@ -1,7 +1,7 @@
 // public/tmsa-kpi-presentation-v01.js
 // C.S.V. BEACON - TMSA KPI Audit Presentation View v01
 
-const BUILD = "tmsa_kpi_audit_presentation_v01_20260610";
+const BUILD = "tmsa_kpi_audit_presentation_cleanup_v04c_20260612";
 const sb = window.AUTH.ensureSupabase();
 const COMPANY_KEY = "csvb_tmsa_presentation_selected_company_id";
 
@@ -227,9 +227,7 @@ function renderPresentation(){
       </div>
       <div>
         ${pill(`Coverage: ${label(r.coverage_status)}`)}
-        ${pill(`Readiness: ${label(r.readiness_status)}`, readinessClass(r.readiness_status))}
         ${pill(`Input: ${label(r.input_method)}`)}
-        ${pill(`Sensitivity: ${label(r.oil_major_sensitivity)}`)}
         ${r.import_status && r.import_status!=="exact_text_imported"?pill(`Text: ${label(r.import_status)}`,"amber"):""}
       </div>
     </div>
@@ -260,11 +258,11 @@ function renderPresentation(){
 
     <div class="sectionGrid" style="margin-top:10px;">
       <div class="box">
-        <h3>Company Handling / SMS References</h3>
+        <h3>Company Handling / eSMS References</h3>
         <div class="kv"><div class="k">Claimed level</div><div>${r.claimed_level?`Level ${esc(r.claimed_level)}`:"-"}</div></div>
         <div class="kv"><div class="k">Target level</div><div>${r.target_level?`Level ${esc(r.target_level)}`:"-"}</div></div>
-        <div class="kv"><div class="k">SMS reference</div><div>${text(r.sms_reference)}</div></div>
-        <div class="kv"><div class="k">Forms / records</div><div>${text(r.forms_records)}</div></div>
+        <div class="kv"><div class="k">eSMS reference</div><div>${text(r.sms_reference)}</div></div>
+        <div class="kv"><div class="k">eSMS Forms / records</div><div>${text(r.forms_records)}</div></div>
         <div class="kv"><div class="k">Owner department</div><div>${text(r.owner_department)}</div></div>
         <div class="kv"><div class="k">Presenter</div><div>${text(r.responsible_presenter)}</div></div>
       </div>
@@ -279,20 +277,6 @@ function renderPresentation(){
         <div class="kv"><div class="k">Acceptable range</div><div>${valueWithUnit(r.minimum_acceptable_value,r.measurement_unit)} / ${valueWithUnit(r.maximum_acceptable_value,r.measurement_unit)}</div></div>
         <div class="kv"><div class="k">Thresholds</div><div>Green ${valueWithUnit(r.green_threshold,r.measurement_unit)} · Amber ${valueWithUnit(r.amber_threshold,r.measurement_unit)} · Red ${valueWithUnit(r.red_threshold,r.measurement_unit)}</div></div>
         <div class="kv"><div class="k">Measured / review</div><div>Measured: ${date(r.last_measured_at)} · Reviewed: ${date(r.last_reviewed_at)} · Next due: ${date(r.next_review_due)}</div></div>
-      </div>
-    </div>
-
-    <div class="sectionGrid" style="margin-top:10px;">
-      <div class="box">
-        <h3>Weakness / Risk to Avoid</h3>
-        <div class="text">${text(r.weakness_to_avoid, '<span class="small">No weakness/risk note entered.</span>')}</div>
-      </div>
-
-      <div class="box">
-        <h3>Gaps / Actions</h3>
-        <div class="kv"><div class="k">Gap summary</div><div>${text(r.gap_summary)}</div></div>
-        <div class="kv"><div class="k">Action required</div><div>${text(r.action_required)}</div></div>
-        <div class="kv"><div class="k">Internal remarks</div><div>${text(r.internal_remarks)}</div></div>
       </div>
     </div>
 
@@ -319,7 +303,7 @@ function renderEvidence(items){
       </div>
       <div class="small">${esc(label(ev.evidence_type))} · ${esc(label(ev.confidentiality_level))}</div>
       <div class="kv"><div class="k">Document reference</div><div>${text(ev.document_reference)}</div></div>
-      <div class="kv"><div class="k">SMS reference</div><div>${text(ev.sms_reference)}</div></div>
+      <div class="kv"><div class="k">eSMS reference</div><div>${text(ev.sms_reference)}</div></div>
       <div class="kv"><div class="k">Revision / validity</div><div>Rev ${text(ev.revision_no)} · Rev date ${date(ev.revision_date)} · Valid ${date(ev.valid_from)} to ${date(ev.valid_until)}</div></div>
       <div class="kv"><div class="k">Owner / file</div><div>${text(ev.owner_department)} · ${text(ev.file_name)} ${ev.file_type?`(${esc(ev.file_type)})`:""}</div></div>
       <div class="kv"><div class="k">Storage path</div><div>${text(ev.storage_path)}</div></div>
