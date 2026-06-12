@@ -1,7 +1,7 @@
 // public/tmsa-element-v01.js
 // C.S.V. BEACON - TMSA Element / KPI Workspace v04B
 
-const BUILD = "tmsa_element_workspace_v04d_a_20260612";
+const BUILD = "tmsa_element_workspace_v04d_b2_20260612";
 const sb = window.AUTH.ensureSupabase();
 const COMPANY_KEY = "csvb_tmsa_element_workspace_selected_company_id";
 
@@ -52,7 +52,8 @@ function supportFor(kpiId){
     presenters: [],
     internal_notes: [],
     policy_links: [],
-    matrix_meta: {}
+    matrix_meta: {},
+    evidence_records: []
   };
 }
 
@@ -132,7 +133,8 @@ async function loadSupportForRows(rows){
       presenters: arr(support.presenters),
       internal_notes: arr(support.internal_notes),
       policy_links: arr(support.policy_links),
-      matrix_meta: support.matrix_meta || {}
+      matrix_meta: support.matrix_meta || {},
+      evidence_records: arr(support.evidence_records)
     });
 
     return true;
@@ -449,7 +451,7 @@ function renderKpiCard(r, idx){
     </div>
 
     <div class="supportGrid">
-      ${renderRecordsBox(evidence)}
+      ${renderRecordsBox(r,support.evidence_records)}
       ${renderInternalNotesBox(support.internal_notes)}
     </div>
 
@@ -487,16 +489,53 @@ function renderPolicyBox(r,kind,title,links){
   </div>`;
 }
 
-function renderRecordsBox(items){
+function renderRecordsBox(r,items){
+  const list=arr(items);
+
   return `<div class="box">
     <h4>Records / uploaded evidence</h4>
-    ${items.length?items.map(ev=>`<div class="evidenceItem">
+
+    ${list.length?list.map(ev=>`<div class="evidenceItem">
       <strong>${esc(ev.evidence_title||"-")}</strong>
       ${ev.is_primary?pill("Primary","green"):""}
       ${ev.evidence_strength?pill(label(ev.evidence_strength),readinessClass(ev.evidence_strength)):""}
       <div class="small">Doc: ${esc(ev.document_reference||"-")} · eSMS: ${esc(ev.sms_reference||"-")}</div>
+      ${ev.file_name?`<div class="small">File: ${esc(ev.file_name)} ${ev.file_type?`(${esc(ev.file_type)})`:""}</div>`:""}
+      ${ev.storage_path?`<div class="small">Storage: ${esc(ev.storage_path)}</div>`:""}
       ${ev.link_note?`<div class="small">Link note: ${esc(ev.link_note)}</div>`:""}
-    </div>`).join(""):`<div class="small">No records linked yet. Use Evidence Register for uploaded records / files.</div>`}
+      <div class="recordActions">
+        ${ev.storage_path?`<button class="miniBtn" data-open-record="${esc(ev.storage_path)}" type="button">Open</button>`:""}
+        ${ev.link_id?`<button class="miniBtn danger" data-unlink-record="${esc(ev.link_id)}" type="button">Remove link</button>`:""}
+        ${ev.evidence_id?`<button class="miniBtn danger" data-deactivate-record="${esc(ev.evidence_id)}" type="button">Deactivate record</button>`:""}
+      </div>
+    </div>`).join(""):`<div class="small">No records linked yet.</div>`}
+
+    <div class="uploadBox">
+      <label>Upload evidence / record for this KPI</label>
+      <input data-field="evidence_file" type="file" />
+      <div class="miniRow" style="margin-top:6px;">
+        <input data-field="evidence_title" placeholder="Evidence title; optional, defaults to file name" />
+        <input data-field="evidence_doc_ref" placeholder="Document / record reference; optional" />
+      </div>
+      <div class="miniRow" style="margin-top:6px;">
+        <select data-field="evidence_type">
+          <option value="record">Record</option>
+          <option value="report">Report</option>
+          <option value="meeting_minutes">Meeting Minutes</option>
+          <option value="training_record">Training Record</option>
+          <option value="kpi_dashboard">KPI Dashboard</option>
+          <option value="audit_report">Audit Report</option>
+          <option value="inspection_report">Inspection Report</option>
+          <option value="other">Other</option>
+        </select>
+        <label style="display:flex;gap:6px;align-items:center;margin:0;">
+          <input data-field="evidence_primary" type="checkbox" style="width:auto;min-height:auto;" />
+          Primary evidence
+        </label>
+        <button class="miniBtn" data-upload-evidence="${esc(r.kpi_id)}" type="button">Upload evidence</button>
+      </div>
+      <div class="small">File will be stored under this company / element / KPI path and linked automatically to this KPI.</div>
+    </div>
   </div>`;
 }
 
@@ -902,6 +941,137 @@ async function archiveNote(noteId){
   await loadWorkspace();
 }
 
+function cleanFileName(name){
+  return String(name||"file")
+    .replace(/[^\w.\-]+/g,"_")
+    .replace(/_+/g,"_")
+    .slice(0,160);
+}
+
+function storagePathFor(row,file){
+  const stamp=new Date().toISOString().replace(/[-:]/g,"").replace(/\..+$/,"Z");
+  return [
+    companyId(),
+    String(row.element_code||"element").replace(/[^\w.\-]+/g,"_"),
+    String(row.kpi_code||"kpi").replace(/[^\w.\-]+/g,"_"),
+    `${stamp}_${cleanFileName(file.name)}`
+  ].join("/");
+}
+
+async function uploadEvidenceForKpi(kpiId){
+  clearMessages();
+
+  const card=document.querySelector(`[data-kpi-card="${CSS.escape(kpiId)}"]`);
+  if(!card)throw new Error("KPI card not found.");
+
+  const row=ROWS.find(r=>String(r.kpi_id)===String(kpiId));
+  if(!row)throw new Error("KPI row not found.");
+
+  const fileInput=card.querySelector('[data-field="evidence_file"]');
+  const file=fileInput?.files?.[0];
+
+  if(!file)throw new Error("Select a file to upload.");
+
+  const path=storagePathFor(row,file);
+
+  const upload=await sb.storage
+    .from("tmsa-kpi-evidence")
+    .upload(path,file,{
+      cacheControl: "3600",
+      upsert: false,
+      contentType: file.type || "application/octet-stream"
+    });
+
+  if(upload.error)throw upload.error;
+
+  const title=nval(card,"evidence_title").trim() || file.name;
+  const docRef=nval(card,"evidence_doc_ref").trim() || `${row.kpi_code} / ${file.name}`;
+  const type=nval(card,"evidence_type") || "record";
+  const primary=bval(card,"evidence_primary");
+
+  const evidence=await sb.rpc("csvb_tmsa_save_evidence",{
+    p_evidence_id: null,
+    p_company_id: companyId(),
+    p_evidence_title: title,
+    p_evidence_type: type,
+    p_document_reference: docRef,
+    p_sms_reference: policyLabels(card,"esms_reference").join("; ") || null,
+    p_revision_no: null,
+    p_revision_date: null,
+    p_valid_from: null,
+    p_valid_until: null,
+    p_owner_department: ownerDepartmentLabel(card) || null,
+    p_storage_path: path,
+    p_file_name: file.name,
+    p_file_type: file.type || null,
+    p_evidence_strength: "moderate",
+    p_confidentiality_level: "internal",
+    p_remarks: `Uploaded from TMSA Element Workspace for KPI ${row.kpi_code}.`,
+    p_is_active: true
+  });
+
+  if(evidence.error)throw evidence.error;
+
+  const evidenceId=evidence.data;
+
+  const link=await sb.rpc("csvb_tmsa_link_evidence_to_kpi",{
+    p_evidence_id: evidenceId,
+    p_kpi_id: kpiId,
+    p_company_id: companyId(),
+    p_link_note: "Uploaded directly under this KPI from Element Workspace.",
+    p_is_primary: primary
+  });
+
+  if(link.error)throw link.error;
+
+  showOk("Evidence uploaded and linked to KPI.");
+  await loadWorkspace();
+}
+
+async function openRecord(storagePath){
+  clearMessages();
+
+  const signed=await sb.storage
+    .from("tmsa-kpi-evidence")
+    .createSignedUrl(storagePath,60 * 10);
+
+  if(signed.error)throw signed.error;
+  window.open(signed.data.signedUrl,"_blank","noopener,noreferrer");
+}
+
+async function unlinkRecord(linkId){
+  clearMessages();
+
+  const ok=confirm("Remove this record link from the KPI?");
+  if(!ok)return;
+
+  const {error}=await sb.rpc("csvb_tmsa_unlink_evidence_from_kpi",{
+    p_link_id: linkId
+  });
+
+  if(error)throw error;
+
+  showOk("Record link removed from KPI.");
+  await loadWorkspace();
+}
+
+async function deactivateRecord(evidenceId){
+  clearMessages();
+
+  const ok=confirm("Deactivate this evidence record? The stored file will not be deleted in this step.");
+  if(!ok)return;
+
+  const {error}=await sb.rpc("csvb_tmsa_set_evidence_active",{
+    p_evidence_id: evidenceId,
+    p_is_active: false
+  });
+
+  if(error)throw error;
+
+  showOk("Evidence record deactivated.");
+  await loadWorkspace();
+}
+
 function updateGlobalState(){
   const exactImportedCount = ROWS.filter(r=>!!r.has_exact_text || ["exact_text_imported","exact_kpi_text_imported_guidance_pending"].includes(r.import_status)).length;
   const guidancePendingCount = ROWS.filter(r=>!!r.guidance_pending).length;
@@ -919,6 +1089,7 @@ function updateGlobalState(){
     support_loaded_count: SUPPORT_BY_KPI.size,
     title_loaded_count: TITLE_BY_KPI.size,
     element_target_level: ELEMENT_TARGET?.target_level || null,
+    evidence_record_count: Array.from(SUPPORT_BY_KPI.values()).reduce((sum,s)=>sum+arr(s.evidence_records).length,0),
     profile: PROFILE
   };
 }
@@ -993,6 +1164,30 @@ function bind(){
     const archiveLink=e.target.closest("button[data-archive-policy-link]");
     if(archiveLink){
       archivePolicyLink(archiveLink.dataset.archivePolicyLink).catch(err=>showWarn(err.message||String(err)));
+      return;
+    }
+
+    const uploadBtn=e.target.closest("button[data-upload-evidence]");
+    if(uploadBtn){
+      uploadEvidenceForKpi(uploadBtn.dataset.uploadEvidence).catch(err=>showWarn(err.message||String(err)));
+      return;
+    }
+
+    const openRecordBtn=e.target.closest("button[data-open-record]");
+    if(openRecordBtn){
+      openRecord(openRecordBtn.dataset.openRecord).catch(err=>showWarn(err.message||String(err)));
+      return;
+    }
+
+    const unlinkRecordBtn=e.target.closest("button[data-unlink-record]");
+    if(unlinkRecordBtn){
+      unlinkRecord(unlinkRecordBtn.dataset.unlinkRecord).catch(err=>showWarn(err.message||String(err)));
+      return;
+    }
+
+    const deactivateRecordBtn=e.target.closest("button[data-deactivate-record]");
+    if(deactivateRecordBtn){
+      deactivateRecord(deactivateRecordBtn.dataset.deactivateRecord).catch(err=>showWarn(err.message||String(err)));
       return;
     }
 
