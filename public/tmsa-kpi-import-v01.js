@@ -1,7 +1,7 @@
 // public/tmsa-kpi-import-v01.js
 // C.S.V. BEACON - TMSA Exact KPI Text Import v02
 
-const BUILD = "tmsa_exact_kpi_text_import_v02_20260612";
+const BUILD = "tmsa_exact_kpi_text_import_progress_v03_20260612";
 const sb = window.AUTH.ensureSupabase();
 
 let PROFILE = null;
@@ -224,12 +224,14 @@ function renderProgress(){
   const total=PROGRESS.reduce((s,r)=>s+Number(r.total_kpis||0),0);
   const imported=PROGRESS.reduce((s,r)=>s+Number(r.exact_text_imported||0),0);
   const guidance=PROGRESS.reduce((s,r)=>s+Number(r.guidance_imported||0),0);
-  const pending=PROGRESS.reduce((s,r)=>s+Number(r.pending_kpis||0),0);
+  const exactPending=PROGRESS.reduce((s,r)=>s+Number((r.exact_text_pending ?? r.pending_kpis)||0),0);
+  const guidancePending=PROGRESS.reduce((s,r)=>s+Number(r.guidance_pending||0),0);
 
   el("totalKpis").textContent=total;
   el("importedKpis").textContent=imported;
   el("guidanceKpis").textContent=guidance;
-  el("pendingKpis").textContent=pending;
+  el("pendingKpis").textContent=exactPending;
+  if(el("guidancePendingKpis")) el("guidancePendingKpis").textContent=guidancePending;
   el("templateCountPill").textContent=`${TEMPLATE.length} KPI${TEMPLATE.length===1?"":"s"}`;
 }
 
@@ -345,6 +347,8 @@ function updateGlobalState(){
   const total=PROGRESS.reduce((s,r)=>s+Number(r.total_kpis||0),0);
   const imported=PROGRESS.reduce((s,r)=>s+Number(r.exact_text_imported||0),0);
   const guidance=PROGRESS.reduce((s,r)=>s+Number(r.guidance_imported||0),0);
+  const exactPending=PROGRESS.reduce((s,r)=>s+Number((r.exact_text_pending ?? r.pending_kpis)||0),0);
+  const guidancePending=PROGRESS.reduce((s,r)=>s+Number(r.guidance_pending||0),0);
 
   window.CSVB_TMSA_KPI_IMPORT={
     build: BUILD,
@@ -354,6 +358,8 @@ function updateGlobalState(){
     total_kpis: total,
     exact_text_imported: imported,
     guidance_imported: guidance,
+    exact_text_pending: exactPending,
+    guidance_pending: guidancePending,
     preview_count: PREVIEW.length,
     valid_count: VALIDATION.validRows.length,
     error_count: VALIDATION.errors.length,

@@ -1,7 +1,7 @@
 // public/tmsa-element-v01.js
 // C.S.V. BEACON - TMSA Element / KPI Workspace v01
 
-const BUILD = "tmsa_element_workspace_v01_20260611";
+const BUILD = "tmsa_element_workspace_import_status_v03_20260612";
 const sb = window.AUTH.ensureSupabase();
 const COMPANY_KEY = "csvb_tmsa_element_workspace_selected_company_id";
 
@@ -9,6 +9,7 @@ let PROFILE = null;
 let COMPANIES = [];
 let ROWS = [];
 let ELEMENTS = [];
+let IMPORT_STATUS_ROWS = [];
 let ELEMENT_CODE = new URLSearchParams(location.search).get("element_code") || "1";
 
 function el(id){return document.getElementById(id)}
@@ -98,14 +99,27 @@ async function loadElementList(){
 async function loadWorkspace(){
   clearMessages();
 
-  const {data,error}=await sb.rpc("csvb_tmsa_element_workspace_for_me",{
+  const workspaceResult = await sb.rpc("csvb_tmsa_element_workspace_for_me",{
     p_element_code: ELEMENT_CODE,
     p_company_id: companyId()
   });
 
-  if(error)throw error;
+  if(workspaceResult.error)throw workspaceResult.error;
 
-  ROWS=data||[];
+  const statusResult = await sb.rpc("csvb_tmsa_element_import_status_for_me",{
+    p_element_code: ELEMENT_CODE
+  });
+
+  if(statusResult.error)throw statusResult.error;
+
+  IMPORT_STATUS_ROWS = statusResult.data || [];
+  const byId = new Map(IMPORT_STATUS_ROWS.map(r=>[String(r.kpi_id),r]));
+
+  ROWS=(workspaceResult.data||[]).map(r=>{
+    const meta=byId.get(String(r.kpi_id)) || {};
+    return {...r,...meta};
+  });
+
   renderWorkspace();
   updateGlobalState();
 }
@@ -158,6 +172,13 @@ function renderWorkspace(){
   const rows=filteredRows();
   updateStats(rows);
 
+  const guidancePendingRows = rows.filter(r=>r.guidance_pending);
+  if(guidancePendingRows.length){
+    showWarn(`Best Practice Guidance pending for ${guidancePendingRows.length} KPI(s): ${guidancePendingRows.map(r=>r.kpi_code).join(", ")}`);
+  }else{
+    showWarn("");
+  }
+
   const levels=[...new Set(rows.map(r=>r.kpi_level))].sort((a,b)=>Number(a)-Number(b));
 
   body.innerHTML=levels.map(level=>{
@@ -171,7 +192,14 @@ function renderWorkspace(){
 
 function renderKpiCard(r){
   const evidence=Array.isArray(r.linked_evidence)?r.linked_evidence:[];
-  const textImported=r.import_status==="exact_text_imported";
+  const textImported=!!r.has_exact_text || ["exact_text_imported","exact_kpi_text_imported_guidance_pending"].includes(r.import_status);
+  const hasGuidance=!!r.has_guidance || String(r.best_practice_guidance||"").trim() !== "";
+  const guidancePending=!!r.guidance_pending || (textImported && !hasGuidance);
+  const sourceReference=String(r.exact_text_source_reference||"").trim();
+  const sourceLabel=String(r.exact_text_source_label||"").trim();
+  const importedAt=r.exact_text_imported_at
+    ? String(r.exact_text_imported_at).slice(0,19).replace("T"," ")+" UTC"
+    : "";
 
   return `<article class="kpiCard" data-kpi-card="${esc(r.kpi_id)}">
     <div class="kpiHeader">
@@ -184,7 +212,8 @@ function renderKpiCard(r){
         ${pill(label(r.readiness_status),readinessClass(r.readiness_status))}
         ${pill(label(r.input_method))}
         ${r.requires_calculation?pill("Calculation required","amber"):""}
-        ${textImported?pill("Exact text imported","green"):pill(label(r.import_status),"amber")}
+        ${textImported?pill("Exact Text Imported","green"):pill(label(r.import_status),"amber")}
+        ${guidancePending?pill("Guidance Pending","amber"):""}
       </div>
     </div>
 
@@ -195,9 +224,19 @@ function renderKpiCard(r){
       </div>
       <div class="box">
         <h4>Best Practice Guidance</h4>
-        <div class="text">${r.best_practice_guidance?esc(r.best_practice_guidance):'<span class="small">Not imported yet.</span>'}</div>
+        <div class="text">${r.best_practice_guidance?esc(r.best_practice_guidance):'<span class="small">Guidance pending / blank in extracted source.</span>'}</div>
       </div>
     </div>
+
+    ${textImported?`<div class="box" data-import-status-box style="margin-top:8px;">
+      <h4>Import status / source</h4>
+      <div class="small">
+        <strong>Status:</strong> Exact Text Imported${guidancePending?" · Guidance Pending":""}<br>
+        <strong>Source label:</strong> ${esc(sourceLabel||"-")}<br>
+        <strong>Source reference:</strong> ${esc(sourceReference||"-")}<br>
+        <strong>Imported at:</strong> ${esc(importedAt||"-")}
+      </div>
+    </div>`:""}
 
     <div class="formGrid" style="margin-top:8px;">
       <div>
@@ -434,6 +473,9 @@ async function saveKpi(kpiId){
 }
 
 function updateGlobalState(){
+  const exactImportedCount = ROWS.filter(r=>!!r.has_exact_text || ["exact_text_imported","exact_kpi_text_imported_guidance_pending"].includes(r.import_status)).length;
+  const guidancePendingCount = ROWS.filter(r=>!!r.guidance_pending).length;
+
   window.CSVB_TMSA_ELEMENT_WORKSPACE={
     build: BUILD,
     loaded: true,
@@ -442,6 +484,8 @@ function updateGlobalState(){
     level_count: new Set(ROWS.map(r=>r.kpi_level)).size,
     calculation_required_count: ROWS.filter(r=>r.requires_calculation).length,
     linked_evidence_count: ROWS.reduce((sum,r)=>sum+Number(r.linked_evidence_count||0),0),
+    exact_text_imported_count: exactImportedCount,
+    guidance_pending_count: guidancePendingCount,
     profile: PROFILE
   };
 }
