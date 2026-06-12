@@ -1,7 +1,7 @@
 // public/tmsa-element-v01.js
-// C.S.V. BEACON - TMSA Element / KPI Workspace v01
+// C.S.V. BEACON - TMSA Element / KPI Workspace v04B
 
-const BUILD = "tmsa_element_workspace_import_status_v03_20260612";
+const BUILD = "tmsa_element_workspace_v04b_20260612";
 const sb = window.AUTH.ensureSupabase();
 const COMPANY_KEY = "csvb_tmsa_element_workspace_selected_company_id";
 
@@ -10,6 +10,7 @@ let COMPANIES = [];
 let ROWS = [];
 let ELEMENTS = [];
 let IMPORT_STATUS_ROWS = [];
+let SUPPORT_BY_KPI = new Map();
 let ELEMENT_CODE = new URLSearchParams(location.search).get("element_code") || "1";
 
 function el(id){return document.getElementById(id)}
@@ -23,6 +24,8 @@ function date(v){return v?String(v).slice(0,10):""}
 function nval(card,name){const node=card.querySelector(`[data-field="${name}"]`); return node?.value ?? ""}
 function bval(card,name){const node=card.querySelector(`[data-field="${name}"]`); return !!node?.checked}
 function numOrNull(v){return String(v??"").trim()===""?null:Number(v)}
+function arr(v){return Array.isArray(v)?v:[]}
+
 function companyId(){
   const n=el("companyFilter");
   if(n && n.style.display!=="none" && n.value) return n.value;
@@ -38,6 +41,17 @@ function readinessClass(v){
   if(v==="partly_ready" || v==="defined" || v==="requires_definition")return "amber";
   if(v==="not_ready" || v==="weak")return "red";
   return "";
+}
+
+function supportFor(kpiId){
+  return SUPPORT_BY_KPI.get(String(kpiId)) || {
+    departments: [],
+    personnel: [],
+    presenters: [],
+    internal_notes: [],
+    policy_links: [],
+    matrix_meta: {}
+  };
 }
 
 async function setupCompanyFilter(){
@@ -96,6 +110,35 @@ async function loadElementList(){
   el("elementJump").value=ELEMENT_CODE;
 }
 
+async function loadSupportForRows(rows){
+  SUPPORT_BY_KPI = new Map();
+
+  const cid = companyId();
+
+  const calls = await Promise.all(rows.map(async r=>{
+    const {data,error}=await sb.rpc("csvb_tmsa_kpi_support_for_me",{
+      p_kpi_id: r.kpi_id,
+      p_company_id: cid
+    });
+
+    if(error)throw error;
+
+    const support=(data||[])[0]||{};
+    SUPPORT_BY_KPI.set(String(r.kpi_id),{
+      departments: arr(support.departments),
+      personnel: arr(support.personnel),
+      presenters: arr(support.presenters),
+      internal_notes: arr(support.internal_notes),
+      policy_links: arr(support.policy_links),
+      matrix_meta: support.matrix_meta || {}
+    });
+
+    return true;
+  }));
+
+  return calls.length;
+}
+
 async function loadWorkspace(){
   clearMessages();
 
@@ -120,6 +163,8 @@ async function loadWorkspace(){
     return {...r,...meta};
   });
 
+  await loadSupportForRows(ROWS);
+
   renderWorkspace();
   updateGlobalState();
 }
@@ -137,7 +182,8 @@ function filteredRows(){
     r.evidence_to_present,
     r.internal_remarks,
     r.calculation_method,
-    r.calculation_notes
+    r.calculation_notes,
+    supportFor(r.kpi_id).matrix_meta?.kpi_short_title
   ].some(x=>String(x||"").toLowerCase().includes(q)));
 }
 
@@ -181,16 +227,20 @@ function renderWorkspace(){
 
   const levels=[...new Set(rows.map(r=>r.kpi_level))].sort((a,b)=>Number(a)-Number(b));
 
-  body.innerHTML=levels.map(level=>{
+  body.innerHTML=levels.map((level,levelIdx)=>{
     const levelRows=rows.filter(r=>String(r.kpi_level)===String(level));
-    return `<section class="levelBlock">
-      <h3 class="levelTitle">Level / Stage ${esc(level)} · ${levelRows.length} KPI(s)</h3>
-      ${levelRows.map(renderKpiCard).join("")}
-    </section>`;
+    return `<details class="levelBlock" ${levelIdx===0?"open":""}>
+      <summary class="levelSummary">
+        <span>Level / Stage ${esc(level)} · ${levelRows.length} KPI(s)</span>
+        <span class="small">Click to expand / collapse</span>
+      </summary>
+      ${levelRows.map((r,idx)=>renderKpiCard(r,idx)).join("")}
+    </details>`;
   }).join("");
 }
 
-function renderKpiCard(r){
+function renderKpiCard(r, idx){
+  const support=supportFor(r.kpi_id);
   const evidence=Array.isArray(r.linked_evidence)?r.linked_evidence:[];
   const textImported=!!r.has_exact_text || ["exact_text_imported","exact_kpi_text_imported_guidance_pending"].includes(r.import_status);
   const hasGuidance=!!r.has_guidance || String(r.best_practice_guidance||"").trim() !== "";
@@ -201,23 +251,27 @@ function renderKpiCard(r){
     ? String(r.exact_text_imported_at).slice(0,19).replace("T"," ")+" UTC"
     : "";
 
-  return `<article class="kpiCard" data-kpi-card="${esc(r.kpi_id)}">
-    <div class="kpiHeader">
-      <div>
-        <div class="kpiTitle">${esc(r.kpi_code)} · Level ${esc(r.kpi_level)}</div>
-        <div class="small">${esc(r.company_name||"")}</div>
-      </div>
-      <div>
+  const meta=support.matrix_meta||{};
+  const shortTitle=meta.kpi_short_title || "";
+  const ownerDepartmentId=meta.owner_department_id || "";
+  const selectedPresenterIds=new Set(arr(support.presenters).map(p=>String(p.profile_id)));
+
+  return `<details class="kpiCard" data-kpi-card="${esc(r.kpi_id)}" ${idx===0?"open":""}>
+    <summary class="kpiSummary">
+      <span class="kpiSummaryLeft">
+        <span class="kpiTitle">${esc(r.kpi_code)} · Level ${esc(r.kpi_level)}</span>
+        <span class="small">${esc(shortTitle || r.company_name || "No short title set")}</span>
+      </span>
+      <span>
         ${pill(label(r.coverage_status))}
-        ${pill(label(r.readiness_status),readinessClass(r.readiness_status))}
         ${pill(label(r.input_method))}
         ${r.requires_calculation?pill("Calculation required","amber"):""}
         ${textImported?pill("Exact Text Imported","green"):pill(label(r.import_status),"amber")}
         ${guidancePending?pill("Guidance Pending","amber"):""}
-      </div>
-    </div>
+      </span>
+    </summary>
 
-    <div class="sectionGrid">
+    <div class="sectionGrid" style="margin-top:8px;">
       <div class="box">
         <h4>KPI text</h4>
         <div class="text">${esc(r.kpi_statement||"No KPI text available.")}</div>
@@ -240,9 +294,18 @@ function renderKpiCard(r){
 
     <div class="formGrid" style="margin-top:8px;">
       <div>
+        <label>KPI short title / name</label>
+        <input data-field="kpi_short_title" value="${esc(shortTitle)}" placeholder="Short internal name for this KPI" />
+      </div>
+      <div>
         <label>Coverage status</label>
         <select data-field="coverage_status">${optionSet(["not_reviewed","not_covered","partly_covered","covered_weak_evidence","covered_acceptable_evidence","verified"],r.coverage_status)}</select>
       </div>
+      <div>
+        <label>Input / response method</label>
+        <select data-field="input_method">${optionSet(["narrative","yes_no","level_claim","numeric_metric","percentage_metric","date_based","frequency_based","document_reference","evidence_checklist","action_plan","mixed"],r.input_method)}</select>
+      </div>
+
       <div>
         <label>Claimed level</label>
         <select data-field="claimed_level">${levelOptions(r.claimed_level)}</select>
@@ -251,11 +314,111 @@ function renderKpiCard(r){
         <label>Target level</label>
         <select data-field="target_level">${levelOptions(r.target_level)}</select>
       </div>
-
       <div>
-        <label>Input method</label>
-        <select data-field="input_method">${optionSet(["narrative","yes_no","level_claim","numeric_metric","percentage_metric","date_based","frequency_based","document_reference","evidence_checklist","action_plan","mixed"],r.input_method)}</select>
+        <label>Owner department</label>
+        <select data-field="owner_department_id">
+          <option value="">-</option>
+          ${departmentOptions(support.departments,ownerDepartmentId)}
+        </select>
+        <div class="miniRow" style="margin-top:5px;">
+          <input data-field="new_department_name" placeholder="Add department..." />
+          <button class="miniBtn" data-add-department="${esc(r.kpi_id)}" type="button">Add</button>
+        </div>
       </div>
+
+      <div class="full">
+        <label>Responsible presenter(s)</label>
+        <select data-field="presenter_ids" multiple size="5">
+          ${presenterOptions(support.personnel,selectedPresenterIds)}
+        </select>
+        <div class="small">Select one or more company personnel.</div>
+      </div>
+
+      <div class="full">
+        <label>Company answer / interpretation</label>
+        <textarea data-field="company_response">${esc(r.company_response||"")}</textarea>
+      </div>
+    </div>
+
+    <div class="supportGrid">
+      ${renderPolicyBox(r,"esms_reference","eSMS reference(s)",support.policy_links)}
+      ${renderPolicyBox(r,"esms_form","eSMS Form(s)",support.policy_links)}
+    </div>
+
+    <div class="supportGrid">
+      ${renderRecordsBox(evidence)}
+      ${renderInternalNotesBox(support.internal_notes)}
+    </div>
+
+    ${renderAdvancedFields(r)}
+
+    <div class="actions" style="margin-top:8px;">
+      <button class="btn" data-save-kpi="${esc(r.kpi_id)}" type="button">Save KPI Workspace</button>
+      <a class="btn secondary" href="./tmsa-kpi-presentation.html?kpi_id=${encodeURIComponent(r.kpi_id)}">Open Audit Presentation</a>
+      <a class="btn secondary" href="./tmsa-evidence.html">Open Records / Evidence Register</a>
+    </div>
+  </details>`;
+}
+
+function renderPolicyBox(r,kind,title,links){
+  const filtered=arr(links).filter(x=>x.link_kind===kind);
+  const codeField=kind+"_code";
+  const labelField=kind+"_label";
+
+  return `<div class="box">
+    <h4>${esc(title)}</h4>
+    <div class="supportList">
+      ${filtered.length?filtered.map(link=>`<div class="supportItem">
+        <strong>${esc(link.display_label||"-")}</strong>
+        ${link.reference_code?`<div class="small">Reference: ${esc(link.reference_code)}</div>`:""}
+        ${link.link_note?`<div class="small">Note: ${esc(link.link_note)}</div>`:""}
+        <button class="miniBtn danger" data-archive-policy-link="${esc(link.id)}" type="button">Remove</button>
+      </div>`).join(""):`<div class="small">No ${esc(title)} linked yet.</div>`}
+    </div>
+    <div class="miniRow" style="margin-top:7px;">
+      <input data-field="${esc(codeField)}" placeholder="Reference code" />
+      <input data-field="${esc(labelField)}" placeholder="Display label" />
+      <button class="miniBtn" data-add-policy-link="${esc(kind)}" type="button">Add</button>
+    </div>
+    <div class="small">Policy-module picker will be connected after the Company Policy RPC is mapped. Current link is stored in the correct TMSA link table.</div>
+  </div>`;
+}
+
+function renderRecordsBox(items){
+  return `<div class="box">
+    <h4>Records / uploaded evidence</h4>
+    ${items.length?items.map(ev=>`<div class="evidenceItem">
+      <strong>${esc(ev.evidence_title||"-")}</strong>
+      ${ev.is_primary?pill("Primary","green"):""}
+      ${ev.evidence_strength?pill(label(ev.evidence_strength),readinessClass(ev.evidence_strength)):""}
+      <div class="small">Doc: ${esc(ev.document_reference||"-")} · eSMS: ${esc(ev.sms_reference||"-")}</div>
+      ${ev.link_note?`<div class="small">Link note: ${esc(ev.link_note)}</div>`:""}
+    </div>`).join(""):`<div class="small">No records linked yet. Use Evidence Register for uploaded records / files.</div>`}
+  </div>`;
+}
+
+function renderInternalNotesBox(notes){
+  return `<div class="box">
+    <h4>Internal notes / remarks</h4>
+    <div class="notesList">
+      ${notes.length?notes.map(n=>`<div class="noteItem">
+        <div class="text">${esc(n.note_text||"")}</div>
+        <div class="small">${esc(n.created_by_username||"-")} · ${esc(String(n.created_at||"").slice(0,19).replace("T"," "))}</div>
+        <button class="miniBtn danger" data-archive-note="${esc(n.id)}" type="button">Remove</button>
+      </div>`).join(""):`<div class="small">No internal notes yet.</div>`}
+    </div>
+    <label>Add internal note</label>
+    <textarea data-field="new_internal_note" placeholder="Add new note; it will be stored as a separate note when you save."></textarea>
+  </div>`;
+}
+
+function renderAdvancedFields(r){
+  const gapText=[r.gap_summary,r.action_required].filter(Boolean).join("\\n\\n");
+
+  return `<details class="advancedFields">
+    <summary>Advanced / Optional Fields</summary>
+
+    <div class="formGrid" style="margin-top:8px;">
       <div>
         <label>Readiness status</label>
         <select data-field="readiness_status">${optionSet(["not_assessed","not_ready","partly_ready","ready","oil_major_ready"],r.readiness_status)}</select>
@@ -264,43 +427,15 @@ function renderKpiCard(r){
         <label>Evidence strength</label>
         <select data-field="evidence_strength">${optionSet(["no_evidence","weak","moderate","strong","oil_major_ready"],r.evidence_strength)}</select>
       </div>
-
       <div>
         <label>Oil Major sensitivity</label>
         <select data-field="oil_major_sensitivity">${optionSet(["low","medium","high","critical"],r.oil_major_sensitivity)}</select>
-      </div>
-      <div>
-        <label>Owner department</label>
-        <input data-field="owner_department" value="${esc(r.owner_department||"")}" />
-      </div>
-      <div>
-        <label>Responsible presenter</label>
-        <input data-field="responsible_presenter" value="${esc(r.responsible_presenter||"")}" />
-      </div>
-
-      <div class="full">
-        <label>Company answer / interpretation</label>
-        <textarea data-field="company_response">${esc(r.company_response||"")}</textarea>
-      </div>
-
-      <div>
-        <label>SMS reference</label>
-        <textarea data-field="sms_reference">${esc(r.sms_reference||"")}</textarea>
-      </div>
-      <div>
-        <label>Forms / records</label>
-        <textarea data-field="forms_records">${esc(r.forms_records||"")}</textarea>
-      </div>
-      <div>
-        <label>Internal notes / remarks</label>
-        <textarea data-field="internal_remarks">${esc(r.internal_remarks||"")}</textarea>
       </div>
 
       <div class="full">
         <label>Audit answer summary</label>
         <textarea data-field="audit_answer_summary">${esc(r.audit_answer_summary||"")}</textarea>
       </div>
-
       <div>
         <label>Evidence to present</label>
         <textarea data-field="evidence_to_present">${esc(r.evidence_to_present||"")}</textarea>
@@ -311,7 +446,7 @@ function renderKpiCard(r){
       </div>
       <div>
         <label>Gap / action required</label>
-        <textarea data-field="gap_action">${esc([r.gap_summary,r.action_required].filter(Boolean).join("\\n\\n"))}</textarea>
+        <textarea data-field="gap_action">${esc(gapText)}</textarea>
       </div>
 
       <div class="full">
@@ -378,34 +513,20 @@ function renderKpiCard(r){
           </div>
         </div>
       </div>
-
-      <div class="full">
-        <div class="box">
-          <h4>Linked Evidence (${esc(r.linked_evidence_count||0)})</h4>
-          ${renderEvidence(evidence)}
-        </div>
-      </div>
     </div>
-
-    <div class="actions" style="margin-top:8px;">
-      <button class="btn" data-save-kpi="${esc(r.kpi_id)}" type="button">Save KPI Workspace</button>
-      <a class="btn secondary" href="./tmsa-kpi-presentation.html?kpi_id=${encodeURIComponent(r.kpi_id)}">Open Audit Presentation</a>
-      <a class="btn secondary" href="./tmsa-evidence.html">Open Evidence Register</a>
-    </div>
-  </article>`;
+  </details>`;
 }
 
-function renderEvidence(items){
-  if(!items.length)return `<div class="small">No evidence linked yet.</div>`;
+function departmentOptions(departments,current){
+  return arr(departments).map(d=>{
+    return `<option value="${esc(d.id)}" ${String(d.id)===String(current)?"selected":""}>${esc(d.department_name)}</option>`;
+  }).join("");
+}
 
-  return items.map(ev=>{
-    return `<div class="evidenceItem">
-      <strong>${esc(ev.evidence_title||"-")}</strong>
-      ${ev.is_primary?pill("Primary","green"):""}
-      ${ev.evidence_strength?pill(label(ev.evidence_strength),readinessClass(ev.evidence_strength)):""}
-      <div class="small">Doc: ${esc(ev.document_reference||"-")} · SMS: ${esc(ev.sms_reference||"-")}</div>
-      ${ev.link_note?`<div class="small">Link note: ${esc(ev.link_note)}</div>`:""}
-    </div>`;
+function presenterOptions(personnel,selectedIds){
+  return arr(personnel).map(p=>{
+    const id=String(p.profile_id);
+    return `<option value="${esc(id)}" ${selectedIds.has(id)?"selected":""}>${esc(p.display_label||p.username||id)}</option>`;
   }).join("");
 }
 
@@ -417,6 +538,24 @@ function levelOptions(current){
   return `<option value="">-</option>`+[1,2,3,4].map(v=>`<option value="${v}" ${Number(current)===v?"selected":""}>Level ${v}</option>`).join("");
 }
 
+function selectedPresenterIds(card){
+  return Array.from(card.querySelector('[data-field="presenter_ids"]')?.selectedOptions || []).map(o=>o.value).filter(Boolean);
+}
+
+function selectedPresenterLabels(card){
+  return Array.from(card.querySelector('[data-field="presenter_ids"]')?.selectedOptions || []).map(o=>o.textContent.trim()).filter(Boolean);
+}
+
+function policyLabels(card,kind){
+  const links=arr(supportFor(card.dataset.kpiCard).policy_links).filter(x=>x.link_kind===kind);
+  return links.map(x=>x.display_label || x.reference_code).filter(Boolean);
+}
+
+function ownerDepartmentLabel(card){
+  const sel=card.querySelector('[data-field="owner_department_id"]');
+  return sel?.selectedOptions?.[0]?.textContent?.trim() || "";
+}
+
 async function saveKpi(kpiId){
   clearMessages();
 
@@ -424,6 +563,8 @@ async function saveKpi(kpiId){
   if(!card)throw new Error("KPI card not found.");
 
   const gapAction=nval(card,"gap_action").split(/\n\s*\n/);
+  const presenters=selectedPresenterIds(card);
+  const presenterLabels=selectedPresenterLabels(card);
 
   const payload={
     p_kpi_id: kpiId,
@@ -434,18 +575,18 @@ async function saveKpi(kpiId){
     p_input_method: nval(card,"input_method"),
     p_readiness_status: nval(card,"readiness_status"),
     p_company_response: nval(card,"company_response") || null,
-    p_sms_reference: nval(card,"sms_reference") || null,
-    p_forms_records: nval(card,"forms_records") || null,
-    p_owner_department: nval(card,"owner_department") || null,
+    p_sms_reference: policyLabels(card,"esms_reference").join("; ") || null,
+    p_forms_records: policyLabels(card,"esms_form").join("; ") || null,
+    p_owner_department: ownerDepartmentLabel(card) || null,
     p_evidence_strength: nval(card,"evidence_strength"),
     p_oil_major_sensitivity: nval(card,"oil_major_sensitivity"),
     p_audit_answer_summary: nval(card,"audit_answer_summary") || null,
     p_evidence_to_present: nval(card,"evidence_to_present") || null,
     p_weakness_to_avoid: nval(card,"weakness_to_avoid") || null,
-    p_responsible_presenter: nval(card,"responsible_presenter") || null,
+    p_responsible_presenter: presenterLabels.join("; ") || null,
     p_gap_summary: gapAction[0] || null,
     p_action_required: gapAction.slice(1).join("\n\n") || null,
-    p_internal_remarks: nval(card,"internal_remarks") || null,
+    p_internal_remarks: null,
     p_measurement_unit: nval(card,"measurement_unit") || null,
     p_measurement_frequency: nval(card,"measurement_frequency") || null,
     p_metric_direction: nval(card,"metric_direction"),
@@ -465,10 +606,109 @@ async function saveKpi(kpiId){
     p_calculation_notes: nval(card,"calculation_notes") || null
   };
 
-  const {data,error}=await sb.rpc("csvb_tmsa_save_kpi_workspace",payload);
+  const {error}=await sb.rpc("csvb_tmsa_save_kpi_workspace",payload);
   if(error)throw error;
 
-  showOk(`KPI workspace saved. Matrix ID: ${data}`);
+  const meta=await sb.rpc("csvb_tmsa_save_kpi_workspace_meta_v04",{
+    p_kpi_id: kpiId,
+    p_company_id: companyId(),
+    p_kpi_short_title: nval(card,"kpi_short_title") || null,
+    p_owner_department_id: nval(card,"owner_department_id") || null
+  });
+  if(meta.error)throw meta.error;
+
+  const presenterSave=await sb.rpc("csvb_tmsa_save_kpi_presenters",{
+    p_kpi_id: kpiId,
+    p_company_id: companyId(),
+    p_presenter_ids: presenters
+  });
+  if(presenterSave.error)throw presenterSave.error;
+
+  const noteText=nval(card,"new_internal_note").trim();
+  if(noteText){
+    const noteResult=await sb.rpc("csvb_tmsa_add_kpi_internal_note",{
+      p_kpi_id: kpiId,
+      p_company_id: companyId(),
+      p_note_text: noteText,
+      p_note_type: "general"
+    });
+    if(noteResult.error)throw noteResult.error;
+  }
+
+  showOk("KPI workspace saved.");
+  await loadWorkspace();
+}
+
+async function addDepartment(kpiId){
+  clearMessages();
+
+  const card=document.querySelector(`[data-kpi-card="${CSS.escape(kpiId)}"]`);
+  if(!card)throw new Error("KPI card not found.");
+
+  const name=nval(card,"new_department_name").trim();
+  if(!name)throw new Error("Department name is required.");
+
+  const {error}=await sb.rpc("csvb_tmsa_create_department",{
+    p_company_id: companyId(),
+    p_department_name: name
+  });
+
+  if(error)throw error;
+
+  showOk("Department added.");
+  await loadWorkspace();
+}
+
+async function addPolicyLink(card,kind){
+  clearMessages();
+
+  const kpiId=card.dataset.kpiCard;
+  const code=nval(card,kind+"_code").trim();
+  const lbl=nval(card,kind+"_label").trim();
+
+  if(!code && !lbl)throw new Error("Reference code or display label is required.");
+
+  const {error}=await sb.rpc("csvb_tmsa_save_kpi_policy_link",{
+    p_kpi_id: kpiId,
+    p_company_id: companyId(),
+    p_link_kind: kind,
+    p_policy_node_id: null,
+    p_policy_document_id: null,
+    p_reference_code: code || null,
+    p_display_label: lbl || code,
+    p_link_note: null,
+    p_sort_order: 100
+  });
+
+  if(error)throw error;
+
+  showOk(kind==="esms_reference" ? "eSMS reference added." : "eSMS form added.");
+  await loadWorkspace();
+}
+
+async function archivePolicyLink(linkId){
+  clearMessages();
+
+  const {error}=await sb.rpc("csvb_tmsa_archive_kpi_policy_link",{
+    p_link_id: linkId
+  });
+
+  if(error)throw error;
+
+  showOk("Link removed.");
+  await loadWorkspace();
+}
+
+async function archiveNote(noteId){
+  clearMessages();
+
+  const {error}=await sb.rpc("csvb_tmsa_archive_kpi_internal_note",{
+    p_note_id: noteId
+  });
+
+  if(error)throw error;
+
+  showOk("Internal note removed.");
   await loadWorkspace();
 }
 
@@ -486,6 +726,7 @@ function updateGlobalState(){
     linked_evidence_count: ROWS.reduce((sum,r)=>sum+Number(r.linked_evidence_count||0),0),
     exact_text_imported_count: exactImportedCount,
     guidance_pending_count: guidancePendingCount,
+    support_loaded_count: SUPPORT_BY_KPI.size,
     profile: PROFILE
   };
 }
@@ -511,9 +752,36 @@ function bind(){
   });
 
   el("workspaceBody")?.addEventListener("click",e=>{
-    const btn=e.target.closest("button[data-save-kpi]");
-    if(!btn)return;
-    saveKpi(btn.dataset.saveKpi).catch(err=>showWarn(err.message||String(err)));
+    const save=e.target.closest("button[data-save-kpi]");
+    if(save){
+      saveKpi(save.dataset.saveKpi).catch(err=>showWarn(err.message||String(err)));
+      return;
+    }
+
+    const addDept=e.target.closest("button[data-add-department]");
+    if(addDept){
+      addDepartment(addDept.dataset.addDepartment).catch(err=>showWarn(err.message||String(err)));
+      return;
+    }
+
+    const addLink=e.target.closest("button[data-add-policy-link]");
+    if(addLink){
+      const card=e.target.closest("[data-kpi-card]");
+      addPolicyLink(card,addLink.dataset.addPolicyLink).catch(err=>showWarn(err.message||String(err)));
+      return;
+    }
+
+    const archiveLink=e.target.closest("button[data-archive-policy-link]");
+    if(archiveLink){
+      archivePolicyLink(archiveLink.dataset.archivePolicyLink).catch(err=>showWarn(err.message||String(err)));
+      return;
+    }
+
+    const archiveNoteBtn=e.target.closest("button[data-archive-note]");
+    if(archiveNoteBtn){
+      archiveNote(archiveNoteBtn.dataset.archiveNote).catch(err=>showWarn(err.message||String(err)));
+      return;
+    }
   });
 }
 

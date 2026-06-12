@@ -47,6 +47,26 @@
     .pill.green{background:#e9fff0;border-color:#bce9c9;color:#11612b}.pill.amber{background:#fff8e6;border-color:#f0d28b;color:#7a5200}.pill.red{background:#fff0f0;border-color:#f1c7c7;color:#7a1f1f}
     .evidenceItem{border:1px solid #dbe6f6;border-radius:10px;background:#fff;padding:6px;margin-top:5px}
     .stickyBar{position:sticky;top:0;z-index:5;background:#eef4fb;padding-bottom:6px}
+
+    details.levelBlock > summary,
+    details.kpiCard > summary{cursor:pointer;list-style:none}
+    details.levelBlock > summary::-webkit-details-marker,
+    details.kpiCard > summary::-webkit-details-marker{display:none}
+    .levelSummary{display:flex;justify-content:space-between;align-items:center;gap:8px;font-weight:850;color:#06305c}
+    .kpiSummary{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap}
+    .kpiSummaryLeft{display:flex;flex-direction:column;gap:2px}
+    .supportGrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px}
+    .supportList{display:flex;flex-direction:column;gap:5px}
+    .supportItem{border:1px solid #dbe6f6;background:#fff;border-radius:10px;padding:6px}
+    .miniRow{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+    .miniRow input,.miniRow select{min-height:32px;padding:5px 7px}
+    .miniBtn{border:1px solid #b9d4ee;border-radius:8px;background:#eef7ff;color:#07345f;font-weight:750;padding:5px 8px;cursor:pointer}
+    .miniBtn.danger{background:#fff0f0;color:#8a1f1f;border-color:#f1c7c7}
+    .advancedFields{border:1px dashed #b9d4ee;border-radius:12px;padding:8px;margin-top:8px;background:#fbfdff}
+    .advancedFields summary{font-weight:850;cursor:pointer;color:#07345f}
+    .notesList{display:flex;flex-direction:column;gap:6px}
+    .noteItem{border:1px solid #dbe6f6;border-radius:10px;background:#fff;padding:6px}
+
     @media(max-width:1100px){.summaryGrid,.sectionGrid,.formGrid{grid-template-columns:1fr}.actions,.btn{width:100%}.btn{justify-content:center}.toolbar .left,.toolbar .right,.toolbar input,.toolbar select{width:100%}}
   </style>
 </head>
@@ -104,6 +124,6 @@
     </div>
   </div>
 
-  <script type="module" src="./tmsa-element-v01.js?v=20260612_importstatus_1"></script>
+  <script type="module" src="./tmsa-element-v01.js?v=20260612_workspace_v04b_1"></script>
 </body>
 </html>
