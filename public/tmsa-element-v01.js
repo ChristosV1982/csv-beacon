@@ -1,7 +1,7 @@
 // public/tmsa-element-v01.js
 // C.S.V. BEACON - TMSA Element / KPI Workspace v04B
 
-const BUILD = "tmsa_element_workspace_v04c_20260612";
+const BUILD = "tmsa_element_workspace_v04d_a_20260612";
 const sb = window.AUTH.ensureSupabase();
 const COMPANY_KEY = "csvb_tmsa_element_workspace_selected_company_id";
 
@@ -11,6 +11,8 @@ let ROWS = [];
 let ELEMENTS = [];
 let IMPORT_STATUS_ROWS = [];
 let SUPPORT_BY_KPI = new Map();
+let TITLE_BY_KPI = new Map();
+let ELEMENT_TARGET = null;
 let ELEMENT_CODE = new URLSearchParams(location.search).get("element_code") || "1";
 
 function el(id){return document.getElementById(id)}
@@ -142,9 +144,11 @@ async function loadSupportForRows(rows){
 async function loadWorkspace(){
   clearMessages();
 
+  const cid = companyId();
+
   const workspaceResult = await sb.rpc("csvb_tmsa_element_workspace_for_me",{
     p_element_code: ELEMENT_CODE,
-    p_company_id: companyId()
+    p_company_id: cid
   });
 
   if(workspaceResult.error)throw workspaceResult.error;
@@ -155,12 +159,31 @@ async function loadWorkspace(){
 
   if(statusResult.error)throw statusResult.error;
 
+  const targetResult = await sb.rpc("csvb_tmsa_element_target_for_me",{
+    p_element_code: ELEMENT_CODE,
+    p_company_id: cid
+  });
+
+  if(targetResult.error)throw targetResult.error;
+
+  const titlesResult = await sb.rpc("csvb_tmsa_kpi_titles_for_me",{
+    p_element_code: ELEMENT_CODE,
+    p_company_id: cid
+  });
+
+  if(titlesResult.error)throw titlesResult.error;
+
+  ELEMENT_TARGET = (targetResult.data || [])[0] || null;
+
   IMPORT_STATUS_ROWS = statusResult.data || [];
   const byId = new Map(IMPORT_STATUS_ROWS.map(r=>[String(r.kpi_id),r]));
 
+  TITLE_BY_KPI = new Map((titlesResult.data || []).map(r=>[String(r.kpi_id),r]));
+
   ROWS=(workspaceResult.data||[]).map(r=>{
     const meta=byId.get(String(r.kpi_id)) || {};
-    return {...r,...meta};
+    const titleMeta=TITLE_BY_KPI.get(String(r.kpi_id)) || {};
+    return {...r,...meta,...titleMeta};
   });
 
   await loadSupportForRows(ROWS);
@@ -200,6 +223,77 @@ function updateStats(rows=ROWS){
   el("statEvidence").textContent=evidence;
 }
 
+function ensureElementTargetPanel(){
+  let panel=el("elementTargetPanel");
+  const body=el("workspaceBody");
+  if(panel || !body || !body.parentNode)return panel;
+
+  panel=document.createElement("div");
+  panel.id="elementTargetPanel";
+  panel.className="elementTargetPanel";
+  body.parentNode.insertBefore(panel, body);
+  return panel;
+}
+
+function renderElementTargetPanel(){
+  const panel=ensureElementTargetPanel();
+  if(!panel)return;
+
+  const level = ELEMENT_TARGET?.target_level || "";
+  const note = ELEMENT_TARGET?.target_note || "";
+
+  panel.innerHTML = `
+    <div class="toolbar">
+      <div class="left">
+        <h3 style="margin:0;color:#06305c;">Element target level</h3>
+        <span class="pill">${level ? "Target Level " + esc(level) : "No target level set"}</span>
+      </div>
+      <div class="right small">
+        Target level applies to the whole TMSA element, not to individual KPIs.
+      </div>
+    </div>
+
+    <div class="elementTargetRow" style="margin-top:8px;">
+      <div>
+        <label for="elementTargetLevel">Target level</label>
+        <select id="elementTargetLevel">
+          <option value="">-</option>
+          <option value="1" ${String(level)==="1"?"selected":""}>Level 1</option>
+          <option value="2" ${String(level)==="2"?"selected":""}>Level 2</option>
+          <option value="3" ${String(level)==="3"?"selected":""}>Level 3</option>
+          <option value="4" ${String(level)==="4"?"selected":""}>Level 4</option>
+        </select>
+      </div>
+
+      <div style="flex:1;min-width:260px;">
+        <label for="elementTargetNote">Target note</label>
+        <input id="elementTargetNote" value="${esc(note)}" placeholder="Optional element-level target note" />
+      </div>
+
+      <button class="btn" id="saveElementTargetBtn" type="button">Save Element Target</button>
+    </div>
+  `;
+}
+
+async function saveElementTarget(){
+  clearMessages();
+
+  const levelRaw=el("elementTargetLevel")?.value || "";
+  const note=el("elementTargetNote")?.value || null;
+
+  const {error}=await sb.rpc("csvb_tmsa_save_element_target_level",{
+    p_element_code: ELEMENT_CODE,
+    p_company_id: companyId(),
+    p_target_level: levelRaw ? Number(levelRaw) : null,
+    p_target_note: note
+  });
+
+  if(error)throw error;
+
+  showOk("Element target level saved.");
+  await loadWorkspace();
+}
+
 function renderWorkspace(){
   const body=el("workspaceBody");
 
@@ -214,6 +308,7 @@ function renderWorkspace(){
   const first=ROWS[0];
   el("elementTitle").textContent=`Element ${first.element_code} - ${first.element_title}`;
   el("elementCodePill").textContent=`Element ${first.element_code}`;
+  renderElementTargetPanel();
 
   const rows=filteredRows();
   updateStats(rows);
@@ -252,15 +347,18 @@ function renderKpiCard(r, idx){
     : "";
 
   const meta=support.matrix_meta||{};
-  const shortTitle=meta.kpi_short_title || "";
+  const shortTitle=meta.kpi_short_title || r.effective_short_title || r.default_short_title || "";
   const ownerDepartmentId=meta.owner_department_id || "";
   const selectedPresenterIds=new Set(arr(support.presenters).map(p=>String(p.profile_id)));
 
   return `<details class="kpiCard" data-kpi-card="${esc(r.kpi_id)}" ${idx===0?"open":""}>
     <summary class="kpiSummary">
       <span class="kpiSummaryLeft">
-        <span class="kpiTitle">${esc(r.kpi_code)} · Level ${esc(r.kpi_level)}</span>
-        <span class="small">${esc(shortTitle || r.company_name || "No short title set")}</span>
+        <span>
+          <span class="kpiTitle">${esc(r.kpi_code)} · Level ${esc(r.kpi_level)}</span>
+          ${shortTitle?`<span class="kpiShortPill">${esc(shortTitle)}</span>`:""}
+        </span>
+        <span class="small">${esc(r.company_name || "")}</span>
       </span>
       <span>
         ${pill(label(r.coverage_status))}
@@ -310,10 +408,7 @@ function renderKpiCard(r, idx){
         <label>Claimed level</label>
         <select data-field="claimed_level">${levelOptions(r.claimed_level)}</select>
       </div>
-      <div>
-        <label>Target level</label>
-        <select data-field="target_level">${levelOptions(r.target_level)}</select>
-      </div>
+
       <div>
         <label>Owner department</label>
         <select data-field="owner_department_id">
@@ -599,7 +694,7 @@ async function saveKpi(kpiId){
     p_company_id: companyId(),
     p_coverage_status: nval(card,"coverage_status"),
     p_claimed_level: nval(card,"claimed_level")?Number(nval(card,"claimed_level")):null,
-    p_target_level: nval(card,"target_level")?Number(nval(card,"target_level")):null,
+    p_target_level: null,
     p_input_method: nval(card,"input_method"),
     p_readiness_status: nval(card,"readiness_status"),
     p_company_response: nval(card,"company_response") || null,
@@ -822,11 +917,19 @@ function updateGlobalState(){
     exact_text_imported_count: exactImportedCount,
     guidance_pending_count: guidancePendingCount,
     support_loaded_count: SUPPORT_BY_KPI.size,
+    title_loaded_count: TITLE_BY_KPI.size,
+    element_target_level: ELEMENT_TARGET?.target_level || null,
     profile: PROFILE
   };
 }
 
 function bind(){
+  document.addEventListener("click",e=>{
+    const btn=e.target.closest("#saveElementTargetBtn");
+    if(!btn)return;
+    saveElementTarget().catch(err=>showWarn(err.message||String(err)));
+  });
+
   el("logoutBtn")?.addEventListener("click",async()=>window.AUTH.logout());
   el("refreshBtn")?.addEventListener("click",()=>loadWorkspace().catch(e=>showWarn(e.message||String(e))));
   el("searchBox")?.addEventListener("input",renderWorkspace);
