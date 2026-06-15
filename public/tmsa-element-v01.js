@@ -1,7 +1,7 @@
 // public/tmsa-element-v01.js
 // C.S.V. BEACON - TMSA Element / KPI Workspace v04B
 
-const BUILD = "tmsa_element_workspace_v04d_b2_20260612";
+const BUILD = "tmsa_element_workspace_editable_narratives_v04e_b_20260615";
 const sb = window.AUTH.ensureSupabase();
 const COMPANY_KEY = "csvb_tmsa_element_workspace_selected_company_id";
 
@@ -12,6 +12,7 @@ let ELEMENTS = [];
 let IMPORT_STATUS_ROWS = [];
 let SUPPORT_BY_KPI = new Map();
 let TITLE_BY_KPI = new Map();
+let NARRATIVE_BY_KPI = new Map();
 let ELEMENT_TARGET = null;
 let ELEMENT_CODE = new URLSearchParams(location.search).get("element_code") || "1";
 
@@ -175,17 +176,26 @@ async function loadWorkspace(){
 
   if(titlesResult.error)throw titlesResult.error;
 
+  const narrativesResult = await sb.rpc("csvb_tmsa_kpi_narratives_for_me",{
+    p_element_code: ELEMENT_CODE,
+    p_company_id: cid
+  });
+
+  if(narrativesResult.error)throw narrativesResult.error;
+
   ELEMENT_TARGET = (targetResult.data || [])[0] || null;
 
   IMPORT_STATUS_ROWS = statusResult.data || [];
   const byId = new Map(IMPORT_STATUS_ROWS.map(r=>[String(r.kpi_id),r]));
 
   TITLE_BY_KPI = new Map((titlesResult.data || []).map(r=>[String(r.kpi_id),r]));
+  NARRATIVE_BY_KPI = new Map((narrativesResult.data || []).map(r=>[String(r.kpi_id),r]));
 
   ROWS=(workspaceResult.data||[]).map(r=>{
     const meta=byId.get(String(r.kpi_id)) || {};
     const titleMeta=TITLE_BY_KPI.get(String(r.kpi_id)) || {};
-    return {...r,...meta,...titleMeta};
+    const narrativeMeta=NARRATIVE_BY_KPI.get(String(r.kpi_id)) || {};
+    return {...r,...meta,...titleMeta,...narrativeMeta};
   });
 
   await loadSupportForRows(ROWS);
@@ -202,6 +212,12 @@ function filteredRows(){
     r.kpi_code,
     r.kpi_statement,
     r.best_practice_guidance,
+    r.original_kpi_statement,
+    r.original_best_practice_guidance,
+    r.company_kpi_statement,
+    r.company_best_practice_guidance,
+    r.effective_kpi_statement,
+    r.effective_best_practice_guidance,
     r.company_response,
     r.audit_answer_summary,
     r.evidence_to_present,
@@ -340,7 +356,16 @@ function renderKpiCard(r, idx){
   const support=supportFor(r.kpi_id);
   const evidence=Array.isArray(r.linked_evidence)?r.linked_evidence:[];
   const textImported=!!r.has_exact_text || ["exact_text_imported","exact_kpi_text_imported_guidance_pending"].includes(r.import_status);
-  const hasGuidance=!!r.has_guidance || String(r.best_practice_guidance||"").trim() !== "";
+
+  const originalKpiText = r.original_kpi_statement || r.kpi_statement || "";
+  const companyKpiText = r.company_kpi_statement || "";
+  const effectiveKpiText = r.effective_kpi_statement || companyKpiText || originalKpiText || "";
+
+  const originalGuidanceText = r.original_best_practice_guidance || r.best_practice_guidance || "";
+  const companyGuidanceText = r.company_best_practice_guidance || "";
+  const effectiveGuidanceText = r.effective_best_practice_guidance || companyGuidanceText || originalGuidanceText || "";
+
+  const hasGuidance=!!r.has_guidance || String(effectiveGuidanceText||"").trim() !== "";
   const guidancePending=!!r.guidance_pending || (textImported && !hasGuidance);
   const sourceReference=String(r.exact_text_source_reference||"").trim();
   const sourceLabel=String(r.exact_text_source_label||"").trim();
@@ -372,14 +397,21 @@ function renderKpiCard(r, idx){
     </summary>
 
     <div class="sectionGrid" style="margin-top:8px;">
-      <div class="box">
-        <h4>KPI text</h4>
-        <div class="text">${esc(r.kpi_statement||"No KPI text available.")}</div>
-      </div>
-      <div class="box">
-        <h4>Best Practice Guidance</h4>
-        <div class="text">${r.best_practice_guidance?esc(r.best_practice_guidance):'<span class="small">Guidance pending / blank in extracted source.</span>'}</div>
-      </div>
+      ${renderNarrativeEditor(
+        "kpi_statement",
+        "KPI text",
+        originalKpiText,
+        companyKpiText,
+        effectiveKpiText
+      )}
+
+      ${renderNarrativeEditor(
+        "best_practice_guidance",
+        "Best Practice Guidance",
+        originalGuidanceText,
+        companyGuidanceText,
+        effectiveGuidanceText
+      )}
     </div>
 
     ${textImported?`<div class="box" data-import-status-box style="margin-top:8px;">
@@ -463,6 +495,45 @@ function renderKpiCard(r, idx){
       <a class="btn secondary" href="./tmsa-evidence.html">Open Records / Evidence Register</a>
     </div>
   </details>`;
+}
+
+function narrativeStatus(companyText){
+  return String(companyText||"").trim()
+    ? pill("Company edited","green")
+    : pill("Using imported source");
+}
+
+function renderNarrativeEditor(kind,title,originalText,companyText,effectiveText){
+  const field = kind === "kpi_statement"
+    ? "company_kpi_statement"
+    : "company_best_practice_guidance";
+
+  const hasOriginal = String(originalText||"").trim() !== "";
+
+  return `<div class="box">
+    <h4>${esc(title)} <span class="small">(editable)</span></h4>
+
+    <div class="narrativeMeta">
+      ${narrativeStatus(companyText)}
+      ${hasOriginal ? pill("Imported source preserved","green") : pill("No imported source","amber")}
+    </div>
+
+    <textarea
+      class="narrativeTextarea"
+      data-field="${esc(field)}"
+      placeholder="Enter company working narrative..."
+    >${esc(effectiveText || "")}</textarea>
+
+    <div class="narrativeActions">
+      <button class="miniBtn" data-save-narrative="${esc(kind)}" type="button">Save ${esc(title)}</button>
+      <button class="miniBtn danger" data-reset-narrative="${esc(kind)}" type="button">Reset to imported text</button>
+    </div>
+
+    <details>
+      <summary class="small" style="cursor:pointer;font-weight:750;margin-top:7px;">Show original imported text</summary>
+      <div class="originalTextBox">${hasOriginal ? esc(originalText) : "No original imported text available."}</div>
+    </details>
+  </div>`;
 }
 
 function renderPolicyBox(r,kind,title,links){
@@ -941,6 +1012,60 @@ async function archiveNote(noteId){
   await loadWorkspace();
 }
 
+async function saveNarrative(card,kind){
+  clearMessages();
+
+  if(!card)throw new Error("KPI card not found.");
+  const kpiId=card.dataset.kpiCard;
+  const current=NARRATIVE_BY_KPI.get(String(kpiId)) || {};
+
+  const companyKpiStatement = kind === "kpi_statement"
+    ? nval(card,"company_kpi_statement")
+    : (current.company_kpi_statement || null);
+
+  const companyBestPracticeGuidance = kind === "best_practice_guidance"
+    ? nval(card,"company_best_practice_guidance")
+    : (current.company_best_practice_guidance || null);
+
+  const {error}=await sb.rpc("csvb_tmsa_save_kpi_narrative_override",{
+    p_kpi_id: kpiId,
+    p_company_id: companyId(),
+    p_company_kpi_statement: companyKpiStatement,
+    p_company_best_practice_guidance: companyBestPracticeGuidance
+  });
+
+  if(error)throw error;
+
+  showOk(kind === "kpi_statement"
+    ? "KPI text company narrative saved."
+    : "Best Practice Guidance company narrative saved."
+  );
+
+  await loadWorkspace();
+}
+
+async function resetNarrative(card,kind){
+  clearMessages();
+
+  if(!card)throw new Error("KPI card not found.");
+  const kpiId=card.dataset.kpiCard;
+
+  const ok=confirm("Reset this narrative to the imported source text?");
+  if(!ok)return;
+
+  const {error}=await sb.rpc("csvb_tmsa_reset_kpi_narrative_override",{
+    p_kpi_id: kpiId,
+    p_company_id: companyId(),
+    p_reset_kpi_statement: kind === "kpi_statement",
+    p_reset_best_practice_guidance: kind === "best_practice_guidance"
+  });
+
+  if(error)throw error;
+
+  showOk("Narrative reset to imported source text.");
+  await loadWorkspace();
+}
+
 function cleanFileName(name){
   return String(name||"file")
     .replace(/[^\w.\-]+/g,"_")
@@ -1088,6 +1213,8 @@ function updateGlobalState(){
     guidance_pending_count: guidancePendingCount,
     support_loaded_count: SUPPORT_BY_KPI.size,
     title_loaded_count: TITLE_BY_KPI.size,
+    narrative_loaded_count: NARRATIVE_BY_KPI.size,
+    company_narrative_override_count: ROWS.filter(r=>String(r.company_kpi_statement||"").trim() || String(r.company_best_practice_guidance||"").trim()).length,
     element_target_level: ELEMENT_TARGET?.target_level || null,
     evidence_record_count: Array.from(SUPPORT_BY_KPI.values()).reduce((sum,s)=>sum+arr(s.evidence_records).length,0),
     profile: PROFILE
@@ -1121,6 +1248,20 @@ function bind(){
   });
 
   el("workspaceBody")?.addEventListener("click",e=>{
+    const saveNarrativeBtn=e.target.closest("button[data-save-narrative]");
+    if(saveNarrativeBtn){
+      const card=e.target.closest("[data-kpi-card]");
+      saveNarrative(card,saveNarrativeBtn.dataset.saveNarrative).catch(err=>showWarn(err.message||String(err)));
+      return;
+    }
+
+    const resetNarrativeBtn=e.target.closest("button[data-reset-narrative]");
+    if(resetNarrativeBtn){
+      const card=e.target.closest("[data-kpi-card]");
+      resetNarrative(card,resetNarrativeBtn.dataset.resetNarrative).catch(err=>showWarn(err.message||String(err)));
+      return;
+    }
+
     const save=e.target.closest("button[data-save-kpi]");
     if(save){
       saveKpi(save.dataset.saveKpi).catch(err=>showWarn(err.message||String(err)));
