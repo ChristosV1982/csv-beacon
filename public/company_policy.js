@@ -13,6 +13,45 @@ let currentEditorState = null;
 let currentPublishedVersion = null;
 let activeContentTab = "published";
 
+const COMPANY_POLICY_BUILD = "company_policy_deeplink_v04f_a1_20260615";
+const POLICY_NODE_URL_PARAM = "node_id";
+
+function urlNodeId() {
+  try {
+    return new URLSearchParams(window.location.search).get(POLICY_NODE_URL_PARAM) || "";
+  } catch (_) {
+    return "";
+  }
+}
+
+function setUrlNodeId(nodeId) {
+  try {
+    const url = new URL(window.location.href);
+    if (nodeId) {
+      url.searchParams.set(POLICY_NODE_URL_PARAM, nodeId);
+    } else {
+      url.searchParams.delete(POLICY_NODE_URL_PARAM);
+    }
+    window.history.replaceState(null, "", url.toString());
+  } catch (_) {}
+}
+
+function exposeCompanyPolicyState(node = null, publishedVersion = null) {
+  window.CSVB_COMPANY_POLICY = {
+    build: COMPANY_POLICY_BUILD,
+    loaded: Array.isArray(policyNodes) && policyNodes.length > 0,
+    node_count: Array.isArray(policyNodes) ? policyNodes.length : 0,
+    selected_node_id: selectedNodeId || "",
+    selected_node_code: node?.node_code || "",
+    selected_node_title: node?.title || "",
+    selected_node_type: node?.node_type || "",
+    selected_node_label: node ? nodeLabel(node) : "",
+    url_node_id: urlNodeId(),
+    published_version_no: publishedVersion?.version_no || null,
+    has_published_content: !!(publishedVersion?.content_html || publishedVersion?.content_text)
+  };
+}
+
 const COLLAPSED_STORAGE_KEY = "csvb_company_policy_collapsed_nodes_v1";
 let collapsedNodeIds = new Set();
 
@@ -426,13 +465,20 @@ async function loadPolicyNodesFromSupabase() {
   saveCollapsedState();
 
   const flat = flattenTree(policyTree);
+  const requestedNodeId = urlNodeId();
 
-  if (selectedNodeId && !policyNodes.some((node) => node.id === selectedNodeId)) {
+  if (requestedNodeId && policyNodes.some((node) => node.id === requestedNodeId)) {
+    selectedNodeId = requestedNodeId;
+  } else if (selectedNodeId && !policyNodes.some((node) => node.id === selectedNodeId)) {
     selectedNodeId = "";
   }
 
   if (!selectedNodeId && flat.length) {
     selectedNodeId = flat[0].id;
+  }
+
+  if (selectedNodeId) {
+    setUrlNodeId(selectedNodeId);
   }
 
   expandAncestors(selectedNodeId);
@@ -561,6 +607,7 @@ async function handleTreeNodeClick(nodeId) {
   }
 
   selectedNodeId = node.id;
+  setUrlNodeId(selectedNodeId);
   renderChapterList();
   await renderSelectedNode();
   refreshAdminUi();
@@ -572,6 +619,7 @@ async function selectNode(nodeId) {
 
   expandAncestors(node.id);
   selectedNodeId = node.id;
+  setUrlNodeId(selectedNodeId);
   renderChapterList();
   await renderSelectedNode();
   refreshAdminUi();
@@ -757,6 +805,7 @@ async function renderSelectedNode() {
     if (titleEl) titleEl.textContent = "Select a policy item";
     if (metaEl) metaEl.textContent = "No policy item selected.";
     renderPublishedContent(null);
+    exposeCompanyPolicyState(null, null);
     renderEditorState();
     renderVersionHistory();
     return;
@@ -777,6 +826,7 @@ async function renderSelectedNode() {
 
   try {
     currentPublishedVersion = await loadPublishedContent(node.id);
+    exposeCompanyPolicyState(node, currentPublishedVersion);
     renderPublishedContent(currentPublishedVersion);
 
     if (isStructureAdmin()) {
@@ -1656,6 +1706,7 @@ async function init() {
     if (!authBundle?.session?.user) {
       renderChapterList();
       await renderSelectedNode();
+      exposeCompanyPolicyState(null, null);
       refreshAdminUi();
       return;
     }
