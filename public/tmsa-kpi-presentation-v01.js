@@ -1,7 +1,7 @@
 // public/tmsa-kpi-presentation-v01.js
 // C.S.V. BEACON - TMSA KPI Audit Presentation View v01
 
-const BUILD = "tmsa_kpi_audit_presentation_editable_narratives_v04e_c_20260615";
+const BUILD = "tmsa_kpi_audit_presentation_esms_links_v04f_b3_20260615";
 const sb = window.AUTH.ensureSupabase();
 const COMPANY_KEY = "csvb_tmsa_presentation_selected_company_id";
 
@@ -19,6 +19,7 @@ function isPlatformRole(role){return role==="super_admin" || role==="platform_ow
 function label(v){return String(v||"-").replaceAll("_"," ").replace(/\b\w/g,c=>c.toUpperCase())}
 function date(v){return v?String(v).slice(0,10):"-"}
 function text(v,fallback="-"){return v?esc(v):fallback}
+function arr(v){return Array.isArray(v)?v:[]}
 function companyId(){
   const n=el("companyFilter");
   if(n && n.style.display!=="none" && n.value) return n.value;
@@ -105,6 +106,20 @@ async function applyEditableNarrative(kpiId){
 
   CURRENT.kpi_statement = n.effective_kpi_statement || CURRENT.kpi_statement;
   CURRENT.best_practice_guidance = n.effective_best_practice_guidance || CURRENT.best_practice_guidance;
+}
+
+async function applySupportPolicyLinks(kpiId){
+  if(!CURRENT)return;
+
+  const {data,error}=await sb.rpc("csvb_tmsa_kpi_support_for_me",{
+    p_kpi_id: kpiId,
+    p_company_id: companyId()
+  });
+
+  if(error)throw error;
+
+  const support=(data||[])[0]||{};
+  CURRENT.policy_links = arr(support.policy_links);
 }
 
 async function setupCompanyFilter(){
@@ -216,6 +231,7 @@ async function loadPresentation(){
 
   CURRENT=(data||[])[0]||null;
   await applyEditableNarrative(kpiId);
+  await applySupportPolicyLinks(kpiId);
   renderPresentation();
 
   window.CSVB_TMSA_KPI_PRESENTATION={
@@ -225,12 +241,42 @@ async function loadPresentation(){
     selected_kpi_id: CURRENT?.kpi_id || null,
     selected_kpi_code: CURRENT?.kpi_code || "",
     linked_evidence_count: CURRENT?.linked_evidence_count ?? null,
+    policy_links_count: arr(CURRENT?.policy_links).length,
+    esms_reference_links_count: arr(CURRENT?.policy_links).filter(x=>x && x.link_kind==="esms_reference" && x.is_active!==false).length,
     uses_company_kpi_statement: !!CURRENT?.uses_company_kpi_statement,
     uses_company_best_practice_guidance: !!CURRENT?.uses_company_best_practice_guidance,
     kpi_statement_preview: String(CURRENT?.kpi_statement || "").slice(0,180),
     best_practice_guidance_preview: String(CURRENT?.best_practice_guidance || "").slice(0,220),
     profile: PROFILE
   };
+}
+
+function companyPolicyNodeUrl(nodeId){
+  return `./company_policy.html?node_id=${encodeURIComponent(nodeId)}&from=tmsa_presentation`;
+}
+
+function renderPolicyLinks(items, kind){
+  const filtered = arr(items).filter(x => x && x.link_kind === kind && x.is_active !== false);
+
+  if(!filtered.length){
+    return `<div class="small">No linked eSMS references yet.</div>`;
+  }
+
+  return `<div class="policyLinkList">` + filtered.map(link=>{
+    const title = link.display_label || link.reference_code || link.policy_node_id || "-";
+    return `<div class="policyLinkItem">
+      <div class="policyLinkTitle">${esc(title)}</div>
+      ${link.reference_code ? `<div class="small">Reference: ${esc(link.reference_code)}</div>` : ""}
+      ${link.link_note ? `<div class="small">Note: ${esc(link.link_note)}</div>` : ""}
+      ${link.policy_node_id ? `<a
+        class="policyOpenLink"
+        data-open-policy-node="${esc(link.policy_node_id)}"
+        href="${esc(companyPolicyNodeUrl(link.policy_node_id))}"
+        target="_blank"
+        rel="noopener noreferrer"
+      >Open linked policy item</a>` : ""}
+    </div>`;
+  }).join("") + `</div>`;
 }
 
 function renderPresentation(){
@@ -292,7 +338,8 @@ function renderPresentation(){
         <h3>Company Handling / eSMS References</h3>
         <div class="kv"><div class="k">Claimed level</div><div>${r.claimed_level?`Level ${esc(r.claimed_level)}`:"-"}</div></div>
         <div class="kv"><div class="k">Target level</div><div>${r.target_level?`Level ${esc(r.target_level)}`:"-"}</div></div>
-        <div class="kv"><div class="k">eSMS reference</div><div>${text(r.sms_reference)}</div></div>
+        <div class="kv"><div class="k">eSMS reference<br><span class="small">(matrix field)</span></div><div>${text(r.sms_reference)}</div></div>
+        <div class="kv"><div class="k">Linked eSMS references</div><div>${renderPolicyLinks(r.policy_links,"esms_reference")}</div></div>
         <div class="kv"><div class="k">eSMS Forms / records</div><div>${text(r.forms_records)}</div></div>
         <div class="kv"><div class="k">Owner department</div><div>${text(r.owner_department)}</div></div>
         <div class="kv"><div class="k">Presenter</div><div>${text(r.responsible_presenter)}</div></div>
