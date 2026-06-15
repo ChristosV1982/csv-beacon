@@ -1,7 +1,7 @@
 // public/tmsa-element-v01.js
 // C.S.V. BEACON - TMSA Element / KPI Workspace v04B
 
-const BUILD = "tmsa_element_workspace_editable_narratives_v04e_b_20260615";
+const BUILD = "tmsa_element_workspace_esms_reference_picker_v04f_b2_20260615";
 const sb = window.AUTH.ensureSupabase();
 const COMPANY_KEY = "csvb_tmsa_element_workspace_selected_company_id";
 
@@ -13,6 +13,7 @@ let IMPORT_STATUS_ROWS = [];
 let SUPPORT_BY_KPI = new Map();
 let TITLE_BY_KPI = new Map();
 let NARRATIVE_BY_KPI = new Map();
+let POLICY_NODES = [];
 let ELEMENT_TARGET = null;
 let ELEMENT_CODE = new URLSearchParams(location.search).get("element_code") || "1";
 
@@ -182,6 +183,16 @@ async function loadWorkspace(){
   });
 
   if(narrativesResult.error)throw narrativesResult.error;
+
+  const policyNodesResult = await sb.rpc("csvb_tmsa_policy_node_picker_for_me",{
+    p_search: "",
+    p_book_key: "main_policy",
+    p_limit: 100
+  });
+
+  if(policyNodesResult.error)throw policyNodesResult.error;
+
+  POLICY_NODES = policyNodesResult.data || [];
 
   ELEMENT_TARGET = (targetResult.data || [])[0] || null;
 
@@ -536,27 +547,64 @@ function renderNarrativeEditor(kind,title,originalText,companyText,effectiveText
   </div>`;
 }
 
+function policyNodeOptions(){
+  return `<option value="">Select Company Policy item...</option>` + POLICY_NODES.map(n=>{
+    const label=n.display_label || [n.node_code,n.node_title].filter(Boolean).join(" - ") || n.policy_node_id;
+    return `<option
+      value="${esc(n.policy_node_id)}"
+      data-code="${esc(n.node_code || "")}"
+      data-label="${esc(label)}"
+    >${esc(label)}</option>`;
+  }).join("");
+}
+
 function renderPolicyBox(r,kind,title,links){
   const filtered=arr(links).filter(x=>x.link_kind===kind);
+
+  const linkedHtml = filtered.length ? filtered.map(link=>`<div class="supportItem">
+    <strong>${esc(link.display_label||"-")}</strong>
+    ${link.reference_code?`<div class="small">Reference: ${esc(link.reference_code)}</div>`:""}
+    ${link.link_note?`<div class="small">Note: ${esc(link.link_note)}</div>`:""}
+    <div class="policyLinkedActions">
+      ${link.policy_node_id?`<button class="miniBtn" data-open-policy-node="${esc(link.policy_node_id)}" type="button">Open</button>`:""}
+      <button class="miniBtn danger" data-archive-policy-link="${esc(link.id)}" type="button">Remove</button>
+    </div>
+  </div>`).join("") : `<div class="small">No ${esc(title)} linked yet.</div>`;
+
+  if(kind === "esms_reference"){
+    return `<div class="box">
+      <h4>${esc(title)}</h4>
+      <div class="supportList">
+        ${linkedHtml}
+      </div>
+
+      <div class="policyPickerRow">
+        <select data-field="esms_reference_policy_node_id">
+          ${policyNodeOptions()}
+        </select>
+        <button class="miniBtn" data-add-policy-link="${esc(kind)}" type="button">Add selected eSMS reference</button>
+      </div>
+
+      <div class="small">
+        Select from Company Policy. Linked items open in company_policy.html using the policy node deep link.
+      </div>
+    </div>`;
+  }
+
   const codeField=kind+"_code";
   const labelField=kind+"_label";
 
   return `<div class="box">
     <h4>${esc(title)}</h4>
     <div class="supportList">
-      ${filtered.length?filtered.map(link=>`<div class="supportItem">
-        <strong>${esc(link.display_label||"-")}</strong>
-        ${link.reference_code?`<div class="small">Reference: ${esc(link.reference_code)}</div>`:""}
-        ${link.link_note?`<div class="small">Note: ${esc(link.link_note)}</div>`:""}
-        <button class="miniBtn danger" data-archive-policy-link="${esc(link.id)}" type="button">Remove</button>
-      </div>`).join(""):`<div class="small">No ${esc(title)} linked yet.</div>`}
+      ${linkedHtml}
     </div>
     <div class="miniRow" style="margin-top:7px;">
       <input data-field="${esc(codeField)}" placeholder="Reference code" />
       <input data-field="${esc(labelField)}" placeholder="Display label" />
       <button class="miniBtn" data-add-policy-link="${esc(kind)}" type="button">Add</button>
     </div>
-    <div class="small">Policy-module picker will be connected after the Company Policy RPC is mapped. Current link is stored in the correct TMSA link table.</div>
+    <div class="small">Manual temporary link. eSMS document/form repository will be connected when usable form documents exist.</div>
   </div>`;
 }
 
@@ -963,6 +1011,36 @@ async function addPolicyLink(card,kind){
   clearMessages();
 
   const kpiId=card.dataset.kpiCard;
+
+  if(kind === "esms_reference"){
+    const sel=card.querySelector('[data-field="esms_reference_policy_node_id"]');
+    const nodeId=sel?.value || "";
+    const opt=sel?.selectedOptions?.[0] || null;
+
+    if(!nodeId)throw new Error("Select a Company Policy item first.");
+
+    const code=opt?.dataset?.code || "";
+    const label=opt?.dataset?.label || opt?.textContent?.trim() || nodeId;
+
+    const {error}=await sb.rpc("csvb_tmsa_save_kpi_policy_link",{
+      p_kpi_id: kpiId,
+      p_company_id: companyId(),
+      p_link_kind: kind,
+      p_policy_node_id: nodeId,
+      p_policy_document_id: null,
+      p_reference_code: code || null,
+      p_display_label: label,
+      p_link_note: null,
+      p_sort_order: 100
+    });
+
+    if(error)throw error;
+
+    showOk("eSMS reference linked to KPI.");
+    await loadWorkspace();
+    return;
+  }
+
   const code=nval(card,kind+"_code").trim();
   const lbl=nval(card,kind+"_label").trim();
 
@@ -1197,6 +1275,12 @@ async function deactivateRecord(evidenceId){
   await loadWorkspace();
 }
 
+function openPolicyNode(nodeId){
+  if(!nodeId)return;
+  const url = `./company_policy.html?node_id=${encodeURIComponent(nodeId)}&from=tmsa`;
+  window.open(url,"_blank","noopener,noreferrer");
+}
+
 function updateGlobalState(){
   const exactImportedCount = ROWS.filter(r=>!!r.has_exact_text || ["exact_text_imported","exact_kpi_text_imported_guidance_pending"].includes(r.import_status)).length;
   const guidancePendingCount = ROWS.filter(r=>!!r.guidance_pending).length;
@@ -1215,6 +1299,7 @@ function updateGlobalState(){
     title_loaded_count: TITLE_BY_KPI.size,
     narrative_loaded_count: NARRATIVE_BY_KPI.size,
     company_narrative_override_count: ROWS.filter(r=>String(r.company_kpi_statement||"").trim() || String(r.company_best_practice_guidance||"").trim()).length,
+    policy_node_picker_count: POLICY_NODES.length,
     element_target_level: ELEMENT_TARGET?.target_level || null,
     evidence_record_count: Array.from(SUPPORT_BY_KPI.values()).reduce((sum,s)=>sum+arr(s.evidence_records).length,0),
     profile: PROFILE
@@ -1299,6 +1384,12 @@ function bind(){
     if(addLink){
       const card=e.target.closest("[data-kpi-card]");
       addPolicyLink(card,addLink.dataset.addPolicyLink).catch(err=>showWarn(err.message||String(err)));
+      return;
+    }
+
+    const openPolicyNodeBtn=e.target.closest("button[data-open-policy-node]");
+    if(openPolicyNodeBtn){
+      openPolicyNode(openPolicyNodeBtn.dataset.openPolicyNode);
       return;
     }
 
