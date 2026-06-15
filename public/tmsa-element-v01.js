@@ -1,7 +1,7 @@
 // public/tmsa-element-v01.js
 // C.S.V. BEACON - TMSA Element / KPI Workspace v04B
 
-const BUILD = "tmsa_element_workspace_esms_reference_picker_v04f_b2_20260615";
+const BUILD = "tmsa_element_workspace_esms_reference_picker_search_v04f_b4_20260615";
 const sb = window.AUTH.ensureSupabase();
 const COMPANY_KEY = "csvb_tmsa_element_workspace_selected_company_id";
 
@@ -547,9 +547,34 @@ function renderNarrativeEditor(kind,title,originalText,companyText,effectiveText
   </div>`;
 }
 
-function policyNodeOptions(){
-  return `<option value="">Select Company Policy item...</option>` + POLICY_NODES.map(n=>{
-    const label=n.display_label || [n.node_code,n.node_title].filter(Boolean).join(" - ") || n.policy_node_id;
+function policyNodeLabel(n){
+  return n.display_label || [n.node_code,n.node_title].filter(Boolean).join(" - ") || n.policy_node_id;
+}
+
+function filteredPolicyNodes(searchTerm=""){
+  const q=String(searchTerm||"").trim().toLowerCase();
+  if(!q)return POLICY_NODES;
+
+  return POLICY_NODES.filter(n=>{
+    const hay=[
+      n.display_label,
+      n.node_code,
+      n.node_title,
+      n.node_type
+    ].filter(Boolean).join(" ").toLowerCase();
+
+    return hay.includes(q);
+  });
+}
+
+function policyNodeOptions(searchTerm=""){
+  const nodes=filteredPolicyNodes(searchTerm);
+  const firstLabel = nodes.length
+    ? "Select Company Policy item..."
+    : "No matching Company Policy item";
+
+  return `<option value="">${esc(firstLabel)}</option>` + nodes.map(n=>{
+    const label=policyNodeLabel(n);
     return `<option
       value="${esc(n.policy_node_id)}"
       data-code="${esc(n.node_code || "")}"
@@ -578,8 +603,17 @@ function renderPolicyBox(r,kind,title,links){
         ${linkedHtml}
       </div>
 
+      <div class="policySearchRow">
+        <input
+          data-field="esms_reference_policy_search"
+          data-policy-picker-search
+          placeholder="Filter Company Policy by code or title..."
+        />
+        <span class="policySearchMeta" data-policy-picker-count>${esc(String(POLICY_NODES.length))} policy items available.</span>
+      </div>
+
       <div class="policyPickerRow">
-        <select data-field="esms_reference_policy_node_id">
+        <select data-field="esms_reference_policy_node_id" data-policy-picker-select>
           ${policyNodeOptions()}
         </select>
         <button class="miniBtn" data-add-policy-link="${esc(kind)}" type="button">Add selected eSMS reference</button>
@@ -1275,6 +1309,27 @@ async function deactivateRecord(evidenceId){
   await loadWorkspace();
 }
 
+function updatePolicyNodeSelect(searchInput){
+  const card=searchInput.closest("[data-kpi-card]");
+  if(!card)return;
+
+  const select=card.querySelector('[data-field="esms_reference_policy_node_id"]');
+  const count=card.querySelector("[data-policy-picker-count]");
+  if(!select)return;
+
+  const term=searchInput.value || "";
+  const matches=filteredPolicyNodes(term);
+
+  select.innerHTML=policyNodeOptions(term);
+
+  if(count){
+    const q=String(term||"").trim();
+    count.textContent = q
+      ? `${matches.length} matching policy item${matches.length===1?"":"s"}.`
+      : `${POLICY_NODES.length} policy items available.`;
+  }
+}
+
 function openPolicyNode(nodeId){
   if(!nodeId)return;
   const url = `./company_policy.html?node_id=${encodeURIComponent(nodeId)}&from=tmsa`;
@@ -1300,6 +1355,7 @@ function updateGlobalState(){
     narrative_loaded_count: NARRATIVE_BY_KPI.size,
     company_narrative_override_count: ROWS.filter(r=>String(r.company_kpi_statement||"").trim() || String(r.company_best_practice_guidance||"").trim()).length,
     policy_node_picker_count: POLICY_NODES.length,
+    policy_node_picker_search_enabled: true,
     element_target_level: ELEMENT_TARGET?.target_level || null,
     evidence_record_count: Array.from(SUPPORT_BY_KPI.values()).reduce((sum,s)=>sum+arr(s.evidence_records).length,0),
     profile: PROFILE
@@ -1330,6 +1386,14 @@ function bind(){
     loadElementList()
       .then(loadWorkspace)
       .catch(e=>showWarn(e.message||String(e)));
+  });
+
+  el("workspaceBody")?.addEventListener("input",e=>{
+    const policySearch=e.target.closest("[data-policy-picker-search]");
+    if(policySearch){
+      updatePolicyNodeSelect(policySearch);
+      return;
+    }
   });
 
   el("workspaceBody")?.addEventListener("click",e=>{
