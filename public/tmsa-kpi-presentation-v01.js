@@ -1,7 +1,7 @@
 // public/tmsa-kpi-presentation-v01.js
 // C.S.V. BEACON - TMSA KPI Audit Presentation View v01
 
-const BUILD = "tmsa_kpi_audit_presentation_cleanup_v04c_20260612";
+const BUILD = "tmsa_kpi_audit_presentation_editable_narratives_v04e_c_20260615";
 const sb = window.AUTH.ensureSupabase();
 const COMPANY_KEY = "csvb_tmsa_presentation_selected_company_id";
 
@@ -80,6 +80,31 @@ function traffic(row){
   }
 
   return {label:"Not measured", cls:"", detail:"Metric direction not evaluated."};
+}
+
+async function applyEditableNarrative(kpiId){
+  if(!CURRENT)return;
+
+  const {data,error}=await sb.rpc("csvb_tmsa_kpi_narratives_for_me",{
+    p_element_code: CURRENT.element_code || null,
+    p_company_id: companyId()
+  });
+
+  if(error)throw error;
+
+  const n=(data||[]).find(row=>String(row.kpi_id)===String(kpiId));
+  if(!n)return;
+
+  CURRENT.original_kpi_statement = n.original_kpi_statement;
+  CURRENT.original_best_practice_guidance = n.original_best_practice_guidance;
+  CURRENT.company_kpi_statement = n.company_kpi_statement;
+  CURRENT.company_best_practice_guidance = n.company_best_practice_guidance;
+
+  CURRENT.uses_company_kpi_statement = !!String(n.company_kpi_statement || "").trim();
+  CURRENT.uses_company_best_practice_guidance = !!String(n.company_best_practice_guidance || "").trim();
+
+  CURRENT.kpi_statement = n.effective_kpi_statement || CURRENT.kpi_statement;
+  CURRENT.best_practice_guidance = n.effective_best_practice_guidance || CURRENT.best_practice_guidance;
 }
 
 async function setupCompanyFilter(){
@@ -190,6 +215,7 @@ async function loadPresentation(){
   if(error)throw error;
 
   CURRENT=(data||[])[0]||null;
+  await applyEditableNarrative(kpiId);
   renderPresentation();
 
   window.CSVB_TMSA_KPI_PRESENTATION={
@@ -199,6 +225,10 @@ async function loadPresentation(){
     selected_kpi_id: CURRENT?.kpi_id || null,
     selected_kpi_code: CURRENT?.kpi_code || "",
     linked_evidence_count: CURRENT?.linked_evidence_count ?? null,
+    uses_company_kpi_statement: !!CURRENT?.uses_company_kpi_statement,
+    uses_company_best_practice_guidance: !!CURRENT?.uses_company_best_practice_guidance,
+    kpi_statement_preview: String(CURRENT?.kpi_statement || "").slice(0,180),
+    best_practice_guidance_preview: String(CURRENT?.best_practice_guidance || "").slice(0,220),
     profile: PROFILE
   };
 }
@@ -229,6 +259,7 @@ function renderPresentation(){
         ${pill(`Coverage: ${label(r.coverage_status)}`)}
         ${pill(`Input: ${label(r.input_method)}`)}
         ${r.import_status && r.import_status!=="exact_text_imported"?pill(`Text: ${label(r.import_status)}`,"amber"):""}
+        ${(r.uses_company_kpi_statement || r.uses_company_best_practice_guidance)?pill("Company edited narrative","green"):""}
       </div>
     </div>
 
