@@ -1,6 +1,6 @@
 import { loadLockedLibraryJson } from "./question_library_loader.js";
 
-const DETAIL_BUILD = "post_inspection_detail_v26_pdf_import_review_2026-06-17";
+const DETAIL_BUILD = "post_inspection_detail_v27_pdf_import_review_modal_2026-06-17";
 const PDF_BUCKET_DEFAULT = "inspection-reports";
 const PDF_FOLDER_PREFIX = "post_inspections";
 const HUMAN_POSITIVE_FIXED_NOC = "Exceeded normal expectation.";
@@ -1465,8 +1465,76 @@ function buildPdfImportReviewMessage(data, extracted) {
   return lines.join("\n");
 }
 
+function ensurePdfImportReviewDialog() {
+  let dialog = el("pdfImportReviewDialog");
+  if (dialog) return dialog;
+
+  dialog = document.createElement("dialog");
+  dialog.id = "pdfImportReviewDialog";
+  dialog.style.cssText = "max-width:980px;width:calc(100vw - 40px);border:none;border-radius:18px;padding:0;";
+
+  dialog.innerHTML = `
+    <div class="dlg" style="max-height:85vh;overflow:auto;">
+      <h3>PDF Import Review</h3>
+      <div class="dlg-sub">Review the extracted PDF data before anything is written to the report.</div>
+
+      <div style="background:#f8fbff;border:1px solid #d8e8fb;border-radius:14px;color:#143a63;font-weight:800;padding:10px 12px;margin:10px 0 12px;">
+        Nothing has been written to the report yet. Confirm only when the header and extraction counts look correct.
+      </div>
+
+      <pre id="pdfImportReviewText" style="white-space:pre-wrap;max-height:55vh;overflow:auto;background:#fff;border:1px solid #e5eefc;border-radius:14px;padding:12px;color:#0c1b2a;font-weight:700;line-height:1.45;"></pre>
+
+      <div class="dlg-actions">
+        <button class="btn btn-muted" id="pdfImportReviewCancelBtn" type="button">Cancel import</button>
+        <button class="btn primary" id="pdfImportReviewConfirmBtn" type="button">Import and replace extracted items</button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(dialog);
+  return dialog;
+}
+
 async function confirmPdfImportReviewBeforePersist(data, extracted, tempPath) {
-  const ok = confirm(buildPdfImportReviewMessage(data, extracted));
+  const message = buildPdfImportReviewMessage(data, extracted);
+  const dialog = ensurePdfImportReviewDialog();
+  const textBox = el("pdfImportReviewText");
+  const cancelBtn = el("pdfImportReviewCancelBtn");
+  const confirmBtn = el("pdfImportReviewConfirmBtn");
+
+  let ok = false;
+
+  if (dialog && textBox && cancelBtn && confirmBtn && typeof dialog.showModal === "function") {
+    textBox.textContent = message;
+
+    ok = await new Promise((resolve) => {
+      let settled = false;
+
+      const finish = (value) => {
+        if (settled) return;
+        settled = true;
+
+        cancelBtn.onclick = null;
+        confirmBtn.onclick = null;
+        dialog.oncancel = null;
+
+        if (dialog.open) dialog.close();
+        resolve(Boolean(value));
+      };
+
+      cancelBtn.onclick = () => finish(false);
+      confirmBtn.onclick = () => finish(true);
+      dialog.oncancel = (e) => {
+        e.preventDefault();
+        finish(false);
+      };
+
+      dialog.showModal();
+    });
+  } else {
+    ok = confirm(message);
+  }
+
   if (ok) return true;
 
   setSaveStatus("Import cancelled");
