@@ -1,7 +1,7 @@
 export const config = {
   verify_jwt: false
 };
-const FUNCTION_VERSION = "cors-jwt-off-v39_ocimf_footer_cleanup";
+const FUNCTION_VERSION = "cors-jwt-off-v40_photo_highlight_and_lae_qa_cleanup";
 import { createClient } from "npm:@supabase/supabase-js@2.45.4";
 import * as pdfjsLib from "npm:pdfjs-dist@4.2.67/legacy/build/pdf.mjs";
 /**
@@ -311,6 +311,12 @@ function parseResponsePhrase(phrase) {
     return {
       response_type: "as_expected",
       nature_of_concern: "Photo provided representative."
+    };
+  }
+  if (/^Photo representative\s*[-–]\s*item to be highlighted\.$/i.test(p)) {
+    return {
+      response_type: "as_expected",
+      nature_of_concern: "Photo representative - item to be highlighted."
     };
   }
   if (/^As expected\.$/i.test(p)) {
@@ -665,7 +671,14 @@ function buildImportQaDebug(pages, header, observations, question_sections_count
       warnings.push(`${label}: observation_text is empty.`);
     }
 
-    if ((obs.designation === "Process" || obs.designation === "Hardware") && !String(obs.classification_coding || "").trim()) {
+    const missingClassificationAllowed =
+      obs.obs_type === "largely" &&
+      (obs.designation === "Process" || obs.designation === "Hardware") &&
+      /^Largely as expected\b/i.test(String(obs.nature_of_concern || ""));
+
+    if ((obs.designation === "Process" || obs.designation === "Hardware") &&
+        !String(obs.classification_coding || "").trim() &&
+        !missingClassificationAllowed) {
       warnings.push(`${label}: classification_coding was not detected.`);
     }
 
