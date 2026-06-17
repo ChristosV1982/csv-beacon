@@ -1,4 +1,4 @@
-const MSCAT_BUILD = "csvb_mscat_ui_v04_five_panel_dialog_2026-06-17";
+const MSCAT_BUILD = "csvb_mscat_ui_v05_full_compact_modal_2026-06-17";
 const MSCAT_SOURCE_REF = "DNV M-SCAT 8.2";
 
 const mscat = {
@@ -225,6 +225,212 @@ function injectMscatStyle() {
     .csvb-mscat-section-card:not([open]) .csvb-mscat-section-body{
       display:none;
     }
+
+    /* v05 full-window compact M-SCAT modal */
+    .csvb-mscat-dialog{
+      width:96vw;
+      max-width:none;
+      height:92vh;
+      max-height:92vh;
+      border-radius:16px;
+      box-shadow:0 20px 60px rgba(11,31,52,.35);
+    }
+    .csvb-mscat-dialog::backdrop{
+      background:rgba(7,18,31,.48);
+    }
+    .csvb-mscat-dialog .dlg{
+      height:92vh;
+      max-height:92vh;
+      padding:0;
+      overflow:hidden;
+      display:flex;
+      flex-direction:column;
+      background:#ffffff;
+    }
+    .csvb-mscat-dialog-header{
+      display:flex;
+      justify-content:space-between;
+      gap:12px;
+      align-items:flex-start;
+      padding:10px 14px;
+      border-bottom:1px solid #dbe8f8;
+      background:#ffffff;
+      flex:0 0 auto;
+    }
+    .csvb-mscat-dialog h3{
+      margin:0 0 4px;
+      font-size:18px;
+      line-height:1.15;
+    }
+    .csvb-mscat-dialog .dlg-sub{
+      margin:0;
+      font-size:12px;
+      line-height:1.25;
+    }
+    .csvb-mscat-dialog-body{
+      flex:1 1 auto;
+      overflow:auto;
+      padding:8px 12px 10px;
+      background:#f8fbff;
+    }
+    .csvb-mscat-dialog-toolbar{
+      margin:0;
+      padding:7px 12px;
+      border-bottom:1px solid #e5eefc;
+      background:#ffffff;
+      flex:0 0 auto;
+    }
+    .csvb-mscat-dialog-toolbar .btn,
+    .csvb-mscat-dialog-actions .btn,
+    .csvb-mscat-close-window{
+      padding:7px 11px;
+      font-size:12px;
+      line-height:1.15;
+    }
+    .csvb-mscat-compact-note{
+      margin:0;
+      border:none;
+      border-radius:0;
+      border-bottom:1px solid #e5eefc;
+      padding:7px 12px;
+      font-size:12px;
+      line-height:1.25;
+      background:#f8fbff;
+      flex:0 0 auto;
+    }
+    .csvb-mscat-dialog-actions{
+      margin:0;
+      padding:9px 12px;
+      border-top:1px solid #dbe8f8;
+      background:#ffffff;
+      flex:0 0 auto;
+    }
+    .csvb-mscat-section-card{
+      margin:6px 0;
+      border-radius:12px;
+    }
+    .csvb-mscat-section-card summary{
+      padding:7px 10px;
+      gap:8px;
+    }
+    .csvb-mscat-section-main{
+      font-size:13px;
+      line-height:1.15;
+    }
+    .csvb-mscat-section-sub{
+      font-size:11px;
+      line-height:1.15;
+    }
+    .csvb-mscat-section-count{
+      font-size:11px;
+      padding:3px 8px;
+    }
+    .csvb-mscat-section-body{
+      padding:6px 8px 7px;
+    }
+    .csvb-mscat-subgroup{
+      padding-top:5px;
+      margin-top:5px;
+      border-top:1px dashed rgba(80,111,143,.28);
+    }
+    .csvb-mscat-subgroup:first-child{
+      margin-top:0;
+      padding-top:0;
+      border-top:none;
+    }
+    .csvb-mscat-subgroup h5{
+      margin:3px 0 5px;
+      font-size:12px;
+      line-height:1.15;
+    }
+    .csvb-mscat-option-grid{
+      display:grid;
+      grid-template-columns:repeat(3,minmax(220px,1fr));
+      gap:3px 8px;
+      align-items:start;
+    }
+    .csvb-mscat-check{
+      padding:3px 4px;
+      gap:5px;
+      border-bottom:none;
+      border-radius:7px;
+      background:rgba(255,255,255,.78);
+      font-size:12px;
+      line-height:1.18;
+      min-height:28px;
+    }
+    .csvb-mscat-check:hover{
+      background:#ffffff;
+      box-shadow:0 0 0 1px rgba(120,150,185,.20) inset;
+    }
+    .csvb-mscat-check input{
+      margin-top:1px;
+      transform:scale(.92);
+    }
+    .csvb-mscat-code{
+      font-size:11px;
+    }
+
+    .csvb-mscat-section-card.csvb-mscat-immediate{
+      border-color:#f0c2a4;
+      background:#fff8f3;
+    }
+    .csvb-mscat-section-card.csvb-mscat-immediate summary{
+      background:#fff0e5;
+      border-bottom-color:#f0c2a4;
+      color:#73320e;
+    }
+    .csvb-mscat-section-card.csvb-mscat-immediate .csvb-mscat-section-count{
+      border-color:#efc4ab;
+      color:#73320e;
+      background:#fffaf6;
+    }
+
+    .csvb-mscat-section-card.csvb-mscat-basic{
+      border-color:#c9dcf5;
+      background:#f7fbff;
+    }
+    .csvb-mscat-section-card.csvb-mscat-basic summary{
+      background:#edf6ff;
+      border-bottom-color:#c9dcf5;
+      color:#123e68;
+    }
+    .csvb-mscat-section-card.csvb-mscat-basic .csvb-mscat-section-count{
+      border-color:#c9dcf5;
+      color:#123e68;
+      background:#ffffff;
+    }
+
+    .csvb-mscat-section-card.csvb-mscat-control{
+      border-color:#c8e5d0;
+      background:#f5fbf7;
+    }
+    .csvb-mscat-section-card.csvb-mscat-control summary{
+      background:#eaf8ee;
+      border-bottom-color:#c8e5d0;
+      color:#14522c;
+    }
+    .csvb-mscat-section-card.csvb-mscat-control .csvb-mscat-section-count{
+      border-color:#c8e5d0;
+      color:#14522c;
+      background:#ffffff;
+    }
+
+    @media (max-width:1250px){
+      .csvb-mscat-option-grid{ grid-template-columns:repeat(2,minmax(220px,1fr)); }
+    }
+    @media (max-width:760px){
+      .csvb-mscat-dialog{
+        width:98vw;
+        height:94vh;
+        max-height:94vh;
+      }
+      .csvb-mscat-dialog .dlg{
+        height:94vh;
+        max-height:94vh;
+      }
+      .csvb-mscat-option-grid{ grid-template-columns:1fr; }
+    }
     @media (max-width:1100px){
       .csvb-mscat-status-grid{ grid-template-columns:1fr; }
       .csvb-mscat-section-card summary{
@@ -441,20 +647,29 @@ function ensureDialog() {
   dialog.className = "csvb-mscat-dialog";
   dialog.innerHTML = `
     <div class="dlg">
-      <h3>M-SCAT Analysis</h3>
-      <div class="dlg-sub">
-        Select Immediate Cause(s), Basic Cause(s), and Control Area(s) for Improvement Actions.
+      <div class="csvb-mscat-dialog-header">
+        <div>
+          <h3>M-SCAT Analysis</h3>
+          <div class="dlg-sub">
+            Select Immediate Cause(s), Basic Cause(s), and Control Area(s) for Improvement Actions.
+          </div>
+        </div>
+        <button class="btn btn-muted csvb-mscat-close-window" id="mscatCloseWindowTopBtn" type="button">Close Window</button>
       </div>
-      <div class="csvb-mscat-compact-note">
-        The list is grouped and collapsed for easier review. Open only the relevant M-SCAT family and tick the applicable item(s).
-      </div>
+
       <div class="csvb-mscat-dialog-toolbar">
         <button class="btn btn-muted" id="mscatExpandAllBtn" type="button">Expand all</button>
         <button class="btn btn-muted" id="mscatCollapseAllBtn" type="button">Collapse all</button>
       </div>
-      <div id="mscatDialogBody"></div>
+
+      <div class="csvb-mscat-compact-note">
+        The list is grouped in five M-SCAT families. Open the relevant family and tick the applicable item(s).
+      </div>
+
+      <div id="mscatDialogBody" class="csvb-mscat-dialog-body"></div>
+
       <div class="csvb-mscat-dialog-actions">
-        <button class="btn btn-muted" id="mscatCancelBtn" type="button">Cancel</button>
+        <button class="btn btn-muted" id="mscatCloseWindowBtn" type="button">Close Window</button>
         <button class="btn primary" id="mscatSaveBtn" type="button">Save M-SCAT Selection</button>
       </div>
     </div>
@@ -478,6 +693,26 @@ function mscatPanelKey(row) {
   }
 
   return `${row.section_key}|||${row.section_label}|||${mscatPanelTitle(row)}`;
+}
+
+function mscatPanelClass(panel) {
+  const key = String(panel?.section_key || "").toLowerCase();
+
+  if (key.includes("immediate")) return "csvb-mscat-immediate";
+  if (key.includes("basic")) return "csvb-mscat-basic";
+  return "csvb-mscat-control";
+}
+
+function renderMscatOption(row, selected) {
+  const checked = selected.has(String(row.id)) ? "checked" : "";
+  const label = `${row.item_no ? row.item_no + " " : ""}${row.item_label}`;
+
+  return `
+    <label class="csvb-mscat-check">
+      <input type="checkbox" name="mscatTaxonomyId" value="${esc(row.id)}" ${checked}>
+      <span><span class="csvb-mscat-code">${esc(row.item_code)}</span> — ${esc(label)}</span>
+    </label>
+  `;
 }
 
 function renderDialogBody() {
@@ -507,9 +742,10 @@ function renderDialogBody() {
     const selectedInPanel = panel.rows.filter((row) => selected.has(String(row.id))).length;
     const openAttr = selectedInPanel ? "open" : "";
     const safeId = panel.title.replace(/[^a-z0-9_-]/gi, "_");
+    const panelClass = mscatPanelClass(panel);
 
     html += `
-      <details class="csvb-mscat-section-card" id="mscatPanel_${esc(safeId)}" ${openAttr}>
+      <details class="csvb-mscat-section-card ${esc(panelClass)}" id="mscatPanel_${esc(safeId)}" ${openAttr}>
         <summary>
           <span class="csvb-mscat-section-title">
             <span class="csvb-mscat-section-main">${esc(panel.title)}</span>
@@ -521,17 +757,9 @@ function renderDialogBody() {
     `;
 
     if (panel.section_key === "immediate_cause") {
-      for (const row of panel.rows) {
-        const checked = selected.has(String(row.id)) ? "checked" : "";
-        const label = `${row.item_no ? row.item_no + " " : ""}${row.item_label}`;
-
-        html += `
-          <label class="csvb-mscat-check">
-            <input type="checkbox" name="mscatTaxonomyId" value="${esc(row.id)}" ${checked}>
-            <span><span class="csvb-mscat-code">${esc(row.item_code)}</span> — ${esc(label)}</span>
-          </label>
-        `;
-      }
+      html += `<div class="csvb-mscat-option-grid">`;
+      for (const row of panel.rows) html += renderMscatOption(row, selected);
+      html += `</div>`;
     } else {
       const subMap = new Map();
 
@@ -547,21 +775,15 @@ function renderDialogBody() {
         html += `
           <div class="csvb-mscat-subgroup">
             <h5>${esc(subLabel)}</h5>
+            <div class="csvb-mscat-option-grid">
         `;
 
-        for (const row of rows) {
-          const checked = selected.has(String(row.id)) ? "checked" : "";
-          const label = `${row.item_no ? row.item_no + " " : ""}${row.item_label}`;
+        for (const row of rows) html += renderMscatOption(row, selected);
 
-          html += `
-            <label class="csvb-mscat-check">
-              <input type="checkbox" name="mscatTaxonomyId" value="${esc(row.id)}" ${checked}>
-              <span><span class="csvb-mscat-code">${esc(row.item_code)}</span> — ${esc(label)}</span>
-            </label>
-          `;
-        }
-
-        html += `</div>`;
+        html += `
+            </div>
+          </div>
+        `;
       }
     }
 
@@ -669,7 +891,10 @@ async function openDialog() {
   const dialog = ensureDialog();
   renderDialogBody();
 
-  q("mscatCancelBtn").onclick = () => dialog.open && dialog.close();
+  const closeDialog = () => dialog.open && dialog.close();
+
+  q("mscatCloseWindowBtn").onclick = closeDialog;
+  q("mscatCloseWindowTopBtn").onclick = closeDialog;
   q("mscatSaveBtn").onclick = saveDialog;
   q("mscatExpandAllBtn").onclick = () => setAllMscatGroupsOpen(true);
   q("mscatCollapseAllBtn").onclick = () => setAllMscatGroupsOpen(false);
