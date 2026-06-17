@@ -1,0 +1,200 @@
+cd /home/runner/workspace || exit 1
+
+echo "=== Pre-patch status ==="
+git status -sb
+
+python3 - <<'PY'
+from pathlib import Path
+import subprocess
+import sys
+
+allowed = {
+    "public/post_inspection_mscat_ui.js",
+    "public/post_inspection_observation_detail.html",
+}
+
+porcelain = subprocess.check_output(["git", "status", "--porcelain"], text=True).splitlines()
+dirty_paths = set()
+for line in porcelain:
+    path = line[3:] if line.startswith("?? ") else line[3:]
+    dirty_paths.add(path)
+
+unexpected = sorted(p for p in dirty_paths if p not in allowed)
+if unexpected:
+    print("STOP: unexpected dirty files:")
+    for p in unexpected:
+        print(" -", p)
+    sys.exit(1)
+
+ui_path = Path("public/post_inspection_mscat_ui.js")
+html_path = Path("public/post_inspection_observation_detail.html")
+
+ui = ui_path.read_text()
+html = html_path.read_text()
+
+old_build = 'const MSCAT_BUILD = "csvb_mscat_ui_v03_compact_grouped_dialog_2026-06-17";'
+new_build = 'const MSCAT_BUILD = "csvb_mscat_ui_v04_five_panel_dialog_2026-06-17";'
+
+if old_build not in ui:
+    raise SystemExit("STOP: expected v03 M-SCAT build marker not found.")
+ui = ui.replace(old_build, new_build, 1)
+
+old_script = './post_inspection_mscat_ui.js?v=20260617_manual_selector_v03'
+new_script = './post_inspection_mscat_ui.js?v=20260617_manual_selector_v04'
+
+if old_script not in html:
+    raise SystemExit("STOP: expected v03 M-SCAT script reference not found.")
+html = html.replace(old_script, new_script, 1)
+
+start = ui.find("function renderDialogBody() {")
+if start < 0:
+    raise SystemExit("STOP: renderDialogBody start not found.")
+
+end = ui.find("\n\nfunction updateDialogGroupCounts()", start)
+if end < 0:
+    raise SystemExit("STOP: updateDialogGroupCounts marker after renderDialogBody not found.")
+
+new_render = r'''function mscatPanelTitle(row) {
+  if (row.section_key === "immediate_cause") {
+    return `${row.section_label} — ${row.subsection_label}`;
+  }
+
+  return row.section_label;
+}
+
+function mscatPanelKey(row) {
+  if (row.section_key === "immediate_cause") {
+    return `${row.section_key}|||${row.subsection_key}|||${mscatPanelTitle(row)}`;
+  }
+
+  return `${row.section_key}|||${row.section_label}|||${mscatPanelTitle(row)}`;
+}
+
+function renderDialogBody() {
+  const body = q("mscatDialogBody");
+  if (!body) return;
+
+  const selected = selectedIds();
+  const panelMap = new Map();
+
+  for (const row of mscat.taxonomy || []) {
+    const panelKey = mscatPanelKey(row);
+
+    if (!panelMap.has(panelKey)) {
+      panelMap.set(panelKey, {
+        title: mscatPanelTitle(row),
+        section_key: row.section_key,
+        rows: [],
+      });
+    }
+
+    panelMap.get(panelKey).rows.push(row);
+  }
+
+  let html = "";
+
+  for (const panel of panelMap.values()) {
+    const selectedInPanel = panel.rows.filter((row) => selected.has(String(row.id))).length;
+    const openAttr = selectedInPanel ? "open" : "";
+    const safeId = panel.title.replace(/[^a-z0-9_-]/gi, "_");
+
+    html += `
+      <details class="csvb-mscat-section-card" id="mscatPanel_${esc(safeId)}" ${openAttr}>
+        <summary>
+          <span class="csvb-mscat-section-title">
+            <span class="csvb-mscat-section-main">${esc(panel.title)}</span>
+            <span class="csvb-mscat-section-sub">Open to review and select from this M-SCAT family</span>
+          </span>
+          <span class="csvb-mscat-section-count">${selectedInPanel} selected / ${panel.rows.length}</span>
+        </summary>
+        <div class="csvb-mscat-section-body">
+    `;
+
+    if (panel.section_key === "immediate_cause") {
+      for (const row of panel.rows) {
+        const checked = selected.has(String(row.id)) ? "checked" : "";
+        const label = `${row.item_no ? row.item_no + " " : ""}${row.item_label}`;
+
+        html += `
+          <label class="csvb-mscat-check">
+            <input type="checkbox" name="mscatTaxonomyId" value="${esc(row.id)}" ${checked}>
+            <span><span class="csvb-mscat-code">${esc(row.item_code)}</span> — ${esc(label)}</span>
+          </label>
+        `;
+      }
+    } else {
+      const subMap = new Map();
+
+      for (const row of panel.rows) {
+        const subKey = `${row.subsection_key}|||${row.subsection_label}`;
+        if (!subMap.has(subKey)) subMap.set(subKey, []);
+        subMap.get(subKey).push(row);
+      }
+
+      for (const [subKey, rows] of subMap.entries()) {
+        const [, subLabel] = subKey.split("|||");
+
+        html += `
+          <div class="csvb-mscat-subgroup">
+            <h5>${esc(subLabel)}</h5>
+        `;
+
+        for (const row of rows) {
+          const checked = selected.has(String(row.id)) ? "checked" : "";
+          const label = `${row.item_no ? row.item_no + " " : ""}${row.item_label}`;
+
+          html += `
+            <label class="csvb-mscat-check">
+              <input type="checkbox" name="mscatTaxonomyId" value="${esc(row.id)}" ${checked}>
+              <span><span class="csvb-mscat-code">${esc(row.item_code)}</span> — ${esc(label)}</span>
+            </label>
+          `;
+        }
+
+        html += `</div>`;
+      }
+    }
+
+    html += `
+        </div>
+      </details>
+    `;
+  }
+
+  body.innerHTML = html || `<div class="csvb-mscat-summary">No M-SCAT taxonomy rows found.</div>`;
+
+  document.querySelectorAll('input[name="mscatTaxonomyId"]').forEach((checkbox) => {
+    checkbox.addEventListener("change", updateDialogGroupCounts);
+  });
+
+  updateDialogGroupCounts();
+}'''
+
+ui = ui[:start] + new_render + ui[end:]
+
+ui_path.write_text(ui)
+html_path.write_text(html)
+
+print("OK: v04 five-panel M-SCAT dialog patch applied")
+PY
+
+echo "=== Markers after patch ==="
+grep -nE 'csvb_mscat_ui_v04_five_panel_dialog|manual_selector_v04|mscatPanelTitle|mscatPanelKey|csvb-mscat-section-card|setAllMscatGroupsOpen|updateDialogGroupCounts' \
+  public/post_inspection_mscat_ui.js \
+  public/post_inspection_observation_detail.html
+
+echo "=== Syntax and safety checks ==="
+node --check public/post_inspection_mscat_ui.js
+node --check public/post_inspection_observation_detail.js
+node --check public/post_inspection_detail.js
+node --check public/post_inspection.js
+node --check public/company_policy.js
+node --check public/csvb-module-guard.js
+
+git diff --check
+
+echo "=== Diff stat ==="
+git diff --stat
+
+echo "=== Changed files ==="
+git status --short
