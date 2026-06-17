@@ -1,7 +1,7 @@
 export const config = {
   verify_jwt: false
 };
-const FUNCTION_VERSION = "cors-jwt-off-v38_human_noc_and_section_heading_cleanup";
+const FUNCTION_VERSION = "cors-jwt-off-v39_ocimf_footer_cleanup";
 import { createClient } from "npm:@supabase/supabase-js@2.45.4";
 import * as pdfjsLib from "npm:pdfjs-dist@4.2.67/legacy/build/pdf.mjs";
 /**
@@ -222,9 +222,32 @@ function isReportHeaderOrFooter(line) {
   if (!t) return true;
   if (/^Report for .+\[[A-Z]{3,6}-\d{4}-\d{4}-\d{4}\]$/i.test(t)) return true;
   if (/^©\s*\d{4}\s+Oil Companies International Marine Forum/i.test(t)) return true;
+  if (/^©\s*\d{4}\s+OCIMF\b/i.test(t)) return true;
   if (/^Page\s+\d+\s+of\s+\d+$/i.test(t)) return true;
   if (/^Operator uploaded photos$/i.test(t)) return true;
   return false;
+}
+
+function cleanOcimfFooterFragments(value) {
+  let out = String(value ?? "");
+
+  /*
+    Some PDF text extraction output merges the footer into the end of an
+    observation sentence, for example:
+    "… critical hydrographic locations. © 2026 OCIMF Page 14 of 60"
+  */
+  out = out.replace(/\s*©\s*\d{4}\s+OCIMF\s+Page\s+\d+\s+of\s+\d+\s*/gi, " ");
+  out = out.replace(/\s*©\s*\d{4}\s+Oil Companies International Marine Forum\s+Page\s+\d+\s+of\s+\d+\s*/gi, " ");
+
+  /*
+    Defensive cleanup for cases where copyright and page markers are split
+    or only partly merged into the observation text.
+  */
+  out = out.replace(/\s*©\s*\d{4}\s+OCIMF\b\s*/gi, " ");
+  out = out.replace(/\s*©\s*\d{4}\s+Oil Companies International Marine Forum\b\s*/gi, " ");
+  out = out.replace(/\s+Page\s+\d+\s+of\s+\d+\s*$/gi, "");
+
+  return normSpaces(out);
 }
 function isQuestionHeaderStart(line) {
   const t = line.trim();
@@ -528,7 +551,7 @@ function parseResponseBlock(block) {
     }
     commentParts.push(t);
   }
-  const observation_text = normSpaces(commentParts.join(" "));
+  const observation_text = cleanOcimfFooterFragments(commentParts.join(" "));
   const positive_rank = block.response_type === "positive" && block.designation === "Human" ? block.rank : null;
   const finding_kind = block.response_type === "negative" ? "negative_observation" : block.response_type === "positive" ? "positive_observation" : "note_improvement";
   const counts_as_observation = block.response_type !== "largely";
