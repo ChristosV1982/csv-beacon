@@ -1,4 +1,4 @@
-const MSCAT_BUILD = "csvb_mscat_ui_v03_compact_grouped_dialog_2026-06-17";
+const MSCAT_BUILD = "csvb_mscat_ui_v04_five_panel_dialog_2026-06-17";
 const MSCAT_SOURCE_REF = "DNV M-SCAT 8.2";
 
 const mscat = {
@@ -464,59 +464,105 @@ function ensureDialog() {
   return dialog;
 }
 
+function mscatPanelTitle(row) {
+  if (row.section_key === "immediate_cause") {
+    return `${row.section_label} — ${row.subsection_label}`;
+  }
+
+  return row.section_label;
+}
+
+function mscatPanelKey(row) {
+  if (row.section_key === "immediate_cause") {
+    return `${row.section_key}|||${row.subsection_key}|||${mscatPanelTitle(row)}`;
+  }
+
+  return `${row.section_key}|||${row.section_label}|||${mscatPanelTitle(row)}`;
+}
+
 function renderDialogBody() {
   const body = q("mscatDialogBody");
   if (!body) return;
 
   const selected = selectedIds();
-  const groupMap = new Map();
+  const panelMap = new Map();
 
   for (const row of mscat.taxonomy || []) {
-    const key = `${row.section_key}|||${row.section_label}|||${row.subsection_key}|||${row.subsection_label}`;
+    const panelKey = mscatPanelKey(row);
 
-    if (!groupMap.has(key)) {
-      groupMap.set(key, {
+    if (!panelMap.has(panelKey)) {
+      panelMap.set(panelKey, {
+        title: mscatPanelTitle(row),
         section_key: row.section_key,
-        section_label: row.section_label,
-        subsection_key: row.subsection_key,
-        subsection_label: row.subsection_label,
         rows: [],
       });
     }
 
-    groupMap.get(key).rows.push(row);
+    panelMap.get(panelKey).rows.push(row);
   }
 
   let html = "";
 
-  for (const group of groupMap.values()) {
-    const selectedInGroup = group.rows.filter((row) => selected.has(String(row.id))).length;
-    const openAttr = selectedInGroup ? "open" : "";
-    const groupTitle = `${group.section_label} — ${group.subsection_label}`;
-    const safeId = `${group.section_key}-${group.subsection_key}`.replace(/[^a-z0-9_-]/gi, "_");
+  for (const panel of panelMap.values()) {
+    const selectedInPanel = panel.rows.filter((row) => selected.has(String(row.id))).length;
+    const openAttr = selectedInPanel ? "open" : "";
+    const safeId = panel.title.replace(/[^a-z0-9_-]/gi, "_");
 
     html += `
-      <details class="csvb-mscat-section-card" id="mscatGroup_${esc(safeId)}" ${openAttr}>
+      <details class="csvb-mscat-section-card" id="mscatPanel_${esc(safeId)}" ${openAttr}>
         <summary>
           <span class="csvb-mscat-section-title">
-            <span class="csvb-mscat-section-main">${esc(groupTitle)}</span>
-            <span class="csvb-mscat-section-sub">Open to select from this M-SCAT family</span>
+            <span class="csvb-mscat-section-main">${esc(panel.title)}</span>
+            <span class="csvb-mscat-section-sub">Open to review and select from this M-SCAT family</span>
           </span>
-          <span class="csvb-mscat-section-count">${selectedInGroup} selected / ${group.rows.length}</span>
+          <span class="csvb-mscat-section-count">${selectedInPanel} selected / ${panel.rows.length}</span>
         </summary>
         <div class="csvb-mscat-section-body">
     `;
 
-    for (const row of group.rows) {
-      const checked = selected.has(String(row.id)) ? "checked" : "";
-      const label = `${row.item_no ? row.item_no + " " : ""}${row.item_label}`;
+    if (panel.section_key === "immediate_cause") {
+      for (const row of panel.rows) {
+        const checked = selected.has(String(row.id)) ? "checked" : "";
+        const label = `${row.item_no ? row.item_no + " " : ""}${row.item_label}`;
 
-      html += `
-        <label class="csvb-mscat-check">
-          <input type="checkbox" name="mscatTaxonomyId" value="${esc(row.id)}" ${checked}>
-          <span><span class="csvb-mscat-code">${esc(row.item_code)}</span> — ${esc(label)}</span>
-        </label>
-      `;
+        html += `
+          <label class="csvb-mscat-check">
+            <input type="checkbox" name="mscatTaxonomyId" value="${esc(row.id)}" ${checked}>
+            <span><span class="csvb-mscat-code">${esc(row.item_code)}</span> — ${esc(label)}</span>
+          </label>
+        `;
+      }
+    } else {
+      const subMap = new Map();
+
+      for (const row of panel.rows) {
+        const subKey = `${row.subsection_key}|||${row.subsection_label}`;
+        if (!subMap.has(subKey)) subMap.set(subKey, []);
+        subMap.get(subKey).push(row);
+      }
+
+      for (const [subKey, rows] of subMap.entries()) {
+        const [, subLabel] = subKey.split("|||");
+
+        html += `
+          <div class="csvb-mscat-subgroup">
+            <h5>${esc(subLabel)}</h5>
+        `;
+
+        for (const row of rows) {
+          const checked = selected.has(String(row.id)) ? "checked" : "";
+          const label = `${row.item_no ? row.item_no + " " : ""}${row.item_label}`;
+
+          html += `
+            <label class="csvb-mscat-check">
+              <input type="checkbox" name="mscatTaxonomyId" value="${esc(row.id)}" ${checked}>
+              <span><span class="csvb-mscat-code">${esc(row.item_code)}</span> — ${esc(label)}</span>
+            </label>
+          `;
+        }
+
+        html += `</div>`;
+      }
     }
 
     html += `
