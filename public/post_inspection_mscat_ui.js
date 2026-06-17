@@ -1,4 +1,4 @@
-const MSCAT_BUILD = "csvb_mscat_ui_v02_no_kind_column_2026-06-17";
+const MSCAT_BUILD = "csvb_mscat_ui_v03_compact_grouped_dialog_2026-06-17";
 const MSCAT_SOURCE_REF = "DNV M-SCAT 8.2";
 
 const mscat = {
@@ -156,8 +156,81 @@ function injectMscatStyle() {
     .csvb-mscat-check:last-child{ border-bottom:none; }
     .csvb-mscat-check input{ margin-top:3px; flex:0 0 auto; }
     .csvb-mscat-code{ color:#55708f; font-weight:900; }
+    .csvb-mscat-compact-note{
+      border:1px solid #dbe8f8;
+      background:#f8fbff;
+      color:#143a63;
+      border-radius:14px;
+      padding:10px 12px;
+      font-weight:800;
+      margin:10px 0 12px;
+    }
+    .csvb-mscat-dialog-toolbar{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      margin:10px 0 12px;
+      align-items:center;
+    }
+    .csvb-mscat-section-card{
+      border:1px solid #dbe8f8;
+      border-radius:16px;
+      background:#fbfdff;
+      margin:10px 0;
+      overflow:hidden;
+    }
+    .csvb-mscat-section-card summary{
+      cursor:pointer;
+      list-style:none;
+      padding:12px 14px;
+      display:flex;
+      justify-content:space-between;
+      gap:12px;
+      align-items:center;
+      color:#113a63;
+      font-weight:900;
+      background:#f3f8ff;
+      border-bottom:1px solid #dbe8f8;
+    }
+    .csvb-mscat-section-card summary::-webkit-details-marker{ display:none; }
+    .csvb-mscat-section-title{
+      display:flex;
+      flex-direction:column;
+      gap:4px;
+    }
+    .csvb-mscat-section-main{
+      font-size:15px;
+      font-weight:900;
+    }
+    .csvb-mscat-section-sub{
+      font-size:12px;
+      color:#55708f;
+      font-weight:900;
+    }
+    .csvb-mscat-section-count{
+      display:inline-flex;
+      align-items:center;
+      white-space:nowrap;
+      border:1px solid #cfe0f4;
+      background:#fff;
+      color:#143a63;
+      border-radius:999px;
+      padding:5px 10px;
+      font-size:12px;
+      font-weight:900;
+    }
+    .csvb-mscat-section-body{
+      padding:8px 12px 10px;
+    }
+    .csvb-mscat-section-card:not([open]) .csvb-mscat-section-body{
+      display:none;
+    }
     @media (max-width:1100px){
       .csvb-mscat-status-grid{ grid-template-columns:1fr; }
+      .csvb-mscat-section-card summary{
+        align-items:flex-start;
+        flex-direction:column;
+      }
     }
   `;
   document.head.appendChild(style);
@@ -372,6 +445,13 @@ function ensureDialog() {
       <div class="dlg-sub">
         Select Immediate Cause(s), Basic Cause(s), and Control Area(s) for Improvement Actions.
       </div>
+      <div class="csvb-mscat-compact-note">
+        The list is grouped and collapsed for easier review. Open only the relevant M-SCAT family and tick the applicable item(s).
+      </div>
+      <div class="csvb-mscat-dialog-toolbar">
+        <button class="btn btn-muted" id="mscatExpandAllBtn" type="button">Expand all</button>
+        <button class="btn btn-muted" id="mscatCollapseAllBtn" type="button">Collapse all</button>
+      </div>
       <div id="mscatDialogBody"></div>
       <div class="csvb-mscat-dialog-actions">
         <button class="btn btn-muted" id="mscatCancelBtn" type="button">Cancel</button>
@@ -389,46 +469,84 @@ function renderDialogBody() {
   if (!body) return;
 
   const selected = selectedIds();
-  const sectionMap = new Map();
+  const groupMap = new Map();
 
   for (const row of mscat.taxonomy || []) {
-    const sectionKey = `${row.section_key}|||${row.section_label}`;
-    const subKey = `${row.subsection_key}|||${row.subsection_label}`;
+    const key = `${row.section_key}|||${row.section_label}|||${row.subsection_key}|||${row.subsection_label}`;
 
-    if (!sectionMap.has(sectionKey)) sectionMap.set(sectionKey, new Map());
-    const subMap = sectionMap.get(sectionKey);
-    if (!subMap.has(subKey)) subMap.set(subKey, []);
-    subMap.get(subKey).push(row);
+    if (!groupMap.has(key)) {
+      groupMap.set(key, {
+        section_key: row.section_key,
+        section_label: row.section_label,
+        subsection_key: row.subsection_key,
+        subsection_label: row.subsection_label,
+        rows: [],
+      });
+    }
+
+    groupMap.get(key).rows.push(row);
   }
 
   let html = "";
 
-  for (const [sectionKey, subMap] of sectionMap.entries()) {
-    const [, sectionLabel] = sectionKey.split("|||");
-    html += `<div class="csvb-mscat-group"><h4>${esc(sectionLabel)}</h4>`;
+  for (const group of groupMap.values()) {
+    const selectedInGroup = group.rows.filter((row) => selected.has(String(row.id))).length;
+    const openAttr = selectedInGroup ? "open" : "";
+    const groupTitle = `${group.section_label} — ${group.subsection_label}`;
+    const safeId = `${group.section_key}-${group.subsection_key}`.replace(/[^a-z0-9_-]/gi, "_");
 
-    for (const [subKey, rows] of subMap.entries()) {
-      const [, subLabel] = subKey.split("|||");
-      html += `<div class="csvb-mscat-subgroup"><h5>${esc(subLabel)}</h5>`;
+    html += `
+      <details class="csvb-mscat-section-card" id="mscatGroup_${esc(safeId)}" ${openAttr}>
+        <summary>
+          <span class="csvb-mscat-section-title">
+            <span class="csvb-mscat-section-main">${esc(groupTitle)}</span>
+            <span class="csvb-mscat-section-sub">Open to select from this M-SCAT family</span>
+          </span>
+          <span class="csvb-mscat-section-count">${selectedInGroup} selected / ${group.rows.length}</span>
+        </summary>
+        <div class="csvb-mscat-section-body">
+    `;
 
-      for (const row of rows) {
-        const checked = selected.has(String(row.id)) ? "checked" : "";
-        const label = `${row.item_no ? row.item_no + " " : ""}${row.item_label}`;
-        html += `
-          <label class="csvb-mscat-check">
-            <input type="checkbox" name="mscatTaxonomyId" value="${esc(row.id)}" ${checked}>
-            <span><span class="csvb-mscat-code">${esc(row.item_code)}</span> — ${esc(label)}</span>
-          </label>
-        `;
-      }
+    for (const row of group.rows) {
+      const checked = selected.has(String(row.id)) ? "checked" : "";
+      const label = `${row.item_no ? row.item_no + " " : ""}${row.item_label}`;
 
-      html += `</div>`;
+      html += `
+        <label class="csvb-mscat-check">
+          <input type="checkbox" name="mscatTaxonomyId" value="${esc(row.id)}" ${checked}>
+          <span><span class="csvb-mscat-code">${esc(row.item_code)}</span> — ${esc(label)}</span>
+        </label>
+      `;
     }
 
-    html += `</div>`;
+    html += `
+        </div>
+      </details>
+    `;
   }
 
   body.innerHTML = html || `<div class="csvb-mscat-summary">No M-SCAT taxonomy rows found.</div>`;
+
+  document.querySelectorAll('input[name="mscatTaxonomyId"]').forEach((checkbox) => {
+    checkbox.addEventListener("change", updateDialogGroupCounts);
+  });
+
+  updateDialogGroupCounts();
+}
+
+function updateDialogGroupCounts() {
+  document.querySelectorAll(".csvb-mscat-section-card").forEach((details) => {
+    const boxes = Array.from(details.querySelectorAll('input[name="mscatTaxonomyId"]'));
+    const checked = boxes.filter((x) => x.checked).length;
+    const pill = details.querySelector(".csvb-mscat-section-count");
+    if (pill) pill.textContent = `${checked} selected / ${boxes.length}`;
+  });
+}
+
+function setAllMscatGroupsOpen(open) {
+  document.querySelectorAll(".csvb-mscat-section-card").forEach((details) => {
+    details.open = Boolean(open);
+  });
 }
 
 async function saveDialog() {
@@ -507,6 +625,8 @@ async function openDialog() {
 
   q("mscatCancelBtn").onclick = () => dialog.open && dialog.close();
   q("mscatSaveBtn").onclick = saveDialog;
+  q("mscatExpandAllBtn").onclick = () => setAllMscatGroupsOpen(true);
+  q("mscatCollapseAllBtn").onclick = () => setAllMscatGroupsOpen(false);
 
   dialog.showModal();
 }
