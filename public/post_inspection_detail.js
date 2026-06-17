@@ -1,6 +1,6 @@
 import { loadLockedLibraryJson } from "./question_library_loader.js";
 
-const DETAIL_BUILD = "post_inspection_detail_v25_ddmmyyyy_datetime_display_2026-05-29";
+const DETAIL_BUILD = "post_inspection_detail_v26_pdf_import_review_2026-06-17";
 const PDF_BUCKET_DEFAULT = "inspection-reports";
 const PDF_FOLDER_PREFIX = "post_inspections";
 const HUMAN_POSITIVE_FIXED_NOC = "Exceeded normal expectation.";
@@ -1378,6 +1378,111 @@ async function guardExistingObservationItemsBeforePdfImport() {
 }
 
 
+function countImportedFindingTypes(observations) {
+  const counts = { negative: 0, positive: 0, largely: 0, other: 0 };
+  const list = Array.isArray(observations) ? observations : [];
+
+  for (const item of list) {
+    const t = String(item?.obs_type || "").trim().toLowerCase();
+    if (t === "negative") counts.negative += 1;
+    else if (t === "positive") counts.positive += 1;
+    else if (t === "largely") counts.largely += 1;
+    else counts.other += 1;
+  }
+
+  return counts;
+}
+
+function importReviewValue(value) {
+  const s = String(value ?? "").trim();
+  return s || "—";
+}
+
+function buildPdfImportReviewMessage(data, extracted) {
+  const h = extracted?.header || {};
+  const observations = Array.isArray(extracted?.observations) ? extracted.observations : [];
+  const examinedQuestions = Array.isArray(extracted?.examined_questions) ? extracted.examined_questions : [];
+  const examinedCount = Number(extracted?.examined_count || examinedQuestions.length || 0);
+  const counts = countImportedFindingTypes(observations);
+
+  const qa = data?.qa_debug || {};
+  const qaCounts = qa?.counts || {};
+  const warningsCount = Number(qaCounts.warnings_count || 0);
+  const unparsedCount = Number(qaCounts.unparsed_response_lines_count || 0);
+  const warnings = Array.isArray(qa?.warnings) ? qa.warnings.slice(0, 10) : [];
+  const unparsed = Array.isArray(qa?.unparsed_response_lines)
+    ? qa.unparsed_response_lines.slice(0, 8)
+    : [];
+
+  const lines = [
+    "PDF Import Review",
+    "",
+    "Nothing has been written to the report yet.",
+    "",
+    `Report Ref: ${importReviewValue(h.report_reference)}`,
+    `Vessel: ${importReviewValue(h.vessel_name)}`,
+    `Inspection Date: ${importReviewValue(h.inspection_date)}`,
+    `Port: ${importReviewValue(h.port_name)}`,
+    `Port Code: ${importReviewValue(h.port_code)}`,
+    `OCIMF Inspecting Company: ${importReviewValue(h.ocimf_inspecting_company)}`,
+    "",
+    `Questions examined: ${examinedCount}`,
+    `Items extracted: ${observations.length}`,
+    `- Negative: ${counts.negative}`,
+    `- Positive: ${counts.positive}`,
+    `- Largely as expected: ${counts.largely}`,
+  ];
+
+  if (counts.other) lines.push(`- Other / unknown: ${counts.other}`);
+
+  lines.push(
+    "",
+    `Function version: ${importReviewValue(data?.function_version)}`,
+    `Warnings: ${warningsCount}`,
+    `Unparsed response-like lines: ${unparsedCount}`
+  );
+
+  if (warnings.length) {
+    lines.push("", "Warning preview:");
+    for (const w of warnings) lines.push(`- ${String(w).slice(0, 180)}`);
+    if (warningsCount > warnings.length) lines.push(`- … plus ${warningsCount - warnings.length} more warning(s).`);
+  }
+
+  if (unparsed.length) {
+    lines.push("", "Unparsed line preview:");
+    for (const u of unparsed) {
+      const page = u?.page ? `p.${u.page}: ` : "";
+      lines.push(`- ${page}${String(u?.text || "").slice(0, 160)}`);
+    }
+    if (unparsedCount > unparsed.length) lines.push(`- … plus ${unparsedCount - unparsed.length} more unparsed line(s).`);
+  }
+
+  lines.push(
+    "",
+    "Continue and replace the current extracted items with this import?"
+  );
+
+  return lines.join("\n");
+}
+
+async function confirmPdfImportReviewBeforePersist(data, extracted, tempPath) {
+  const ok = confirm(buildPdfImportReviewMessage(data, extracted));
+  if (ok) return true;
+
+  setSaveStatus("Import cancelled");
+
+  try {
+    if (tempPath) {
+      await state.supabase.storage.from(PDF_BUCKET_DEFAULT).remove([tempPath]);
+    }
+  } catch (e) {
+    console.warn("Temporary PDF cleanup after cancelled import failed:", e);
+  }
+
+  return false;
+}
+
+
 async function importReportPdfAiFromFile(file) {
   if (!file) return;
 
@@ -1400,7 +1505,13 @@ async function importReportPdfAiFromFile(file) {
   setSaveStatus("Extracting via AI…");
   const { data, error } = await state.supabase.functions.invoke(
     "import-post-inspection-pdf",
-    { body: { report_id: state.activeReport?.id || "temp", pdf_storage_path: tempPath } }
+    {
+      body: {
+        report_id: state.activeReport?.id || "temp",
+        pdf_storage_path: tempPath,
+        debug: true,
+      },
+    }
   );
 
   if (error) throw error;
@@ -1411,6 +1522,9 @@ async function importReportPdfAiFromFile(file) {
   const obs = Array.isArray(extracted.observations) ? extracted.observations : [];
   const examined_questions = Array.isArray(extracted.examined_questions) ? extracted.examined_questions : [];
   const examined_count = Number(extracted.examined_count || examined_questions.length || 0);
+
+  const reviewAccepted = await confirmPdfImportReviewBeforePersist(data, extracted, tempPath);
+  if (!reviewAccepted) return;
 
   const extractedVesselName = String(h.vessel_name || "").trim();
   const matchedVessel = findVesselByName(extractedVesselName);
