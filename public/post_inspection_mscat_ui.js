@@ -1,4 +1,4 @@
-const MSCAT_BUILD = "csvb_mscat_ui_v05_full_compact_modal_2026-06-17";
+const MSCAT_BUILD = "csvb_mscat_ui_v06a_ai_suggestions_source_fix_2026-06-17";
 const MSCAT_SOURCE_REF = "DNV M-SCAT 8.2";
 
 const mscat = {
@@ -8,6 +8,8 @@ const mscat = {
   item: null,
   taxonomy: [],
   selections: [],
+  aiSuggestions: [],
+  aiSuggestedIds: new Set(),
 };
 
 function q(id) {
@@ -370,6 +372,42 @@ function injectMscatStyle() {
     .csvb-mscat-code{
       font-size:11px;
     }
+    .csvb-mscat-ai-note{
+      border:1px solid #c9dcf5;
+      background:#eef6ff;
+      color:#123e68;
+      border-radius:10px;
+      padding:7px 9px;
+      margin:0 0 7px;
+      font-size:12px;
+      font-weight:800;
+      line-height:1.25;
+    }
+    .csvb-mscat-check.csvb-mscat-ai-suggested{
+      background:#fff9df;
+      box-shadow:0 0 0 1px #edd37b inset;
+    }
+    .csvb-mscat-ai-badge{
+      display:inline-flex;
+      align-items:center;
+      margin-left:5px;
+      padding:1px 5px;
+      border-radius:999px;
+      background:#ffe89a;
+      border:1px solid #e2c25a;
+      color:#5c4100;
+      font-size:10px;
+      font-weight:900;
+      white-space:nowrap;
+    }
+    .csvb-mscat-ai-reason{
+      display:block;
+      margin-top:2px;
+      color:#5c4100;
+      font-size:10.5px;
+      font-weight:800;
+      line-height:1.15;
+    }
 
     .csvb-mscat-section-card.csvb-mscat-immediate{
       border-color:#f0c2a4;
@@ -491,6 +529,7 @@ function ensureCard() {
 
     <div class="csvb-mscat-actions">
       <button class="btn primary" id="openMscatBtn" type="button">Select M-SCAT Causes / Actions</button>
+      <button class="btn btn-muted" id="suggestMscatBtn" type="button">AI Suggest M-SCAT</button>
       <button class="btn btn-muted" id="reloadMscatBtn" type="button">Reload M-SCAT</button>
     </div>
   `;
@@ -660,6 +699,7 @@ function ensureDialog() {
       <div class="csvb-mscat-dialog-toolbar">
         <button class="btn btn-muted" id="mscatExpandAllBtn" type="button">Expand all</button>
         <button class="btn btn-muted" id="mscatCollapseAllBtn" type="button">Collapse all</button>
+        <button class="btn btn-muted" id="mscatAiSuggestBtn" type="button">AI Suggest M-SCAT</button>
       </div>
 
       <div class="csvb-mscat-compact-note">
@@ -703,14 +743,28 @@ function mscatPanelClass(panel) {
   return "csvb-mscat-control";
 }
 
+function aiSuggestionForCode(itemCode) {
+  const code = String(itemCode || "").trim();
+  return (mscat.aiSuggestions || []).find((s) => String(s.item_code || "").trim() === code) || null;
+}
+
 function renderMscatOption(row, selected) {
-  const checked = selected.has(String(row.id)) ? "checked" : "";
+  const rowId = String(row.id);
+  const suggestion = aiSuggestionForCode(row.item_code);
+  const isAiSuggested = Boolean(suggestion) || Boolean(mscat.aiSuggestedIds?.has(rowId));
+  const checked = selected.has(rowId) || isAiSuggested ? "checked" : "";
   const label = `${row.item_no ? row.item_no + " " : ""}${row.item_label}`;
+  const cssClass = isAiSuggested ? "csvb-mscat-check csvb-mscat-ai-suggested" : "csvb-mscat-check";
+  const reason = suggestion?.reason ? String(suggestion.reason) : "";
+  const confidence = Number(suggestion?.confidence || 0);
+  const confidencePct = confidence ? ` ${Math.round(confidence * 100)}%` : "";
+  const badge = isAiSuggested ? `<span class="csvb-mscat-ai-badge">AI Suggested${esc(confidencePct)}</span>` : "";
+  const reasonHtml = reason ? `<span class="csvb-mscat-ai-reason">${esc(reason)}</span>` : "";
 
   return `
-    <label class="csvb-mscat-check">
+    <label class="${cssClass}">
       <input type="checkbox" name="mscatTaxonomyId" value="${esc(row.id)}" ${checked}>
-      <span><span class="csvb-mscat-code">${esc(row.item_code)}</span> — ${esc(label)}</span>
+      <span><span class="csvb-mscat-code">${esc(row.item_code)}</span> — ${esc(label)}${badge}${reasonHtml}</span>
     </label>
   `;
 }
@@ -737,6 +791,14 @@ function renderDialogBody() {
   }
 
   let html = "";
+
+  if ((mscat.aiSuggestions || []).length) {
+    html += `
+      <div class="csvb-mscat-ai-note">
+        AI has pre-ticked ${esc(mscat.aiSuggestions.length)} suggested M-SCAT item(s). Review, untick if not applicable, add any missing items, then press Save M-SCAT Selection to confirm.
+      </div>
+    `;
+  }
 
   for (const panel of panelMap.values()) {
     const selectedInPanel = panel.rows.filter((row) => selected.has(String(row.id))).length;
@@ -851,13 +913,18 @@ async function saveDialog() {
   }
 
   if (toAdd.length) {
-    const rows = toAdd.map((taxonomyId) => ({
-      observation_item_id: mscat.item.id,
-      report_id: mscat.item.report_id,
-      company_id: mscat.item.company_id || null,
-      taxonomy_id: taxonomyId,
-      selection_source: "manual",
-    }));
+    const rows = toAdd.map((taxonomyId) => {
+      const suggestion = (mscat.aiSuggestions || []).find((s) => String(s.taxonomy_id) === String(taxonomyId));
+
+      return {
+        observation_item_id: mscat.item.id,
+        report_id: mscat.item.report_id,
+        company_id: mscat.item.company_id || null,
+        taxonomy_id: taxonomyId,
+        selection_source: suggestion ? "ai_suggested" : "manual",
+        notes: suggestion?.reason || null,
+      };
+    });
 
     const { error } = await mscat.supabase
       .from("post_inspection_observation_mscat")
@@ -872,6 +939,8 @@ async function saveDialog() {
   }
 
   await loadSelections();
+  mscat.aiSuggestions = [];
+  mscat.aiSuggestedIds = new Set();
   renderCard();
 
   const dialog = q("mscatDialog");
@@ -880,14 +949,17 @@ async function saveDialog() {
   setTopStatus("M-SCAT saved");
 }
 
-async function openDialog() {
-  if (!itemNeedsMscat(mscat.item)) {
-    alert("M-SCAT analysis is required for Negative and Largely as Expected observations only.");
-    return;
+function setAiButtonsBusy(busy) {
+  const ids = ["suggestMscatBtn", "mscatAiSuggestBtn"];
+  for (const id of ids) {
+    const btn = q(id);
+    if (!btn) continue;
+    btn.disabled = Boolean(busy);
+    btn.textContent = busy ? "AI suggesting…" : "AI Suggest M-SCAT";
   }
+}
 
-  await loadSelections();
-
+function presentMscatDialog() {
   const dialog = ensureDialog();
   renderDialogBody();
 
@@ -898,8 +970,68 @@ async function openDialog() {
   q("mscatSaveBtn").onclick = saveDialog;
   q("mscatExpandAllBtn").onclick = () => setAllMscatGroupsOpen(true);
   q("mscatCollapseAllBtn").onclick = () => setAllMscatGroupsOpen(false);
+  q("mscatAiSuggestBtn").onclick = suggestMscatWithAi;
 
-  dialog.showModal();
+  if (!dialog.open) dialog.showModal();
+}
+
+async function openDialog() {
+  if (!itemNeedsMscat(mscat.item)) {
+    alert("M-SCAT analysis is required for Negative and Largely as Expected observations only.");
+    return;
+  }
+
+  await loadSelections();
+  mscat.aiSuggestions = [];
+  mscat.aiSuggestedIds = new Set();
+  presentMscatDialog();
+}
+
+async function suggestMscatWithAi() {
+  if (!itemNeedsMscat(mscat.item)) {
+    alert("AI M-SCAT suggestion is required for Negative and Largely as Expected observations only.");
+    return;
+  }
+
+  try {
+    setAiButtonsBusy(true);
+    setTopStatus("AI suggesting M-SCAT…");
+
+    if (!mscat.taxonomy.length) await loadTaxonomy();
+    await loadSelections();
+
+    const { data, error } = await mscat.supabase.functions.invoke("suggest-post-inspection-mscat", {
+      body: {
+        report_id: mscat.reportId,
+        observation_item_id: mscat.itemId,
+      },
+    });
+
+    if (error) throw error;
+    if (!data?.ok) throw new Error(data?.error || "AI M-SCAT suggestion failed.");
+
+    mscat.aiSuggestions = Array.isArray(data.suggestions) ? data.suggestions : [];
+    mscat.aiSuggestedIds = new Set(
+      mscat.aiSuggestions
+        .map((s) => String(s.taxonomy_id || "").trim())
+        .filter(Boolean)
+    );
+
+    if (!mscat.aiSuggestions.length) {
+      alert("AI did not return any valid M-SCAT suggestions for this observation.");
+      setTopStatus("AI M-SCAT: no valid suggestions");
+      return;
+    }
+
+    setTopStatus(`AI suggested ${mscat.aiSuggestions.length} M-SCAT item(s). Review before saving.`);
+    presentMscatDialog();
+  } catch (e) {
+    console.error(e);
+    setTopStatus("AI M-SCAT suggestion error");
+    alert("AI M-SCAT suggestion failed: " + (e?.message || String(e)));
+  } finally {
+    setAiButtonsBusy(false);
+  }
 }
 
 async function initMscat() {
@@ -924,6 +1056,7 @@ async function initMscat() {
   mscat.supabase = window.AUTH.ensureSupabase();
 
   q("openMscatBtn").addEventListener("click", openDialog);
+  q("suggestMscatBtn").addEventListener("click", suggestMscatWithAi);
   q("reloadMscatBtn").addEventListener("click", reloadAll);
 
   await reloadAll();
