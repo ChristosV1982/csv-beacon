@@ -1,4 +1,4 @@
-const MSCAT_BUILD = "csvb_mscat_ui_v01_manual_selector_2026-06-17";
+const MSCAT_BUILD = "csvb_mscat_ui_v02_no_kind_column_2026-06-17";
 const MSCAT_SOURCE_REF = "DNV M-SCAT 8.2";
 
 const mscat = {
@@ -307,7 +307,7 @@ function renderCard() {
 async function loadItem() {
   const { data, error } = await mscat.supabase
     .from("post_inspection_observation_items")
-    .select("id,report_id,company_id,obs_type,kind,question_no,question_base,designation,nature_of_concern,classification_coding,observation_text")
+    .select("id,report_id,company_id,obs_type,question_no,question_base,designation,nature_of_concern,classification_coding,observation_text")
     .eq("id", mscat.itemId)
     .eq("report_id", mscat.reportId)
     .single();
