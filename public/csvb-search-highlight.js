@@ -1,12 +1,12 @@
 /* public/csvb-search-highlight.js */
-/* C.S.V. BEACON — shared search-term highlighter for SIRE/RISQ question viewer/editor pages */
+/* C.S.V. BEACON — shared search-term highlighter + next/previous navigation */
 (() => {
   "use strict";
 
   if (window.CSVB_SEARCH_HIGHLIGHT_LOADED) return;
   window.CSVB_SEARCH_HIGHLIGHT_LOADED = true;
 
-  const BUILD = "CSVB_SEARCH_HIGHLIGHT_20260625_1";
+  const BUILD = "CSVB_SEARCH_HIGHLIGHT_20260625_2_NAV";
   window.CSVB_SEARCH_HIGHLIGHT_BUILD = BUILD;
 
   const PAGE_TARGETS = {
@@ -35,6 +35,13 @@
   let applyTimer = null;
   let running = false;
   let boundInput = null;
+  let navEl = null;
+  let prevBtn = null;
+  let nextBtn = null;
+  let countEl = null;
+  let matches = [];
+  let currentIndex = -1;
+  let lastTerm = "";
 
   function pageName() {
     const attr = document.documentElement?.getAttribute("data-csvb-page") || "";
@@ -68,16 +75,97 @@
         box-shadow: inset 0 -1px 0 rgba(0,0,0,.12);
       }
 
+      mark.csvb-search-highlight.csvb-search-highlight-current {
+        background: #ffb300 !important;
+        color: #000 !important;
+        outline: 2px solid #b45309;
+        box-shadow: 0 0 0 3px rgba(255, 193, 7, .35);
+      }
+
+      .csvb-search-nav {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-top: 6px;
+        flex-wrap: wrap;
+      }
+
+      .csvb-search-nav button {
+        border: 1px solid #b7cde7;
+        background: #fff;
+        color: #062a5e;
+        border-radius: 8px;
+        padding: 5px 8px;
+        font-size: 12px;
+        font-weight: 850;
+        cursor: pointer;
+        line-height: 1.1;
+      }
+
+      .csvb-search-nav button:hover:not(:disabled) {
+        background: #eef7ff;
+        border-color: #7db7d8;
+      }
+
+      .csvb-search-nav button:disabled {
+        opacity: .45;
+        cursor: not-allowed;
+      }
+
+      .csvb-search-nav-count {
+        min-width: 58px;
+        text-align: center;
+        color: #062a5e;
+        font-size: 12px;
+        font-weight: 900;
+        border: 1px solid #d7e6f5;
+        background: #f8fbff;
+        border-radius: 999px;
+        padding: 4px 8px;
+      }
+
       @media print {
         mark.csvb-search-highlight {
           background: transparent !important;
           color: inherit !important;
           box-shadow: none !important;
+          outline: none !important;
           padding: 0 !important;
+        }
+
+        .csvb-search-nav {
+          display: none !important;
         }
       }
     `;
     document.head.appendChild(style);
+  }
+
+  function ensureNavUi() {
+    const input = document.getElementById("searchInput");
+    if (!input) return;
+
+    if (!navEl) {
+      navEl = document.createElement("div");
+      navEl.id = "csvbSearchNav";
+      navEl.className = "csvb-search-nav";
+      navEl.innerHTML = `
+        <button type="button" id="csvbSearchPrevBtn" title="Previous search result">◀ Previous</button>
+        <span class="csvb-search-nav-count" id="csvbSearchCount">0 / 0</span>
+        <button type="button" id="csvbSearchNextBtn" title="Next search result">Next ▶</button>
+      `;
+
+      prevBtn = navEl.querySelector("#csvbSearchPrevBtn");
+      nextBtn = navEl.querySelector("#csvbSearchNextBtn");
+      countEl = navEl.querySelector("#csvbSearchCount");
+
+      prevBtn?.addEventListener("click", () => goToMatch(-1));
+      nextBtn?.addEventListener("click", () => goToMatch(1));
+    }
+
+    if (!navEl.parentNode) {
+      input.insertAdjacentElement("afterend", navEl);
+    }
   }
 
   function getTargets() {
@@ -174,6 +262,74 @@
     }
   }
 
+  function collectMatches(targets) {
+    const seen = new Set();
+    const out = [];
+
+    for (const root of targets) {
+      root.querySelectorAll("mark.csvb-search-highlight").forEach((mark) => {
+        if (seen.has(mark)) return;
+        seen.add(mark);
+        out.push(mark);
+      });
+    }
+
+    return out;
+  }
+
+  function updateCurrentClass() {
+    matches.forEach((mark, idx) => {
+      mark.classList.toggle("csvb-search-highlight-current", idx === currentIndex);
+    });
+  }
+
+  function updateNavUi() {
+    ensureNavUi();
+
+    const hasTerm = !!searchTerm();
+    const total = matches.length;
+    const active = hasTerm && total > 0 && currentIndex >= 0;
+
+    if (countEl) {
+      countEl.textContent = active ? `${currentIndex + 1} / ${total}` : `0 / ${total}`;
+    }
+
+    if (prevBtn) prevBtn.disabled = !active;
+    if (nextBtn) nextBtn.disabled = !active;
+
+    if (navEl) {
+      navEl.style.display = hasTerm ? "flex" : "none";
+    }
+  }
+
+  function scrollCurrentIntoView() {
+    const mark = matches[currentIndex];
+    if (!mark) return;
+
+    updateCurrentClass();
+
+    try {
+      mark.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+        inline: "nearest"
+      });
+    } catch (_) {
+      mark.scrollIntoView();
+    }
+  }
+
+  function goToMatch(direction) {
+    if (!matches.length) return;
+
+    currentIndex += direction;
+    if (currentIndex < 0) currentIndex = matches.length - 1;
+    if (currentIndex >= matches.length) currentIndex = 0;
+
+    updateNavUi();
+    scrollCurrentIntoView();
+  }
+
   function disconnectObserver() {
     if (observer) {
       observer.disconnect();
@@ -200,8 +356,24 @@
     if (!input || input === boundInput) return;
 
     boundInput = input;
-    input.addEventListener("input", () => scheduleHighlight(30));
-    input.addEventListener("change", () => scheduleHighlight(30));
+
+    input.addEventListener("input", () => {
+      currentIndex = -1;
+      scheduleHighlight(30);
+    });
+
+    input.addEventListener("change", () => {
+      currentIndex = -1;
+      scheduleHighlight(30);
+    });
+
+    input.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter") return;
+      if (!searchTerm()) return;
+
+      event.preventDefault();
+      goToMatch(event.shiftKey ? -1 : 1);
+    });
   }
 
   function applyHighlights() {
@@ -212,19 +384,44 @@
 
     try {
       bindSearchInput();
+      ensureNavUi();
 
       const term = searchTerm();
+      const termChanged = term !== lastTerm;
+      lastTerm = term;
+
       const targets = getTargets();
 
       for (const root of targets) {
         clearHighlights(root);
       }
 
+      matches = [];
+
       if (term) {
         const regex = new RegExp(escapeRegExp(term), "gi");
+
         for (const root of targets) {
           highlightRoot(root, regex);
         }
+
+        matches = collectMatches(targets);
+
+        if (matches.length) {
+          if (termChanged || currentIndex < 0) currentIndex = 0;
+          if (currentIndex >= matches.length) currentIndex = matches.length - 1;
+        } else {
+          currentIndex = -1;
+        }
+      } else {
+        currentIndex = -1;
+      }
+
+      updateCurrentClass();
+      updateNavUi();
+
+      if (termChanged && matches.length && currentIndex >= 0) {
+        setTimeout(scrollCurrentIntoView, 40);
       }
     } finally {
       running = false;
@@ -240,6 +437,7 @@
   function init() {
     injectStyles();
     bindSearchInput();
+    ensureNavUi();
     connectObserver();
 
     scheduleHighlight(0);
