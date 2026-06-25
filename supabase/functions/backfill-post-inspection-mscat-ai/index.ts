@@ -2,7 +2,7 @@ export const config = {
   verify_jwt: false,
 };
 
-const FUNCTION_VERSION = "mscat-ai-backfill-v01-20260617";
+const FUNCTION_VERSION = "mscat-ai-backfill-v02_duplicate_safe_20260617";
 const MSCAT_SOURCE_REF = "DNV M-SCAT 8.2";
 const MAX_BATCH_ITEMS = 10;
 const DEFAULT_BATCH_ITEMS = 5;
@@ -584,21 +584,58 @@ Deno.serve(async (req: Request) => {
         };
       }
 
-      const rows = ai.suggestions.map((s: any) => ({
-        observation_item_id: item.id,
-        report_id: item.report_id,
-        company_id: item.company_id || null,
-        taxonomy_id: s.taxonomy_id,
-        selection_source: "ai_suggested",
-        notes: s.reason || null,
-      }));
+      const rows: any[] = [];
+      const rowTaxonomyIds = new Set<string>();
 
-      const { error: insertErr } = await supabaseAdmin
-        .from("post_inspection_observation_mscat")
-        .insert(rows);
+      for (const s of ai.suggestions) {
+        const taxonomyId = String(s.taxonomy_id || "").trim();
+        if (!taxonomyId || rowTaxonomyIds.has(taxonomyId)) continue;
 
-      if (insertErr) {
-        throw new Error("Insert failed: " + (insertErr.message || String(insertErr)));
+        rowTaxonomyIds.add(taxonomyId);
+
+        rows.push({
+          observation_item_id: item.id,
+          report_id: item.report_id,
+          company_id: item.company_id || null,
+          taxonomy_id: taxonomyId,
+          selection_source: "ai_suggested",
+          notes: s.reason || null,
+        });
+      }
+
+      let rowsToInsert = rows;
+      let skipped_duplicate_rows = 0;
+
+      if (rowTaxonomyIds.size) {
+        const { data: existingForItem, error: existingItemErr } = await supabaseAdmin
+          .from("post_inspection_observation_mscat")
+          .select("taxonomy_id")
+          .eq("observation_item_id", item.id)
+          .in("taxonomy_id", Array.from(rowTaxonomyIds));
+
+        if (existingItemErr) {
+          throw new Error("Existing row check failed: " + (existingItemErr.message || String(existingItemErr)));
+        }
+
+        const existingTaxonomyIds = new Set(
+          (existingForItem || []).map((x: any) => String(x.taxonomy_id))
+        );
+
+        rowsToInsert = rows.filter((row) => !existingTaxonomyIds.has(String(row.taxonomy_id)));
+        skipped_duplicate_rows = rows.length - rowsToInsert.length;
+      }
+
+      if (rowsToInsert.length) {
+        const { error: insertErr } = await supabaseAdmin
+          .from("post_inspection_observation_mscat")
+          .upsert(rowsToInsert, {
+            onConflict: "observation_item_id,taxonomy_id",
+            ignoreDuplicates: true,
+          });
+
+        if (insertErr) {
+          throw new Error("Insert failed: " + (insertErr.message || String(insertErr)));
+        }
       }
 
       return {
@@ -606,7 +643,8 @@ Deno.serve(async (req: Request) => {
         item_id: item.id,
         report_id: item.report_id,
         question_base: item.question_base,
-        inserted_rows: rows.length,
+        inserted_rows: rowsToInsert.length,
+        skipped_duplicate_rows,
         suggestions: ai.suggestions.map((s: any) => ({
           item_code: s.item_code,
           section_label: s.section_label,
