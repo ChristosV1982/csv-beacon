@@ -2,7 +2,7 @@ export const config = {
   verify_jwt: false,
 };
 
-const FUNCTION_VERSION = "mscat-ai-backfill-v02_duplicate_safe_20260617";
+const FUNCTION_VERSION = "mscat-ai-backfill-v03_chunked_existing_lookup_20260617";
 const MSCAT_SOURCE_REF = "DNV M-SCAT 8.2";
 const MAX_BATCH_ITEMS = 10;
 const DEFAULT_BATCH_ITEMS = 5;
@@ -379,15 +379,21 @@ async function collectPendingItems(supabaseAdmin: any, profile: any, scope: stri
     const existingIds = new Set<string>();
 
     if (ids.length) {
-      const { data: existing, error: existingErr } = await supabaseAdmin
-        .from("post_inspection_observation_mscat")
-        .select("observation_item_id")
-        .in("observation_item_id", ids);
+      const existingLookupChunkSize = 25;
 
-      if (existingErr) throw new Error("Existing M-SCAT lookup failed: " + (existingErr.message || String(existingErr)));
+      for (let i = 0; i < ids.length; i += existingLookupChunkSize) {
+        const idChunk = ids.slice(i, i + existingLookupChunkSize);
 
-      for (const row of existing || []) {
-        existingIds.add(String(row.observation_item_id));
+        const { data: existing, error: existingErr } = await supabaseAdmin
+          .from("post_inspection_observation_mscat")
+          .select("observation_item_id")
+          .in("observation_item_id", idChunk);
+
+        if (existingErr) throw new Error("Existing M-SCAT lookup failed: " + (existingErr.message || String(existingErr)));
+
+        for (const row of existing || []) {
+          existingIds.add(String(row.observation_item_id));
+        }
       }
     }
 
