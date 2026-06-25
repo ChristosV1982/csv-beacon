@@ -1,12 +1,12 @@
 /* public/csvb-search-highlight.js */
-/* C.S.V. BEACON — shared search-term highlighter + next/previous navigation */
+/* C.S.V. BEACON — shared search highlighter + result-row navigation */
 (() => {
   "use strict";
 
   if (window.CSVB_SEARCH_HIGHLIGHT_LOADED) return;
   window.CSVB_SEARCH_HIGHLIGHT_LOADED = true;
 
-  const BUILD = "CSVB_SEARCH_HIGHLIGHT_20260625_2_NAV";
+  const BUILD = "CSVB_SEARCH_HIGHLIGHT_20260625_3_RESULT_NAV";
   window.CSVB_SEARCH_HIGHLIGHT_BUILD = BUILD;
 
   const PAGE_TARGETS = {
@@ -39,8 +39,9 @@
   let prevBtn = null;
   let nextBtn = null;
   let countEl = null;
-  let matches = [];
-  let currentIndex = -1;
+  let markMatches = [];
+  let resultRows = [];
+  let currentResultIndex = -1;
   let lastTerm = "";
 
   function pageName() {
@@ -75,19 +76,26 @@
         box-shadow: inset 0 -1px 0 rgba(0,0,0,.12);
       }
 
-      mark.csvb-search-highlight.csvb-search-highlight-current {
-        background: #ffb300 !important;
-        color: #000 !important;
-        outline: 2px solid #b45309;
-        box-shadow: 0 0 0 3px rgba(255, 193, 7, .35);
+      .csvb-search-result-current {
+        outline: 3px solid #ffb300 !important;
+        box-shadow: 0 0 0 4px rgba(255, 193, 7, .34) !important;
       }
 
       .csvb-search-nav {
+        position: sticky;
+        top: 6px;
+        z-index: 9999;
         display: flex;
         align-items: center;
         gap: 6px;
         margin-top: 6px;
+        margin-bottom: 8px;
         flex-wrap: wrap;
+        padding: 6px;
+        border: 1px solid #d6e4f5;
+        border-radius: 10px;
+        background: rgba(248, 251, 255, .98);
+        box-shadow: 0 8px 22px rgba(3,27,63,.08);
       }
 
       .csvb-search-nav button {
@@ -113,15 +121,23 @@
       }
 
       .csvb-search-nav-count {
-        min-width: 58px;
+        min-width: 76px;
         text-align: center;
         color: #062a5e;
         font-size: 12px;
         font-weight: 900;
         border: 1px solid #d7e6f5;
-        background: #f8fbff;
+        background: #fff;
         border-radius: 999px;
         padding: 4px 8px;
+      }
+
+      .csvb-search-nav-note {
+        color: #52677f;
+        font-size: 11px;
+        font-weight: 800;
+        flex-basis: 100%;
+        line-height: 1.2;
       }
 
       @media print {
@@ -153,14 +169,15 @@
         <button type="button" id="csvbSearchPrevBtn" title="Previous search result">◀ Previous</button>
         <span class="csvb-search-nav-count" id="csvbSearchCount">0 / 0</span>
         <button type="button" id="csvbSearchNextBtn" title="Next search result">Next ▶</button>
+        <div class="csvb-search-nav-note">Result navigation follows the filtered question list. Yellow marks show visible text matches.</div>
       `;
 
       prevBtn = navEl.querySelector("#csvbSearchPrevBtn");
       nextBtn = navEl.querySelector("#csvbSearchNextBtn");
       countEl = navEl.querySelector("#csvbSearchCount");
 
-      prevBtn?.addEventListener("click", () => goToMatch(-1));
-      nextBtn?.addEventListener("click", () => goToMatch(1));
+      prevBtn?.addEventListener("click", () => goToResult(-1));
+      nextBtn?.addEventListener("click", () => goToResult(1));
     }
 
     if (!navEl.parentNode) {
@@ -181,6 +198,26 @@
     }
 
     return out;
+  }
+
+  function getListRoot() {
+    return document.querySelector("#qList") || document.querySelector("#questionList");
+  }
+
+  function collectResultRows() {
+    const root = getListRoot();
+    if (!root) return [];
+
+    const rows = Array.from(root.querySelectorAll(".qitem, .q-item"))
+      .filter((node) => node instanceof HTMLElement);
+
+    return rows;
+  }
+
+  function clearResultCurrentClass() {
+    document.querySelectorAll(".csvb-search-result-current").forEach((node) => {
+      node.classList.remove("csvb-search-result-current");
+    });
   }
 
   function clearHighlights(root) {
@@ -262,7 +299,7 @@
     }
   }
 
-  function collectMatches(targets) {
+  function collectMarkMatches(targets) {
     const seen = new Set();
     const out = [];
 
@@ -277,21 +314,50 @@
     return out;
   }
 
-  function updateCurrentClass() {
-    matches.forEach((mark, idx) => {
-      mark.classList.toggle("csvb-search-highlight-current", idx === currentIndex);
-    });
+  function activeResultIndex() {
+    const idx = resultRows.findIndex((row) => row.classList.contains("active"));
+    return idx >= 0 ? idx : -1;
+  }
+
+  function normalizeCurrentResultIndex(termChanged) {
+    if (!resultRows.length) {
+      currentResultIndex = -1;
+      return;
+    }
+
+    const activeIdx = activeResultIndex();
+
+    if (termChanged) {
+      currentResultIndex = activeIdx >= 0 ? activeIdx : 0;
+      return;
+    }
+
+    if (activeIdx >= 0 && activeIdx < resultRows.length) {
+      currentResultIndex = activeIdx;
+      return;
+    }
+
+    if (currentResultIndex < 0) currentResultIndex = 0;
+    if (currentResultIndex >= resultRows.length) currentResultIndex = resultRows.length - 1;
+  }
+
+  function updateCurrentResultClass() {
+    clearResultCurrentClass();
+
+    const row = resultRows[currentResultIndex];
+    if (row) row.classList.add("csvb-search-result-current");
   }
 
   function updateNavUi() {
     ensureNavUi();
 
     const hasTerm = !!searchTerm();
-    const total = matches.length;
-    const active = hasTerm && total > 0 && currentIndex >= 0;
+    const total = resultRows.length;
+    const active = hasTerm && total > 0 && currentResultIndex >= 0;
 
     if (countEl) {
-      countEl.textContent = active ? `${currentIndex + 1} / ${total}` : `0 / ${total}`;
+      countEl.textContent = active ? `${currentResultIndex + 1} / ${total}` : `0 / ${total}`;
+      countEl.title = `${markMatches.length} visible highlighted word occurrence(s) on the current screen`;
     }
 
     if (prevBtn) prevBtn.disabled = !active;
@@ -302,32 +368,37 @@
     }
   }
 
-  function scrollCurrentIntoView() {
-    const mark = matches[currentIndex];
-    if (!mark) return;
-
-    updateCurrentClass();
+  function scrollResultIntoView(row) {
+    if (!row) return;
 
     try {
-      mark.scrollIntoView({
+      row.scrollIntoView({
         behavior: "smooth",
         block: "center",
         inline: "nearest"
       });
     } catch (_) {
-      mark.scrollIntoView();
+      row.scrollIntoView();
     }
   }
 
-  function goToMatch(direction) {
-    if (!matches.length) return;
+  function goToResult(direction) {
+    if (!resultRows.length) return;
 
-    currentIndex += direction;
-    if (currentIndex < 0) currentIndex = matches.length - 1;
-    if (currentIndex >= matches.length) currentIndex = 0;
+    currentResultIndex += direction;
+    if (currentResultIndex < 0) currentResultIndex = resultRows.length - 1;
+    if (currentResultIndex >= resultRows.length) currentResultIndex = 0;
 
+    const row = resultRows[currentResultIndex];
+    updateCurrentResultClass();
     updateNavUi();
-    scrollCurrentIntoView();
+    scrollResultIntoView(row);
+
+    if (row) {
+      row.click();
+      setTimeout(() => scheduleHighlight(40), 60);
+      setTimeout(() => scheduleHighlight(40), 250);
+    }
   }
 
   function disconnectObserver() {
@@ -341,7 +412,7 @@
     if (observer || !document.body) return;
 
     observer = new MutationObserver(() => {
-      if (!running) scheduleHighlight(80);
+      if (!running) scheduleHighlight(100);
     });
 
     observer.observe(document.body, {
@@ -358,13 +429,13 @@
     boundInput = input;
 
     input.addEventListener("input", () => {
-      currentIndex = -1;
-      scheduleHighlight(30);
+      currentResultIndex = -1;
+      scheduleHighlight(40);
     });
 
     input.addEventListener("change", () => {
-      currentIndex = -1;
-      scheduleHighlight(30);
+      currentResultIndex = -1;
+      scheduleHighlight(40);
     });
 
     input.addEventListener("keydown", (event) => {
@@ -372,7 +443,7 @@
       if (!searchTerm()) return;
 
       event.preventDefault();
-      goToMatch(event.shiftKey ? -1 : 1);
+      goToResult(event.shiftKey ? -1 : 1);
     });
   }
 
@@ -396,7 +467,7 @@
         clearHighlights(root);
       }
 
-      matches = [];
+      markMatches = [];
 
       if (term) {
         const regex = new RegExp(escapeRegExp(term), "gi");
@@ -405,24 +476,15 @@
           highlightRoot(root, regex);
         }
 
-        matches = collectMatches(targets);
-
-        if (matches.length) {
-          if (termChanged || currentIndex < 0) currentIndex = 0;
-          if (currentIndex >= matches.length) currentIndex = matches.length - 1;
-        } else {
-          currentIndex = -1;
-        }
+        markMatches = collectMarkMatches(targets);
       } else {
-        currentIndex = -1;
+        currentResultIndex = -1;
       }
 
-      updateCurrentClass();
+      resultRows = term ? collectResultRows() : [];
+      normalizeCurrentResultIndex(termChanged);
+      updateCurrentResultClass();
       updateNavUi();
-
-      if (termChanged && matches.length && currentIndex >= 0) {
-        setTimeout(scrollCurrentIntoView, 40);
-      }
     } finally {
       running = false;
       connectObserver();
