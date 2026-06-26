@@ -1,7 +1,7 @@
 // public/audit_observations_manual_detail.js
 // Audit Observations Manual — separate audit detail window.
 
-const BUILD = "AUDIT_OBSERVATIONS_MANUAL_DETAIL_20260626_STEP6I_LEARNING_ASSISTED_SUGGEST";
+const BUILD = "AUDIT_OBSERVATIONS_MANUAL_DETAIL_20260626_STEP6I2_RESULT_BANNER";
 window.CSVB_AUDIT_OBSERVATIONS_MANUAL_DETAIL_BUILD = BUILD;
 
 const AUDIT_BUCKET = "audit-reports";
@@ -84,6 +84,7 @@ const state = {
   activeAiSuggestions: [],
   activeAiOverallNote: "",
   activeAiLearningExamplesUsed: 0,
+  activeAiSuggestionResult: null,
 };
 
 function vesselNameById(id) {
@@ -326,6 +327,7 @@ function clearActiveAiSuggestions() {
   state.activeAiSuggestions = [];
   state.activeAiOverallNote = "";
   state.activeAiLearningExamplesUsed = 0;
+  state.activeAiSuggestionResult = null;
 }
 
 function mscatSourceBadge(source) {
@@ -539,6 +541,52 @@ function renderMscatSelectedObservation() {
   `;
 }
 
+function renderAiSuggestionResult() {
+  const box = el("mscatAiSuggestionResultBox");
+  if (!box) return;
+
+  const obs = activeMscatObservation();
+  const result = state.activeAiSuggestionResult;
+
+  if (!obs || !result) {
+    box.style.display = "none";
+    box.innerHTML = "";
+    return;
+  }
+
+  const count = Number(result.suggestionsReturned || 0);
+  const learningCount = Number(result.learningExamplesUsed || 0);
+  const note = String(result.overallNote || "").trim();
+
+  box.style.display = "block";
+
+  if (count < 1) {
+    box.innerHTML = `
+      <div class="mscatSavedMain">
+        <span class="pill pill-none">Learning-assisted AI completed</span>
+        <span>No valid M-SCAT suggestions were returned.</span>
+      </div>
+      <div class="mscatReason">
+        Nothing has been saved. You may keep the existing selection or manually adjust the M-SCAT taxonomy.
+      </div>
+      ${note ? `<div class="mscatReason"><strong>AI note:</strong> ${esc(note)}</div>` : ""}
+    `;
+    return;
+  }
+
+  box.innerHTML = `
+    <div class="mscatSavedMain">
+      <span class="pill pill-ai">Learning-assisted AI completed</span>
+      <span>${esc(count)} suggestion(s) returned.</span>
+      <span>${esc(learningCount)} reviewed company example(s) used.</span>
+    </div>
+    <div class="mscatReason">
+      Nothing has been saved yet. Review the ticked M-SCAT items, then press <strong>Save M-SCAT selections</strong> if you accept them.
+    </div>
+    ${note ? `<div class="mscatReason"><strong>AI note:</strong> ${esc(note)}</div>` : ""}
+  `;
+}
+
 function groupMscatTaxonomy(items) {
   const sections = new Map();
 
@@ -644,6 +692,7 @@ function renderMscatTaxonomy() {
 
 function renderMscatPanel() {
   renderMscatSelectedObservation();
+  renderAiSuggestionResult();
   renderMscatSavedList();
   renderLearningExamplesPanel();
   renderMscatTaxonomy();
@@ -757,6 +806,12 @@ async function suggestMscatWithLearning() {
 
   state.activeAiOverallNote = String(row.overall_note || "").trim();
   state.activeAiLearningExamplesUsed = Number(row.learning_examples_used || 0);
+  state.activeAiSuggestionResult = {
+    suggestionsReturned: state.activeAiSuggestions.length,
+    learningExamplesUsed: state.activeAiLearningExamplesUsed,
+    overallNote: state.activeAiOverallNote,
+    completedAt: new Date().toISOString()
+  };
 
   renderMscatPanel();
 
