@@ -3,7 +3,7 @@
 // Manual Excel-based audit observation staging module. Future steps will add Excel import and M-SCAT RCA.
 // Observations use SIRE-style fields: question_no, obs_type, designation, SOC, NOC.
 
-const AUDIT_OBSERVATIONS_MANUAL_BUILD = "AUDIT_OBSERVATIONS_MANUAL_20260626_STEP3A_EXCEL_PREVIEW";
+const AUDIT_OBSERVATIONS_MANUAL_BUILD = "AUDIT_OBSERVATIONS_MANUAL_20260626_STEP3B1_EXCLUDED_VESSELS";
 window.CSVB_AUDIT_OBSERVATIONS_MANUAL_BUILD = AUDIT_OBSERVATIONS_MANUAL_BUILD;
 
 const AUDIT_BUCKET = "audit-reports";
@@ -87,10 +87,24 @@ const state = {
 const manualImportState = {
   workbook: null,
   fileName: "",
+  fileType: "",
   sheetName: "",
   rows: [],
   headerRowNumber: null,
+  batchId: null,
+  saving: false,
 };
+
+const EXCLUDED_MANUAL_IMPORT_VESSELS = new Set([
+  "OLYMPIC SEA",
+  "OLYMPIC SKY",
+]);
+
+function isExcludedManualImportVessel(normalizedName) {
+  const name = String(normalizedName || "").replace(/\s+/g, " ").trim().toUpperCase();
+  return EXCLUDED_MANUAL_IMPORT_VESSELS.has(name);
+}
+
 
 function vesselNameById(id) {
   const v = state.vessels.find((x) => String(x.id) === String(id));
@@ -885,12 +899,28 @@ function isManualNilAudit(ncrText) {
 
 function manualValidationPill(status) {
   const s = String(status || "warning");
-  const label = s === "valid" ? "Valid" : (s === "error" ? "Error" : "Warning");
+  const labels = {
+    valid: "Valid",
+    warning: "Warning",
+    error: "Error",
+    skipped: "Skipped"
+  };
+  const label = labels[s] || s;
   return `<span class="validationPill validation-${esc(s)}">${esc(label)}</span>`;
 }
 
 function validateManualImportRow(row) {
   const messages = [];
+
+  if (row.is_excluded_vessel) {
+    return {
+      status: "skipped",
+      messages: [{
+        level: "skipped",
+        message: "Vessel excluded from import because it is no longer in the fleet."
+      }]
+    };
+  }
 
   if (!row.vessel_raw) messages.push({ level: "error", message: "Vessel missing." });
   if (row.vessel_normalized && !row.vessel_id) messages.push({ level: "error", message: "Vessel not matched to vessel list." });
@@ -930,6 +960,7 @@ function buildManualImportRow(rawRow, excelRowNo, cols) {
   const ncrDetails = manualCellText(rawRow[cols.ncr]);
 
   const vesselNormalized = normalizeManualVessel(vesselRaw);
+  const isExcludedVessel = isExcludedManualImportVessel(vesselNormalized);
   const auditCode = parseManualAuditCode(auditCodeRaw);
   const isNil = isManualNilAudit(ncrDetails);
   const questionNo = normalizeManualQuestionNo(checklistRaw);
@@ -940,6 +971,7 @@ function buildManualImportRow(rawRow, excelRowNo, cols) {
     vessel_raw: vesselRaw,
     vessel_normalized: vesselNormalized,
     vessel_id: findManualVesselId(vesselNormalized),
+    is_excluded_vessel: isExcludedVessel,
     audit_date_raw: auditDateRaw,
     audit_date: parseManualDate(rawRow[cols.auditDate]),
     audit_code_raw: auditCodeRaw,
@@ -958,13 +990,14 @@ function buildManualImportRow(rawRow, excelRowNo, cols) {
       : (checklistRaw ? "provided" : "missing_needs_mapping"),
     ncr_details: ncrDetails,
     is_nil_audit: isNil,
-    import_action: isNil ? "create_audit_header_only" : "create_observation",
+    import_action: isExcludedVessel ? "no_action" : (isNil ? "create_audit_header_only" : "create_observation"),
     raw_payload: {
       Vessel: vesselRaw,
       Audit_date: auditDateRaw,
       Audit_code: auditCodeRaw,
       "Checklist_no(VIQ/SIRE2.0)": checklistRaw,
-      ncr_details: ncrDetails
+      ncr_details: ncrDetails,
+      __csvb_excluded_vessel: isExcludedVessel
     }
   };
 
@@ -972,7 +1005,9 @@ function buildManualImportRow(rawRow, excelRowNo, cols) {
   row.validation_status = validation.status;
   row.validation_messages = validation.messages;
 
-  if (validation.status === "error") {
+  if (validation.status === "skipped") {
+    row.import_action = "no_action";
+  } else if (validation.status === "error") {
     row.import_action = "skip_needs_review";
   }
 
@@ -985,6 +1020,7 @@ function manualImportSummaryCounts(rows) {
     valid: rows.filter((r) => r.validation_status === "valid").length,
     warning: rows.filter((r) => r.validation_status === "warning").length,
     error: rows.filter((r) => r.validation_status === "error").length,
+    skipped: rows.filter((r) => r.validation_status === "skipped").length,
     nil: rows.filter((r) => r.is_nil_audit).length
   };
 }
@@ -999,7 +1035,13 @@ function renderManualImportPreview() {
   el("manualImportWarning").textContent = String(counts.warning);
   el("manualImportError").textContent = String(counts.error);
   el("manualImportNil").textContent = String(counts.nil);
-  el("manualImportShown").textContent = String(shown.length);
+  el("manualImportSkipped").textContent = String(counts.skipped);
+
+  const saveBtn = el("saveManualImportStagingBtn");
+  if (saveBtn) {
+    saveBtn.disabled = !rows.length || manualImportState.saving;
+    saveBtn.textContent = manualImportState.saving ? "Saving…" : "Save preview to staging";
+  }
 
   const header = manualImportState.headerRowNumber
     ? `Header detected at Excel row ${manualImportState.headerRowNumber}.`
@@ -1010,7 +1052,9 @@ function renderManualImportPreview() {
     Source file: ${esc(manualImportState.fileName || "—")}<br/>
     Sheet: ${esc(manualImportState.sheetName || "—")}<br/>
     ${esc(header)}<br/>
-    Parsed rows: ${counts.total}. Valid: ${counts.valid}. Warnings: ${counts.warning}. Errors: ${counts.error}. NIL audits: ${counts.nil}.
+    Parsed rows: ${counts.total}. Valid: ${counts.valid}. Warnings: ${counts.warning}. Errors: ${counts.error}. NIL audits: ${counts.nil}. Excluded/skipped: ${counts.skipped}.<br/>
+    Rows shown in preview: ${shown.length}.<br/>
+    Staging batch: ${manualImportState.batchId ? esc(manualImportState.batchId) : "not saved yet"}.
   `;
 
   const tbody = el("manualImportPreviewTbody");
@@ -1053,9 +1097,12 @@ function renderManualImportPreview() {
 function clearManualImportPreview() {
   manualImportState.workbook = null;
   manualImportState.fileName = "";
+  manualImportState.fileType = "";
   manualImportState.sheetName = "";
   manualImportState.rows = [];
   manualImportState.headerRowNumber = null;
+  manualImportState.batchId = null;
+  manualImportState.saving = false;
 
   el("manualExcelFile").value = "";
   el("manualExcelSheetSelect").innerHTML = `<option value="">No workbook loaded</option>`;
@@ -1073,6 +1120,7 @@ async function handleManualExcelFileChange() {
   manualImportState.workbook = null;
   manualImportState.rows = [];
   manualImportState.headerRowNumber = null;
+  manualImportState.batchId = null;
 
   if (!file) {
     clearManualImportPreview();
@@ -1094,6 +1142,7 @@ async function handleManualExcelFileChange() {
 
   manualImportState.workbook = workbook;
   manualImportState.fileName = file.name;
+  manualImportState.fileType = file.type || (file.name.toLowerCase().endsWith(".xls") ? "application/vnd.ms-excel" : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
 
   const sheetNames = workbook.SheetNames || [];
   const sel = el("manualExcelSheetSelect");
@@ -1118,6 +1167,146 @@ async function handleManualExcelFileChange() {
 
   renderManualImportPreview();
   setStatus("Excel loaded");
+}
+
+
+function manualImportRowDbPayload(row, batchId) {
+  return {
+    batch_id: batchId,
+    excel_row_no: row.excel_row_no,
+    raw_payload: row.raw_payload || {},
+
+    vessel_raw: row.vessel_raw || null,
+    vessel_normalized: row.vessel_normalized || null,
+    vessel_id: row.vessel_id || null,
+
+    audit_date_raw: row.audit_date_raw || null,
+    audit_date: row.audit_date || null,
+
+    audit_code_raw: row.audit_code_raw || null,
+    audit_year: row.audit_year || null,
+    audit_domain: row.audit_domain || "unknown",
+    audit_source_normalized: row.audit_source_normalized || null,
+    audit_source_detail: row.audit_source_detail || "unknown",
+    audit_type_id: row.audit_type_id || null,
+
+    checklist_no_raw: row.checklist_no_raw || null,
+    sire_question_no_normalized: row.sire_question_no_normalized || null,
+    sire_mapping_status: row.sire_mapping_status || "missing_needs_mapping",
+
+    ai_suggested_question_no: null,
+    ai_question_confidence: null,
+    ai_question_reason: null,
+
+    ncr_details: row.ncr_details || null,
+    is_nil_audit: !!row.is_nil_audit,
+
+    validation_status: row.validation_status || "warning",
+    validation_messages: row.validation_messages || [],
+
+    import_action: row.import_action || "no_action",
+
+    created_report_id: null,
+    created_observation_item_id: null
+  };
+}
+
+async function saveManualImportToStaging() {
+  const rows = manualImportState.rows || [];
+
+  if (!rows.length) {
+    alert("Preview the Excel file first. No rows are available for staging.");
+    return;
+  }
+
+  if (manualImportState.batchId) {
+    const again = confirm("This preview has already been saved to staging. Save it again as a new batch?");
+    if (!again) return;
+  }
+
+  const counts = manualImportSummaryCounts(rows);
+
+  const ok = confirm(
+    `Save this preview to staging only?\\n\\n` +
+    `Parsed rows: ${counts.total}\\n` +
+    `Valid: ${counts.valid}\\n` +
+    `Warnings: ${counts.warning}\\n` +
+    `Errors: ${counts.error}\\n` +
+    `NIL audits: ${counts.nil}\\n` +
+    `Excluded/skipped: ${counts.skipped}\\n\\n` +
+    `No audit records or observation records will be created yet.`
+  );
+
+  if (!ok) return;
+
+  manualImportState.saving = true;
+  renderManualImportPreview();
+  setStatus("Saving staging batch…");
+
+  try {
+    const batchPayload = {
+      source_file_name: manualImportState.fileName || "manual_audit_observations.xlsx",
+      source_file_type: manualImportState.fileType || null,
+      source_storage_path: null,
+      sheet_name: manualImportState.sheetName || null,
+      import_status: "validated",
+
+      total_rows: rows.length,
+      parsed_rows: rows.length,
+      valid_rows: counts.valid,
+      warning_rows: counts.warning,
+      error_rows: counts.error,
+      nil_audit_rows: counts.nil,
+
+      notes: "Created from Audit Observations Manual Excel preview. No final audit import performed.",
+      import_summary: {
+        build: AUDIT_OBSERVATIONS_MANUAL_BUILD,
+        source_file_name: manualImportState.fileName || null,
+        sheet_name: manualImportState.sheetName || null,
+        header_row_number: manualImportState.headerRowNumber,
+        counts
+      },
+      imported_at: null
+    };
+
+    const { data: batch, error: batchErr } = await state.supabase
+      .from("audit_manual_import_batches")
+      .insert([batchPayload])
+      .select("*")
+      .single();
+
+    if (batchErr) throw batchErr;
+    if (!batch?.id) throw new Error("No staging batch ID returned.");
+
+    const dbRows = rows.map((r) => manualImportRowDbPayload(r, batch.id));
+    const chunkSize = 200;
+
+    for (let i = 0; i < dbRows.length; i += chunkSize) {
+      const chunk = dbRows.slice(i, i + chunkSize);
+      const { error: rowErr } = await state.supabase
+        .from("audit_manual_import_rows")
+        .insert(chunk);
+
+      if (rowErr) throw rowErr;
+
+      setStatus(`Saving staging rows ${Math.min(i + chunk.length, dbRows.length)} / ${dbRows.length}…`);
+    }
+
+    manualImportState.batchId = batch.id;
+
+    renderManualImportPreview();
+    setStatus("Staged");
+
+    alert(
+      `Preview saved to staging.\\n\\n` +
+      `Batch ID: ${batch.id}\\n` +
+      `Rows saved: ${dbRows.length}\\n\\n` +
+      `No final audit records were created.`
+    );
+  } finally {
+    manualImportState.saving = false;
+    renderManualImportPreview();
+  }
 }
 
 function parseManualExcelPreview() {
@@ -1170,6 +1359,7 @@ function parseManualExcelPreview() {
   manualImportState.sheetName = sheetName;
   manualImportState.rows = parsed;
   manualImportState.headerRowNumber = header.rowNumber;
+  manualImportState.batchId = null;
 
   renderManualImportPreview();
   setStatus("Preview ready");
@@ -1316,6 +1506,16 @@ async function init() {
   });
 
   el("clearManualExcelPreviewBtn").addEventListener("click", clearManualImportPreview);
+
+  el("saveManualImportStagingBtn").addEventListener("click", async () => {
+    try {
+      await saveManualImportToStaging();
+    } catch (e) {
+      console.error(e);
+      alert("Save preview to staging failed: " + (e?.message || String(e)));
+      setStatus("Error");
+    }
+  });
 
   renderManualImportPreview();
 
