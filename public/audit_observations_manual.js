@@ -3,7 +3,7 @@
 // Manual Excel-based audit observation staging module. Future steps will add Excel import and M-SCAT RCA.
 // Observations use SIRE-style fields: question_no, obs_type, designation, SOC, NOC.
 
-const AUDIT_OBSERVATIONS_MANUAL_BUILD = "AUDIT_OBSERVATIONS_MANUAL_20260626_STEP3B1_EXCLUDED_VESSELS";
+const AUDIT_OBSERVATIONS_MANUAL_BUILD = "AUDIT_OBSERVATIONS_MANUAL_20260626_STEP4G_DISPLAY_OBSERVATION_TEXT";
 window.CSVB_AUDIT_OBSERVATIONS_MANUAL_BUILD = AUDIT_OBSERVATIONS_MANUAL_BUILD;
 
 const AUDIT_BUCKET = "audit-reports";
@@ -657,7 +657,13 @@ function renderObservationsTable() {
   }
 
   tbody.innerHTML = rows.map((r) => {
-    const remarks = String(r.remarks || r.observation_text || "").trim();
+    const observationText = String(r.observation_text || "").trim();
+    const importRemarks = String(r.remarks || "").trim();
+    const mainText = observationText || importRemarks || "—";
+    const metaHtml = observationText && importRemarks
+      ? `<div class="obsImportMeta">${esc(importRemarks)}</div>`
+      : "";
+
     return `
       <tr>
         <td class="mono">${esc(r.question_no || "—")}</td>
@@ -665,7 +671,10 @@ function renderObservationsTable() {
         <td>${esc(r.designation || "—")}</td>
         <td>${esc(r.soc || "—")}</td>
         <td>${esc(r.noc || "—")}</td>
-        <td class="remarksCell">${esc(remarks || "—")}</td>
+        <td class="remarksCell">
+          <div class="obsTextMain">${esc(mainText)}</div>
+          ${metaHtml}
+        </td>
         <td><button class="btn btn-danger btn-small deleteObsBtn" data-id="${esc(r.id)}">Delete</button></td>
       </tr>
     `;
