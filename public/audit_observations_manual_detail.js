@@ -1,7 +1,7 @@
 // public/audit_observations_manual_detail.js
 // Audit Observations Manual — separate audit detail window.
 
-const BUILD = "AUDIT_OBSERVATIONS_MANUAL_DETAIL_20260626_STEP5A";
+const BUILD = "AUDIT_OBSERVATIONS_MANUAL_DETAIL_20260626_STEP6A_MANUAL_MSCAT";
 window.CSVB_AUDIT_OBSERVATIONS_MANUAL_DETAIL_BUILD = BUILD;
 
 const AUDIT_BUCKET = "audit-reports";
@@ -60,6 +60,9 @@ const state = {
   vessels: [],
   auditTypes: [],
   observations: [],
+  mscatTaxonomy: [],
+  mscatSelections: [],
+  activeMscatObservationId: null,
 };
 
 function vesselNameById(id) {
@@ -162,6 +165,283 @@ function renderCounters() {
   el("cntPositive").textContent = String(rows.filter((r) => r.obs_type === "positive").length);
 }
 
+
+async function loadMscatTaxonomy() {
+  const { data, error } = await state.supabase
+    .from("post_inspection_mscat_taxonomy")
+    .select("*")
+    .order("sort_order", { ascending: true });
+
+  if (error) throw error;
+
+  return data || [];
+}
+
+async function loadMscatSelectionsForAudit() {
+  const { data, error } = await state.supabase.rpc("csvb_audit_observation_mscat_for_me", {
+    p_audit_observation_item_id: null,
+    p_report_id: state.reportId
+  });
+
+  if (error) throw error;
+
+  return data || [];
+}
+
+function mscatSelectionsForObservation(observationId) {
+  return (state.mscatSelections || []).filter((x) =>
+    String(x.audit_observation_item_id) === String(observationId)
+  );
+}
+
+function taxonomyById(id) {
+  return (state.mscatTaxonomy || []).find((x) => String(x.id) === String(id));
+}
+
+function activeMscatObservation() {
+  return (state.observations || []).find((x) =>
+    String(x.id) === String(state.activeMscatObservationId)
+  );
+}
+
+function mscatDisplayLabel(item) {
+  if (!item) return "—";
+
+  const code = item.item_code || item.item_no || "";
+  const label = item.item_label || "";
+  const section = item.section_label || "";
+  const subsection = item.subsection_label || "";
+
+  return [code, label].filter(Boolean).join(" — ") ||
+    [section, subsection].filter(Boolean).join(" / ") ||
+    item.id;
+}
+
+function renderMscatSavedList() {
+  const box = el("mscatSavedList");
+  const obs = activeMscatObservation();
+
+  if (!box) return;
+
+  if (!obs) {
+    box.innerHTML = "";
+    return;
+  }
+
+  const saved = mscatSelectionsForObservation(obs.id);
+
+  if (!saved.length) {
+    box.innerHTML = `<span class="muted">No M-SCAT selections saved for this observation.</span>`;
+    return;
+  }
+
+  box.innerHTML = saved.map((s) => {
+    const label = [
+      s.section_label,
+      s.subsection_label,
+      s.item_code || s.item_no,
+      s.item_label
+    ].filter(Boolean).join(" / ");
+
+    return `<span class="mscatChip">${esc(label)}</span>`;
+  }).join("");
+}
+
+function renderMscatSelectedObservation() {
+  const box = el("mscatSelectedObservationBox");
+  const obs = activeMscatObservation();
+
+  if (!box) return;
+
+  if (!obs) {
+    box.textContent = "No observation selected for M-SCAT.";
+    return;
+  }
+
+  const observationText = String(obs.observation_text || obs.remarks || "").trim();
+
+  box.innerHTML = `
+    <strong>Selected observation:</strong> ${esc(obs.question_no || "—")} / ${esc(OBS_TYPE_LABELS[obs.obs_type] || obs.obs_type || "—")}
+    <br/>
+    ${esc(observationText || "—")}
+  `;
+}
+
+function groupMscatTaxonomy(items) {
+  const sections = new Map();
+
+  for (const item of items) {
+    const sectionKey = item.section_label || item.section_key || "Other";
+    const subsectionKey = item.subsection_label || item.subsection_key || "General";
+
+    if (!sections.has(sectionKey)) {
+      sections.set(sectionKey, new Map());
+    }
+
+    const subsections = sections.get(sectionKey);
+
+    if (!subsections.has(subsectionKey)) {
+      subsections.set(subsectionKey, []);
+    }
+
+    subsections.get(subsectionKey).push(item);
+  }
+
+  return sections;
+}
+
+function renderMscatTaxonomy() {
+  const grid = el("mscatTaxonomyGrid");
+  if (!grid) return;
+
+  const obs = activeMscatObservation();
+  const search = String(el("mscatSearchInput")?.value || "").trim().toLowerCase();
+  const savedIds = new Set(mscatSelectionsForObservation(obs?.id).map((s) => String(s.taxonomy_id)));
+
+  let items = state.mscatTaxonomy || [];
+
+  if (search) {
+    items = items.filter((item) => {
+      const haystack = [
+        item.section_key,
+        item.section_label,
+        item.subsection_key,
+        item.subsection_label,
+        item.item_code,
+        item.item_no,
+        item.item_label,
+        item.source_ref
+      ].filter(Boolean).join(" ").toLowerCase();
+
+      return haystack.includes(search);
+    });
+  }
+
+  if (!items.length) {
+    grid.innerHTML = `<div class="muted">No M-SCAT taxonomy items found.</div>`;
+    return;
+  }
+
+  const grouped = groupMscatTaxonomy(items);
+
+  const html = Array.from(grouped.entries()).map(([sectionLabel, subsections]) => {
+    const subsectionHtml = Array.from(subsections.entries()).map(([subsectionLabel, subItems]) => {
+      const itemHtml = subItems.map((item) => {
+        const id = String(item.id);
+        const code = item.item_code || item.item_no || "";
+        const checked = savedIds.has(id) ? "checked" : "";
+
+        return `
+          <label class="mscatItem">
+            <input type="checkbox" class="mscatCheckbox" value="${esc(id)}" ${checked} ${obs ? "" : "disabled"}/>
+            <span>
+              <span class="mscatCode">${esc(code || "—")}</span>
+              ${esc(item.item_label || "—")}
+            </span>
+          </label>
+        `;
+      }).join("");
+
+      return `
+        <details class="mscatSubsection" open>
+          <summary>${esc(subsectionLabel)} <span class="mscatCountPill">${subItems.length}</span></summary>
+          <div class="mscatItems">${itemHtml}</div>
+        </details>
+      `;
+    }).join("");
+
+    return `
+      <div class="mscatSection">
+        <div class="mscatSectionHead">${esc(sectionLabel)}</div>
+        ${subsectionHtml}
+      </div>
+    `;
+  }).join("");
+
+  grid.innerHTML = html;
+}
+
+function renderMscatPanel() {
+  renderMscatSelectedObservation();
+  renderMscatSavedList();
+  renderMscatTaxonomy();
+
+  const active = !!activeMscatObservation();
+  el("saveMscatBtn").disabled = !active;
+  el("clearMscatSelectionBtn").disabled = !active;
+}
+
+function setActiveMscatObservation(observationId) {
+  state.activeMscatObservationId = observationId || null;
+  renderObservationsTable();
+  renderMscatPanel();
+
+  const panel = el("mscatPanel");
+  if (panel) {
+    try {
+      panel.scrollIntoView({ behavior: "smooth", block: "start" });
+    } catch (_) {
+      panel.scrollIntoView();
+    }
+  }
+}
+
+async function saveMscatSelections() {
+  const obs = activeMscatObservation();
+  if (!obs) {
+    alert("Select an observation first.");
+    return;
+  }
+
+  const selectedIds = Array.from(document.querySelectorAll(".mscatCheckbox:checked"))
+    .map((x) => String(x.value || "").trim())
+    .filter(Boolean);
+
+  const ok = confirm(
+    `Save ${selectedIds.length} M-SCAT selection(s) for this observation?\\n\\n` +
+    `Existing M-SCAT selections for this observation will be replaced.`
+  );
+
+  if (!ok) return;
+
+  setStatus("Saving M-SCAT…");
+
+  const { error: delErr } = await state.supabase
+    .from("audit_observation_mscat")
+    .delete()
+    .eq("audit_observation_item_id", obs.id);
+
+  if (delErr) throw delErr;
+
+  if (selectedIds.length) {
+    const payload = selectedIds.map((taxonomyId) => ({
+      audit_observation_item_id: obs.id,
+      taxonomy_id: taxonomyId,
+      selection_source: "manual"
+    }));
+
+    const { error: insErr } = await state.supabase
+      .from("audit_observation_mscat")
+      .insert(payload);
+
+    if (insErr) throw insErr;
+  }
+
+  state.mscatSelections = await loadMscatSelectionsForAudit();
+
+  renderObservationsTable();
+  renderMscatPanel();
+
+  setStatus("M-SCAT saved");
+}
+
+function clearMscatSelection() {
+  state.activeMscatObservationId = null;
+  renderObservationsTable();
+  renderMscatPanel();
+}
+
+
 function renderObservationsTable() {
   const tbody = el("observationsTbody");
   const rows = state.observations || [];
@@ -169,7 +449,7 @@ function renderObservationsTable() {
   renderCounters();
 
   if (!rows.length) {
-    tbody.innerHTML = `<tr><td colspan="7" class="muted">No observations entered for this audit.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8" class="muted">No observations entered for this audit.</td></tr>`;
     return;
   }
 
@@ -182,7 +462,7 @@ function renderObservationsTable() {
       : "";
 
     return `
-      <tr>
+      <tr class="${String(r.id) === String(state.activeMscatObservationId) ? 'csvb-mscat-active-row' : ''}">
         <td class="mono">${esc(r.question_no || "—")}</td>
         <td>${obsTypeBadge(r.obs_type)}</td>
         <td>${esc(r.designation || "—")}</td>
@@ -192,10 +472,21 @@ function renderObservationsTable() {
           <div class="obsTextMain">${esc(mainText)}</div>
           ${metaHtml}
         </td>
+        <td>
+          <button class="btn btn-muted btn-small mscatBtn selectMscatBtn" data-id="${esc(r.id)}">
+            M-SCAT <span class="mscatCountPill">${mscatSelectionsForObservation(r.id).length}</span>
+          </button>
+        </td>
         <td><button class="btn btn-danger btn-small deleteObsBtn" data-id="${esc(r.id)}">Delete</button></td>
       </tr>
     `;
   }).join("");
+
+  tbody.querySelectorAll(".selectMscatBtn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      setActiveMscatObservation(btn.getAttribute("data-id"));
+    });
+  });
 
   tbody.querySelectorAll(".deleteObsBtn").forEach((btn) => {
     btn.addEventListener("click", async () => {
@@ -325,10 +616,13 @@ async function refreshDetail() {
   state.auditTypes = await loadAuditTypes();
   state.audit = await loadAudit();
   state.observations = await loadObservationsForAudit();
+  state.mscatTaxonomy = await loadMscatTaxonomy();
+  state.mscatSelections = await loadMscatSelectionsForAudit();
 
   renderAuditHeader();
   renderObservationsTable();
   clearObservationForm();
+  renderMscatPanel();
 
   setStatus("Ready");
 }
@@ -395,6 +689,20 @@ async function init() {
   });
 
   el("clearObsBtn").addEventListener("click", clearObservationForm);
+
+  el("mscatSearchInput").addEventListener("input", renderMscatTaxonomy);
+
+  el("saveMscatBtn").addEventListener("click", async () => {
+    try {
+      await saveMscatSelections();
+    } catch (e) {
+      console.error(e);
+      alert("Save M-SCAT failed: " + (e?.message || String(e)));
+      setStatus("Error");
+    }
+  });
+
+  el("clearMscatSelectionBtn").addEventListener("click", clearMscatSelection);
 
   el("buildInfo").textContent = BUILD;
 

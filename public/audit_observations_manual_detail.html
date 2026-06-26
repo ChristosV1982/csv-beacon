@@ -191,6 +191,120 @@
     .pill-lae{ background:#fef3c7; color:#92400e; border-color:#fde68a; }
     .pill-pos{ background:#dcfce7; color:#166534; border-color:#bbf7d0; }
 
+
+    .mscatToolbar{
+      display:flex;
+      gap:8px;
+      flex-wrap:wrap;
+      align-items:flex-end;
+      margin-top:10px;
+    }
+    .mscatSearch{
+      min-width:320px;
+      flex:1;
+    }
+    .mscatSelectedBox{
+      margin-top:10px;
+      padding:10px 12px;
+      border:1px solid #d5deef;
+      border-radius:12px;
+      background:#f8fbff;
+      color:#1a4170;
+      font-weight:850;
+      line-height:1.45;
+      white-space:pre-wrap;
+    }
+    .mscatTaxonomyGrid{
+      display:grid;
+      grid-template-columns:repeat(3, minmax(0,1fr));
+      gap:10px;
+      margin-top:10px;
+    }
+    @media(max-width:1300px){ .mscatTaxonomyGrid{ grid-template-columns:1fr; } }
+    .mscatSection{
+      border:1px solid #d5deef;
+      border-radius:12px;
+      background:#fff;
+      overflow:hidden;
+    }
+    .mscatSectionHead{
+      padding:10px 12px;
+      background:#eaf4ff;
+      color:#062a5e;
+      font-weight:950;
+      border-bottom:1px solid #d5deef;
+    }
+    .mscatSubsection{
+      border-bottom:1px solid #e3ecfb;
+    }
+    .mscatSubsection summary{
+      cursor:pointer;
+      padding:8px 10px;
+      font-weight:950;
+      color:#1a4170;
+      background:#f8fbff;
+    }
+    .mscatItems{
+      padding:8px 10px;
+      display:grid;
+      gap:6px;
+    }
+    .mscatItem{
+      display:flex;
+      gap:8px;
+      align-items:flex-start;
+      padding:6px 7px;
+      border:1px solid #edf3fb;
+      border-radius:8px;
+      background:#fff;
+      line-height:1.25;
+      color:#223a66;
+      font-weight:800;
+      font-size:.86rem;
+    }
+    .mscatItem input{
+      width:auto;
+      margin-top:2px;
+      flex:0 0 auto;
+    }
+    .mscatCode{
+      font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+      font-weight:950;
+      color:#062a5e;
+      white-space:nowrap;
+    }
+    .mscatSavedList{
+      display:flex;
+      flex-wrap:wrap;
+      gap:6px;
+      margin-top:8px;
+    }
+    .mscatChip{
+      display:inline-flex;
+      border-radius:999px;
+      padding:4px 8px;
+      font-size:.78rem;
+      font-weight:950;
+      border:1px solid #d5deef;
+      background:#f8fbff;
+      color:#062a5e;
+      max-width:100%;
+    }
+    .mscatBtn{
+      white-space:nowrap;
+    }
+    .mscatCountPill{
+      display:inline-flex;
+      border-radius:999px;
+      padding:3px 8px;
+      font-size:.78rem;
+      font-weight:950;
+      border:1px solid #bcd3ee;
+      background:#f8fbff;
+      color:#062a5e;
+      margin-left:4px;
+    }
+
     .statusLine{
       margin-top:10px;
       font-weight:950;
@@ -338,6 +452,7 @@
             <th>SOC</th>
             <th>NOC</th>
             <th>Observation / Remarks</th>
+            <th>M-SCAT</th>
             <th>Delete</th>
           </tr>
         </thead>
@@ -347,10 +462,30 @@
       </table>
     </div>
 
-    <div class="panel">
+    <div class="panel" id="mscatPanel">
       <h3 class="sectionTitle">Root Cause Analysis / M-SCAT</h3>
-      <div class="activeBox">
-        M-SCAT root cause analysis will be added here next. This detail window is now the correct location for M-SCAT, SIRE question mapping, corrective actions, attachments and audit-specific KPIs.
+      <div class="muted">
+        Select an observation from the table, then apply M-SCAT root cause classifications using the same taxonomy used for SIRE 2.0 post-inspection observations.
+      </div>
+
+      <div class="mscatSelectedBox" id="mscatSelectedObservationBox">
+        No observation selected for M-SCAT.
+      </div>
+
+      <div class="mscatSavedList" id="mscatSavedList"></div>
+
+      <div class="mscatToolbar">
+        <div class="field mscatSearch">
+          <label for="mscatSearchInput">Search M-SCAT taxonomy</label>
+          <input id="mscatSearchInput" type="text" placeholder="Search code, section or item text"/>
+        </div>
+
+        <button class="btn btn-muted" id="saveMscatBtn" type="button">Save M-SCAT selections</button>
+        <button class="btn btn-danger" id="clearMscatSelectionBtn" type="button">Clear selected observation</button>
+      </div>
+
+      <div class="mscatTaxonomyGrid" id="mscatTaxonomyGrid">
+        <div class="muted">Loading M-SCAT taxonomy…</div>
       </div>
     </div>
 
@@ -362,7 +497,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="./auth.js"></script>
-  <script type="module" src="./audit_observations_manual_detail.js?v=20260626_1"></script>
+  <script type="module" src="./audit_observations_manual_detail.js?v=20260626_2"></script>
   <script src="./csvb-ui-polish.js?v=20260430_1"></script>
   <script src="./csvb-help-tooltips.js?v=20260430_1"></script>
   <script src="./csvb-100pct-fit.js?v=20260430_1"></script>
