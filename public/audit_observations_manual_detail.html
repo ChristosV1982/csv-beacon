@@ -341,6 +341,46 @@
       background:#fffaf0;
     }
 
+    .collapsiblePanel{
+      padding:0;
+      overflow:hidden;
+    }
+    .collapsibleSummary{
+      cursor:pointer;
+      list-style:none;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      padding:12px;
+      color:#062a5e;
+      font-weight:950;
+      background:#f8fbff;
+      border-radius:14px;
+      user-select:none;
+    }
+    .collapsibleSummary::-webkit-details-marker{
+      display:none;
+    }
+    .collapsibleSummary::after{
+      content:"▸";
+      font-size:1.05rem;
+      color:#1a4170;
+      font-weight:950;
+    }
+    .collapsiblePanel[open] .collapsibleSummary::after{
+      content:"▾";
+    }
+    .collapsibleHint{
+      color:#64748b;
+      font-size:.82rem;
+      font-weight:850;
+      margin-left:auto;
+    }
+    .collapsibleBody{
+      padding:0 12px 12px 12px;
+    }
+
     .statusLine{
       margin-top:10px;
       font-weight:950;
@@ -386,17 +426,26 @@
       </div>
     </div>
 
-    <div class="panel">
-      <h3 class="sectionTitle">Audit Header</h3>
-      <div class="summaryGrid" id="auditSummaryGrid"></div>
-      <div class="activeBox" id="auditRemarksBox">Loading audit…</div>
-      <div class="row" style="margin-top:10px;">
-        <button class="btn btn-muted" id="openReportBtn" type="button">Open source / report file</button>
+    <details class="panel collapsiblePanel" id="auditHeaderPanel">
+      <summary class="collapsibleSummary">
+        <span>Audit Header</span>
+        <span class="collapsibleHint">collapsed by default</span>
+      </summary>
+      <div class="collapsibleBody">
+        <div class="summaryGrid" id="auditSummaryGrid"></div>
+        <div class="activeBox" id="auditRemarksBox">Loading audit…</div>
+        <div class="row" style="margin-top:10px;">
+          <button class="btn btn-muted" id="openReportBtn" type="button">Open source / report file</button>
+        </div>
       </div>
-    </div>
+    </details>
 
-    <div class="panel">
-      <h3 class="sectionTitle">Audit Observation Entry</h3>
+    <details class="panel collapsiblePanel" id="auditObservationEntryPanel">
+      <summary class="collapsibleSummary">
+        <span>Audit Observation Entry</span>
+        <span class="collapsibleHint">collapsed by default</span>
+      </summary>
+      <div class="collapsibleBody">
       <div class="muted">Add an observation directly to this audit, or review imported observations below.</div>
 
       <div class="row">
@@ -496,7 +545,8 @@
           <tr><td colspan="8" class="muted">Loading observations…</td></tr>
         </tbody>
       </table>
-    </div>
+      </div>
+    </details>
 
     <div class="panel" id="mscatPanel">
       <h3 class="sectionTitle">Root Cause Analysis / M-SCAT</h3>
