@@ -3,7 +3,7 @@
 // Manual Excel-based audit observation staging module. Future steps will add Excel import and M-SCAT RCA.
 // Observations use SIRE-style fields: question_no, obs_type, designation, SOC, NOC.
 
-const AUDIT_OBSERVATIONS_MANUAL_BUILD = "AUDIT_OBSERVATIONS_MANUAL_20260625_STEP1_COPY";
+const AUDIT_OBSERVATIONS_MANUAL_BUILD = "AUDIT_OBSERVATIONS_MANUAL_20260626_STEP3A_EXCEL_PREVIEW";
 window.CSVB_AUDIT_OBSERVATIONS_MANUAL_BUILD = AUDIT_OBSERVATIONS_MANUAL_BUILD;
 
 const AUDIT_BUCKET = "audit-reports";
@@ -82,6 +82,14 @@ const state = {
   observations: [],
   activeAudit: null,
   uploadedFileMeta: null,
+};
+
+const manualImportState = {
+  workbook: null,
+  fileName: "",
+  sheetName: "",
+  rows: [],
+  headerRowNumber: null,
 };
 
 function vesselNameById(id) {
@@ -662,6 +670,512 @@ function renderObservationsTable() {
   });
 }
 
+
+function manualCellText(value) {
+  if (value === null || value === undefined) return "";
+  if (value instanceof Date && !Number.isNaN(value.getTime())) return ymd(value);
+  return String(value).trim();
+}
+
+function manualHeaderKey(value) {
+  return manualCellText(value).toLowerCase().replace(/[^a-z0-9]+/g, "");
+}
+
+function findManualHeader(rows) {
+  const max = Math.min(rows.length, 80);
+
+  for (let r = 0; r < max; r += 1) {
+    const row = rows[r] || [];
+    const keys = row.map(manualHeaderKey);
+
+    const vessel = keys.findIndex((k) => k === "vessel" || k.includes("vessel"));
+    const auditDate = keys.findIndex((k) => k === "auditdate" || k.includes("auditdate"));
+    const auditCode = keys.findIndex((k) => k === "auditcode" || k.includes("auditcode"));
+    const checklist = keys.findIndex((k) =>
+      k.includes("checklist") ||
+      k.includes("viq") ||
+      k.includes("sire20") ||
+      k.includes("sire2")
+    );
+    const ncr = keys.findIndex((k) => k === "ncrdetails" || k.includes("ncrdetails") || k.includes("ncr"));
+
+    if (vessel >= 0 && auditDate >= 0 && auditCode >= 0 && checklist >= 0 && ncr >= 0) {
+      return {
+        rowIndex: r,
+        rowNumber: r + 1,
+        columns: { vessel, auditDate, auditCode, checklist, ncr }
+      };
+    }
+  }
+
+  return null;
+}
+
+function parseManualDate(value) {
+  if (value instanceof Date && !Number.isNaN(value.getTime())) return ymd(value);
+
+  if (typeof value === "number" && Number.isFinite(value)) {
+    const base = new Date(Date.UTC(1899, 11, 30));
+    base.setUTCDate(base.getUTCDate() + Math.floor(value));
+    return base.toISOString().slice(0, 10);
+  }
+
+  const raw = manualCellText(value);
+  if (!raw) return "";
+
+  const iso = raw.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/);
+  if (iso) {
+    const yyyy = iso[1];
+    const mm = String(Number(iso[2])).padStart(2, "0");
+    const dd = String(Number(iso[3])).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
+  }
+
+  const dmy = raw.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4})$/);
+  if (dmy) {
+    const dd = String(Number(dmy[1])).padStart(2, "0");
+    const mm = String(Number(dmy[2])).padStart(2, "0");
+    let yyyy = String(Number(dmy[3]));
+    if (yyyy.length === 2) yyyy = `20${yyyy}`;
+    return `${yyyy}-${mm}-${dd}`;
+  }
+
+  return "";
+}
+
+function normalizeManualVessel(raw) {
+  const base = manualCellText(raw).replace(/\s+/g, " ").trim();
+  if (!base) return "";
+
+  const withPrefix = /^olympic\b/i.test(base) ? base : `OLYMPIC ${base}`;
+  return withPrefix.replace(/\s+/g, " ").trim().toUpperCase();
+}
+
+function findManualVesselId(normalizedName) {
+  if (!normalizedName) return null;
+
+  const wanted = normalizedName.replace(/\s+/g, " ").trim().toUpperCase();
+
+  const direct = state.vessels.find((v) =>
+    String(v.name || "").replace(/\s+/g, " ").trim().toUpperCase() === wanted
+  );
+
+  if (direct?.id) return direct.id;
+
+  const withoutOlympic = wanted.replace(/^OLYMPIC\s+/i, "");
+  const suffixMatch = state.vessels.find((v) => {
+    const name = String(v.name || "").replace(/\s+/g, " ").trim().toUpperCase();
+    return name.replace(/^OLYMPIC\s+/i, "") === withoutOlympic;
+  });
+
+  return suffixMatch?.id || null;
+}
+
+function parseManualAuditCode(raw) {
+  const text = manualCellText(raw).replace(/\s+/g, " ").trim();
+  if (!text) {
+    return {
+      ok: false,
+      audit_code_raw: "",
+      audit_year: null,
+      audit_domain: "unknown",
+      audit_source_normalized: null,
+      audit_source_detail: "unknown",
+      label: "",
+      message: "Audit code missing."
+    };
+  }
+
+  const domainMap = {
+    car: "cargo",
+    cargo: "cargo",
+    moo: "mooring",
+    mooring: "mooring",
+    nav: "navigation",
+    navigation: "navigation"
+  };
+
+  const standard = text.match(/^(Ext|Mrn|Mstr)\.?\s*(Car|Cargo|Moo|Mooring|Nav|Navigation)\.?\s*(\d{4})$/i);
+  if (standard) {
+    const prefix = standard[1].toLowerCase();
+    const domain = domainMap[standard[2].toLowerCase()] || "unknown";
+    const year = Number(standard[3]);
+
+    const sourceMap = {
+      ext: ["external_contractor", "external_contractor", "External auditor"],
+      mrn: ["internal_superintendent", "marine_superintendent", "Marine Superintendent"],
+      mstr: ["internal_master", "master", "Master"]
+    };
+
+    const source = sourceMap[prefix] || [null, "unknown", "Unknown"];
+
+    return {
+      ok: domain !== "unknown",
+      audit_code_raw: text,
+      audit_year: year,
+      audit_domain: domain,
+      audit_source_normalized: source[0],
+      audit_source_detail: source[1],
+      label: `${source[2]} / ${domain}`,
+      message: ""
+    };
+  }
+
+  const vdr = text.match(/^VDR\s+Nav\.?\s*(\d{4})$/i);
+  if (vdr) {
+    return {
+      ok: true,
+      audit_code_raw: text,
+      audit_year: Number(vdr[1]),
+      audit_domain: "navigation",
+      audit_source_normalized: "external_contractor",
+      audit_source_detail: "remote_vdr",
+      label: "Remote VDR auditor / navigation",
+      message: ""
+    };
+  }
+
+  return {
+    ok: false,
+    audit_code_raw: text,
+    audit_year: null,
+    audit_domain: "unknown",
+    audit_source_normalized: null,
+    audit_source_detail: "unknown",
+    label: "Unknown",
+    message: `Audit code not recognized: ${text}`
+  };
+}
+
+function findManualAuditTypeId(domain) {
+  if (!domain || domain === "unknown") return null;
+
+  const terms = {
+    cargo: ["cargo"],
+    mooring: ["mooring", "moor"],
+    navigation: ["navigation", "navigational", "nav"]
+  }[domain] || [];
+
+  const found = state.auditTypes.find((t) => {
+    const name = String(t.audit_type_name || "").toLowerCase();
+    return terms.some((term) => name.includes(term));
+  });
+
+  return found?.id || null;
+}
+
+function normalizeManualQuestionNo(raw) {
+  const text = manualCellText(raw);
+  if (!text) return "";
+
+  const match = text.match(/\d+(?:\.\d+)+/);
+  if (!match) return text.trim();
+
+  return match[0]
+    .split(".")
+    .filter(Boolean)
+    .map((part) => String(Number(part)).padStart(2, "0"))
+    .join(".");
+}
+
+function isManualNilAudit(ncrText) {
+  const text = manualCellText(ncrText).replace(/\s+/g, " ").trim().toUpperCase();
+  return text === "NIL";
+}
+
+function manualValidationPill(status) {
+  const s = String(status || "warning");
+  const label = s === "valid" ? "Valid" : (s === "error" ? "Error" : "Warning");
+  return `<span class="validationPill validation-${esc(s)}">${esc(label)}</span>`;
+}
+
+function validateManualImportRow(row) {
+  const messages = [];
+
+  if (!row.vessel_raw) messages.push({ level: "error", message: "Vessel missing." });
+  if (row.vessel_normalized && !row.vessel_id) messages.push({ level: "error", message: "Vessel not matched to vessel list." });
+
+  if (!row.audit_date_raw) messages.push({ level: "error", message: "Audit date missing." });
+  if (row.audit_date_raw && !row.audit_date) messages.push({ level: "error", message: "Audit date could not be parsed." });
+
+  if (!row.audit_code_raw) messages.push({ level: "error", message: "Audit code missing." });
+  if (row.audit_code_raw && !row.audit_code_ok) messages.push({ level: "error", message: row.audit_code_message || "Audit code not recognized." });
+
+  if (!row.audit_type_id && row.audit_domain !== "unknown") {
+    messages.push({ level: "warning", message: "Audit type was parsed but not matched to an application audit type." });
+  }
+
+  if (!row.ncr_details) {
+    messages.push({ level: "error", message: "ncr_details missing. Blank is not treated as NIL." });
+  }
+
+  if (!row.is_nil_audit && row.ncr_details && !row.checklist_no_raw) {
+    messages.push({ level: "warning", message: "SIRE / checklist reference missing. Mapping will be required." });
+  }
+
+  const hasError = messages.some((m) => m.level === "error");
+  const hasWarning = messages.some((m) => m.level === "warning");
+
+  return {
+    status: hasError ? "error" : (hasWarning ? "warning" : "valid"),
+    messages
+  };
+}
+
+function buildManualImportRow(rawRow, excelRowNo, cols) {
+  const vesselRaw = manualCellText(rawRow[cols.vessel]);
+  const auditDateRaw = manualCellText(rawRow[cols.auditDate]);
+  const auditCodeRaw = manualCellText(rawRow[cols.auditCode]);
+  const checklistRaw = manualCellText(rawRow[cols.checklist]);
+  const ncrDetails = manualCellText(rawRow[cols.ncr]);
+
+  const vesselNormalized = normalizeManualVessel(vesselRaw);
+  const auditCode = parseManualAuditCode(auditCodeRaw);
+  const isNil = isManualNilAudit(ncrDetails);
+  const questionNo = normalizeManualQuestionNo(checklistRaw);
+  const auditTypeId = findManualAuditTypeId(auditCode.audit_domain);
+
+  const row = {
+    excel_row_no: excelRowNo,
+    vessel_raw: vesselRaw,
+    vessel_normalized: vesselNormalized,
+    vessel_id: findManualVesselId(vesselNormalized),
+    audit_date_raw: auditDateRaw,
+    audit_date: parseManualDate(rawRow[cols.auditDate]),
+    audit_code_raw: auditCodeRaw,
+    audit_code_ok: auditCode.ok,
+    audit_code_message: auditCode.message,
+    audit_year: auditCode.audit_year,
+    audit_domain: auditCode.audit_domain,
+    audit_source_normalized: auditCode.audit_source_normalized,
+    audit_source_detail: auditCode.audit_source_detail,
+    audit_source_label: auditCode.label,
+    audit_type_id: auditTypeId,
+    checklist_no_raw: checklistRaw,
+    sire_question_no_normalized: questionNo,
+    sire_mapping_status: isNil && !checklistRaw
+      ? "blank_nil_audit"
+      : (checklistRaw ? "provided" : "missing_needs_mapping"),
+    ncr_details: ncrDetails,
+    is_nil_audit: isNil,
+    import_action: isNil ? "create_audit_header_only" : "create_observation",
+    raw_payload: {
+      Vessel: vesselRaw,
+      Audit_date: auditDateRaw,
+      Audit_code: auditCodeRaw,
+      "Checklist_no(VIQ/SIRE2.0)": checklistRaw,
+      ncr_details: ncrDetails
+    }
+  };
+
+  const validation = validateManualImportRow(row);
+  row.validation_status = validation.status;
+  row.validation_messages = validation.messages;
+
+  if (validation.status === "error") {
+    row.import_action = "skip_needs_review";
+  }
+
+  return row;
+}
+
+function manualImportSummaryCounts(rows) {
+  return {
+    total: rows.length,
+    valid: rows.filter((r) => r.validation_status === "valid").length,
+    warning: rows.filter((r) => r.validation_status === "warning").length,
+    error: rows.filter((r) => r.validation_status === "error").length,
+    nil: rows.filter((r) => r.is_nil_audit).length
+  };
+}
+
+function renderManualImportPreview() {
+  const rows = manualImportState.rows || [];
+  const shown = rows.slice(0, 200);
+  const counts = manualImportSummaryCounts(rows);
+
+  el("manualImportTotal").textContent = String(counts.total);
+  el("manualImportValid").textContent = String(counts.valid);
+  el("manualImportWarning").textContent = String(counts.warning);
+  el("manualImportError").textContent = String(counts.error);
+  el("manualImportNil").textContent = String(counts.nil);
+  el("manualImportShown").textContent = String(shown.length);
+
+  const header = manualImportState.headerRowNumber
+    ? `Header detected at Excel row ${manualImportState.headerRowNumber}.`
+    : "Header not detected.";
+
+  el("manualImportSummary").innerHTML = `
+    <strong>Preview only — no database changes.</strong><br/>
+    Source file: ${esc(manualImportState.fileName || "—")}<br/>
+    Sheet: ${esc(manualImportState.sheetName || "—")}<br/>
+    ${esc(header)}<br/>
+    Parsed rows: ${counts.total}. Valid: ${counts.valid}. Warnings: ${counts.warning}. Errors: ${counts.error}. NIL audits: ${counts.nil}.
+  `;
+
+  const tbody = el("manualImportPreviewTbody");
+
+  if (!shown.length) {
+    tbody.innerHTML = `<tr><td colspan="12" class="muted">No preview rows generated.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = shown.map((r) => {
+    const messages = (r.validation_messages || []).map((m) => m.message).join(" | ");
+    const ncr = r.ncr_details || "—";
+
+    return `
+      <tr title="${esc(messages)}">
+        <td class="mono">${esc(r.excel_row_no)}</td>
+        <td>${esc(r.vessel_raw || "—")}</td>
+        <td>${esc(r.vessel_normalized || "—")}</td>
+        <td>${esc(r.audit_date || r.audit_date_raw || "—")}</td>
+        <td class="mono">${esc(r.audit_code_raw || "—")}</td>
+        <td>${esc(r.audit_domain || "—")}</td>
+        <td>${esc(r.audit_source_detail || "—")}</td>
+        <td class="mono">${esc(r.sire_question_no_normalized || r.checklist_no_raw || "—")}</td>
+        <td>${r.is_nil_audit ? "YES" : "NO"}</td>
+        <td>${manualValidationPill(r.validation_status)}</td>
+        <td class="mono">${esc(r.import_action || "—")}</td>
+        <td class="remarksCell">${esc(ncr.length > 360 ? `${ncr.slice(0, 360)}…` : ncr)}</td>
+      </tr>
+    `;
+  }).join("");
+
+  if (rows.length > shown.length) {
+    tbody.insertAdjacentHTML(
+      "beforeend",
+      `<tr><td colspan="12" class="muted">Showing first ${shown.length} rows only. Total parsed rows: ${rows.length}.</td></tr>`
+    );
+  }
+}
+
+function clearManualImportPreview() {
+  manualImportState.workbook = null;
+  manualImportState.fileName = "";
+  manualImportState.sheetName = "";
+  manualImportState.rows = [];
+  manualImportState.headerRowNumber = null;
+
+  el("manualExcelFile").value = "";
+  el("manualExcelSheetSelect").innerHTML = `<option value="">No workbook loaded</option>`;
+  el("manualExcelSheetSelect").disabled = true;
+
+  renderManualImportPreview();
+  el("manualImportSummary").textContent = "No Excel file parsed.";
+  setStatus("Ready");
+}
+
+async function handleManualExcelFileChange() {
+  const input = el("manualExcelFile");
+  const file = input.files && input.files[0];
+
+  manualImportState.workbook = null;
+  manualImportState.rows = [];
+  manualImportState.headerRowNumber = null;
+
+  if (!file) {
+    clearManualImportPreview();
+    return;
+  }
+
+  if (!window.XLSX) {
+    throw new Error("Excel parser library did not load. Check internet/CDN availability.");
+  }
+
+  setStatus("Reading Excel…");
+
+  const buf = await file.arrayBuffer();
+  const workbook = window.XLSX.read(buf, {
+    type: "array",
+    cellDates: true,
+    raw: true
+  });
+
+  manualImportState.workbook = workbook;
+  manualImportState.fileName = file.name;
+
+  const sheetNames = workbook.SheetNames || [];
+  const sel = el("manualExcelSheetSelect");
+  sel.innerHTML = "";
+
+  for (const name of sheetNames) {
+    const o = document.createElement("option");
+    o.value = name;
+    o.textContent = name;
+    sel.appendChild(o);
+  }
+
+  const preferred = sheetNames.find((name) => /stats/i.test(name)) || sheetNames[0] || "";
+  sel.value = preferred;
+  sel.disabled = !sheetNames.length;
+  manualImportState.sheetName = preferred;
+
+  el("manualImportSummary").innerHTML = `
+    Workbook loaded: <strong>${esc(file.name)}</strong><br/>
+    Select the required sheet and press <strong>Preview Excel</strong>.
+  `;
+
+  renderManualImportPreview();
+  setStatus("Excel loaded");
+}
+
+function parseManualExcelPreview() {
+  if (!manualImportState.workbook) {
+    alert("Select an Excel file first.");
+    return;
+  }
+
+  const sheetName = String(el("manualExcelSheetSelect").value || "").trim();
+  if (!sheetName) {
+    alert("Select a sheet first.");
+    return;
+  }
+
+  const ws = manualImportState.workbook.Sheets[sheetName];
+  if (!ws) throw new Error(`Sheet not found: ${sheetName}`);
+
+  setStatus("Parsing Excel…");
+
+  const rows = window.XLSX.utils.sheet_to_json(ws, {
+    header: 1,
+    raw: true,
+    defval: "",
+    blankrows: false
+  });
+
+  const header = findManualHeader(rows);
+  if (!header) {
+    throw new Error("Could not detect expected headers: Vessel, Audit_date, Audit_code, Checklist_no(VIQ/SIRE2.0), ncr_details.");
+  }
+
+  const parsed = [];
+
+  for (let r = header.rowIndex + 1; r < rows.length; r += 1) {
+    const rawRow = rows[r] || [];
+    const selectedCells = [
+      rawRow[header.columns.vessel],
+      rawRow[header.columns.auditDate],
+      rawRow[header.columns.auditCode],
+      rawRow[header.columns.checklist],
+      rawRow[header.columns.ncr],
+    ].map(manualCellText);
+
+    const hasAnyExpectedCell = selectedCells.some((v) => v !== "");
+    if (!hasAnyExpectedCell) continue;
+
+    parsed.push(buildManualImportRow(rawRow, r + 1, header.columns));
+  }
+
+  manualImportState.sheetName = sheetName;
+  manualImportState.rows = parsed;
+  manualImportState.headerRowNumber = header.rowNumber;
+
+  renderManualImportPreview();
+  setStatus("Preview ready");
+}
+
+
 async function reloadAll() {
   state.vessels = await loadVessels();
   state.auditTypes = await loadAuditTypes();
@@ -773,6 +1287,37 @@ async function init() {
   });
 
   el("clearObsBtn").addEventListener("click", clearObservationForm);
+
+  el("manualExcelFile").addEventListener("change", async () => {
+    try {
+      await handleManualExcelFileChange();
+    } catch (e) {
+      console.error(e);
+      alert("Excel load failed: " + (e?.message || String(e)));
+      setStatus("Error");
+    }
+  });
+
+  el("manualExcelSheetSelect").addEventListener("change", () => {
+    manualImportState.sheetName = String(el("manualExcelSheetSelect").value || "").trim();
+    manualImportState.rows = [];
+    manualImportState.headerRowNumber = null;
+    renderManualImportPreview();
+  });
+
+  el("parseManualExcelBtn").addEventListener("click", () => {
+    try {
+      parseManualExcelPreview();
+    } catch (e) {
+      console.error(e);
+      alert("Excel preview failed: " + (e?.message || String(e)));
+      setStatus("Error");
+    }
+  });
+
+  el("clearManualExcelPreviewBtn").addEventListener("click", clearManualImportPreview);
+
+  renderManualImportPreview();
 
   setStatus("Ready");
 }
