@@ -2,7 +2,7 @@ export const config = {
   verify_jwt: false,
 };
 
-const FUNCTION_VERSION = "audit-mscat-ai-backfill-v01-20260626";
+const FUNCTION_VERSION = "audit-mscat-ai-backfill-v02-learning-assisted-20260626";
 const MSCAT_SOURCE_REF = "DNV M-SCAT 8.2";
 const MAX_BATCH_ITEMS = 10;
 const DEFAULT_BATCH_ITEMS = 5;
@@ -161,6 +161,138 @@ function buildTaxonomyPromptRows(rows: any[]) {
     item_no: r.item_no,
     item_label: r.item_label,
   }));
+}
+
+
+function tokenizeLearningText(value: unknown) {
+  return Array.from(
+    new Set(
+      normSpaces(String(value || "").toLowerCase())
+        .split(/[^a-z0-9]+/g)
+        .map((x) => x.trim())
+        .filter((x) =>
+          x.length >= 4 &&
+          ![
+            "this","that","with","from","have","were","been","being","into","onto",
+            "they","their","there","where","which","when","then","than","such",
+            "audit","observation","observed","vessel","ship","during","found"
+          ].includes(x)
+        )
+    )
+  );
+}
+
+function learningSelectionCodes(example: any) {
+  const rows = Array.isArray(example?.final_manual_selections)
+    ? example.final_manual_selections
+    : [];
+
+  return rows
+    .map((x: any) => String(x?.item_code || x?.item_no || "").trim())
+    .filter(Boolean);
+}
+
+function buildLearningPromptRows(examples: any[]) {
+  return (examples || []).slice(0, 6).map((e: any) => ({
+    similarity_score: e.similarity_score || 0,
+    match_summary: e.match_summary || "",
+    audit_type_name: e.audit_type_name || "",
+    audit_source: e.audit_source || "",
+    sire_question_no: e.sire_question_no || e.question_base || "",
+    obs_type: e.obs_type || "",
+    designation: e.designation || "",
+    observation_text: previewText(e.observation_text || e.observation_remarks || "", 360),
+    reviewed_mscat_item_codes: learningSelectionCodes(e),
+    review_comment: previewText(e.review_comment || "", 220),
+  }));
+}
+
+function scoreLearningExample(example: any, item: any, tokens: string[]) {
+  let score = 0;
+  const itemQuestion = String(item?.question_no || item?.question_base || "").trim();
+
+  if (example?.sire_question_no && itemQuestion && String(example.sire_question_no) === itemQuestion) score += 50;
+  if (example?.audit_type_id && item?.audit_type_id && String(example.audit_type_id) === String(item.audit_type_id)) score += 25;
+  if (example?.audit_source && item?.audit_source && String(example.audit_source) === String(item.audit_source)) score += 15;
+  if (example?.obs_type && item?.obs_type && String(example.obs_type) === String(item.obs_type)) score += 10;
+  if (example?.designation && item?.designation && String(example.designation) === String(item.designation)) score += 8;
+
+  const haystack = normSpaces([
+    example?.question_base,
+    example?.sire_question_no,
+    example?.designation,
+    example?.soc,
+    example?.noc,
+    example?.observation_text,
+    example?.observation_remarks
+  ].filter(Boolean).join(" ")).toLowerCase();
+
+  let tokenHits = 0;
+  for (const token of tokens) {
+    if (haystack.includes(token)) tokenHits++;
+  }
+
+  score += Math.min(40, tokenHits * 4);
+
+  const parts: string[] = [];
+  if (example?.sire_question_no && itemQuestion && String(example.sire_question_no) === itemQuestion) parts.push("same SIRE reference");
+  if (example?.audit_type_id && item?.audit_type_id && String(example.audit_type_id) === String(item.audit_type_id)) parts.push("same audit type");
+  if (example?.audit_source && item?.audit_source && String(example.audit_source) === String(item.audit_source)) parts.push("same audit source");
+  if (example?.obs_type && item?.obs_type && String(example.obs_type) === String(item.obs_type)) parts.push("same observation type");
+  if (example?.designation && item?.designation && String(example.designation) === String(item.designation)) parts.push("same designation");
+  if (tokenHits > 0) parts.push("keyword overlap");
+
+  return {
+    ...example,
+    similarity_score: score,
+    match_summary: parts.join("; "),
+  };
+}
+
+async function loadLearningExamplesForItem(supabaseAdmin: any, profile: any, item: any, limit = 6) {
+  const role = String(profile?.role || "").trim();
+  const companyId = String(item?.company_id || profile?.company_id || "").trim();
+
+  let query = supabaseAdmin
+    .from("audit_observation_mscat_learning_examples")
+    .select("id,company_id,source_report_id,source_audit_observation_item_id,audit_type_id,audit_type_name,audit_source,sire_question_no,question_base,obs_type,designation,soc,noc,observation_text,observation_remarks,review_comment,final_taxonomy_ids,final_manual_selections,reviewed_at")
+    .neq("source_audit_observation_item_id", item.id)
+    .not("final_taxonomy_ids", "is", null)
+    .order("reviewed_at", { ascending: false })
+    .limit(200);
+
+  if (role !== "super_admin") {
+    if (!companyId) return [];
+    query = query.eq("company_id", companyId);
+  } else if (companyId) {
+    query = query.eq("company_id", companyId);
+  }
+
+  const { data, error } = await query;
+
+  if (error) throw new Error("Learning examples lookup failed: " + (error.message || String(error)));
+
+  const itemText = [
+    item?.question_no,
+    item?.question_base,
+    item?.designation,
+    item?.soc,
+    item?.noc,
+    item?.observation_text,
+    item?.remarks
+  ].filter(Boolean).join(" ");
+
+  const tokens = tokenizeLearningText(itemText);
+
+  return (data || [])
+    .map((e: any) => scoreLearningExample(e, item, tokens))
+    .filter((e: any) => Number(e.similarity_score || 0) > 0)
+    .sort((a: any, b: any) => {
+      const scoreDiff = Number(b.similarity_score || 0) - Number(a.similarity_score || 0);
+      if (scoreDiff) return scoreDiff;
+      return String(b.reviewed_at || "").localeCompare(String(a.reviewed_at || ""));
+    })
+    .slice(0, Math.max(0, Math.min(Number(limit || 6), 10)));
 }
 
 function extractOpenAiText(data: any) {
@@ -395,6 +527,7 @@ async function collectPendingItems(
   scope: string,
   reportId: string,
   batchId: string,
+  itemId: string,
   skipExisting: boolean
 ) {
   const pageSize = 200;
@@ -409,6 +542,36 @@ async function collectPendingItems(
     skipped_existing: 0,
     pending_items: 0,
   };
+
+  if (scope === "current_item") {
+    if (!itemId) throw new Error("item_id is required when scope=current_item.");
+
+    const { data, error } = await supabaseAdmin
+      .from("audit_observation_items")
+      .select("id,company_id,report_id,question_no,question_base,obs_type,designation,soc,noc,observation_text,remarks,sort_index")
+      .eq("id", itemId)
+      .maybeSingle();
+
+    if (error) throw new Error("Current audit observation lookup failed: " + (error.message || String(error)));
+    if (!data) throw new Error("Audit observation item not found: " + itemId);
+
+    await scanObservationPage(
+      supabaseAdmin,
+      profile,
+      [data],
+      skipExisting,
+      selectedPending,
+      allPendingSample,
+      counters
+    );
+
+    return {
+      counts: counters,
+      selectedPending,
+      allPendingSample,
+      scoped_report_count: reportId ? 1 : null,
+    };
+  }
 
   const scopedReportIds = await getScopedReportIds(supabaseAdmin, scope, reportId, batchId);
 
@@ -483,7 +646,7 @@ async function collectPendingItems(
   };
 }
 
-async function suggestForItem(openAiKey: string, model: string, item: any, taxonomyRows: any[], codeMap: Map<string, any>) {
+async function suggestForItem(openAiKey: string, model: string, item: any, taxonomyRows: any[], codeMap: Map<string, any>, learningExamples: any[] = []) {
   const responseSchema = {
     type: "object",
     additionalProperties: false,
@@ -541,6 +704,7 @@ async function suggestForItem(openAiKey: string, model: string, item: any, taxon
           "You are a maritime safety, tanker audit, SIRE 2.0, and DNV M-SCAT 8.2 cause analysis assistant. " +
           "Suggest M-SCAT causes/actions only from the provided taxonomy. Do not invent item codes. " +
           "Return only high-relevance suggestions. Prefer a balanced set: immediate cause(s), basic cause(s), and control area(s) when supported by the audit observation. " +
+          "When reviewed company examples are supplied, treat them as company preference signals. Do not copy them blindly; use them only when factually relevant to the current observation. " +
           "This is advisory only; final selections are saved as AI-suggested and remain reviewable by the user.",
       },
       {
@@ -548,6 +712,7 @@ async function suggestForItem(openAiKey: string, model: string, item: any, taxon
         content: JSON.stringify({
           task: "Suggest M-SCAT item codes for this vessel audit observation.",
           observation: buildObservationContext(item),
+          reviewed_company_examples: buildLearningPromptRows(learningExamples),
           taxonomy: buildTaxonomyPromptRows(taxonomyRows),
           constraints: [
             "Use exact item_code values only from the supplied taxonomy.",
@@ -555,6 +720,7 @@ async function suggestForItem(openAiKey: string, model: string, item: any, taxon
             "Return 2 to 6 strong suggestions unless fewer are justified.",
             "Never return more than 8 suggestions.",
             "Keep each reason concise.",
+            "If reviewed_company_examples are relevant, align with the reviewed company pattern and mention that alignment in the reason.",
           ],
         }),
       },
@@ -684,13 +850,20 @@ Deno.serve(async (req: Request) => {
     const scope = String(payload?.scope || "batch").trim();
     const report_id = String(payload?.report_id || "").trim();
     const batch_id = String(payload?.batch_id || "").trim();
+    const item_id = String(payload?.item_id || payload?.audit_observation_item_id || "").trim();
+    const suggest_only = payload?.suggest_only === true;
+    const use_learning = payload?.use_learning !== false;
     const dry_run = payload?.dry_run !== false;
     const skip_existing = payload?.skip_existing !== false;
     const max_items = clampInt(payload?.max_items, DEFAULT_BATCH_ITEMS, 1, MAX_BATCH_ITEMS);
     const concurrency = clampInt(payload?.concurrency, 2, 1, MAX_CONCURRENCY);
 
-    if (scope !== "current_report" && scope !== "batch" && scope !== "all_reports") {
-      return json(req, { ok: false, error: "scope must be current_report, batch, or all_reports" }, 400);
+    if (scope !== "current_item" && scope !== "current_report" && scope !== "batch" && scope !== "all_reports") {
+      return json(req, { ok: false, error: "scope must be current_item, current_report, batch, or all_reports" }, 400);
+    }
+
+    if (scope === "current_item" && !item_id) {
+      return json(req, { ok: false, error: "item_id is required when scope=current_item" }, 400);
     }
 
     if (scope === "current_report" && !report_id) {
@@ -728,6 +901,7 @@ Deno.serve(async (req: Request) => {
       scope,
       report_id,
       batch_id,
+      item_id,
       skip_existing
     );
 
@@ -742,6 +916,9 @@ Deno.serve(async (req: Request) => {
         scope,
         report_id: report_id || null,
         batch_id: batch_id || null,
+        item_id: item_id || null,
+        suggest_only,
+        use_learning,
         skip_existing,
         max_items,
         scoped_report_count: pending.scoped_report_count,
@@ -781,7 +958,11 @@ Deno.serve(async (req: Request) => {
     const codeMap = new Map(taxonomyRows.map((r: any) => [String(r.item_code), r]));
 
     const processed = await runWithConcurrency(selected, concurrency, async (item) => {
-      const ai = await suggestForItem(OPENAI_API_KEY, getOpenAiModel(), item, taxonomyRows, codeMap);
+      const learningExamples = use_learning
+        ? await loadLearningExamplesForItem(supabaseAdmin, profile, item, 6)
+        : [];
+
+      const ai = await suggestForItem(OPENAI_API_KEY, getOpenAiModel(), item, taxonomyRows, codeMap, learningExamples);
 
       if (!ai.suggestions.length) {
         return {
@@ -793,6 +974,30 @@ Deno.serve(async (req: Request) => {
           suggestions: [],
           overall_note: ai.overall_note,
           ignored_item_codes: ai.ignored_item_codes,
+          learning_examples_used: learningExamples.length,
+        };
+      }
+
+      if (suggest_only) {
+        return {
+          ok: true,
+          item_id: item.id,
+          report_id: item.report_id,
+          question_base: item.question_base,
+          inserted_rows: 0,
+          skipped_duplicate_rows: 0,
+          suggestions: ai.suggestions.map((s: any) => ({
+            taxonomy_id: s.taxonomy_id,
+            item_code: s.item_code,
+            section_label: s.section_label,
+            subsection_label: s.subsection_label,
+            item_label: s.item_label,
+            confidence: s.confidence,
+            reason: s.reason,
+          })),
+          overall_note: ai.overall_note,
+          ignored_item_codes: ai.ignored_item_codes,
+          learning_examples_used: learningExamples.length,
         };
       }
 
@@ -858,6 +1063,7 @@ Deno.serve(async (req: Request) => {
         inserted_rows: rowsToInsert.length,
         skipped_duplicate_rows,
         suggestions: ai.suggestions.map((s: any) => ({
+          taxonomy_id: s.taxonomy_id,
           item_code: s.item_code,
           section_label: s.section_label,
           subsection_label: s.subsection_label,
@@ -867,6 +1073,7 @@ Deno.serve(async (req: Request) => {
         })),
         overall_note: ai.overall_note,
         ignored_item_codes: ai.ignored_item_codes,
+        learning_examples_used: learningExamples.length,
       };
     });
 
@@ -877,13 +1084,16 @@ Deno.serve(async (req: Request) => {
     return json(req, {
       ok: true,
       function_version: FUNCTION_VERSION,
-      mode: "apply",
+      mode: suggest_only ? "suggest_only" : "apply",
       model: getOpenAiModel(),
       secret_name_used: Deno.env.get("OPENAI_API_KEY_2") ? "OPENAI_API_KEY_2" : "OPENAI_API_KEY",
       role,
       scope,
       report_id: report_id || null,
       batch_id: batch_id || null,
+      item_id: item_id || null,
+      suggest_only,
+      use_learning,
       skip_existing,
       max_items,
       concurrency,

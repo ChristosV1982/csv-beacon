@@ -1,7 +1,7 @@
 // public/audit_observations_manual_detail.js
 // Audit Observations Manual — separate audit detail window.
 
-const BUILD = "AUDIT_OBSERVATIONS_MANUAL_DETAIL_20260626_STEP6H3_LEARNING_DIAGNOSTICS_HIDDEN";
+const BUILD = "AUDIT_OBSERVATIONS_MANUAL_DETAIL_20260626_STEP6I_LEARNING_ASSISTED_SUGGEST";
 window.CSVB_AUDIT_OBSERVATIONS_MANUAL_DETAIL_BUILD = BUILD;
 
 const AUDIT_BUCKET = "audit-reports";
@@ -81,6 +81,9 @@ const state = {
   learningExamples: [],
   similarLearningExamples: [],
   similarLearningStatus: "",
+  activeAiSuggestions: [],
+  activeAiOverallNote: "",
+  activeAiLearningExamplesUsed: 0,
 };
 
 function vesselNameById(id) {
@@ -306,6 +309,23 @@ function mscatStatusForObservation(observationId) {
 function mscatStatusBadge(observationId) {
   const s = mscatStatusForObservation(observationId);
   return `<span class="pill ${esc(s.className)}">${esc(s.label)}</span>`;
+}
+
+function itemNeedsMscat(obs) {
+  const k = String(obs?.obs_type || "").trim().toLowerCase();
+  return k === "negative" || k === "largely";
+}
+
+function activeAiSuggestionForTaxonomyId(taxonomyId) {
+  return (state.activeAiSuggestions || []).find((s) =>
+    String(s.taxonomy_id || "") === String(taxonomyId || "")
+  ) || null;
+}
+
+function clearActiveAiSuggestions() {
+  state.activeAiSuggestions = [];
+  state.activeAiOverallNote = "";
+  state.activeAiLearningExamplesUsed = 0;
 }
 
 function mscatSourceBadge(source) {
@@ -549,6 +569,7 @@ function renderMscatTaxonomy() {
   const obs = activeMscatObservation();
   const search = String(el("mscatSearchInput")?.value || "").trim().toLowerCase();
   const savedIds = new Set(mscatSelectionsForObservation(obs?.id).map((s) => String(s.taxonomy_id)));
+  const suggestedIds = new Set((state.activeAiSuggestions || []).map((s) => String(s.taxonomy_id)));
 
   let items = state.mscatTaxonomy || [];
 
@@ -581,14 +602,22 @@ function renderMscatTaxonomy() {
       const itemHtml = subItems.map((item) => {
         const id = String(item.id);
         const code = item.item_code || item.item_no || "";
-        const checked = savedIds.has(id) ? "checked" : "";
+        const suggestion = activeAiSuggestionForTaxonomyId(id);
+        const checked = (savedIds.has(id) || suggestedIds.has(id)) ? "checked" : "";
+        const aiBadge = suggestion
+          ? `<span class="pill pill-ai" style="margin-left:6px;">AI suggested</span>`
+          : "";
+        const aiReason = suggestion?.reason
+          ? `<div class="mscatReason"><strong>AI reason:</strong> ${esc(suggestion.reason)}</div>`
+          : "";
 
         return `
           <label class="mscatItem">
             <input type="checkbox" class="mscatCheckbox" value="${esc(id)}" ${checked} ${obs ? "" : "disabled"}/>
             <span>
               <span class="mscatCode">${esc(code || "—")}</span>
-              ${esc(item.item_label || "—")}
+              ${esc(item.item_label || "—")}${aiBadge}
+              ${aiReason}
             </span>
           </label>
         `;
@@ -623,6 +652,9 @@ function renderMscatPanel() {
   const activeObs = activeMscatObservation();
   const savedCount = activeObs ? mscatSelectionsForObservation(activeObs.id).length : 0;
 
+  const status = activeObs ? mscatStatusForObservation(activeObs.id) : { key: "none" };
+
+  el("suggestLearningMscatBtn").disabled = !active || !itemNeedsMscat(activeObs) || status.key === "manual";
   el("saveMscatBtn").disabled = !active;
   el("markMscatReviewedBtn").disabled = !active || savedCount === 0;
   el("clearMscatSelectionBtn").disabled = !active;
@@ -632,6 +664,7 @@ function setActiveMscatObservation(observationId) {
   state.activeMscatObservationId = observationId || null;
   state.similarLearningExamples = [];
   state.similarLearningStatus = "";
+  clearActiveAiSuggestions();
   renderObservationsTable();
   renderMscatPanel();
 
@@ -647,6 +680,96 @@ function setActiveMscatObservation(observationId) {
       panel.scrollIntoView();
     }
   }
+}
+
+async function suggestMscatWithLearning() {
+  const obs = activeMscatObservation();
+
+  if (!obs) {
+    alert("Select an observation first.");
+    return;
+  }
+
+  if (!itemNeedsMscat(obs)) {
+    alert("M-SCAT suggestion is required for Negative and Largely as Expected observations only.");
+    return;
+  }
+
+  const status = mscatStatusForObservation(obs.id);
+
+  if (status.key === "manual") {
+    alert(
+      "This observation is manually reviewed and locked.\n\n" +
+      "AI suggestion will not overwrite manually reviewed M-SCAT selections."
+    );
+    return;
+  }
+
+  if (status.key === "mixed") {
+    const okMixed = confirm(
+      "This observation has mixed AI/manual M-SCAT selections.\n\n" +
+      "The AI suggestion will only pre-tick suggested checkboxes. It will not save or overwrite anything until you press Save.\n\n" +
+      "Continue?"
+    );
+    if (!okMixed) return;
+  }
+
+  const ok = confirm(
+    "Generate AI M-SCAT suggestions for the selected observation using reviewed company examples?\n\n" +
+    "No M-SCAT selection will be saved until you review the ticks and press Save M-SCAT selections."
+  );
+
+  if (!ok) return;
+
+  setStatus("AI suggesting M-SCAT using company learning…");
+
+  const { data, error } = await state.supabase.functions.invoke("backfill-audit-observations-mscat-ai", {
+    body: {
+      scope: "current_item",
+      item_id: obs.id,
+      report_id: state.reportId,
+      dry_run: false,
+      suggest_only: true,
+      use_learning: true,
+      skip_existing: false,
+      max_items: 1,
+      concurrency: 1
+    }
+  });
+
+  if (error) throw error;
+  if (!data?.ok) throw new Error(data?.error || "AI M-SCAT suggestion failed.");
+
+  const processed = Array.isArray(data.processed) ? data.processed : [];
+  const row = processed.find((x) => String(x.item_id || "") === String(obs.id)) || processed[0] || {};
+  const suggestions = Array.isArray(row.suggestions) ? row.suggestions : [];
+
+  clearActiveAiSuggestions();
+
+  state.activeAiSuggestions = suggestions
+    .map((s) => ({
+      taxonomy_id: String(s.taxonomy_id || "").trim(),
+      item_code: String(s.item_code || "").trim(),
+      confidence: Number(s.confidence || 0),
+      reason: String(s.reason || "").trim()
+    }))
+    .filter((s) => s.taxonomy_id);
+
+  state.activeAiOverallNote = String(row.overall_note || "").trim();
+  state.activeAiLearningExamplesUsed = Number(row.learning_examples_used || 0);
+
+  renderMscatPanel();
+
+  if (!state.activeAiSuggestions.length) {
+    setStatus("AI returned no valid M-SCAT suggestions");
+    alert("AI did not return valid M-SCAT suggestions for this observation.");
+    return;
+  }
+
+  setStatus(
+    `AI suggested ${state.activeAiSuggestions.length} M-SCAT item(s) using ` +
+    `${state.activeAiLearningExamplesUsed} reviewed example(s). Review ticks, then Save.`
+  );
 }
 
 async function saveMscatSelections() {
@@ -685,6 +808,8 @@ async function saveMscatSelections() {
   });
 
   if (error) throw error;
+
+  clearActiveAiSuggestions();
 
   state.mscatSelections = await loadMscatSelectionsForAudit();
   if (learningDebugEnabled()) {
@@ -802,6 +927,7 @@ async function editObservationSireReference(id) {
 
 function clearMscatSelection() {
   state.activeMscatObservationId = null;
+  clearActiveAiSuggestions();
   renderObservationsTable();
   renderMscatPanel();
 }
@@ -1082,6 +1208,16 @@ async function init() {
   el("clearObsBtn").addEventListener("click", clearObservationForm);
 
   el("mscatSearchInput").addEventListener("input", renderMscatTaxonomy);
+
+  el("suggestLearningMscatBtn").addEventListener("click", async () => {
+    try {
+      await suggestMscatWithLearning();
+    } catch (e) {
+      console.error(e);
+      alert("AI M-SCAT learning suggestion failed: " + (e?.message || String(e)));
+      setStatus("Error");
+    }
+  });
 
   el("saveMscatBtn").addEventListener("click", async () => {
     try {
