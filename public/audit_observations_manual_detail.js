@@ -1,7 +1,7 @@
 // public/audit_observations_manual_detail.js
 // Audit Observations Manual — separate audit detail window.
 
-const BUILD = "AUDIT_OBSERVATIONS_MANUAL_DETAIL_20260626_STEP6G_MSCAT_LEARNING_MEMORY";
+const BUILD = "AUDIT_OBSERVATIONS_MANUAL_DETAIL_20260626_STEP6H_LEARNING_EXAMPLES_VIEWER";
 window.CSVB_AUDIT_OBSERVATIONS_MANUAL_DETAIL_BUILD = BUILD;
 
 const AUDIT_BUCKET = "audit-reports";
@@ -74,6 +74,9 @@ const state = {
   mscatSelections: [],
   activeMscatObservationId: null,
   learningExamplesCount: 0,
+  learningExamples: [],
+  similarLearningExamples: [],
+  similarLearningStatus: "",
 };
 
 function vesselNameById(id) {
@@ -207,6 +210,33 @@ async function loadLearningExamplesCountForAudit() {
   return Number(count || 0);
 }
 
+async function loadLearningExamplesForAudit() {
+  if (!state.reportId) return [];
+
+  const { data, error } = await state.supabase.rpc("csvb_audit_mscat_learning_examples_for_me", {
+    p_report_id: state.reportId,
+    p_audit_observation_item_id: null,
+    p_limit: 25
+  });
+
+  if (error) throw error;
+
+  return data || [];
+}
+
+async function loadSimilarLearningExamplesForObservation(observationId) {
+  if (!observationId) return [];
+
+  const { data, error } = await state.supabase.rpc("csvb_find_similar_audit_mscat_learning_examples", {
+    p_audit_observation_item_id: observationId,
+    p_limit: 8
+  });
+
+  if (error) throw error;
+
+  return data || [];
+}
+
 
 async function loadMscatTaxonomy() {
   const { data, error } = await state.supabase
@@ -266,6 +296,119 @@ function mscatSourceBadge(source) {
   if (String(source) === "manual") return `<span class="pill pill-manual">Manual</span>`;
   if (String(source) === "ai_suggested") return `<span class="pill pill-ai">AI</span>`;
   return `<span class="pill">${esc(source || "—")}</span>`;
+}
+
+function learningSelectionLabels(example) {
+  const rows = Array.isArray(example?.final_manual_selections)
+    ? example.final_manual_selections
+    : [];
+
+  return rows.map((x) => {
+    const code = x.item_code || x.item_no || "";
+    const label = x.item_label || "";
+    return [code, label].filter(Boolean).join(" — ") || String(x.taxonomy_id || "");
+  }).filter(Boolean);
+}
+
+function renderLearningExampleCard(example, opts = {}) {
+  const labels = learningSelectionLabels(example);
+  const obsText = String(example.observation_text || example.observation_remarks || "").trim();
+  const score = example.similarity_score != null
+    ? `<span class="pill pill-ai">Score ${esc(example.similarity_score)}</span>`
+    : "";
+  const match = String(example.match_summary || "").trim();
+  const comment = String(example.review_comment || "").trim();
+
+  return `
+    <div class="mscatSavedItem">
+      <div class="mscatSavedMain">
+        ${score}
+        <span class="pill pill-manual">${esc(example.action_type || "reviewed")}</span>
+        <span class="mono">${esc(example.sire_question_no || example.question_base || "—")}</span>
+        <span>${esc(example.audit_type_name || "—")}</span>
+      </div>
+      ${match ? `<div class="mscatReason"><strong>Match:</strong> ${esc(match)}</div>` : ""}
+      <div class="mscatReason"><strong>Observation:</strong> ${esc(obsText || "—")}</div>
+      <div class="mscatReason"><strong>Reviewed M-SCAT:</strong> ${esc(labels.join(" | ") || "—")}</div>
+      ${comment ? `<div class="mscatReason"><strong>Review comment:</strong> ${esc(comment)}</div>` : ""}
+    </div>
+  `;
+}
+
+function renderLearningExamplesPanel() {
+  const box = el("mscatLearningExamplesBox");
+  if (!box) return;
+
+  const active = activeMscatObservation();
+  const auditExamples = state.learningExamples || [];
+  const similar = state.similarLearningExamples || [];
+
+  if (!active) {
+    const latest = auditExamples.slice(0, 3).map((x) => renderLearningExampleCard(x)).join("");
+
+    box.innerHTML = `
+      <div class="mscatSavedMain">
+        <span class="pill pill-manual">Learning memory</span>
+        <span>${esc(state.learningExamplesCount || 0)} reviewed example(s) logged for this audit.</span>
+      </div>
+      <div class="mscatReason">Select an observation to search for similar company-reviewed examples.</div>
+      ${latest ? `<div class="mscatReason"><strong>Latest examples from this audit:</strong></div>${latest}` : ""}
+    `;
+    return;
+  }
+
+  const status = String(state.similarLearningStatus || "").trim();
+
+  if (status) {
+    box.innerHTML = `
+      <div class="mscatSavedMain">
+        <span class="pill pill-ai">Similar examples</span>
+        <span>${esc(status)}</span>
+      </div>
+    `;
+    return;
+  }
+
+  const similarHtml = similar.map((x) => renderLearningExampleCard(x, { similar: true })).join("");
+  const latestHtml = auditExamples.slice(0, 3).map((x) => renderLearningExampleCard(x)).join("");
+
+  box.innerHTML = `
+    <div class="mscatSavedMain">
+      <span class="pill pill-manual">Learning memory</span>
+      <span>${esc(state.learningExamplesCount || 0)} reviewed example(s) logged for this audit.</span>
+    </div>
+    <div class="mscatReason">
+      <strong>Similar reviewed examples for selected observation:</strong>
+      ${similar.length ? "" : " No similar reviewed examples found yet."}
+    </div>
+    ${similarHtml}
+    ${latestHtml ? `<div class="mscatReason"><strong>Latest reviewed examples from this audit:</strong></div>${latestHtml}` : ""}
+  `;
+}
+
+async function refreshSimilarLearningExamplesForActiveObservation() {
+  const obs = activeMscatObservation();
+
+  state.similarLearningExamples = [];
+
+  if (!obs?.id) {
+    state.similarLearningStatus = "";
+    renderLearningExamplesPanel();
+    return;
+  }
+
+  state.similarLearningStatus = "Searching reviewed examples…";
+  renderLearningExamplesPanel();
+
+  try {
+    state.similarLearningExamples = await loadSimilarLearningExamplesForObservation(obs.id);
+    state.similarLearningStatus = "";
+  } catch (e) {
+    console.error(e);
+    state.similarLearningStatus = "Similar-example search failed: " + (e?.message || String(e));
+  }
+
+  renderLearningExamplesPanel();
 }
 
 function taxonomyById(id) {
@@ -449,6 +592,7 @@ function renderMscatTaxonomy() {
 function renderMscatPanel() {
   renderMscatSelectedObservation();
   renderMscatSavedList();
+  renderLearningExamplesPanel();
   renderMscatTaxonomy();
 
   const active = !!activeMscatObservation();
@@ -462,8 +606,11 @@ function renderMscatPanel() {
 
 function setActiveMscatObservation(observationId) {
   state.activeMscatObservationId = observationId || null;
+  state.similarLearningExamples = [];
+  state.similarLearningStatus = "";
   renderObservationsTable();
   renderMscatPanel();
+  refreshSimilarLearningExamplesForActiveObservation();
 
   const panel = el("mscatPanel");
   if (panel) {
@@ -514,6 +661,8 @@ async function saveMscatSelections() {
 
   state.mscatSelections = await loadMscatSelectionsForAudit();
   state.learningExamplesCount = await loadLearningExamplesCountForAudit();
+  state.learningExamples = await loadLearningExamplesForAudit();
+  state.similarLearningExamples = await loadSimilarLearningExamplesForObservation(obs.id);
 
   renderObservationsTable();
   renderMscatPanel();
@@ -562,6 +711,8 @@ async function markActiveMscatReviewed() {
 
   state.mscatSelections = await loadMscatSelectionsForAudit();
   state.learningExamplesCount = await loadLearningExamplesCountForAudit();
+  state.learningExamples = await loadLearningExamplesForAudit();
+  state.similarLearningExamples = await loadSimilarLearningExamplesForObservation(obs.id);
 
   renderObservationsTable();
   renderMscatPanel();
@@ -810,6 +961,8 @@ async function refreshDetail() {
   state.mscatTaxonomy = await loadMscatTaxonomy();
   state.mscatSelections = await loadMscatSelectionsForAudit();
   state.learningExamplesCount = await loadLearningExamplesCountForAudit();
+  state.learningExamples = await loadLearningExamplesForAudit();
+  state.similarLearningExamples = [];
 
   renderAuditHeader();
   renderObservationsTable();
