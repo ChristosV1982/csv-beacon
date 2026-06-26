@@ -345,6 +345,16 @@
       padding:0;
       overflow:hidden;
     }
+    .inlineCollapsible{
+      margin-top:10px;
+      border:1px solid #d5deef;
+      border-radius:12px;
+      background:#fff;
+    }
+    .inlineCollapsible[open] .collapsibleSummary{
+      border-bottom:1px solid #d5deef;
+      border-radius:12px 12px 0 0;
+    }
     .collapsibleSummary{
       cursor:pointer;
       list-style:none;
@@ -426,26 +436,35 @@
       </div>
     </div>
 
-    <details class="panel collapsiblePanel" id="auditHeaderPanel">
-      <summary class="collapsibleSummary">
-        <span>Audit Header</span>
-        <span class="collapsibleHint">collapsed by default</span>
-      </summary>
-      <div class="collapsibleBody">
-        <div class="summaryGrid" id="auditSummaryGrid"></div>
-        <div class="activeBox" id="auditRemarksBox">Loading audit…</div>
-        <div class="row" style="margin-top:10px;">
-          <button class="btn btn-muted" id="openReportBtn" type="button">Open source / report file</button>
-        </div>
-      </div>
-    </details>
+    <div class="panel" id="auditHeaderPanel">
+      <h3 class="sectionTitle">Audit Header</h3>
 
-    <details class="panel collapsiblePanel" id="auditObservationEntryPanel">
-      <summary class="collapsibleSummary">
-        <span>Audit Observation Entry</span>
-        <span class="collapsibleHint">collapsed by default</span>
-      </summary>
-      <div class="collapsibleBody">
+      <div class="summaryGrid" id="auditSummaryGrid"></div>
+
+      <details class="collapsiblePanel inlineCollapsible" id="auditMetadataPanel">
+        <summary class="collapsibleSummary">
+          <span>Manual Excel import metadata</span>
+          <span class="collapsibleHint">collapsed by default</span>
+        </summary>
+        <div class="collapsibleBody">
+          <div class="activeBox" id="auditRemarksBox">Loading audit…</div>
+          <div class="row" style="margin-top:10px;">
+            <button class="btn btn-muted" id="openReportBtn" type="button">Open source / report file</button>
+          </div>
+        </div>
+      </details>
+    </div>
+
+    <div class="panel" id="auditObservationEntryPanel">
+      <h3 class="sectionTitle">Audit Observation Entry</h3>
+      <div class="muted">Review imported observations below. Expand manual addition only when adding a new observation directly to this audit.</div>
+
+      <details class="collapsiblePanel inlineCollapsible" id="manualObservationEntryPanel">
+        <summary class="collapsibleSummary">
+          <span>Manual addition of observation</span>
+          <span class="collapsibleHint">collapsed by default</span>
+        </summary>
+        <div class="collapsibleBody">
       <div class="muted">Add an observation directly to this audit, or review imported observations below.</div>
 
       <div class="row">
@@ -508,6 +527,8 @@
         <button class="btn btn-muted" id="saveObsBtn" type="button">Add observation</button>
         <button class="btn btn-danger" id="clearObsBtn" type="button">Clear observation form</button>
       </div>
+        </div>
+      </details>
 
       <div class="statGrid">
         <div class="stat">
@@ -544,9 +565,7 @@
         <tbody id="observationsTbody">
           <tr><td colspan="8" class="muted">Loading observations…</td></tr>
         </tbody>
-      </table>
-      </div>
-    </details>
+      </table>    </div>
 
     <div class="panel" id="mscatPanel">
       <h3 class="sectionTitle">Root Cause Analysis / M-SCAT</h3>
