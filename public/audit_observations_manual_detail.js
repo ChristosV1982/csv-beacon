@@ -1,7 +1,7 @@
 // public/audit_observations_manual_detail.js
 // Audit Observations Manual — separate audit detail window.
 
-const BUILD = "AUDIT_OBSERVATIONS_MANUAL_DETAIL_20260626_STEP6D_MSCAT_REVIEW_SIRE_REF";
+const BUILD = "AUDIT_OBSERVATIONS_MANUAL_DETAIL_20260626_STEP6G_MSCAT_LEARNING_MEMORY";
 window.CSVB_AUDIT_OBSERVATIONS_MANUAL_DETAIL_BUILD = BUILD;
 
 const AUDIT_BUCKET = "audit-reports";
@@ -73,6 +73,7 @@ const state = {
   mscatTaxonomy: [],
   mscatSelections: [],
   activeMscatObservationId: null,
+  learningExamplesCount: 0,
 };
 
 function vesselNameById(id) {
@@ -166,13 +167,44 @@ function renderAuditHeader() {
   el("auditRemarksBox").textContent = String(a.remarks || "No audit remarks recorded.");
 }
 
+function ensureLearningCounterCard() {
+  const grid = document.querySelector(".statGrid");
+  if (!grid || el("cntLearning")) return;
+
+  grid.insertAdjacentHTML("beforeend", `
+    <div class="stat">
+      <div class="statN" id="cntLearning">0</div>
+      <div class="statL">Learning examples available</div>
+    </div>
+  `);
+}
+
 function renderCounters() {
+  ensureLearningCounterCard();
+
   const rows = state.observations || [];
 
   el("cntTotal").textContent = String(rows.length);
   el("cntNegative").textContent = String(rows.filter((r) => r.obs_type === "negative").length);
   el("cntLargely").textContent = String(rows.filter((r) => r.obs_type === "largely").length);
   el("cntPositive").textContent = String(rows.filter((r) => r.obs_type === "positive").length);
+
+  if (el("cntLearning")) {
+    el("cntLearning").textContent = String(Number(state.learningExamplesCount || 0));
+  }
+}
+
+async function loadLearningExamplesCountForAudit() {
+  if (!state.reportId) return 0;
+
+  const { count, error } = await state.supabase
+    .from("audit_observation_mscat_learning_examples")
+    .select("id", { count: "exact", head: true })
+    .eq("source_report_id", state.reportId);
+
+  if (error) throw error;
+
+  return Number(count || 0);
 }
 
 
@@ -455,41 +487,38 @@ async function saveMscatSelections() {
     .filter(Boolean);
 
   const ok = confirm(
-    `Save ${selectedIds.length} M-SCAT selection(s) for this observation?\\n\\n` +
-    `Existing M-SCAT selections for this observation will be replaced.`
+    `Save ${selectedIds.length} M-SCAT selection(s) for this observation?\n\n` +
+    `Existing M-SCAT selections for this observation will be replaced.\n\n` +
+    `A reviewed learning example will also be logged.`
   );
 
   if (!ok) return;
 
-  setStatus("Saving M-SCAT…");
+  const reviewComment = prompt(
+    "Optional review comment for the M-SCAT learning example.\n\nLeave blank if not required.",
+    ""
+  );
 
-  const { error: delErr } = await state.supabase
-    .from("audit_observation_mscat")
-    .delete()
-    .eq("audit_observation_item_id", obs.id);
+  if (reviewComment === null) return;
 
-  if (delErr) throw delErr;
+  setStatus("Saving M-SCAT and logging learning example…");
 
-  if (selectedIds.length) {
-    const payload = selectedIds.map((taxonomyId) => ({
-      audit_observation_item_id: obs.id,
-      taxonomy_id: taxonomyId,
-      selection_source: "manual"
-    }));
+  const { error } = await state.supabase.rpc("csvb_save_audit_mscat_manual_selection", {
+    p_audit_observation_item_id: obs.id,
+    p_final_taxonomy_ids: selectedIds,
+    p_review_comment: String(reviewComment || "").trim() || null,
+    p_source_app_build: BUILD
+  });
 
-    const { error: insErr } = await state.supabase
-      .from("audit_observation_mscat")
-      .insert(payload);
-
-    if (insErr) throw insErr;
-  }
+  if (error) throw error;
 
   state.mscatSelections = await loadMscatSelectionsForAudit();
+  state.learningExamplesCount = await loadLearningExamplesCountForAudit();
 
   renderObservationsTable();
   renderMscatPanel();
 
-  setStatus("M-SCAT saved");
+  setStatus("M-SCAT saved and learning example logged");
 }
 
 async function markActiveMscatReviewed() {
@@ -508,26 +537,36 @@ async function markActiveMscatReviewed() {
 
   const ok = confirm(
     `Mark ${rows.length} M-SCAT selection(s) for this observation as manually reviewed?\n\n` +
-    `The selected M-SCAT codes will remain unchanged. Only their source will change from AI to Manual.`
+    `The selected M-SCAT codes will remain unchanged. Only their source will change from AI to Manual.\n\n` +
+    `A reviewed learning example will also be logged.`
   );
 
   if (!ok) return;
 
-  setStatus("Marking M-SCAT as manually reviewed…");
+  const reviewComment = prompt(
+    "Optional review comment for the M-SCAT learning example.\n\nLeave blank if not required.",
+    ""
+  );
 
-  const { error } = await state.supabase
-    .from("audit_observation_mscat")
-    .update({ selection_source: "manual" })
-    .eq("audit_observation_item_id", obs.id);
+  if (reviewComment === null) return;
+
+  setStatus("Marking M-SCAT as manually reviewed and logging learning example…");
+
+  const { error } = await state.supabase.rpc("csvb_mark_audit_mscat_manually_reviewed", {
+    p_audit_observation_item_id: obs.id,
+    p_review_comment: String(reviewComment || "").trim() || null,
+    p_source_app_build: BUILD
+  });
 
   if (error) throw error;
 
   state.mscatSelections = await loadMscatSelectionsForAudit();
+  state.learningExamplesCount = await loadLearningExamplesCountForAudit();
 
   renderObservationsTable();
   renderMscatPanel();
 
-  setStatus("M-SCAT marked as manually reviewed");
+  setStatus("M-SCAT marked as manually reviewed and learning example logged");
 }
 
 async function editObservationSireReference(id) {
@@ -770,6 +809,7 @@ async function refreshDetail() {
   state.observations = await loadObservationsForAudit();
   state.mscatTaxonomy = await loadMscatTaxonomy();
   state.mscatSelections = await loadMscatSelectionsForAudit();
+  state.learningExamplesCount = await loadLearningExamplesCountForAudit();
 
   renderAuditHeader();
   renderObservationsTable();
