@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en" data-csvb-page="audit_observations_manual_detail.html">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Audit Observations Manual Detail</title>
+
+  <link rel="stylesheet" href="./csv-beacon-theme.css?v=20260428_3" />
+  <link rel="stylesheet" href="./style.css?v=20260428_3" />
+
+  <style>
+    body{
+      margin:0;
+      min-height:100vh;
+      font-family:"Segoe UI", Arial, sans-serif;
+      background:#f4f8fd;
+      color:#0b2e5c;
+      padding:10px;
+      box-sizing:border-box;
+    }
+    .wrap{ max-width:1900px; margin:0 auto; }
+
+    .topbar{
+      display:flex;
+      gap:12px;
+      flex-wrap:wrap;
+      align-items:center;
+      justify-content:space-between;
+      margin-bottom:10px;
+      background:#062a5e;
+      border:1px solid #d5deef;
+      border-radius:12px;
+      padding:12px 14px;
+      box-shadow:0 4px 18px rgba(18,44,87,0.16);
+      color:#fff;
+    }
+    .title{ margin:0; font-weight:950; letter-spacing:0.02em; font-size:1.15rem; }
+    .sub{ margin-top:4px; opacity:0.92; font-weight:800; line-height:1.35; font-size:0.92rem; }
+    .actions{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+
+    .btn{
+      border:none;
+      border-radius:8px;
+      padding:8px 12px;
+      font-weight:900;
+      cursor:pointer;
+      text-decoration:none;
+      display:inline-block;
+      background:#062a5e;
+      color:#fff;
+      white-space:nowrap;
+    }
+    .btn-outline{ background:transparent; border:1px solid rgba(255,255,255,0.65); color:#fff; }
+    .btn-muted{ background:#eaf1fb; border:1px solid #d5deef; color:#1a4170; }
+    .btn-danger{ background:#fee2e2; color:#991b1b; border:1px solid #fecaca; }
+    .btn-small{ padding:6px 10px; border-radius:8px; font-size:0.82rem; }
+
+    .panel{
+      background:#fff;
+      border:1px solid #d5deef;
+      border-radius:14px;
+      padding:12px;
+      box-shadow:0 4px 18px rgba(18,44,87,0.12);
+      margin-bottom:10px;
+      overflow-x:auto;
+    }
+    .sectionTitle{
+      margin:0 0 8px 0;
+      color:#062a5e;
+      font-weight:950;
+    }
+    .muted{ color:#64748b; font-weight:800; line-height:1.35; }
+    .activeBox{
+      margin-top:10px;
+      padding:10px 12px;
+      border:1px solid #d5deef;
+      border-radius:12px;
+      background:#f8fbff;
+      color:#1a4170;
+      font-weight:850;
+      line-height:1.45;
+      white-space:pre-wrap;
+    }
+
+    .summaryGrid{
+      display:grid;
+      grid-template-columns:repeat(4, minmax(0,1fr));
+      gap:10px;
+      margin-top:10px;
+    }
+    @media(max-width:1200px){ .summaryGrid{ grid-template-columns:repeat(2, minmax(0,1fr)); } }
+    @media(max-width:720px){ .summaryGrid{ grid-template-columns:1fr; } }
+
+    .summaryCard{
+      border:1px solid #d5deef;
+      border-radius:12px;
+      background:#f8fbff;
+      padding:10px;
+      min-height:58px;
+    }
+    .summaryLabel{ color:#64748b; font-weight:900; font-size:.82rem; }
+    .summaryValue{ color:#062a5e; font-weight:950; margin-top:5px; line-height:1.3; }
+
+    .row{ display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; }
+    .field{ min-width:220px; flex:1; }
+    .field-wide{ min-width:360px; flex:1.6; }
+
+    label{
+      display:block;
+      margin:9px 0 5px 0;
+      font-weight:900;
+      color:#062a5e;
+      font-size:0.92rem;
+    }
+    input, select, textarea{
+      width:100%;
+      box-sizing:border-box;
+      border-radius:8px;
+      border:1px solid #bcd3ee;
+      padding:9px 10px;
+      font-size:.95rem;
+      font-family:"Segoe UI", Arial, sans-serif;
+      background:#fff;
+      color:#062a5e;
+      outline:none;
+    }
+    textarea{ min-height:82px; resize:vertical; line-height:1.4; }
+
+    .statGrid{
+      display:grid;
+      grid-template-columns:repeat(4, minmax(0,1fr));
+      gap:10px;
+      margin-top:10px;
+    }
+    @media(max-width:980px){ .statGrid{ grid-template-columns:1fr; } }
+    .stat{
+      border:1px solid #d5deef;
+      border-radius:12px;
+      padding:12px;
+      background:#f8fbff;
+    }
+    .statN{ font-size:1.55rem; font-weight:950; color:#062a5e; }
+    .statL{ margin-top:4px; color:#35507b; font-weight:850; }
+
+    table{
+      width:100%;
+      border-collapse:collapse;
+      margin-top:10px;
+      min-width:1300px;
+    }
+    th, td{
+      border-bottom:1px solid #e3ecfb;
+      padding:9px;
+      text-align:left;
+      vertical-align:top;
+    }
+    th{ color:#062a5e; font-weight:950; background:#eaf4ff; }
+    td{ color:#223a66; font-weight:850; }
+
+    .mono{ font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
+    .remarksCell{ max-width:620px; white-space:normal; line-height:1.35; }
+    .obsTextMain{
+      white-space:pre-wrap;
+      color:#223a66;
+      font-weight:850;
+      line-height:1.35;
+    }
+    .obsImportMeta{
+      margin-top:6px;
+      padding-top:6px;
+      border-top:1px dashed #d5deef;
+      white-space:pre-wrap;
+      color:#64748b;
+      font-size:.82rem;
+      font-weight:800;
+      line-height:1.3;
+    }
+
+    .pill{
+      display:inline-flex;
+      border-radius:999px;
+      padding:4px 10px;
+      font-size:0.8rem;
+      font-weight:950;
+      border:1px solid #d5deef;
+      background:#f8fbff;
+      color:#1a4170;
+      white-space:nowrap;
+    }
+    .pill-neg{ background:#fee2e2; color:#991b1b; border-color:#fecaca; }
+    .pill-lae{ background:#fef3c7; color:#92400e; border-color:#fde68a; }
+    .pill-pos{ background:#dcfce7; color:#166534; border-color:#bbf7d0; }
+
+    .statusLine{
+      margin-top:10px;
+      font-weight:950;
+      color:#062a5e;
+      display:flex;
+      gap:10px;
+      align-items:center;
+      flex-wrap:wrap;
+    }
+    .statusPill{
+      display:inline-block;
+      padding:4px 10px;
+      border-radius:999px;
+      font-weight:950;
+      font-size:0.85rem;
+      border:1px solid #d5deef;
+      background:#f8fbff;
+      color:#062a5e;
+    }
+  </style>
+
+  <link rel="stylesheet" href="./csvb-ui-polish.css?v=20260430_1" />
+  <link rel="stylesheet" href="./csvb-help-tooltips.css?v=20260430_1" />
+  <link rel="stylesheet" href="./csvb-100pct-fit.css?v=20260430_1" />
+  <link rel="stylesheet" href="./csvb-mobile-polish.css?v=20260528_1" />
+  <link rel="stylesheet" href="./csvb-mobile-fixes-20260528-2.css?v=20260528_2" />
+</head>
+
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <div>
+        <div class="title" id="pageTitle">Audit Detail</div>
+        <div class="sub" id="pageSub">Manual audit observation detail window.</div>
+      </div>
+      <div class="actions">
+        <div id="userBadge" style="font-weight:900; opacity:0.95;"></div>
+        <a class="btn btn-outline" href="./audit_observations_manual.html">Manual Register</a>
+        <a class="btn btn-outline" href="./q-dashboard.html">Dashboard</a>
+        <button class="btn btn-outline" id="refreshBtn" type="button">Reload</button>
+        <button class="btn btn-outline" id="closeWindowBtn" type="button">Close Window</button>
+        <button class="btn" id="logoutBtn" type="button">Logout</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3 class="sectionTitle">Audit Header</h3>
+      <div class="summaryGrid" id="auditSummaryGrid"></div>
+      <div class="activeBox" id="auditRemarksBox">Loading audit…</div>
+      <div class="row" style="margin-top:10px;">
+        <button class="btn btn-muted" id="openReportBtn" type="button">Open source / report file</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3 class="sectionTitle">Audit Observation Entry</h3>
+      <div class="muted">Add an observation directly to this audit, or review imported observations below.</div>
+
+      <div class="row">
+        <div class="field">
+          <label for="obsQuestionNo">Question no</label>
+          <input id="obsQuestionNo" type="text" placeholder="e.g. 4.2.7"/>
+        </div>
+
+        <div class="field">
+          <label for="obsType">Observation type</label>
+          <select id="obsType">
+            <option value="negative">Negative</option>
+            <option value="largely">Largely as expected</option>
+            <option value="positive">Positive</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="obsDesignation">Designation</label>
+          <select id="obsDesignation">
+            <option value="">—</option>
+            <option value="Human">Human</option>
+            <option value="Process">Process</option>
+            <option value="Hardware">Hardware</option>
+            <option value="Photo">Photo</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="obsSortIndex">Sort index</label>
+          <input id="obsSortIndex" type="number" min="0" step="1" value="0"/>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="field">
+          <label for="obsSoc">SOC</label>
+          <input id="obsSoc" type="text"/>
+        </div>
+
+        <div class="field">
+          <label for="obsNoc">NOC</label>
+          <input id="obsNoc" type="text"/>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="field-wide">
+          <label for="obsText">Observation text</label>
+          <textarea id="obsText"></textarea>
+        </div>
+
+        <div class="field-wide">
+          <label for="obsRemarks">Remarks</label>
+          <textarea id="obsRemarks"></textarea>
+        </div>
+      </div>
+
+      <div class="row" style="margin-top:10px;">
+        <button class="btn btn-muted" id="saveObsBtn" type="button">Add observation</button>
+        <button class="btn btn-danger" id="clearObsBtn" type="button">Clear observation form</button>
+      </div>
+
+      <div class="statGrid">
+        <div class="stat">
+          <div class="statN" id="cntTotal">0</div>
+          <div class="statL">Total observations</div>
+        </div>
+        <div class="stat">
+          <div class="statN" id="cntNegative">0</div>
+          <div class="statL">Negative</div>
+        </div>
+        <div class="stat">
+          <div class="statN" id="cntLargely">0</div>
+          <div class="statL">Largely as expected</div>
+        </div>
+        <div class="stat">
+          <div class="statN" id="cntPositive">0</div>
+          <div class="statL">Positive</div>
+        </div>
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Question</th>
+            <th>Type</th>
+            <th>Designation</th>
+            <th>SOC</th>
+            <th>NOC</th>
+            <th>Observation / Remarks</th>
+            <th>Delete</th>
+          </tr>
+        </thead>
+        <tbody id="observationsTbody">
+          <tr><td colspan="7" class="muted">Loading observations…</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="panel">
+      <h3 class="sectionTitle">Root Cause Analysis / M-SCAT</h3>
+      <div class="activeBox">
+        M-SCAT root cause analysis will be added here next. This detail window is now the correct location for M-SCAT, SIRE question mapping, corrective actions, attachments and audit-specific KPIs.
+      </div>
+    </div>
+
+    <div class="statusLine">
+      <span class="statusPill" id="statusPill">Loading</span>
+      <span class="muted" id="buildInfo"></span>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="./auth.js"></script>
+  <script type="module" src="./audit_observations_manual_detail.js?v=20260626_1"></script>
+  <script src="./csvb-ui-polish.js?v=20260430_1"></script>
+  <script src="./csvb-help-tooltips.js?v=20260430_1"></script>
+  <script src="./csvb-100pct-fit.js?v=20260430_1"></script>
+  <script src="./csvb-build-badge.js?v=20260528_01"></script>
+</body>
+</html>

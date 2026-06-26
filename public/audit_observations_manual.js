@@ -3,7 +3,7 @@
 // Manual Excel-based audit observation staging module. Future steps will add Excel import and M-SCAT RCA.
 // Observations use SIRE-style fields: question_no, obs_type, designation, SOC, NOC.
 
-const AUDIT_OBSERVATIONS_MANUAL_BUILD = "AUDIT_OBSERVATIONS_MANUAL_20260626_STEP4G_DISPLAY_OBSERVATION_TEXT";
+const AUDIT_OBSERVATIONS_MANUAL_BUILD = "AUDIT_OBSERVATIONS_MANUAL_20260626_STEP5A_OPEN_DETAIL_WINDOW";
 window.CSVB_AUDIT_OBSERVATIONS_MANUAL_BUILD = AUDIT_OBSERVATIONS_MANUAL_BUILD;
 
 const AUDIT_BUCKET = "audit-reports";
@@ -327,9 +327,12 @@ function renderAuditsTable() {
   }).join("");
 
   tbody.querySelectorAll(".openAuditBtn").forEach((btn) => {
-    btn.addEventListener("click", async () => {
+    btn.addEventListener("click", () => {
       const id = btn.getAttribute("data-id");
-      await openAudit(id);
+      if (!id) return;
+
+      const url = `./audit_observations_manual_detail.html?id=${encodeURIComponent(id)}`;
+      window.open(url, "_blank", "noopener,noreferrer");
     });
   });
 }
