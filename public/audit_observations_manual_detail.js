@@ -1,7 +1,7 @@
 // public/audit_observations_manual_detail.js
 // Audit Observations Manual — separate audit detail window.
 
-const BUILD = "AUDIT_OBSERVATIONS_MANUAL_DETAIL_20260626_STEP6H_LEARNING_EXAMPLES_VIEWER";
+const BUILD = "AUDIT_OBSERVATIONS_MANUAL_DETAIL_20260626_STEP6H3_LEARNING_DIAGNOSTICS_HIDDEN";
 window.CSVB_AUDIT_OBSERVATIONS_MANUAL_DETAIL_BUILD = BUILD;
 
 const AUDIT_BUCKET = "audit-reports";
@@ -37,6 +37,10 @@ function setStatus(text) {
 
 function getAuditId() {
   return new URLSearchParams(window.location.search).get("id");
+}
+
+function learningDebugEnabled() {
+  return new URLSearchParams(window.location.search).get("debug_learning") === "1";
 }
 
 function canonicalQno(qno) {
@@ -171,8 +175,20 @@ function renderAuditHeader() {
 }
 
 function ensureLearningCounterCard() {
+  const existing = el("cntLearning")?.closest(".stat");
+
+  if (!learningDebugEnabled()) {
+    if (existing) existing.style.display = "none";
+    return;
+  }
+
   const grid = document.querySelector(".statGrid");
-  if (!grid || el("cntLearning")) return;
+  if (!grid) return;
+
+  if (existing) {
+    existing.style.display = "";
+    return;
+  }
 
   grid.insertAdjacentHTML("beforeend", `
     <div class="stat">
@@ -338,6 +354,14 @@ function renderLearningExampleCard(example, opts = {}) {
 function renderLearningExamplesPanel() {
   const box = el("mscatLearningExamplesBox");
   if (!box) return;
+
+  if (!learningDebugEnabled()) {
+    box.style.display = "none";
+    box.innerHTML = "";
+    return;
+  }
+
+  box.style.display = "";
 
   const active = activeMscatObservation();
   const auditExamples = state.learningExamples || [];
@@ -610,7 +634,10 @@ function setActiveMscatObservation(observationId) {
   state.similarLearningStatus = "";
   renderObservationsTable();
   renderMscatPanel();
-  refreshSimilarLearningExamplesForActiveObservation();
+
+  if (learningDebugEnabled()) {
+    refreshSimilarLearningExamplesForActiveObservation();
+  }
 
   const panel = el("mscatPanel");
   if (panel) {
@@ -660,9 +687,15 @@ async function saveMscatSelections() {
   if (error) throw error;
 
   state.mscatSelections = await loadMscatSelectionsForAudit();
-  state.learningExamplesCount = await loadLearningExamplesCountForAudit();
-  state.learningExamples = await loadLearningExamplesForAudit();
-  state.similarLearningExamples = await loadSimilarLearningExamplesForObservation(obs.id);
+  if (learningDebugEnabled()) {
+    state.learningExamplesCount = await loadLearningExamplesCountForAudit();
+    state.learningExamples = await loadLearningExamplesForAudit();
+    state.similarLearningExamples = await loadSimilarLearningExamplesForObservation(obs.id);
+  } else {
+    state.learningExamplesCount = 0;
+    state.learningExamples = [];
+    state.similarLearningExamples = [];
+  }
 
   renderObservationsTable();
   renderMscatPanel();
@@ -710,9 +743,15 @@ async function markActiveMscatReviewed() {
   if (error) throw error;
 
   state.mscatSelections = await loadMscatSelectionsForAudit();
-  state.learningExamplesCount = await loadLearningExamplesCountForAudit();
-  state.learningExamples = await loadLearningExamplesForAudit();
-  state.similarLearningExamples = await loadSimilarLearningExamplesForObservation(obs.id);
+  if (learningDebugEnabled()) {
+    state.learningExamplesCount = await loadLearningExamplesCountForAudit();
+    state.learningExamples = await loadLearningExamplesForAudit();
+    state.similarLearningExamples = await loadSimilarLearningExamplesForObservation(obs.id);
+  } else {
+    state.learningExamplesCount = 0;
+    state.learningExamples = [];
+    state.similarLearningExamples = [];
+  }
 
   renderObservationsTable();
   renderMscatPanel();
@@ -960,8 +999,15 @@ async function refreshDetail() {
   state.observations = await loadObservationsForAudit();
   state.mscatTaxonomy = await loadMscatTaxonomy();
   state.mscatSelections = await loadMscatSelectionsForAudit();
-  state.learningExamplesCount = await loadLearningExamplesCountForAudit();
-  state.learningExamples = await loadLearningExamplesForAudit();
+
+  if (learningDebugEnabled()) {
+    state.learningExamplesCount = await loadLearningExamplesCountForAudit();
+    state.learningExamples = await loadLearningExamplesForAudit();
+  } else {
+    state.learningExamplesCount = 0;
+    state.learningExamples = [];
+  }
+
   state.similarLearningExamples = [];
 
   renderAuditHeader();
