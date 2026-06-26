@@ -1,7 +1,7 @@
 // public/audit_observations_manual_detail.js
 // Audit Observations Manual — separate audit detail window.
 
-const BUILD = "AUDIT_OBSERVATIONS_MANUAL_DETAIL_20260626_STEP6A_MANUAL_MSCAT";
+const BUILD = "AUDIT_OBSERVATIONS_MANUAL_DETAIL_20260626_STEP6B_COLLAPSED_MSCAT";
 window.CSVB_AUDIT_OBSERVATIONS_MANUAL_DETAIL_BUILD = BUILD;
 
 const AUDIT_BUCKET = "audit-reports";
@@ -343,7 +343,7 @@ function renderMscatTaxonomy() {
       }).join("");
 
       return `
-        <details class="mscatSubsection" open>
+        <details class="mscatSubsection" ${search ? "open" : ""}>
           <summary>${esc(subsectionLabel)} <span class="mscatCountPill">${subItems.length}</span></summary>
           <div class="mscatItems">${itemHtml}</div>
         </details>

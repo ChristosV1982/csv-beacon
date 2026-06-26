@@ -3,7 +3,7 @@
 // Manual Excel-based audit observation staging module. Future steps will add Excel import and M-SCAT RCA.
 // Observations use SIRE-style fields: question_no, obs_type, designation, SOC, NOC.
 
-const AUDIT_OBSERVATIONS_MANUAL_BUILD = "AUDIT_OBSERVATIONS_MANUAL_20260626_STEP5A_OPEN_DETAIL_WINDOW";
+const AUDIT_OBSERVATIONS_MANUAL_BUILD = "AUDIT_OBSERVATIONS_MANUAL_20260626_STEP6B_NIL_FILTER";
 window.CSVB_AUDIT_OBSERVATIONS_MANUAL_BUILD = AUDIT_OBSERVATIONS_MANUAL_BUILD;
 
 const AUDIT_BUCKET = "audit-reports";
@@ -69,6 +69,49 @@ function obsTypeBadge(type) {
   if (type === "largely") return `<span class="pill pill-lae">Largely as expected</span>`;
   if (type === "positive") return `<span class="pill pill-pos">Positive</span>`;
   return `<span class="pill">${esc(type || "—")}</span>`;
+}
+
+function auditRemarkNumber(audit, label) {
+  const text = String(audit?.remarks || "");
+  const safeLabel = String(label || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const re = new RegExp(`${safeLabel}\\s*:\\s*(\\d+)`, "i");
+  const m = text.match(re);
+  return m ? Number(m[1]) : null;
+}
+
+function auditNilInfo(audit) {
+  const path = String(audit?.report_storage_path || "");
+  const remarks = String(audit?.remarks || "");
+  const isManualImport = path.startsWith("manual_import_batches/") ||
+    remarks.includes("Manual Excel import from DANAOS-derived audit observations.");
+
+  const nilRows = auditRemarkNumber(audit, "NIL header rows");
+  const observationRows = auditRemarkNumber(audit, "Observation rows");
+
+  const isNil = !!isManualImport &&
+    Number(nilRows || 0) > 0 &&
+    Number(observationRows || 0) === 0;
+
+  return {
+    isManualImport,
+    isNil,
+    nilRows: Number(nilRows || 0),
+    observationRows: Number(observationRows || 0)
+  };
+}
+
+function auditObsStatusBadge(audit) {
+  const info = auditNilInfo(audit);
+
+  if (info.isNil) {
+    return `<span class="pill pill-nil">NIL</span>`;
+  }
+
+  if (info.isManualImport && info.observationRows > 0) {
+    return `<span class="pill pill-obs">OBS ${esc(info.observationRows)}</span>`;
+  }
+
+  return `<span class="pill">—</span>`;
 }
 
 const state = {
@@ -289,6 +332,7 @@ function filteredAudits() {
   const vesselId = String(el("auditVesselFilter").value || "").trim();
   const typeId = String(el("auditTypeFilter").value || "").trim();
   const source = String(el("auditSourceFilter").value || "").trim();
+  const nilFilter = String(el("auditNilFilter")?.value || "").trim();
   const from = String(el("auditFrom").value || "").trim();
   const to = String(el("auditTo").value || "").trim();
 
@@ -296,6 +340,11 @@ function filteredAudits() {
     if (vesselId && String(a.vessel_id) !== vesselId) return false;
     if (typeId && String(a.audit_type_id) !== typeId) return false;
     if (source && String(a.audit_source) !== source) return false;
+
+    const nilInfo = auditNilInfo(a);
+    if (nilFilter === "nil" && !nilInfo.isNil) return false;
+    if (nilFilter === "non_nil" && nilInfo.isNil) return false;
+
     if (!dateInRange(a.audit_date, from, to)) return false;
     return true;
   });
@@ -306,7 +355,7 @@ function renderAuditsTable() {
   const rows = filteredAudits();
 
   if (!rows.length) {
-    tbody.innerHTML = `<tr><td colspan="8" class="muted">No audit records found.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="9" class="muted">No audit records found.</td></tr>`;
     return;
   }
 
@@ -318,6 +367,7 @@ function renderAuditsTable() {
         <td>${esc(a.audit_date || "—")}</td>
         <td>${esc(AUDIT_SOURCE_LABELS[a.audit_source] || a.audit_source || "—")}</td>
         <td>${esc(auditTypeNameById(a.audit_type_id) || "—")}</td>
+        <td>${auditObsStatusBadge(a)}</td>
         <td>${esc(currentAuditorLabel(a))}</td>
         <td>${esc(a.report_reference || "—")}</td>
         <td>${esc(file || "—")}</td>
@@ -1437,7 +1487,7 @@ async function init() {
     }
   });
 
-  ["auditVesselFilter", "auditTypeFilter", "auditSourceFilter", "auditFrom", "auditTo"].forEach((id) => {
+  ["auditVesselFilter", "auditTypeFilter", "auditSourceFilter", "auditNilFilter", "auditFrom", "auditTo"].forEach((id) => {
     el(id).addEventListener("change", renderAuditsTable);
   });
 
