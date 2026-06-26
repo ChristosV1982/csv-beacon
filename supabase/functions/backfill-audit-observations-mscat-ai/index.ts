@@ -9,7 +9,205 @@ const DEFAULT_BATCH_ITEMS = 5;
 const MAX_CONCURRENCY = 3;
 const REPORT_ID_CHUNK_SIZE = 75;
 
-import { createClient } from "npm:@supabase/supabase-js@2.45.4";
+
+class MinimalPostgrestQuery {
+  private baseUrl: string;
+  private serviceKey: string;
+  private table: string;
+  private method = "GET";
+  private selectColumns = "";
+  private filters: Array<[string, string]> = [];
+  private orderParts: string[] = [];
+  private rangeHeader = "";
+  private limitValue: number | null = null;
+  private bodyValue: unknown = null;
+  private maybeSingleMode = false;
+  private preferParts: string[] = [];
+
+  constructor(baseUrl: string, serviceKey: string, table: string) {
+    this.baseUrl = baseUrl.replace(/\/+$/, "");
+    this.serviceKey = serviceKey;
+    this.table = table;
+  }
+
+  select(columns = "*") {
+    this.method = "GET";
+    this.selectColumns = columns;
+    return this;
+  }
+
+  eq(column: string, value: unknown) {
+    this.filters.push([column, `eq.${this.formatValue(value)}`]);
+    return this;
+  }
+
+  neq(column: string, value: unknown) {
+    this.filters.push([column, `neq.${this.formatValue(value)}`]);
+    return this;
+  }
+
+  like(column: string, value: unknown) {
+    this.filters.push([column, `like.${String(value ?? "")}`]);
+    return this;
+  }
+
+  in(column: string, values: unknown[]) {
+    const clean = (values || [])
+      .map((v) => String(v ?? "").trim())
+      .filter(Boolean)
+      .map((v) => v.replaceAll('"', '\\"'));
+
+    this.filters.push([column, `in.(${clean.join(",")})`]);
+    return this;
+  }
+
+  not(column: string, operator: string, value: unknown) {
+    const v = value === null ? "null" : this.formatValue(value);
+    this.filters.push([column, `not.${operator}.${v}`]);
+    return this;
+  }
+
+  order(column: string, opts: { ascending?: boolean } = {}) {
+    const direction = opts.ascending === false ? "desc" : "asc";
+    this.orderParts.push(`${column}.${direction}`);
+    return this;
+  }
+
+  range(from: number, to: number) {
+    this.rangeHeader = `${from}-${to}`;
+    return this;
+  }
+
+  limit(count: number) {
+    this.limitValue = Math.max(0, Math.floor(Number(count || 0)));
+    return this;
+  }
+
+  maybeSingle() {
+    this.maybeSingleMode = true;
+    return this;
+  }
+
+  upsert(rows: unknown[], opts: { onConflict?: string; ignoreDuplicates?: boolean } = {}) {
+    this.method = "POST";
+    this.bodyValue = rows || [];
+
+    if (opts.onConflict) {
+      this.filters.push(["on_conflict", String(opts.onConflict)]);
+    }
+
+    if (opts.ignoreDuplicates) {
+      this.preferParts.push("resolution=ignore-duplicates");
+    } else {
+      this.preferParts.push("resolution=merge-duplicates");
+    }
+
+    this.preferParts.push("return=minimal");
+    return this;
+  }
+
+  then(resolve: any, reject: any) {
+    return this.execute().then(resolve, reject);
+  }
+
+  private formatValue(value: unknown) {
+    if (value === null) return "null";
+    if (typeof value === "boolean") return value ? "true" : "false";
+    return String(value ?? "");
+  }
+
+  private async execute() {
+    const url = new URL(`${this.baseUrl}/rest/v1/${encodeURIComponent(this.table)}`);
+
+    if (this.selectColumns) {
+      url.searchParams.set("select", this.selectColumns);
+    }
+
+    for (const [key, value] of this.filters) {
+      url.searchParams.append(key, value);
+    }
+
+    if (this.orderParts.length) {
+      url.searchParams.set("order", this.orderParts.join(","));
+    }
+
+    if (this.limitValue !== null) {
+      url.searchParams.set("limit", String(this.limitValue));
+    }
+
+    const headers: Record<string, string> = {
+      apikey: this.serviceKey,
+      Authorization: `Bearer ${this.serviceKey}`,
+    };
+
+    if (this.method !== "GET") {
+      headers["Content-Type"] = "application/json";
+    }
+
+    if (this.rangeHeader) {
+      headers.Range = this.rangeHeader;
+    }
+
+    if (this.preferParts.length) {
+      headers.Prefer = this.preferParts.join(",");
+    }
+
+    const resp = await fetch(url.toString(), {
+      method: this.method,
+      headers,
+      body: this.method === "GET" ? undefined : JSON.stringify(this.bodyValue),
+    });
+
+    const text = await resp.text().catch(() => "");
+
+    if (!resp.ok) {
+      return {
+        data: null,
+        error: {
+          message: text || `${resp.status} ${resp.statusText}`,
+          status: resp.status,
+        },
+      };
+    }
+
+    let data: any = null;
+
+    if (text) {
+      try {
+        data = JSON.parse(text);
+      } catch {
+        data = text;
+      }
+    }
+
+    if (this.maybeSingleMode) {
+      if (Array.isArray(data)) {
+        if (data.length === 0) data = null;
+        else if (data.length === 1) data = data[0];
+        else {
+          return {
+            data: null,
+            error: {
+              message: `Expected single row, got ${data.length}`,
+              status: 406,
+            },
+          };
+        }
+      }
+    }
+
+    return { data, error: null };
+  }
+}
+
+function createClient(baseUrl: string, serviceKey: string) {
+  return {
+    from(table: string) {
+      return new MinimalPostgrestQuery(baseUrl, serviceKey, table);
+    },
+  };
+}
+
 
 function buildCorsHeaders(req: Request) {
   const origin = req.headers.get("Origin") ?? "*";
