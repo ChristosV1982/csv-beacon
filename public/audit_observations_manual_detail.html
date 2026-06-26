@@ -158,6 +158,13 @@
     td{ color:#223a66; font-weight:850; }
 
     .mono{ font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
+    .questionRefCell{ min-width:160px; }
+    .questionRefValue{
+      font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+      font-weight:950;
+      margin-bottom:6px;
+      color:#062a5e;
+    }
     .remarksCell{ max-width:620px; white-space:normal; line-height:1.35; }
     .obsTextMain{
       white-space:pre-wrap;
@@ -190,6 +197,10 @@
     .pill-neg{ background:#fee2e2; color:#991b1b; border-color:#fecaca; }
     .pill-lae{ background:#fef3c7; color:#92400e; border-color:#fde68a; }
     .pill-pos{ background:#dcfce7; color:#166534; border-color:#bbf7d0; }
+    .pill-ai{ background:#e0f2fe; color:#075985; border-color:#bae6fd; }
+    .pill-manual{ background:#dcfce7; color:#166534; border-color:#bbf7d0; }
+    .pill-mixed{ background:#fef3c7; color:#92400e; border-color:#fde68a; }
+    .pill-none{ background:#f1f5f9; color:#475569; border-color:#cbd5e1; }
 
 
     .mscatToolbar{
@@ -274,10 +285,24 @@
       white-space:nowrap;
     }
     .mscatSavedList{
+      display:grid;
+      gap:8px;
+      margin-top:10px;
+    }
+    .mscatSavedItem{
+      border:1px solid #d5deef;
+      border-radius:10px;
+      padding:8px 10px;
+      background:#f8fbff;
+      color:#223a66;
+      line-height:1.35;
+    }
+    .mscatSavedMain{
       display:flex;
-      flex-wrap:wrap;
       gap:6px;
-      margin-top:8px;
+      flex-wrap:wrap;
+      align-items:center;
+      font-weight:900;
     }
     .mscatChip{
       display:inline-flex;
@@ -289,6 +314,13 @@
       background:#f8fbff;
       color:#062a5e;
       max-width:100%;
+    }
+    .mscatReason{
+      margin-top:5px;
+      color:#64748b;
+      font-size:.84rem;
+      font-weight:800;
+      white-space:pre-wrap;
     }
     .mscatBtn{
       white-space:nowrap;
@@ -456,12 +488,12 @@
             <th>SOC</th>
             <th>NOC</th>
             <th>Observation / Remarks</th>
-            <th>M-SCAT</th>
+            <th>M-SCAT / Review</th>
             <th>Delete</th>
           </tr>
         </thead>
         <tbody id="observationsTbody">
-          <tr><td colspan="7" class="muted">Loading observations…</td></tr>
+          <tr><td colspan="8" class="muted">Loading observations…</td></tr>
         </tbody>
       </table>
     </div>
@@ -485,6 +517,7 @@
         </div>
 
         <button class="btn btn-muted" id="saveMscatBtn" type="button">Save M-SCAT selections</button>
+        <button class="btn btn-muted" id="markMscatReviewedBtn" type="button">Mark selected M-SCAT as manually reviewed</button>
         <button class="btn btn-danger" id="clearMscatSelectionBtn" type="button">Clear selected observation</button>
       </div>
 
@@ -501,7 +534,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="./auth.js"></script>
-  <script type="module" src="./audit_observations_manual_detail.js?v=20260626_3"></script>
+  <script type="module" src="./audit_observations_manual_detail.js?v=20260626_4"></script>
   <script src="./csvb-ui-polish.js?v=20260430_1"></script>
   <script src="./csvb-help-tooltips.js?v=20260430_1"></script>
   <script src="./csvb-100pct-fit.js?v=20260430_1"></script>

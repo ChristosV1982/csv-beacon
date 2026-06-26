@@ -3,7 +3,7 @@
 // Manual Excel-based audit observation staging module. Future steps will add Excel import and M-SCAT RCA.
 // Observations use SIRE-style fields: question_no, obs_type, designation, SOC, NOC.
 
-const AUDIT_OBSERVATIONS_MANUAL_BUILD = "AUDIT_OBSERVATIONS_MANUAL_20260626_STEP6B_NIL_FILTER";
+const AUDIT_OBSERVATIONS_MANUAL_BUILD = "AUDIT_OBSERVATIONS_MANUAL_20260626_STEP6D_MSCAT_FILTER";
 window.CSVB_AUDIT_OBSERVATIONS_MANUAL_BUILD = AUDIT_OBSERVATIONS_MANUAL_BUILD;
 
 const AUDIT_BUCKET = "audit-reports";
@@ -114,6 +114,170 @@ function auditObsStatusBadge(audit) {
   return `<span class="pill">—</span>`;
 }
 
+function auditMscatChunkArray(arr, size) {
+  const out = [];
+  for (let i = 0; i < arr.length; i += size) {
+    out.push(arr.slice(i, i + size));
+  }
+  return out;
+}
+
+function auditMscatInfo(audit) {
+  const id = String(audit?.id || "");
+  return state.auditMscatStats?.[id] || {
+    status: "not_applicable",
+    applicable: 0,
+    withMscat: 0,
+    mscatRows: 0,
+    aiOnly: 0,
+    manualOnly: 0,
+    mixedObs: 0
+  };
+}
+
+function auditMscatStatusBadge(audit) {
+  const info = auditMscatInfo(audit);
+
+  if (info.status === "missing") {
+    return `<span class="pill pill-none">Missing ${esc(info.withMscat)}/${esc(info.applicable)}</span>`;
+  }
+
+  if (info.status === "manual") {
+    return `<span class="pill pill-manual">Manual reviewed</span>`;
+  }
+
+  if (info.status === "mixed") {
+    return `<span class="pill pill-mixed">Mixed</span>`;
+  }
+
+  if (info.status === "ai") {
+    return `<span class="pill pill-ai">AI populated</span>`;
+  }
+
+  return `<span class="pill pill-none">N/A</span>`;
+}
+
+async function loadAuditMscatStats() {
+  const reportIds = Array.from(new Set((state.audits || []).map((a) => String(a.id || "")).filter(Boolean)));
+  const stats = {};
+
+  for (const reportId of reportIds) {
+    stats[reportId] = {
+      status: "not_applicable",
+      applicable: 0,
+      withMscat: 0,
+      mscatRows: 0,
+      aiOnly: 0,
+      manualOnly: 0,
+      mixedObs: 0
+    };
+  }
+
+  if (!reportIds.length) return stats;
+
+  const obsRows = [];
+
+  for (const reportChunk of auditMscatChunkArray(reportIds, 75)) {
+    const { data, error } = await state.supabase
+      .from("audit_observation_items")
+      .select("id,report_id,obs_type")
+      .in("report_id", reportChunk);
+
+    if (error) throw error;
+
+    obsRows.push(...(data || []));
+  }
+
+  const applicableObs = obsRows.filter((r) => {
+    const t = String(r.obs_type || "").trim().toLowerCase();
+    return t === "negative" || t === "largely";
+  });
+
+  const obsToReport = new Map();
+
+  for (const obs of applicableObs) {
+    const obsId = String(obs.id || "");
+    const reportId = String(obs.report_id || "");
+    if (!obsId || !reportId) continue;
+
+    obsToReport.set(obsId, reportId);
+
+    if (!stats[reportId]) {
+      stats[reportId] = {
+        status: "not_applicable",
+        applicable: 0,
+        withMscat: 0,
+        mscatRows: 0,
+        aiOnly: 0,
+        manualOnly: 0,
+        mixedObs: 0
+      };
+    }
+
+    stats[reportId].applicable += 1;
+  }
+
+  const obsIds = Array.from(obsToReport.keys());
+  const mscatRows = [];
+
+  for (const obsChunk of auditMscatChunkArray(obsIds, 100)) {
+    const { data, error } = await state.supabase
+      .from("audit_observation_mscat")
+      .select("audit_observation_item_id,selection_source")
+      .in("audit_observation_item_id", obsChunk);
+
+    if (error) throw error;
+
+    mscatRows.push(...(data || []));
+  }
+
+  const rowsByObs = new Map();
+
+  for (const row of mscatRows) {
+    const obsId = String(row.audit_observation_item_id || "");
+    if (!obsId) continue;
+
+    if (!rowsByObs.has(obsId)) rowsByObs.set(obsId, []);
+    rowsByObs.get(obsId).push(row);
+  }
+
+  for (const obsId of obsIds) {
+    const reportId = obsToReport.get(obsId);
+    if (!reportId || !stats[reportId]) continue;
+
+    const rows = rowsByObs.get(obsId) || [];
+    if (!rows.length) continue;
+
+    const hasAi = rows.some((r) => String(r.selection_source) === "ai_suggested");
+    const hasManual = rows.some((r) => String(r.selection_source) === "manual");
+
+    stats[reportId].withMscat += 1;
+    stats[reportId].mscatRows += rows.length;
+
+    if (hasManual && !hasAi) stats[reportId].manualOnly += 1;
+    else if (hasAi && !hasManual) stats[reportId].aiOnly += 1;
+    else stats[reportId].mixedObs += 1;
+  }
+
+  for (const reportId of Object.keys(stats)) {
+    const x = stats[reportId];
+
+    if (!x.applicable) {
+      x.status = "not_applicable";
+    } else if (x.withMscat < x.applicable) {
+      x.status = "missing";
+    } else if (x.manualOnly === x.applicable) {
+      x.status = "manual";
+    } else if (x.aiOnly === x.applicable) {
+      x.status = "ai";
+    } else {
+      x.status = "mixed";
+    }
+  }
+
+  return stats;
+}
+
 const state = {
   me: null,
   supabase: null,
@@ -122,6 +286,7 @@ const state = {
   profiles: [],
   inspectors: [],
   audits: [],
+  auditMscatStats: {},
   observations: [],
   activeAudit: null,
   uploadedFileMeta: null,
@@ -333,6 +498,7 @@ function filteredAudits() {
   const typeId = String(el("auditTypeFilter").value || "").trim();
   const source = String(el("auditSourceFilter").value || "").trim();
   const nilFilter = String(el("auditNilFilter")?.value || "").trim();
+  const mscatFilter = String(el("auditMscatFilter")?.value || "").trim();
   const from = String(el("auditFrom").value || "").trim();
   const to = String(el("auditTo").value || "").trim();
 
@@ -345,6 +511,9 @@ function filteredAudits() {
     if (nilFilter === "nil" && !nilInfo.isNil) return false;
     if (nilFilter === "non_nil" && nilInfo.isNil) return false;
 
+    const mscatInfo = auditMscatInfo(a);
+    if (mscatFilter && mscatInfo.status !== mscatFilter) return false;
+
     if (!dateInRange(a.audit_date, from, to)) return false;
     return true;
   });
@@ -355,7 +524,7 @@ function renderAuditsTable() {
   const rows = filteredAudits();
 
   if (!rows.length) {
-    tbody.innerHTML = `<tr><td colspan="9" class="muted">No audit records found.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="10" class="muted">No audit records found.</td></tr>`;
     return;
   }
 
@@ -368,6 +537,7 @@ function renderAuditsTable() {
         <td>${esc(AUDIT_SOURCE_LABELS[a.audit_source] || a.audit_source || "—")}</td>
         <td>${esc(auditTypeNameById(a.audit_type_id) || "—")}</td>
         <td>${auditObsStatusBadge(a)}</td>
+        <td>${auditMscatStatusBadge(a)}</td>
         <td>${esc(currentAuditorLabel(a))}</td>
         <td>${esc(a.report_reference || "—")}</td>
         <td>${esc(file || "—")}</td>
@@ -576,6 +746,7 @@ async function saveAuditHeader() {
 
   state.activeAudit = saved;
   state.audits = await loadAudits();
+  state.auditMscatStats = await loadAuditMscatStats();
 
   loadAuditIntoForm(saved);
   renderAuditsTable();
@@ -615,6 +786,7 @@ async function deleteCurrentAudit() {
   if (error) throw error;
 
   state.audits = await loadAudits();
+  state.auditMscatStats = await loadAuditMscatStats();
   clearAuditForm();
   renderAuditsTable();
 
@@ -1434,6 +1606,7 @@ async function reloadAll() {
   state.profiles = await loadProfiles();
   state.inspectors = await loadInspectors();
   state.audits = await loadAudits();
+  state.auditMscatStats = await loadAuditMscatStats();
 
   renderSelects();
   renderAuditsTable();
@@ -1479,6 +1652,7 @@ async function init() {
   el("reloadAuditsBtn").addEventListener("click", async () => {
     try {
       state.audits = await loadAudits();
+      state.auditMscatStats = await loadAuditMscatStats();
       renderAuditsTable();
     } catch (e) {
       console.error(e);
@@ -1487,7 +1661,7 @@ async function init() {
     }
   });
 
-  ["auditVesselFilter", "auditTypeFilter", "auditSourceFilter", "auditNilFilter", "auditFrom", "auditTo"].forEach((id) => {
+  ["auditVesselFilter", "auditTypeFilter", "auditSourceFilter", "auditNilFilter", "auditMscatFilter", "auditFrom", "auditTo"].forEach((id) => {
     el(id).addEventListener("change", renderAuditsTable);
   });
 

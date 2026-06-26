@@ -202,6 +202,10 @@
     .pill-pos{ background:#dcfce7; color:#166534; border-color:#bbf7d0; }
     .pill-nil{ background:#e0f2fe; color:#075985; border-color:#bae6fd; }
     .pill-obs{ background:#f1f5f9; color:#334155; border-color:#cbd5e1; }
+    .pill-ai{ background:#e0f2fe; color:#075985; border-color:#bae6fd; }
+    .pill-manual{ background:#dcfce7; color:#166534; border-color:#bbf7d0; }
+    .pill-mixed{ background:#fef3c7; color:#92400e; border-color:#fde68a; }
+    .pill-none{ background:#f1f5f9; color:#475569; border-color:#cbd5e1; }
 
     .activeBox{
       margin-top:10px;
@@ -336,6 +340,18 @@
           </div>
 
           <div class="field">
+            <label for="auditMscatFilter">M-SCAT status</label>
+            <select id="auditMscatFilter">
+              <option value="">All M-SCAT statuses</option>
+              <option value="missing">Missing M-SCAT</option>
+              <option value="ai">AI populated</option>
+              <option value="manual">Manual reviewed</option>
+              <option value="mixed">Mixed AI / Manual</option>
+              <option value="not_applicable">NIL / Not applicable</option>
+            </select>
+          </div>
+
+          <div class="field">
             <label for="auditFrom">From date</label>
             <input id="auditFrom" type="date"/>
           </div>
@@ -359,6 +375,7 @@
               <th>Audit Source</th>
               <th>Audit Type</th>
               <th>Obs. Status</th>
+              <th>M-SCAT Status</th>
               <th>Auditor</th>
               <th>Reference</th>
               <th>Report File</th>
@@ -650,7 +667,7 @@
   <script src="./auth.js"></script>
   <script src="./csvb-module-guard.js?v=20260522_dashboard_button_guard"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <script type="module" src="./audit_observations_manual.js?v=20260626_6"></script>
+  <script type="module" src="./audit_observations_manual.js?v=20260626_7"></script>
   <script src="./csvb-ui-polish.js?v=20260430_1"></script>
   <script src="./csvb-help-tooltips.js?v=20260430_1"></script>
   <script src="./csvb-100pct-fit.js?v=20260430_1"></script>
