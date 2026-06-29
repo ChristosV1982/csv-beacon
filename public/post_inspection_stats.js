@@ -8,7 +8,7 @@ import { loadLockedLibraryJson } from "./question_library_loader.js";
 
 const LOCKED_LIBRARY_JSON = "./sire_questions_all_columns_named.json";
 
-const STATS_BUILD = "post_inspection_stats_v03_report_meta_match_2026-06-01";
+const STATS_BUILD = "post_inspection_stats_v04_modes_audit_type_negtrend_2026-06-29";
 window.CSVB_POST_INSPECTION_STATS_BUILD = STATS_BUILD;
 
 const OBS_TYPES = [
@@ -85,6 +85,7 @@ const state = {
   me: null,
   supabase: null,
   vessels: [],
+  auditTypeOptions: [],
   libByNo: new Map(),
   labelMap: new Map(),
 
@@ -181,6 +182,53 @@ function getMode() {
 function isCombinedMode() {
   return getMode() === "combined";
 }
+
+
+function isAuditMode() {
+  return getMode() === "audits";
+}
+
+function isVettingMode() {
+  return getMode() === "post";
+}
+
+function isAuditRecordSource(value) {
+  return String(value || "").trim().startsWith("audit_");
+}
+
+function isInternalAuditRecordSource(value) {
+  const s = String(value || "").trim();
+  return s === "audit_internal_superintendent" || s === "audit_internal_master";
+}
+
+function isExternalAuditRecordSource(value) {
+  return String(value || "").trim() === "audit_external_contractor";
+}
+
+function auditTypeKeyFromRow(row) {
+  return String(
+    row?.audit_type_id ||
+    row?.audit_type_name ||
+    row?.title ||
+    row?.report_title ||
+    ""
+  ).trim();
+}
+
+function auditTypeLabelFromRow(row) {
+  return String(
+    row?.audit_type_name ||
+    row?.title ||
+    row?.report_title ||
+    row?.audit_type_id ||
+    "Unspecified audit type"
+  ).trim();
+}
+
+function getSelectedAuditTypes() {
+  return selectedCheckboxValues("auditTypeCheckList");
+}
+
 
 function sourceLabel(value) {
   return RECORD_SOURCE_LABELS.get(value) || value || "Post-Inspection";
@@ -435,6 +483,7 @@ function getFilters() {
     selected_vessel_ids: getSelectedVesselIds(),
     selected_vessel_names: getSelectedVesselNames(),
     selected_record_sources: getSelectedRecordSources(),
+    selected_audit_types: getSelectedAuditTypes(),
     p_from: el("dateFrom")?.value || null,
     p_to: el("dateTo")?.value || null,
     selected_types: getSelectedTypes(),
@@ -442,27 +491,45 @@ function getFilters() {
 }
 
 function filterReportsBase(reportRows) {
-  const { selected_vessel_ids, selected_record_sources, p_from, p_to } = getFilters();
+  const { selected_vessel_ids, selected_record_sources, selected_audit_types, p_from, p_to } = getFilters();
   const vesselSet = new Set(selected_vessel_ids);
   const sourceSet = new Set(selected_record_sources);
+  const auditTypeSet = new Set(selected_audit_types);
 
   return (reportRows || []).filter((r) => {
+    const recordSource = String(r.record_source || "vetting_inspection").trim();
+
     if (vesselSet.size > 0 && !vesselSet.has(String(r.vessel_id))) return false;
-    if (isCombinedMode() && sourceSet.size > 0 && !sourceSet.has(String(r.record_source || "vetting_inspection"))) return false;
+    if (!isVettingMode() && sourceSet.size > 0 && !sourceSet.has(recordSource)) return false;
+
+    if (auditTypeSet.size > 0 && isAuditRecordSource(recordSource)) {
+      const auditTypeKey = auditTypeKeyFromRow(r);
+      if (!auditTypeSet.has(auditTypeKey)) return false;
+    }
+
     if (!inDateRange(r.inspection_date, p_from, p_to)) return false;
     return true;
   });
 }
 
 function filterRowsBase(rows, ignoreTypeFilter = false) {
-  const { selected_vessel_names, selected_record_sources, p_from, p_to, selected_types } = getFilters();
+  const { selected_vessel_names, selected_record_sources, selected_audit_types, p_from, p_to, selected_types } = getFilters();
   const typeSet = new Set(selected_types);
   const sourceSet = new Set(selected_record_sources);
+  const auditTypeSet = new Set(selected_audit_types);
 
   return (rows || []).filter((r) => {
     const vesselName = String(r.vessel_name || "").trim();
+    const recordSource = String(r.record_source || "vetting_inspection").trim();
+
     if (selected_vessel_names.size > 0 && !selected_vessel_names.has(vesselName)) return false;
-    if (isCombinedMode() && sourceSet.size > 0 && !sourceSet.has(String(r.record_source || "vetting_inspection"))) return false;
+    if (!isVettingMode() && sourceSet.size > 0 && !sourceSet.has(recordSource)) return false;
+
+    if (auditTypeSet.size > 0 && isAuditRecordSource(recordSource)) {
+      const auditTypeKey = auditTypeKeyFromRow(r);
+      if (!auditTypeSet.has(auditTypeKey)) return false;
+    }
+
     if (!inDateRange(r.inspection_date, p_from, p_to)) return false;
     if (!ignoreTypeFilter && typeSet.size > 0 && !typeSet.has(normalizeType(r.observation_type))) return false;
     return true;
@@ -1104,6 +1171,202 @@ function buildPeriodRows(rows, reportRows, keyFn) {
     .sort((a, b) => String(a.key).localeCompare(String(b.key)));
 }
 
+
+function collectAuditTypeOptions() {
+  const map = new Map();
+
+  const add = (row) => {
+    const recordSource = String(row?.record_source || "").trim();
+    if (!isAuditRecordSource(recordSource)) return;
+
+    const key = auditTypeKeyFromRow(row);
+    if (!key) return;
+
+    const label = auditTypeLabelFromRow(row);
+    if (!map.has(key)) map.set(key, label);
+  };
+
+  (state.combinedRows || []).forEach(add);
+  (state.combinedReportRows || []).forEach(add);
+
+  return [...map.entries()]
+    .map(([value, label]) => ({ value, label }))
+    .sort((a, b) => String(a.label).localeCompare(String(b.label)));
+}
+
+function renderAuditTypeFilter() {
+  state.auditTypeOptions = collectAuditTypeOptions();
+
+  const box = safeEl("auditTypeCheckList");
+  if (!box) return;
+
+  if (!state.auditTypeOptions.length) {
+    box.innerHTML = `<div class="muted">No audit types found in the current analytics dataset.</div>`;
+    updateDropSummary("auditTypeDropBtn", "Audit types", 0, 0);
+    return;
+  }
+
+  renderCheckboxList("auditTypeCheckList", "auditTypeChk", state.auditTypeOptions, true);
+  updateDropSummary("auditTypeDropBtn", "Audit types", state.auditTypeOptions.length, state.auditTypeOptions.length);
+}
+
+function monthRangeBetween(fromDate, toDate, fallbackRows = []) {
+  let from = String(fromDate || "").slice(0, 7);
+  let to = String(toDate || "").slice(0, 7);
+
+  const rowMonths = (fallbackRows || [])
+    .map((r) => String(r.inspection_date || "").slice(0, 7))
+    .filter(Boolean)
+    .sort();
+
+  if (!from && rowMonths.length) from = rowMonths[0];
+  if (!to && rowMonths.length) to = rowMonths[rowMonths.length - 1];
+
+  if (!from || !to) {
+    const y = String(new Date().getFullYear());
+    from = `${y}-01`;
+    to = `${y}-12`;
+  }
+
+  const out = [];
+  let [y, m] = from.split("-").map(Number);
+  const [ey, em] = to.split("-").map(Number);
+
+  if (!y || !m || !ey || !em) return [];
+
+  let guard = 0;
+  while ((y < ey || (y === ey && m <= em)) && guard < 60) {
+    out.push(`${y}-${String(m).padStart(2, "0")}`);
+    m += 1;
+    if (m > 12) {
+      y += 1;
+      m = 1;
+    }
+    guard += 1;
+  }
+
+  return out;
+}
+
+function negativeSourceGroup(row) {
+  const src = String(row?.record_source || "vetting_inspection").trim();
+
+  if (src === "vetting_inspection") return "vetting";
+  if (isInternalAuditRecordSource(src)) return "internal";
+  if (isExternalAuditRecordSource(src)) return "external";
+
+  return "";
+}
+
+function renderNegativeSourceTrend(rowsIgnoreTypeFilter) {
+  const box = safeEl("chartNegativeSourceTrend");
+  if (!box) return;
+
+  const { p_from, p_to } = getFilters();
+  const months = monthRangeBetween(p_from, p_to, rowsIgnoreTypeFilter);
+
+  if (!months.length) {
+    box.innerHTML = `<div class="emptyChart">No month range available.</div>`;
+    return;
+  }
+
+  const series = {
+    vetting: { label: "Vetting Observations", values: new Map(months.map((m) => [m, 0])), css: "vetting" },
+    internal: { label: "Internal Audits", values: new Map(months.map((m) => [m, 0])), css: "internal" },
+    external: { label: "External Audits", values: new Map(months.map((m) => [m, 0])), css: "external" },
+  };
+
+  for (const row of rowsIgnoreTypeFilter || []) {
+    if (normalizeType(row.observation_type) !== "negative") continue;
+
+    const month = String(row.inspection_date || "").slice(0, 7);
+    if (!months.includes(month)) continue;
+
+    const group = negativeSourceGroup(row);
+    if (!group || !series[group]) continue;
+
+    series[group].values.set(month, (series[group].values.get(month) || 0) + 1);
+  }
+
+  const width = 920;
+  const height = 300;
+  const padL = 52;
+  const padR = 22;
+  const padT = 22;
+  const padB = 54;
+
+  const allValues = Object.values(series).flatMap((s) => months.map((m) => Number(s.values.get(m) || 0)));
+  const maxVal = Math.max(...allValues, 1);
+
+  const xFor = (idx) => {
+    if (months.length <= 1) return padL;
+    return padL + (idx * (width - padL - padR)) / (months.length - 1);
+  };
+
+  const yFor = (value) => {
+    return padT + (height - padT - padB) * (1 - Number(value || 0) / maxVal);
+  };
+
+  const pointsFor = (s) => months.map((m, idx) => `${xFor(idx).toFixed(1)},${yFor(s.values.get(m) || 0).toFixed(1)}`).join(" ");
+
+  const xLabels = months.map((m, idx) => {
+    const show = months.length <= 14 || idx % Math.ceil(months.length / 12) === 0 || idx === months.length - 1;
+    if (!show) return "";
+    return `<text x="${xFor(idx).toFixed(1)}" y="${height - 18}" text-anchor="middle" class="oi-axis-label">${esc(m)}</text>`;
+  }).join("");
+
+  const yTicks = [0, Math.ceil(maxVal / 2), maxVal]
+    .filter((v, idx, arr) => arr.indexOf(v) === idx)
+    .map((v) => {
+      const y = yFor(v);
+      return `
+        <line x1="${padL}" y1="${y.toFixed(1)}" x2="${width - padR}" y2="${y.toFixed(1)}" class="oi-grid-line"></line>
+        <text x="${padL - 10}" y="${(y + 4).toFixed(1)}" text-anchor="end" class="oi-axis-label">${esc(v)}</text>
+      `;
+    }).join("");
+
+  const totals = Object.fromEntries(
+    Object.entries(series).map(([k, s]) => [k, months.reduce((sum, m) => sum + Number(s.values.get(m) || 0), 0)])
+  );
+
+  box.innerHTML = `
+    <style>
+      #chartNegativeSourceTrend .oi-trend-wrap{border:1px solid #dbe8f8;border-radius:14px;background:#fff;padding:10px;overflow-x:auto;}
+      #chartNegativeSourceTrend svg{min-width:760px;width:100%;height:auto;display:block;}
+      #chartNegativeSourceTrend .oi-grid-line{stroke:#e4edf8;stroke-width:1;}
+      #chartNegativeSourceTrend .oi-axis{stroke:#b7cbe6;stroke-width:1.2;}
+      #chartNegativeSourceTrend .oi-axis-label{fill:#35507b;font-size:11px;font-weight:800;}
+      #chartNegativeSourceTrend .oi-line{fill:none;stroke-width:3.5;stroke-linecap:round;stroke-linejoin:round;}
+      #chartNegativeSourceTrend .oi-line.vetting{stroke:#2563eb;}
+      #chartNegativeSourceTrend .oi-line.internal{stroke:#dc2626;}
+      #chartNegativeSourceTrend .oi-line.external{stroke:#16a34a;}
+      #chartNegativeSourceTrend .oi-legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:8px;color:#143a63;font-weight:900;font-size:.88rem;}
+      #chartNegativeSourceTrend .oi-legend span{display:inline-flex;align-items:center;gap:6px;}
+      #chartNegativeSourceTrend .oi-dot{width:11px;height:11px;border-radius:999px;display:inline-block;}
+      #chartNegativeSourceTrend .oi-dot.vetting{background:#2563eb;}
+      #chartNegativeSourceTrend .oi-dot.internal{background:#dc2626;}
+      #chartNegativeSourceTrend .oi-dot.external{background:#16a34a;}
+    </style>
+    <div class="oi-trend-wrap">
+      <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Negative observations source trend">
+        ${yTicks}
+        <line x1="${padL}" y1="${padT}" x2="${padL}" y2="${height - padB}" class="oi-axis"></line>
+        <line x1="${padL}" y1="${height - padB}" x2="${width - padR}" y2="${height - padB}" class="oi-axis"></line>
+        <polyline class="oi-line vetting" points="${pointsFor(series.vetting)}"></polyline>
+        <polyline class="oi-line internal" points="${pointsFor(series.internal)}"></polyline>
+        <polyline class="oi-line external" points="${pointsFor(series.external)}"></polyline>
+        ${xLabels}
+      </svg>
+      <div class="oi-legend">
+        <span><i class="oi-dot vetting"></i> Vetting Observations: ${esc(totals.vetting)}</span>
+        <span><i class="oi-dot internal"></i> Internal Audits: ${esc(totals.internal)}</span>
+        <span><i class="oi-dot external"></i> External Audits: ${esc(totals.external)}</span>
+      </div>
+    </div>
+  `;
+}
+
+
 function renderMonthlyTrend(rows, reportRows) {
   const tbody = safeTbody("monthlyTbody");
   if (!tbody) return;
@@ -1587,6 +1850,7 @@ async function renderAllStats(rows, rowsIgnoreTypeFilter, reportRows) {
   renderSummaryFromRows(rows, reportRows);
 
   renderTypeVisuals(rows, reportRows);
+  renderNegativeSourceTrend(rowsIgnoreTypeFilter);
   renderByVessel(rows, reportRows);
   renderFleetAverage(rows, reportRows);
   renderByType(rowsIgnoreTypeFilter, reportRows);
@@ -1607,11 +1871,15 @@ function activateCurrentDataset() {
   if (isCombinedMode()) {
     state.allRows = state.combinedRows;
     state.allReportRows = state.combinedReportRows;
-    setText("modeNote", "Combined Analytics mode includes Vetting inspections + Audit observations. Use Record Source(s) to include/exclude specific sources.");
+    setText("modeNote", "Combined Analytics mode includes Vetting Inspections + Vessel Audit observations. Use Record Source(s) and Audit type(s) to include/exclude specific audit sources/types.");
+  } else if (isAuditMode()) {
+    state.allRows = (state.combinedRows || []).filter((r) => isAuditRecordSource(r.record_source));
+    state.allReportRows = (state.combinedReportRows || []).filter((r) => isAuditRecordSource(r.record_source));
+    setText("modeNote", "Vessel Audits mode uses only internal/external vessel audit observations. Use Record Source(s) and Audit type(s) to filter audit records.");
   } else {
     state.allRows = state.postRows;
     state.allReportRows = state.postReportRows;
-    setText("modeNote", "Post-Inspection only mode uses only vetting/SIRE post-inspection observations. Record Source filter is ignored.");
+    setText("modeNote", "Vetting Inspections mode uses only SIRE 2.0 vetting/post-inspection observations. Record Source and Audit type filters are ignored.");
   }
 }
 
@@ -1837,6 +2105,7 @@ async function init() {
   renderCheckboxList("vesselCheckList", "vesselChk", state.vessels.map((v) => ({ value: v.id, label: v.name })), true);
   renderCheckboxList("typeCheckList", "typeChk", OBS_TYPES, true);
   renderCheckboxList("recordSourceCheckList", "recordSourceChk", RECORD_SOURCES, true);
+  renderAuditTypeFilter();
   renderCheckboxList("recurringMonthCheckList", "recMonthChk", MONTHS, true);
 
   const to = new Date();
@@ -1868,6 +2137,7 @@ async function init() {
   };
 
   bindDropdown("recordSourceDrop", "recordSourceDropBtn");
+  bindDropdown("auditTypeDrop", "auditTypeDropBtn");
   bindDropdown("vesselDrop", "vesselDropBtn");
   bindDropdown("typeDrop", "typeDropBtn");
   bindDropdown("recYearDrop", "recYearDropBtn");
@@ -1893,12 +2163,14 @@ async function init() {
   });
 
   bindAllNone("recordSourceAllBtn", "recordSourceNoneBtn", "recordSourceCheckList", refresh);
+  bindAllNone("auditTypeAllBtn", "auditTypeNoneBtn", "auditTypeCheckList", refresh);
   bindAllNone("vesselAllBtn", "vesselNoneBtn", "vesselCheckList", refresh);
   bindAllNone("typeAllBtn", "typeNoneBtn", "typeCheckList", refresh);
   bindAllNone("recYearAllBtn", "recYearNoneBtn", "recurringYearCheckList", refresh);
   bindAllNone("recMonthAllBtn", "recMonthNoneBtn", "recurringMonthCheckList", refresh);
 
   bindCheckboxRefresh("recordSourceCheckList", refresh);
+  bindCheckboxRefresh("auditTypeCheckList", refresh);
   bindCheckboxRefresh("vesselCheckList", refresh);
   bindCheckboxRefresh("typeCheckList", refresh);
   bindCheckboxRefresh("recurringYearCheckList", refresh);

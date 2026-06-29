@@ -430,7 +430,8 @@
           <div class="field-small">
             <label for="statsMode">Statistics mode</label>
             <select id="statsMode">
-              <option value="post">Post-Inspection only</option>
+              <option value="post">Vetting Inspections</option>
+              <option value="audits">Vessel Audits</option>
               <option value="combined">Combined Analytics</option>
             </select>
           </div>
@@ -444,6 +445,19 @@
                 <button type="button" class="miniBtn" id="recordSourceNoneBtn">None</button>
               </div>
               <div class="checkPanel" id="recordSourceCheckList"></div>
+            </div>
+          </div>
+
+
+          <div class="filterDrop" id="auditTypeDrop">
+            <label>Audit type(s)</label>
+            <button type="button" class="filterDropBtn" id="auditTypeDropBtn">Audit types: all</button>
+            <div class="filterPanel">
+              <div class="miniActions">
+                <button type="button" class="miniBtn" id="auditTypeAllBtn">All</button>
+                <button type="button" class="miniBtn" id="auditTypeNoneBtn">None</button>
+              </div>
+              <div class="checkPanel" id="auditTypeCheckList"></div>
             </div>
           </div>
 
@@ -527,7 +541,7 @@
         </div>
 
         <div class="filterNote" id="modeNote">
-          Post-Inspection only mode uses only vetting/SIRE inspection observations. Combined Analytics mode includes vetting inspections plus internal/external audit observations.
+          Vetting Inspections mode uses only SIRE 2.0 vetting observations. Vessel Audits mode uses only internal/external vessel audit observations. Combined Analytics mode includes both.
         </div>
 
         <div class="statusLine">
@@ -564,6 +578,19 @@
     </div>
 
     <div class="panel">
+
+      <div class="card" id="negativeSourceTrendCard">
+        <h3 class="sectionTitle">Negative Observations — Vetting vs Internal Audits vs External Audits</h3>
+        <div class="statL">
+          One trend diagram with three monthly lines. Applies selected vessel(s), date range, record source(s), and audit type(s). Observation type checkbox filter is ignored for this chart because it is always based on Negative observations.
+        </div>
+        <div class="chartBox" style="margin-top:12px;">
+          <div class="chartTitle">Negative Observations — Monthly Source Trend</div>
+          <div class="chartSub">Vetting Observations / Internal Audits / External Audits</div>
+          <div id="chartNegativeSourceTrend"></div>
+        </div>
+      </div>
+
       <div class="card">
         <h3 class="sectionTitle">Visual Overview — Negative Observations</h3>
         <div class="statL">Each chart row shows: observations / inspections / average observations per inspection.</div>
@@ -765,7 +792,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="./auth.js"></script>
   <script src="./csvb-module-guard.js?v=20260522_dashboard_button_guard"></script>
-  <script type="module" src="./post_inspection_stats.js?v=20260601_report_meta_match_v03"></script>
+  <script type="module" src="./post_inspection_stats.js?v=20260629_modes_audit_type_negtrend_v04"></script>
   <script src="./csvb-post-inspection-stats-linecharts-v01.js?v=20260529_1"></script>
   <script src="./csvb-post-inspection-stats-compare-v03.js?v=20260531_1"></script>
   <script src="./csvb-post-inspection-stats-composition-v02.js?v=20260531_1"></script>
