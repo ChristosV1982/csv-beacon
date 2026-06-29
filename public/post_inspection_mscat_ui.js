@@ -1,4 +1,4 @@
-const MSCAT_BUILD = "csvb_mscat_ui_v07_shared_learning_logging_2026-06-26";
+const MSCAT_BUILD = "csvb_mscat_ui_v08_shared_learning_ai_2026-06-29";
 const MSCAT_SOURCE_REF = "DNV M-SCAT 8.2";
 
 const mscat = {
@@ -529,7 +529,7 @@ function ensureCard() {
 
     <div class="csvb-mscat-actions">
       <button class="btn primary" id="openMscatBtn" type="button">Select M-SCAT Causes / Actions</button>
-      <button class="btn btn-muted" id="suggestMscatBtn" type="button">AI Suggest M-SCAT</button>
+      <button class="btn btn-muted" id="suggestMscatBtn" type="button">AI suggest with learning</button>
       <button class="btn btn-muted" id="markMscatReviewedBtn" type="button">Mark selected M-SCAT as manually reviewed</button>
       <button class="btn btn-muted" id="reloadMscatBtn" type="button">Reload M-SCAT</button>
     </div>
@@ -720,7 +720,7 @@ function ensureDialog() {
       <div class="csvb-mscat-dialog-toolbar">
         <button class="btn btn-muted" id="mscatExpandAllBtn" type="button">Expand all</button>
         <button class="btn btn-muted" id="mscatCollapseAllBtn" type="button">Collapse all</button>
-        <button class="btn btn-muted" id="mscatAiSuggestBtn" type="button">AI Suggest M-SCAT</button>
+        <button class="btn btn-muted" id="mscatAiSuggestBtn" type="button">AI suggest with learning</button>
       </div>
 
       <div class="csvb-mscat-compact-note">
@@ -1012,7 +1012,7 @@ function setAiButtonsBusy(busy) {
     const btn = q(id);
     if (!btn) continue;
     btn.disabled = Boolean(busy);
-    btn.textContent = busy ? "AI suggesting…" : "AI Suggest M-SCAT";
+    btn.textContent = busy ? "AI suggesting with learning…" : "AI suggest with learning";
   }
 }
 
@@ -1052,7 +1052,7 @@ async function suggestMscatWithAi() {
 
   try {
     setAiButtonsBusy(true);
-    setTopStatus("AI suggesting M-SCAT…");
+    setTopStatus("AI suggesting M-SCAT with shared learning…");
 
     if (!mscat.taxonomy.length) await loadTaxonomy();
     await loadSelections();
@@ -1080,7 +1080,7 @@ async function suggestMscatWithAi() {
       return;
     }
 
-    setTopStatus(`AI suggested ${mscat.aiSuggestions.length} M-SCAT item(s). Review before saving.`);
+    setTopStatus(`AI suggested ${mscat.aiSuggestions.length} M-SCAT item(s). Shared examples used: ${Number(data.learning_examples_used || 0)}. Review before saving.`);
     presentMscatDialog();
   } catch (e) {
     console.error(e);

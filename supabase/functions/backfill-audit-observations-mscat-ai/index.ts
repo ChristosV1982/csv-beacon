@@ -2,7 +2,7 @@ export const config = {
   verify_jwt: false,
 };
 
-const FUNCTION_VERSION = "audit-mscat-ai-backfill-v03-filtered-recalculate-20260626";
+const FUNCTION_VERSION = "audit-mscat-ai-backfill-v04-shared-learning-20260629";
 const MSCAT_SOURCE_REF = "DNV M-SCAT 8.2";
 const MAX_BATCH_ITEMS = 10;
 const DEFAULT_BATCH_ITEMS = 5;
@@ -112,8 +112,11 @@ class MinimalPostgrestQuery {
     return this;
   }
 
-  then(resolve: any, reject: any) {
-    return this.execute().then(resolve, reject);
+  then<TResult1 = any, TResult2 = never>(
+    onfulfilled?: ((value: any) => TResult1 | PromiseLike<TResult1>) | null,
+    onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | null,
+  ): Promise<TResult1 | TResult2> {
+    return this.execute().then(onfulfilled ?? undefined, onrejected ?? undefined);
   }
 
   private formatValue(value: unknown) {
@@ -396,34 +399,53 @@ function learningSelectionCodes(example: any) {
     .filter(Boolean);
 }
 
+function learningQuestionNo(example: any) {
+  return String(example?.question_no || example?.sire_question_no || example?.question_base || "").trim();
+}
+
+function learningSourceType(example: any) {
+  return String(example?.source_type || example?.audit_source || "").trim();
+}
+
 function buildLearningPromptRows(examples: any[]) {
-  return (examples || []).slice(0, 6).map((e: any) => ({
-    similarity_score: e.similarity_score || 0,
-    match_summary: e.match_summary || "",
-    audit_type_name: e.audit_type_name || "",
-    audit_source: e.audit_source || "",
-    sire_question_no: e.sire_question_no || e.question_base || "",
-    obs_type: e.obs_type || "",
-    designation: e.designation || "",
-    observation_text: previewText(e.observation_text || e.observation_remarks || "", 360),
-    reviewed_mscat_item_codes: learningSelectionCodes(e),
-    review_comment: previewText(e.review_comment || "", 220),
-  }));
+  return (examples || [])
+    .filter((e: any) => learningSelectionCodes(e).length > 0)
+    .slice(0, 6)
+    .map((e: any) => ({
+      source_module: e.source_module || "",
+      source_label: e.source_module === "post_inspection" ? "Vetting/Post-Inspection observation" : "Audit observation",
+      similarity_score: e.similarity_score || 0,
+      match_summary: e.match_summary || "",
+      audit_type_name: e.audit_type_name || "",
+      source_type: learningSourceType(e),
+      source_reference: e.source_reference || "",
+      question_no: learningQuestionNo(e),
+      obs_type: e.obs_type || "",
+      designation: e.designation || "",
+      soc: e.soc || "",
+      noc: e.noc || "",
+      observation_text: previewText(e.observation_text || e.observation_remarks || "", 360),
+      reviewed_mscat_item_codes: learningSelectionCodes(e),
+      review_comment: previewText(e.review_comment || "", 220),
+    }));
 }
 
 function scoreLearningExample(example: any, item: any, tokens: string[]) {
   let score = 0;
   const itemQuestion = String(item?.question_no || item?.question_base || "").trim();
+  const exampleQuestion = learningQuestionNo(example);
+  const exampleSourceType = learningSourceType(example);
 
-  if (example?.sire_question_no && itemQuestion && String(example.sire_question_no) === itemQuestion) score += 50;
+  if (exampleQuestion && itemQuestion && exampleQuestion === itemQuestion) score += 50;
   if (example?.audit_type_id && item?.audit_type_id && String(example.audit_type_id) === String(item.audit_type_id)) score += 25;
-  if (example?.audit_source && item?.audit_source && String(example.audit_source) === String(item.audit_source)) score += 15;
+  if (exampleSourceType && item?.audit_source && exampleSourceType === String(item.audit_source)) score += 15;
   if (example?.obs_type && item?.obs_type && String(example.obs_type) === String(item.obs_type)) score += 10;
   if (example?.designation && item?.designation && String(example.designation) === String(item.designation)) score += 8;
+  if (String(example?.source_module || "") === "audit_observation") score += 4;
 
   const haystack = normSpaces([
     example?.question_base,
-    example?.sire_question_no,
+    exampleQuestion,
     example?.designation,
     example?.soc,
     example?.noc,
@@ -439,11 +461,12 @@ function scoreLearningExample(example: any, item: any, tokens: string[]) {
   score += Math.min(40, tokenHits * 4);
 
   const parts: string[] = [];
-  if (example?.sire_question_no && itemQuestion && String(example.sire_question_no) === itemQuestion) parts.push("same SIRE reference");
+  if (exampleQuestion && itemQuestion && exampleQuestion === itemQuestion) parts.push("same question reference");
   if (example?.audit_type_id && item?.audit_type_id && String(example.audit_type_id) === String(item.audit_type_id)) parts.push("same audit type");
-  if (example?.audit_source && item?.audit_source && String(example.audit_source) === String(item.audit_source)) parts.push("same audit source");
+  if (exampleSourceType && item?.audit_source && exampleSourceType === String(item.audit_source)) parts.push("same audit/source type");
   if (example?.obs_type && item?.obs_type && String(example.obs_type) === String(item.obs_type)) parts.push("same observation type");
   if (example?.designation && item?.designation && String(example.designation) === String(item.designation)) parts.push("same designation");
+  if (String(example?.source_module || "") === "post_inspection") parts.push("shared vetting learning");
   if (tokenHits > 0) parts.push("keyword overlap");
 
   return {
@@ -458,9 +481,8 @@ async function loadLearningExamplesForItem(supabaseAdmin: any, profile: any, ite
   const companyId = String(item?.company_id || profile?.company_id || "").trim();
 
   let query = supabaseAdmin
-    .from("audit_observation_mscat_learning_examples")
-    .select("id,company_id,source_report_id,source_audit_observation_item_id,audit_type_id,audit_type_name,audit_source,sire_question_no,question_base,obs_type,designation,soc,noc,observation_text,observation_remarks,review_comment,final_taxonomy_ids,final_manual_selections,reviewed_at")
-    .neq("source_audit_observation_item_id", item.id)
+    .from("mscat_learning_examples")
+    .select("id,source_module,company_id,source_report_id,source_observation_item_id,vessel_id,event_date,source_type,source_reference,audit_type_id,audit_type_name,question_no,question_base,obs_type,designation,soc,noc,observation_text,observation_remarks,review_comment,final_taxonomy_ids,final_manual_selections,reviewed_at")
     .not("final_taxonomy_ids", "is", null)
     .order("reviewed_at", { ascending: false })
     .limit(200);
@@ -474,7 +496,7 @@ async function loadLearningExamplesForItem(supabaseAdmin: any, profile: any, ite
 
   const { data, error } = await query;
 
-  if (error) throw new Error("Learning examples lookup failed: " + (error.message || String(error)));
+  if (error) throw new Error("Shared learning examples lookup failed: " + (error.message || String(error)));
 
   const itemText = [
     item?.question_no,
@@ -487,8 +509,11 @@ async function loadLearningExamplesForItem(supabaseAdmin: any, profile: any, ite
   ].filter(Boolean).join(" ");
 
   const tokens = tokenizeLearningText(itemText);
+  const currentItemId = String(item?.id || "");
 
   return (data || [])
+    .filter((e: any) => String(e?.source_observation_item_id || "") !== currentItemId)
+    .filter((e: any) => learningSelectionCodes(e).length > 0)
     .map((e: any) => scoreLearningExample(e, item, tokens))
     .filter((e: any) => Number(e.similarity_score || 0) > 0)
     .sort((a: any, b: any) => {
@@ -983,7 +1008,7 @@ async function suggestForItem(openAiKey: string, model: string, item: any, taxon
           "You are a maritime safety, tanker audit, SIRE 2.0, and DNV M-SCAT 8.2 cause analysis assistant. " +
           "Suggest M-SCAT causes/actions only from the provided taxonomy. Do not invent item codes. " +
           "Return only high-relevance suggestions. Prefer a balanced set: immediate cause(s), basic cause(s), and control area(s) when supported by the audit observation. " +
-          "When reviewed company examples are supplied, treat them as company preference signals. Do not copy them blindly; use them only when factually relevant to the current observation. " +
+          "When reviewed company examples from Audit or Vetting/Post-Inspection are supplied, treat them as company preference signals. Do not copy them blindly; use them only when factually relevant to the current observation. " +
           "This is advisory only; final selections are saved as AI-suggested and remain reviewable by the user.",
       },
       {
@@ -999,7 +1024,7 @@ async function suggestForItem(openAiKey: string, model: string, item: any, taxon
             "Return 2 to 6 strong suggestions unless fewer are justified.",
             "Never return more than 8 suggestions.",
             "Keep each reason concise.",
-            "If reviewed_company_examples are relevant, align with the reviewed company pattern and mention that alignment in the reason.",
+            "If reviewed_company_examples from Audit or Vetting/Post-Inspection are relevant, align with the reviewed company pattern and mention that alignment in the reason.",
           ],
         }),
       },

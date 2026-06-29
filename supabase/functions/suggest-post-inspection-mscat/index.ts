@@ -2,10 +2,155 @@ export const config = {
   verify_jwt: false,
 };
 
-const FUNCTION_VERSION = "mscat-ai-suggest-v01-20260617";
+const FUNCTION_VERSION = "mscat-ai-suggest-v02-shared-learning-20260629";
 const MSCAT_SOURCE_REF = "DNV M-SCAT 8.2";
 
-import { createClient } from "npm:@supabase/supabase-js@2.45.4";
+
+class MinimalPostgrestQuery {
+  private baseUrl: string;
+  private serviceKey: string;
+  private table: string;
+  private method = "GET";
+  private selectColumns = "";
+  private filters: Array<[string, string]> = [];
+  private orderParts: string[] = [];
+  private limitValue: number | null = null;
+  private maybeSingleMode = false;
+
+  constructor(baseUrl: string, serviceKey: string, table: string) {
+    this.baseUrl = baseUrl.replace(/\/+$/, "");
+    this.serviceKey = serviceKey;
+    this.table = table;
+  }
+
+  select(columns = "*") {
+    this.method = "GET";
+    this.selectColumns = columns;
+    return this;
+  }
+
+  eq(column: string, value: unknown) {
+    this.filters.push([column, `eq.${this.formatValue(value)}`]);
+    return this;
+  }
+
+  neq(column: string, value: unknown) {
+    this.filters.push([column, `neq.${this.formatValue(value)}`]);
+    return this;
+  }
+
+  not(column: string, operator: string, value: unknown) {
+    const v = value === null ? "null" : this.formatValue(value);
+    this.filters.push([column, `not.${operator}.${v}`]);
+    return this;
+  }
+
+  order(column: string, opts: { ascending?: boolean } = {}) {
+    const direction = opts.ascending === false ? "desc" : "asc";
+    this.orderParts.push(`${column}.${direction}`);
+    return this;
+  }
+
+  limit(count: number) {
+    this.limitValue = Math.max(0, Math.floor(Number(count || 0)));
+    return this;
+  }
+
+  maybeSingle() {
+    this.maybeSingleMode = true;
+    return this;
+  }
+
+  then<TResult1 = any, TResult2 = never>(
+    onfulfilled?: ((value: any) => TResult1 | PromiseLike<TResult1>) | null,
+    onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | null,
+  ): Promise<TResult1 | TResult2> {
+    return this.execute().then(onfulfilled ?? undefined, onrejected ?? undefined);
+  }
+
+  private formatValue(value: unknown) {
+    if (value === null) return "null";
+    if (typeof value === "boolean") return value ? "true" : "false";
+    return String(value ?? "");
+  }
+
+  private async execute() {
+    const url = new URL(`${this.baseUrl}/rest/v1/${encodeURIComponent(this.table)}`);
+
+    if (this.selectColumns) {
+      url.searchParams.set("select", this.selectColumns);
+    }
+
+    for (const [key, value] of this.filters) {
+      url.searchParams.append(key, value);
+    }
+
+    if (this.orderParts.length) {
+      url.searchParams.set("order", this.orderParts.join(","));
+    }
+
+    if (this.limitValue !== null) {
+      url.searchParams.set("limit", String(this.limitValue));
+    }
+
+    const resp = await fetch(url.toString(), {
+      method: this.method,
+      headers: {
+        apikey: this.serviceKey,
+        Authorization: `Bearer ${this.serviceKey}`,
+      },
+    });
+
+    const text = await resp.text().catch(() => "");
+
+    if (!resp.ok) {
+      return {
+        data: null,
+        error: {
+          message: text || `${resp.status} ${resp.statusText}`,
+          status: resp.status,
+        },
+      };
+    }
+
+    let data: any = null;
+
+    if (text) {
+      try {
+        data = JSON.parse(text);
+      } catch {
+        data = text;
+      }
+    }
+
+    if (this.maybeSingleMode) {
+      if (Array.isArray(data)) {
+        if (data.length === 0) data = null;
+        else if (data.length === 1) data = data[0];
+        else {
+          return {
+            data: null,
+            error: {
+              message: `Expected single row, got ${data.length}`,
+              status: 406,
+            },
+          };
+        }
+      }
+    }
+
+    return { data, error: null };
+  }
+}
+
+function createClient(baseUrl: string, serviceKey: string) {
+  return {
+    from(table: string) {
+      return new MinimalPostgrestQuery(baseUrl, serviceKey, table);
+    },
+  };
+}
+
 
 function buildCorsHeaders(req: Request) {
   const origin = req.headers.get("Origin") ?? "*";
@@ -110,6 +255,7 @@ function buildObservationContext(item: any) {
     nature_of_concern: item?.nature_of_concern || "",
     classification_coding: item?.classification_coding || "",
     observation_text: normSpaces(item?.observation_text || ""),
+    remarks: normSpaces(item?.remarks || ""),
   };
 }
 
@@ -161,6 +307,160 @@ function normalizeSuggestion(raw: any) {
     confidence: Math.max(0, Math.min(1, Number(raw?.confidence || 0))),
     reason: normSpaces(raw?.reason || ""),
   };
+}
+
+function previewText(value: unknown, max = 320) {
+  const s = normSpaces(value);
+  if (s.length <= max) return s;
+  return s.slice(0, Math.max(0, max - 1)).trimEnd() + "…";
+}
+
+function tokenizeLearningText(value: unknown) {
+  return Array.from(
+    new Set(
+      normSpaces(String(value || "").toLowerCase())
+        .split(/[^a-z0-9]+/g)
+        .map((x) => x.trim())
+        .filter((x) =>
+          x.length >= 4 &&
+          ![
+            "this","that","with","from","have","were","been","being","into","onto",
+            "they","their","there","where","which","when","then","than","such",
+            "audit","inspection","observation","observed","vessel","ship","during","found"
+          ].includes(x)
+        )
+    )
+  );
+}
+
+function learningSelectionCodes(example: any) {
+  const rows = Array.isArray(example?.final_manual_selections)
+    ? example.final_manual_selections
+    : [];
+
+  return rows
+    .map((x: any) => String(x?.item_code || x?.item_no || "").trim())
+    .filter(Boolean);
+}
+
+function learningQuestionNo(example: any) {
+  return String(example?.question_no || example?.sire_question_no || example?.question_base || "").trim();
+}
+
+function buildLearningPromptRows(examples: any[]) {
+  return (examples || [])
+    .filter((e: any) => learningSelectionCodes(e).length > 0)
+    .slice(0, 6)
+    .map((e: any) => ({
+      source_module: e.source_module || "",
+      source_label: e.source_module === "audit_observation" ? "Audit observation" : "Vetting/Post-Inspection observation",
+      similarity_score: e.similarity_score || 0,
+      match_summary: e.match_summary || "",
+      audit_type_name: e.audit_type_name || "",
+      source_type: e.source_type || "",
+      source_reference: e.source_reference || "",
+      question_no: learningQuestionNo(e),
+      obs_type: e.obs_type || "",
+      designation: e.designation || "",
+      soc: e.soc || "",
+      noc: e.noc || "",
+      observation_text: previewText(e.observation_text || e.observation_remarks || "", 360),
+      reviewed_mscat_item_codes: learningSelectionCodes(e),
+      review_comment: previewText(e.review_comment || "", 220),
+    }));
+}
+
+function scoreLearningExample(example: any, item: any, tokens: string[]) {
+  let score = 0;
+
+  const itemQuestion = String(item?.question_no || item?.question_base || "").trim();
+  const exampleQuestion = learningQuestionNo(example);
+
+  if (exampleQuestion && itemQuestion && exampleQuestion === itemQuestion) score += 50;
+  if (example?.obs_type && item?.obs_type && String(example.obs_type) === String(item.obs_type)) score += 10;
+  if (example?.designation && item?.designation && String(example.designation) === String(item.designation)) score += 8;
+  if (example?.noc && item?.nature_of_concern && String(example.noc) === String(item.nature_of_concern)) score += 8;
+  if (example?.soc && item?.classification_coding && String(example.soc) === String(item.classification_coding)) score += 6;
+  if (String(example?.source_module || "") === "post_inspection") score += 4;
+
+  const haystack = normSpaces([
+    example?.question_base,
+    exampleQuestion,
+    example?.designation,
+    example?.soc,
+    example?.noc,
+    example?.observation_text,
+    example?.observation_remarks
+  ].filter(Boolean).join(" ")).toLowerCase();
+
+  let tokenHits = 0;
+  for (const token of tokens) {
+    if (haystack.includes(token)) tokenHits++;
+  }
+
+  score += Math.min(40, tokenHits * 4);
+
+  const parts: string[] = [];
+  if (exampleQuestion && itemQuestion && exampleQuestion === itemQuestion) parts.push("same question reference");
+  if (example?.obs_type && item?.obs_type && String(example.obs_type) === String(item.obs_type)) parts.push("same observation type");
+  if (example?.designation && item?.designation && String(example.designation) === String(item.designation)) parts.push("same designation");
+  if (String(example?.source_module || "") === "audit_observation") parts.push("shared audit learning");
+  if (String(example?.source_module || "") === "post_inspection") parts.push("shared vetting learning");
+  if (tokenHits > 0) parts.push("keyword overlap");
+
+  return {
+    ...example,
+    similarity_score: score,
+    match_summary: parts.join("; "),
+  };
+}
+
+async function loadLearningExamplesForItem(supabaseAdmin: any, profile: any, item: any, limit = 6) {
+  const role = String(profile?.role || "").trim();
+  const companyId = String(item?.company_id || profile?.company_id || "").trim();
+
+  let query = supabaseAdmin
+    .from("mscat_learning_examples")
+    .select("id,source_module,company_id,source_report_id,source_observation_item_id,vessel_id,event_date,source_type,source_reference,audit_type_id,audit_type_name,question_no,question_base,obs_type,designation,soc,noc,observation_text,observation_remarks,review_comment,final_taxonomy_ids,final_manual_selections,reviewed_at")
+    .not("final_taxonomy_ids", "is", null)
+    .order("reviewed_at", { ascending: false })
+    .limit(200);
+
+  if (role !== "super_admin") {
+    if (!companyId) return [];
+    query = query.eq("company_id", companyId);
+  } else if (companyId) {
+    query = query.eq("company_id", companyId);
+  }
+
+  const { data, error } = await query;
+
+  if (error) throw new Error("Shared learning examples lookup failed: " + (error.message || String(error)));
+
+  const itemText = [
+    item?.question_no,
+    item?.question_base,
+    item?.designation,
+    item?.classification_coding,
+    item?.nature_of_concern,
+    item?.observation_text,
+    item?.remarks
+  ].filter(Boolean).join(" ");
+
+  const tokens = tokenizeLearningText(itemText);
+  const currentItemId = String(item?.id || "");
+
+  return (data || [])
+    .filter((e: any) => String(e?.source_observation_item_id || "") !== currentItemId)
+    .filter((e: any) => learningSelectionCodes(e).length > 0)
+    .map((e: any) => scoreLearningExample(e, item, tokens))
+    .filter((e: any) => Number(e.similarity_score || 0) > 0)
+    .sort((a: any, b: any) => {
+      const scoreDiff = Number(b.similarity_score || 0) - Number(a.similarity_score || 0);
+      if (scoreDiff) return scoreDiff;
+      return String(b.reviewed_at || "").localeCompare(String(a.reviewed_at || ""));
+    })
+    .slice(0, Math.max(0, Math.min(Number(limit || 6), 10)));
 }
 
 Deno.serve(async (req: Request) => {
@@ -217,7 +517,7 @@ Deno.serve(async (req: Request) => {
 
     const { data: item, error: itemErr } = await supabaseAdmin
       .from("post_inspection_observation_items")
-      .select("id,report_id,company_id,obs_type,question_no,question_base,designation,nature_of_concern,classification_coding,observation_text")
+      .select("id,report_id,company_id,obs_type,question_no,question_base,designation,nature_of_concern,classification_coding,observation_text,remarks")
       .eq("id", observation_item_id)
       .eq("report_id", report_id)
       .maybeSingle();
@@ -252,6 +552,7 @@ Deno.serve(async (req: Request) => {
 
     const codeMap = new Map(taxonomyRows.map((r: any) => [String(r.item_code), r]));
     const observation = buildObservationContext(item);
+    const learningExamples = await loadLearningExamplesForItem(supabaseAdmin, profile, item, 6);
 
     const responseSchema = {
       type: "object",
@@ -307,9 +608,10 @@ Deno.serve(async (req: Request) => {
         {
           role: "system",
           content:
-            "You are a maritime safety, tanker vetting, and DNV M-SCAT 8.2 cause analysis assistant. " +
+            "You are a maritime safety, tanker vetting, audit, SIRE 2.0, and DNV M-SCAT 8.2 cause analysis assistant. " +
             "Suggest M-SCAT causes/actions only from the provided taxonomy. Do not invent item codes. " +
             "Return only high-relevance suggestions. Prefer a balanced set: immediate cause(s), basic cause(s), and control area(s) when supported by the observation. " +
+            "When reviewed company examples from Audit or Vetting/Post-Inspection are supplied, treat them as company preference signals. Do not copy them blindly; use them only when factually relevant to the current observation. " +
             "This is advisory only; the human user will confirm before saving.",
         },
         {
@@ -317,6 +619,7 @@ Deno.serve(async (req: Request) => {
           content: JSON.stringify({
             task: "Suggest M-SCAT item codes for this SIRE 2.0 post-inspection observation.",
             observation,
+            reviewed_company_examples: buildLearningPromptRows(learningExamples),
             taxonomy: buildTaxonomyPromptRows(taxonomyRows),
             constraints: [
               "Use exact item_code values only from the supplied taxonomy.",
@@ -324,6 +627,7 @@ Deno.serve(async (req: Request) => {
               "Do not infer facts not supported by the observation text.",
               "Return 2 to 6 strong suggestions unless fewer are justified.",
               "Keep each reason concise.",
+              "If reviewed_company_examples from Audit or Vetting/Post-Inspection are relevant, align with the reviewed company pattern and mention that alignment in the reason.",
             ],
           }),
         },
@@ -390,6 +694,8 @@ Deno.serve(async (req: Request) => {
       function_version: FUNCTION_VERSION,
       model: getOpenAiModel(),
       secret_name_used: Deno.env.get("OPENAI_API_KEY_2") ? "OPENAI_API_KEY_2" : "OPENAI_API_KEY",
+      shared_learning: true,
+      learning_examples_used: learningExamples.length,
       observation_item_id,
       report_id,
       overall_note: normSpaces(parsed?.overall_note || ""),
