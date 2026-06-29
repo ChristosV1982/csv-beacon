@@ -3,7 +3,7 @@
 // Manual Excel-based audit observation staging module. Future steps will add Excel import and M-SCAT RCA.
 // Observations use SIRE-style fields: question_no, obs_type, designation, SOC, NOC.
 
-const AUDIT_OBSERVATIONS_MANUAL_BUILD = "AUDIT_OBSERVATIONS_MANUAL_20260626_FILTERED_MSCAT_RECALC_ALL_BATCHES";
+const AUDIT_OBSERVATIONS_MANUAL_BUILD = "AUDIT_OBSERVATIONS_MANUAL_20260626_PROCESSING_OVERLAY";
 window.CSVB_AUDIT_OBSERVATIONS_MANUAL_BUILD = AUDIT_OBSERVATIONS_MANUAL_BUILD;
 
 const AUDIT_BUCKET = "audit-reports";
@@ -36,6 +36,62 @@ function esc(s) {
 function setStatus(text) {
   el("statusPill").textContent = text || "Ready";
 }
+
+function busyOverlayNode() {
+  return document.getElementById("csvbBusyOverlay");
+}
+
+function setBusy(title, detail = "") {
+  const overlay = busyOverlayNode();
+  if (!overlay) {
+    setStatus(title || "Processing…");
+    return;
+  }
+
+  const titleNode = document.getElementById("csvbBusyTitle");
+  const detailNode = document.getElementById("csvbBusyDetail");
+
+  if (titleNode) titleNode.textContent = title || "Processing…";
+  if (detailNode) detailNode.textContent = detail || "Please wait.";
+
+  overlay.classList.add("is-visible");
+
+  document.querySelectorAll("button, input, select, textarea").forEach((node) => {
+    if (!node.dataset.csvbBusyPrevDisabled) {
+      node.dataset.csvbBusyPrevDisabled = node.disabled ? "1" : "0";
+    }
+    node.disabled = true;
+  });
+}
+
+function updateBusy(title, detail = "") {
+  const overlay = busyOverlayNode();
+  if (!overlay || !overlay.classList.contains("is-visible")) {
+    setBusy(title, detail);
+    return;
+  }
+
+  const titleNode = document.getElementById("csvbBusyTitle");
+  const detailNode = document.getElementById("csvbBusyDetail");
+
+  if (titleNode) titleNode.textContent = title || "Processing…";
+  if (detailNode) detailNode.textContent = detail || "";
+}
+
+function clearBusy() {
+  const overlay = busyOverlayNode();
+  if (overlay) overlay.classList.remove("is-visible");
+
+  document.querySelectorAll("button, input, select, textarea").forEach((node) => {
+    if (node.dataset.csvbBusyPrevDisabled === "0") {
+      node.disabled = false;
+    } else if (node.dataset.csvbBusyPrevDisabled === "1") {
+      node.disabled = true;
+    }
+    delete node.dataset.csvbBusyPrevDisabled;
+  });
+}
+
 
 function ymd(d) {
   const yyyy = d.getFullYear();
@@ -605,8 +661,6 @@ async function recalculateFilteredAiMscat() {
 
   if (!dryConfirm) return;
 
-  setStatus("Running dry-run recalculation preview…");
-
   const commonBody = {
     scope: "selected_reports",
     report_ids: reportIds,
@@ -617,12 +671,23 @@ async function recalculateFilteredAiMscat() {
     concurrency: 1
   };
 
-  const dry = await state.supabase.functions.invoke("backfill-audit-observations-mscat-ai", {
-    body: {
-      ...commonBody,
-      dry_run: true
-    }
-  });
+  setBusy(
+    "Preparing recalculation dry-run…",
+    "Checking the current filtered results.\nManual reviewed and Mixed observations will remain locked."
+  );
+  setStatus("Running dry-run recalculation preview…");
+
+  let dry;
+  try {
+    dry = await state.supabase.functions.invoke("backfill-audit-observations-mscat-ai", {
+      body: {
+        ...commonBody,
+        dry_run: true
+      }
+    });
+  } finally {
+    clearBusy();
+  }
 
   if (dry.error) throw dry.error;
   if (!dry.data?.ok) throw new Error(dry.data?.error || "Dry-run failed.");
@@ -665,59 +730,77 @@ async function recalculateFilteredAiMscat() {
   const maxBatches = Math.ceil(pending / 10) + 5;
   const failedSamples = [];
 
-  while (remaining > 0 && batchNo < maxBatches) {
-    batchNo += 1;
+  setBusy(
+    "Recalculating M-SCAT…",
+    `Starting learning-assisted recalculation for ${pending} eligible observation(s).`
+  );
 
-    setStatus(`Applying learning-assisted M-SCAT recalculation batch ${batchNo}…`);
+  try {
+    while (remaining > 0 && batchNo < maxBatches) {
+      batchNo += 1;
 
-    const apply = await state.supabase.functions.invoke("backfill-audit-observations-mscat-ai", {
-      body: {
-        ...commonBody,
-        dry_run: false
+      updateBusy(
+        "Recalculating M-SCAT…",
+        `Batch ${batchNo}. Remaining before this batch: ${remaining}.\nManual reviewed and Mixed observations remain locked.`
+      );
+      setStatus(`Applying learning-assisted M-SCAT recalculation batch ${batchNo}…`);
+
+      const apply = await state.supabase.functions.invoke("backfill-audit-observations-mscat-ai", {
+        body: {
+          ...commonBody,
+          dry_run: false
+        }
+      });
+
+      if (apply.error) throw apply.error;
+      if (!apply.data?.ok) throw new Error(apply.data?.error || `Apply recalculation failed on batch ${batchNo}.`);
+
+      const resultCounts = apply.data.counts || {};
+      const processed = Number(resultCounts.processed_items || 0);
+      const succeeded = Number(resultCounts.succeeded_items || 0);
+      const failed = Number(resultCounts.failed_items || 0);
+      const inserted = Number(resultCounts.inserted_rows || 0);
+      const newRemaining = Number(resultCounts.remaining_pending_after_batch || 0);
+
+      totalProcessed += processed;
+      totalSucceeded += succeeded;
+      totalFailed += failed;
+      totalInserted += inserted;
+
+      if (Array.isArray(apply.data.failed) && apply.data.failed.length) {
+        failedSamples.push(...apply.data.failed.slice(0, 3));
       }
-    });
 
-    if (apply.error) throw apply.error;
-    if (!apply.data?.ok) throw new Error(apply.data?.error || `Apply recalculation failed on batch ${batchNo}.`);
+      if (processed < 1) {
+        remaining = 0;
+        break;
+      }
 
-    const resultCounts = apply.data.counts || {};
-    const processed = Number(resultCounts.processed_items || 0);
-    const succeeded = Number(resultCounts.succeeded_items || 0);
-    const failed = Number(resultCounts.failed_items || 0);
-    const inserted = Number(resultCounts.inserted_rows || 0);
-    const newRemaining = Number(resultCounts.remaining_pending_after_batch || 0);
+      if (newRemaining >= remaining && failed > 0 && succeeded === 0) {
+        throw new Error(
+          "Recalculation stopped because a batch failed without progress. " +
+          "No manual-reviewed observations were touched."
+        );
+      }
 
-    totalProcessed += processed;
-    totalSucceeded += succeeded;
-    totalFailed += failed;
-    totalInserted += inserted;
-
-    if (Array.isArray(apply.data.failed) && apply.data.failed.length) {
-      failedSamples.push(...apply.data.failed.slice(0, 3));
+      remaining = newRemaining;
     }
 
-    if (processed < 1) {
-      remaining = 0;
-      break;
-    }
-
-    if (newRemaining >= remaining && failed > 0 && succeeded === 0) {
+    if (batchNo >= maxBatches && remaining > 0) {
       throw new Error(
-        "Recalculation stopped because a batch failed without progress. " +
-        "No manual-reviewed observations were touched."
+        `Safety stop reached after ${batchNo} batches with ${remaining} observation(s) still pending.`
       );
     }
 
-    remaining = newRemaining;
-  }
-
-  if (batchNo >= maxBatches && remaining > 0) {
-    throw new Error(
-      `Safety stop reached after ${batchNo} batches with ${remaining} observation(s) still pending.`
+    updateBusy(
+      "Refreshing audit register…",
+      "Recalculation completed. Reloading the register while preserving your selected filters."
     );
-  }
 
-  await refreshAuditRegisterPreservingFilters();
+    await refreshAuditRegisterPreservingFilters({ showOverlay: false });
+  } finally {
+    clearBusy();
+  }
 
   const failedText = failedSamples.length
     ? `\n\nSample failure:\n${String(failedSamples[0]?.error || "Unknown failure").slice(0, 400)}`
@@ -1842,12 +1925,21 @@ async function reloadAll(options = {}) {
   if (!state.activeAudit) clearAuditForm();
 }
 
-async function refreshAuditRegisterPreservingFilters() {
-  setStatus("Refreshing register…");
+async function refreshAuditRegisterPreservingFilters(options = {}) {
+  const showOverlay = options.showOverlay === true;
 
-  await reloadAll({ preserveFilters: true });
+  if (showOverlay) {
+    setBusy("Refreshing audit register…", "Reloading records while preserving your selected filters.");
+  } else {
+    setStatus("Refreshing register…");
+  }
 
-  setStatus("Register refreshed; filters preserved.");
+  try {
+    await reloadAll({ preserveFilters: true });
+    setStatus("Register refreshed; filters preserved.");
+  } finally {
+    if (showOverlay) clearBusy();
+  }
 }
 
 async function init() {

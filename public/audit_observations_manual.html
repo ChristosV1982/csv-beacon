@@ -282,6 +282,69 @@
     }
 
     .hidden{ display:none !important; }
+  
+    .csvbBusyOverlay{
+      position:fixed;
+      inset:0;
+      z-index:99999;
+      display:none;
+      align-items:center;
+      justify-content:center;
+      background:rgba(2,24,55,0.58);
+      backdrop-filter:blur(2px);
+    }
+    .csvbBusyOverlay.is-visible{
+      display:flex;
+    }
+    .csvbBusyBox{
+      width:min(640px, calc(100vw - 32px));
+      border:1px solid #bcd3ee;
+      border-radius:16px;
+      background:#ffffff;
+      box-shadow:0 18px 60px rgba(2,24,55,0.35);
+      padding:18px;
+      color:#062a5e;
+    }
+    .csvbBusyTitle{
+      font-weight:950;
+      font-size:1.1rem;
+      margin-bottom:8px;
+    }
+    .csvbBusyDetail{
+      font-weight:850;
+      color:#35507b;
+      line-height:1.45;
+      min-height:28px;
+      white-space:pre-wrap;
+    }
+    .csvbBusyBar{
+      margin-top:14px;
+      height:12px;
+      border-radius:999px;
+      background:#eaf4ff;
+      overflow:hidden;
+      border:1px solid #bcd3ee;
+    }
+    .csvbBusyBarInner{
+      width:38%;
+      height:100%;
+      border-radius:999px;
+      background:#062a5e;
+      animation:csvbBusySlide 1.15s infinite ease-in-out;
+    }
+    @keyframes csvbBusySlide{
+      0%{ transform:translateX(-110%); }
+      50%{ transform:translateX(95%); }
+      100%{ transform:translateX(260%); }
+    }
+    .csvbBusySmall{
+      margin-top:10px;
+      color:#64748b;
+      font-weight:800;
+      font-size:.86rem;
+      line-height:1.35;
+    }
+
   </style>
   <link rel="stylesheet" href="./csvb-ui-polish.css?v=20260430_1" />
   <link rel="stylesheet" href="./csvb-help-tooltips.css?v=20260430_1" />
@@ -291,6 +354,17 @@
 </head>
 
 <body>
+  <div class="csvbBusyOverlay" id="csvbBusyOverlay" aria-live="polite" aria-busy="true">
+    <div class="csvbBusyBox">
+      <div class="csvbBusyTitle" id="csvbBusyTitle">Processing…</div>
+      <div class="csvbBusyDetail" id="csvbBusyDetail">Please wait.</div>
+      <div class="csvbBusyBar"><div class="csvbBusyBarInner"></div></div>
+      <div class="csvbBusySmall">
+        Do not close this page while the operation is running. Filters will be preserved.
+      </div>
+    </div>
+  </div>
+
   <div class="wrap">
     <div class="topbar">
       <div>
@@ -668,7 +742,7 @@
   <script src="./auth.js"></script>
   <script src="./csvb-module-guard.js?v=20260522_dashboard_button_guard"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <script type="module" src="./audit_observations_manual.js?v=20260626_filtered_mscat_recalc"></script>
+  <script type="module" src="./audit_observations_manual.js?v=20260626_processing_overlay"></script>
   <script src="./csvb-ui-polish.js?v=20260430_1"></script>
   <script src="./csvb-help-tooltips.js?v=20260430_1"></script>
   <script src="./csvb-100pct-fit.js?v=20260430_1"></script>
