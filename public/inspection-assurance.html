@@ -55,5 +55,6 @@
   <script>
     (async()=>{try{const b=await AUTH.setupAuthButtons({logoutBtnId:'logoutBtn'});document.getElementById('subLine').textContent=b?.profile?.username?`${b.profile.username} · ${b.profile.role}`:'Inspection & Assurance Module';}catch(e){const w=document.getElementById('warnBox');w.textContent=e.message||String(e);w.style.display='block';}})();
   </script>
+  <script src="./csvb-global-busy.js?v=20260629_global_busy_v01"></script>
 </body>
 </html>
