@@ -1,7 +1,7 @@
 // public/audit_observations_manual_detail.js
 // Audit Observations Manual — separate audit detail window.
 
-const BUILD = "AUDIT_OBSERVATIONS_MANUAL_DETAIL_20260626_STEP6I2_RESULT_BANNER";
+const BUILD = "AUDIT_OBSERVATIONS_MANUAL_DETAIL_20260629_SHARED_LEARNING_WORDING";
 window.CSVB_AUDIT_OBSERVATIONS_MANUAL_DETAIL_BUILD = BUILD;
 
 const AUDIT_BUCKET = "audit-reports";
@@ -563,7 +563,7 @@ function renderAiSuggestionResult() {
   if (count < 1) {
     box.innerHTML = `
       <div class="mscatSavedMain">
-        <span class="pill pill-none">Learning-assisted AI completed</span>
+        <span class="pill pill-none">Shared-learning AI completed</span>
         <span>No valid M-SCAT suggestions were returned.</span>
       </div>
       <div class="mscatReason">
@@ -576,9 +576,9 @@ function renderAiSuggestionResult() {
 
   box.innerHTML = `
     <div class="mscatSavedMain">
-      <span class="pill pill-ai">Learning-assisted AI completed</span>
+      <span class="pill pill-ai">Shared-learning AI completed</span>
       <span>${esc(count)} suggestion(s) returned.</span>
-      <span>${esc(learningCount)} reviewed company example(s) used.</span>
+      <span>${esc(learningCount)} shared Audit/Vetting reviewed example(s) used.</span>
     </div>
     <div class="mscatReason">
       Nothing has been saved yet. Review the ticked M-SCAT items, then press <strong>Save M-SCAT selections</strong> if you accept them.
