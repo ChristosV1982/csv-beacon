@@ -365,6 +365,7 @@
         <div class="row" style="margin-top:10px;">
           <button class="btn btn-muted" id="newAuditBtn">New audit</button>
           <button class="btn btn-muted" id="reloadAuditsBtn" title="Refresh the audit list without changing selected filters">Refresh results</button>
+          <button class="btn btn-muted" id="recalcFilteredMscatBtn" title="Recalculate Missing / AI-only M-SCAT observations for the current filtered results. Manual and Mixed observations are locked.">Recalculate AI M-SCAT for filtered results</button>
         </div>
 
         <table>
@@ -667,7 +668,7 @@
   <script src="./auth.js"></script>
   <script src="./csvb-module-guard.js?v=20260522_dashboard_button_guard"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <script type="module" src="./audit_observations_manual.js?v=20260626_refresh_filters"></script>
+  <script type="module" src="./audit_observations_manual.js?v=20260626_filtered_mscat_recalc"></script>
   <script src="./csvb-ui-polish.js?v=20260430_1"></script>
   <script src="./csvb-help-tooltips.js?v=20260430_1"></script>
   <script src="./csvb-100pct-fit.js?v=20260430_1"></script>

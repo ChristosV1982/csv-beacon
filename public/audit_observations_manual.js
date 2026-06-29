@@ -3,7 +3,7 @@
 // Manual Excel-based audit observation staging module. Future steps will add Excel import and M-SCAT RCA.
 // Observations use SIRE-style fields: question_no, obs_type, designation, SOC, NOC.
 
-const AUDIT_OBSERVATIONS_MANUAL_BUILD = "AUDIT_OBSERVATIONS_MANUAL_20260626_REFRESH_FILTERS_PRESERVED";
+const AUDIT_OBSERVATIONS_MANUAL_BUILD = "AUDIT_OBSERVATIONS_MANUAL_20260626_FILTERED_MSCAT_RECALC_ALL_BATCHES";
 window.CSVB_AUDIT_OBSERVATIONS_MANUAL_BUILD = AUDIT_OBSERVATIONS_MANUAL_BUILD;
 
 const AUDIT_BUCKET = "audit-reports";
@@ -553,6 +553,190 @@ function filteredAudits() {
     return true;
   });
 }
+
+function filteredAuditIds() {
+  return filteredAudits()
+    .map((a) => String(a.id || "").trim())
+    .filter(Boolean);
+}
+
+function recalcCandidateSummary() {
+  const rows = filteredAudits();
+  const out = {
+    audits: rows.length,
+    missing: 0,
+    ai: 0,
+    manual: 0,
+    mixed: 0,
+    notApplicable: 0
+  };
+
+  for (const audit of rows) {
+    const s = auditMscatInfo(audit).status;
+    if (s === "missing") out.missing += 1;
+    else if (s === "ai") out.ai += 1;
+    else if (s === "manual") out.manual += 1;
+    else if (s === "mixed") out.mixed += 1;
+    else out.notApplicable += 1;
+  }
+
+  return out;
+}
+
+async function recalculateFilteredAiMscat() {
+  const reportIds = filteredAuditIds();
+  const summary = recalcCandidateSummary();
+
+  if (!reportIds.length) {
+    alert("No audit records match the current filters.");
+    return;
+  }
+
+  const dryConfirm = confirm(
+    "Dry-run recalculation for current filtered audit records?\n\n" +
+    `Filtered audits: ${summary.audits}\n` +
+    `Missing M-SCAT audits: ${summary.missing}\n` +
+    `AI populated audits: ${summary.ai}\n` +
+    `Manual reviewed audits locked: ${summary.manual}\n` +
+    `Mixed audits locked: ${summary.mixed}\n` +
+    `NIL / Not applicable: ${summary.notApplicable}\n\n` +
+    "Only Missing or AI-only observations will be considered. Manual and Mixed observations will not be changed."
+  );
+
+  if (!dryConfirm) return;
+
+  setStatus("Running dry-run recalculation preview…");
+
+  const commonBody = {
+    scope: "selected_reports",
+    report_ids: reportIds,
+    skip_existing: false,
+    use_learning: true,
+    target_mode: "ai_unreviewed",
+    max_items: 10,
+    concurrency: 1
+  };
+
+  const dry = await state.supabase.functions.invoke("backfill-audit-observations-mscat-ai", {
+    body: {
+      ...commonBody,
+      dry_run: true
+    }
+  });
+
+  if (dry.error) throw dry.error;
+  if (!dry.data?.ok) throw new Error(dry.data?.error || "Dry-run failed.");
+
+  const counts = dry.data.counts || {};
+  const pending = Number(counts.pending_items || 0);
+  const firstBatch = Number(counts.selected_for_processing || 0);
+
+  if (!pending) {
+    setStatus("No eligible observations found for recalculation.");
+    alert(
+      "No eligible observations found.\n\n" +
+      "Manual reviewed, Mixed, Positive and NIL observations are locked / not applicable."
+    );
+    return;
+  }
+
+  const applyConfirm = confirm(
+    "Dry-run completed. Apply recalculation now?\n\n" +
+    `Eligible observations found: ${pending}\n` +
+    `Will process in repeated batches of up to: ${firstBatch || 10}\n` +
+    `Manual locked skipped: ${counts.skipped_manual_locked || 0}\n` +
+    `Mixed locked skipped: ${counts.skipped_mixed_locked || 0}\n\n` +
+    "This will replace AI-only M-SCAT rows and fill missing M-SCAT rows using learning-assisted AI.\n" +
+    "Manual reviewed and Mixed observations will not be changed.\n\n" +
+    "Continue until all eligible filtered observations are processed?"
+  );
+
+  if (!applyConfirm) {
+    setStatus("Recalculation cancelled after dry-run.");
+    return;
+  }
+
+  let totalProcessed = 0;
+  let totalSucceeded = 0;
+  let totalFailed = 0;
+  let totalInserted = 0;
+  let remaining = pending;
+  let batchNo = 0;
+  const maxBatches = Math.ceil(pending / 10) + 5;
+  const failedSamples = [];
+
+  while (remaining > 0 && batchNo < maxBatches) {
+    batchNo += 1;
+
+    setStatus(`Applying learning-assisted M-SCAT recalculation batch ${batchNo}…`);
+
+    const apply = await state.supabase.functions.invoke("backfill-audit-observations-mscat-ai", {
+      body: {
+        ...commonBody,
+        dry_run: false
+      }
+    });
+
+    if (apply.error) throw apply.error;
+    if (!apply.data?.ok) throw new Error(apply.data?.error || `Apply recalculation failed on batch ${batchNo}.`);
+
+    const resultCounts = apply.data.counts || {};
+    const processed = Number(resultCounts.processed_items || 0);
+    const succeeded = Number(resultCounts.succeeded_items || 0);
+    const failed = Number(resultCounts.failed_items || 0);
+    const inserted = Number(resultCounts.inserted_rows || 0);
+    const newRemaining = Number(resultCounts.remaining_pending_after_batch || 0);
+
+    totalProcessed += processed;
+    totalSucceeded += succeeded;
+    totalFailed += failed;
+    totalInserted += inserted;
+
+    if (Array.isArray(apply.data.failed) && apply.data.failed.length) {
+      failedSamples.push(...apply.data.failed.slice(0, 3));
+    }
+
+    if (processed < 1) {
+      remaining = 0;
+      break;
+    }
+
+    if (newRemaining >= remaining && failed > 0 && succeeded === 0) {
+      throw new Error(
+        "Recalculation stopped because a batch failed without progress. " +
+        "No manual-reviewed observations were touched."
+      );
+    }
+
+    remaining = newRemaining;
+  }
+
+  if (batchNo >= maxBatches && remaining > 0) {
+    throw new Error(
+      `Safety stop reached after ${batchNo} batches with ${remaining} observation(s) still pending.`
+    );
+  }
+
+  await refreshAuditRegisterPreservingFilters();
+
+  const failedText = failedSamples.length
+    ? `\n\nSample failure:\n${String(failedSamples[0]?.error || "Unknown failure").slice(0, 400)}`
+    : "";
+
+  alert(
+    "Learning-assisted M-SCAT recalculation completed.\n\n" +
+    `Batches executed: ${batchNo}\n` +
+    `Processed observations: ${totalProcessed}\n` +
+    `Succeeded: ${totalSucceeded}\n` +
+    `Failed: ${totalFailed}\n` +
+    `Inserted / replaced rows: ${totalInserted}\n` +
+    `Remaining pending after final batch: ${remaining}\n\n` +
+    "Manual reviewed and Mixed observations were locked and not changed.\n" +
+    "Filters were preserved." +
+    failedText
+  );
+}
+
 
 function renderAuditsTable() {
   const tbody = el("auditsTbody");
@@ -1706,6 +1890,16 @@ async function init() {
     } catch (e) {
       console.error(e);
       alert("Refresh failed: " + (e?.message || String(e)));
+      setStatus("Error");
+    }
+  });
+
+  el("recalcFilteredMscatBtn").addEventListener("click", async () => {
+    try {
+      await recalculateFilteredAiMscat();
+    } catch (e) {
+      console.error(e);
+      alert("Recalculate AI M-SCAT failed: " + (e?.message || String(e)));
       setStatus("Error");
     }
   });

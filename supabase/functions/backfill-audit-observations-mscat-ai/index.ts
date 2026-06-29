@@ -2,7 +2,7 @@ export const config = {
   verify_jwt: false,
 };
 
-const FUNCTION_VERSION = "audit-mscat-ai-backfill-v02-learning-assisted-20260626";
+const FUNCTION_VERSION = "audit-mscat-ai-backfill-v03-filtered-recalculate-20260626";
 const MSCAT_SOURCE_REF = "DNV M-SCAT 8.2";
 const MAX_BATCH_ITEMS = 10;
 const DEFAULT_BATCH_ITEMS = 5;
@@ -102,6 +102,12 @@ class MinimalPostgrestQuery {
       this.preferParts.push("resolution=merge-duplicates");
     }
 
+    this.preferParts.push("return=minimal");
+    return this;
+  }
+
+  delete() {
+    this.method = "DELETE";
     this.preferParts.push("return=minimal");
     return this;
   }
@@ -591,7 +597,11 @@ async function loadReportContext(supabaseAdmin: any, reportIds: string[]) {
   return reportMap;
 }
 
-async function getScopedReportIds(supabaseAdmin: any, scope: string, reportId: string, batchId: string) {
+async function getScopedReportIds(supabaseAdmin: any, scope: string, reportId: string, batchId: string, reportIds: string[] = []) {
+  if (scope === "selected_reports") {
+    return Array.from(new Set((reportIds || []).map((x) => String(x || "").trim()).filter(Boolean)));
+  }
+
   if (scope === "current_report") {
     return reportId ? [reportId] : [];
   }
@@ -646,11 +656,56 @@ async function loadExistingMscatIds(supabaseAdmin: any, itemIds: string[]) {
   return existingIds;
 }
 
+async function loadMscatStatusByItemId(supabaseAdmin: any, itemIds: string[]) {
+  const statusMap = new Map<string, { status: string; total: number; ai: number; manual: number }>();
+  const cleanIds = itemIds.filter(Boolean);
+
+  for (const id of cleanIds) {
+    statusMap.set(String(id), { status: "none", total: 0, ai: 0, manual: 0 });
+  }
+
+  for (const idChunk of chunkArray(cleanIds, 50)) {
+    const { data, error } = await supabaseAdmin
+      .from("audit_observation_mscat")
+      .select("audit_observation_item_id,selection_source")
+      .in("audit_observation_item_id", idChunk);
+
+    if (error) throw new Error("Audit M-SCAT status lookup failed: " + (error.message || String(error)));
+
+    for (const row of data || []) {
+      const id = String(row.audit_observation_item_id || "");
+      if (!id) continue;
+
+      if (!statusMap.has(id)) {
+        statusMap.set(id, { status: "none", total: 0, ai: 0, manual: 0 });
+      }
+
+      const s = statusMap.get(id)!;
+      s.total += 1;
+
+      if (String(row.selection_source) === "manual") s.manual += 1;
+      else if (String(row.selection_source) === "ai_suggested") s.ai += 1;
+    }
+  }
+
+  for (const [id, s] of statusMap.entries()) {
+    if (!s.total) s.status = "none";
+    else if (s.manual > 0 && s.ai === 0) s.status = "manual";
+    else if (s.ai > 0 && s.manual === 0) s.status = "ai";
+    else s.status = "mixed";
+
+    statusMap.set(id, s);
+  }
+
+  return statusMap;
+}
+
 async function scanObservationPage(
   supabaseAdmin: any,
   profile: any,
   rows: any[],
   skipExisting: boolean,
+  targetMode: string,
   selectedPending: any[],
   allPendingSample: any[],
   counters: any
@@ -694,12 +749,31 @@ async function scanObservationPage(
 
   const ids = accessibleApplicable.map((x) => x.id).filter(Boolean);
   const existingIds = skipExisting ? await loadExistingMscatIds(supabaseAdmin, ids) : new Set<string>();
+  const statusByItemId = targetMode === "ai_unreviewed"
+    ? await loadMscatStatusByItemId(supabaseAdmin, ids)
+    : new Map<string, any>();
 
   for (const item of accessibleApplicable) {
-    if (skipExisting && existingIds.has(String(item.id))) {
+    const itemId = String(item.id || "");
+    const mscatStatus = statusByItemId.get(itemId) || { status: "none", total: 0, ai: 0, manual: 0 };
+
+    if (targetMode === "ai_unreviewed") {
+      if (mscatStatus.status === "manual") {
+        counters.skipped_manual_locked++;
+        continue;
+      }
+
+      if (mscatStatus.status === "mixed") {
+        counters.skipped_mixed_locked++;
+        continue;
+      }
+    } else if (skipExisting && existingIds.has(String(item.id))) {
       counters.skipped_existing++;
       continue;
     }
+
+    item.mscat_existing_status = mscatStatus.status || "none";
+    item.mscat_existing_rows = mscatStatus.total || 0;
 
     counters.pending_items++;
 
@@ -726,6 +800,8 @@ async function collectPendingItems(
   reportId: string,
   batchId: string,
   itemId: string,
+  reportIds: string[],
+  targetMode: string,
   skipExisting: boolean
 ) {
   const pageSize = 200;
@@ -738,6 +814,8 @@ async function collectPendingItems(
     skipped_not_applicable: 0,
     skipped_no_access: 0,
     skipped_existing: 0,
+    skipped_manual_locked: 0,
+    skipped_mixed_locked: 0,
     pending_items: 0,
   };
 
@@ -758,6 +836,7 @@ async function collectPendingItems(
       profile,
       [data],
       skipExisting,
+      targetMode,
       selectedPending,
       allPendingSample,
       counters
@@ -771,7 +850,7 @@ async function collectPendingItems(
     };
   }
 
-  const scopedReportIds = await getScopedReportIds(supabaseAdmin, scope, reportId, batchId);
+  const scopedReportIds = await getScopedReportIds(supabaseAdmin, scope, reportId, batchId, reportIds);
 
   if (Array.isArray(scopedReportIds)) {
     for (const reportChunk of chunkArray(scopedReportIds, REPORT_ID_CHUNK_SIZE)) {
@@ -796,6 +875,7 @@ async function collectPendingItems(
           profile,
           rows,
           skipExisting,
+          targetMode,
           selectedPending,
           allPendingSample,
           counters
@@ -826,6 +906,7 @@ async function collectPendingItems(
         profile,
         rows,
         skipExisting,
+        targetMode,
         selectedPending,
         allPendingSample,
         counters
@@ -1049,19 +1130,27 @@ Deno.serve(async (req: Request) => {
     const report_id = String(payload?.report_id || "").trim();
     const batch_id = String(payload?.batch_id || "").trim();
     const item_id = String(payload?.item_id || payload?.audit_observation_item_id || "").trim();
+    const report_ids = Array.isArray(payload?.report_ids)
+      ? payload.report_ids.map((x: unknown) => String(x || "").trim()).filter(Boolean)
+      : [];
     const suggest_only = payload?.suggest_only === true;
     const use_learning = payload?.use_learning !== false;
+    const target_mode = String(payload?.target_mode || "").trim() || "default";
     const dry_run = payload?.dry_run !== false;
     const skip_existing = payload?.skip_existing !== false;
     const max_items = clampInt(payload?.max_items, DEFAULT_BATCH_ITEMS, 1, MAX_BATCH_ITEMS);
     const concurrency = clampInt(payload?.concurrency, 2, 1, MAX_CONCURRENCY);
 
-    if (scope !== "current_item" && scope !== "current_report" && scope !== "batch" && scope !== "all_reports") {
-      return json(req, { ok: false, error: "scope must be current_item, current_report, batch, or all_reports" }, 400);
+    if (scope !== "current_item" && scope !== "selected_reports" && scope !== "current_report" && scope !== "batch" && scope !== "all_reports") {
+      return json(req, { ok: false, error: "scope must be current_item, selected_reports, current_report, batch, or all_reports" }, 400);
     }
 
     if (scope === "current_item" && !item_id) {
       return json(req, { ok: false, error: "item_id is required when scope=current_item" }, 400);
+    }
+
+    if (scope === "selected_reports" && !report_ids.length) {
+      return json(req, { ok: false, error: "report_ids are required when scope=selected_reports" }, 400);
     }
 
     if (scope === "current_report" && !report_id) {
@@ -1100,6 +1189,8 @@ Deno.serve(async (req: Request) => {
       report_id,
       batch_id,
       item_id,
+      report_ids,
+      target_mode,
       skip_existing
     );
 
@@ -1115,8 +1206,10 @@ Deno.serve(async (req: Request) => {
         report_id: report_id || null,
         batch_id: batch_id || null,
         item_id: item_id || null,
+        report_ids_count: report_ids.length,
         suggest_only,
         use_learning,
+        target_mode,
         skip_existing,
         max_items,
         scoped_report_count: pending.scoped_report_count,
@@ -1240,6 +1333,21 @@ Deno.serve(async (req: Request) => {
         skipped_duplicate_rows = rows.length - rowsToInsert.length;
       }
 
+      if (target_mode === "ai_unreviewed" && item.mscat_existing_status === "ai") {
+        const { error: deleteAiErr } = await supabaseAdmin
+          .from("audit_observation_mscat")
+          .delete()
+          .eq("audit_observation_item_id", item.id)
+          .eq("selection_source", "ai_suggested");
+
+        if (deleteAiErr) {
+          throw new Error("Delete existing AI M-SCAT rows failed: " + (deleteAiErr.message || String(deleteAiErr)));
+        }
+
+        skipped_duplicate_rows = 0;
+        rowsToInsert = rows;
+      }
+
       if (rowsToInsert.length) {
         const { error: insertErr } = await supabaseAdmin
           .from("audit_observation_mscat")
@@ -1290,8 +1398,10 @@ Deno.serve(async (req: Request) => {
       report_id: report_id || null,
       batch_id: batch_id || null,
       item_id: item_id || null,
+      report_ids_count: report_ids.length,
       suggest_only,
       use_learning,
+      target_mode,
       skip_existing,
       max_items,
       concurrency,
