@@ -3,7 +3,7 @@
 // Manual Excel-based audit observation staging module. Future steps will add Excel import and M-SCAT RCA.
 // Observations use SIRE-style fields: question_no, obs_type, designation, SOC, NOC.
 
-const AUDIT_OBSERVATIONS_MANUAL_BUILD = "AUDIT_OBSERVATIONS_MANUAL_20260626_STEP6D_MSCAT_FILTER";
+const AUDIT_OBSERVATIONS_MANUAL_BUILD = "AUDIT_OBSERVATIONS_MANUAL_20260626_REFRESH_FILTERS_PRESERVED";
 window.CSVB_AUDIT_OBSERVATIONS_MANUAL_BUILD = AUDIT_OBSERVATIONS_MANUAL_BUILD;
 
 const AUDIT_BUCKET = "audit-reports";
@@ -56,6 +56,41 @@ function dateInRange(dateStr, from, to) {
   if (from && d < from) return false;
   if (to && d > to) return false;
   return true;
+}
+
+const AUDIT_FILTER_IDS = [
+  "auditVesselFilter",
+  "auditTypeFilter",
+  "auditSourceFilter",
+  "auditNilFilter",
+  "auditMscatFilter",
+  "auditFrom",
+  "auditTo"
+];
+
+function captureAuditFilters() {
+  const out = {};
+  for (const id of AUDIT_FILTER_IDS) {
+    const node = el(id);
+    if (node) out[id] = String(node.value || "");
+  }
+  return out;
+}
+
+function restoreAuditFilters(filters) {
+  for (const id of AUDIT_FILTER_IDS) {
+    const node = el(id);
+    if (!node) continue;
+
+    const wanted = String(filters?.[id] || "");
+
+    if (node.tagName === "SELECT" && wanted) {
+      const exists = Array.from(node.options || []).some((o) => String(o.value) === wanted);
+      node.value = exists ? wanted : "";
+    } else {
+      node.value = wanted;
+    }
+  }
 }
 
 function safeName(name) {
@@ -1600,7 +1635,10 @@ function parseManualExcelPreview() {
 }
 
 
-async function reloadAll() {
+async function reloadAll(options = {}) {
+  const preserveFilters = options.preserveFilters !== false;
+  const filters = preserveFilters ? captureAuditFilters() : {};
+
   state.vessels = await loadVessels();
   state.auditTypes = await loadAuditTypes();
   state.profiles = await loadProfiles();
@@ -1609,10 +1647,23 @@ async function reloadAll() {
   state.auditMscatStats = await loadAuditMscatStats();
 
   renderSelects();
+
+  if (preserveFilters) {
+    restoreAuditFilters(filters);
+  }
+
   renderAuditsTable();
   updateAuditorMode();
 
   if (!state.activeAudit) clearAuditForm();
+}
+
+async function refreshAuditRegisterPreservingFilters() {
+  setStatus("Refreshing register…");
+
+  await reloadAll({ preserveFilters: true });
+
+  setStatus("Register refreshed; filters preserved.");
 }
 
 async function init() {
@@ -1645,18 +1696,16 @@ async function init() {
   el("auditTo").value = ymd(to);
   el("auditDate").value = ymd(new Date());
 
-  await reloadAll();
+  await reloadAll({ preserveFilters: true });
 
   el("newAuditBtn").addEventListener("click", clearAuditForm);
 
   el("reloadAuditsBtn").addEventListener("click", async () => {
     try {
-      state.audits = await loadAudits();
-      state.auditMscatStats = await loadAuditMscatStats();
-      renderAuditsTable();
+      await refreshAuditRegisterPreservingFilters();
     } catch (e) {
       console.error(e);
-      alert("Reload failed: " + (e?.message || String(e)));
+      alert("Refresh failed: " + (e?.message || String(e)));
       setStatus("Error");
     }
   });
