@@ -1,4 +1,4 @@
-const MSCAT_BUILD = "csvb_mscat_ui_v06a_ai_suggestions_source_fix_2026-06-17";
+const MSCAT_BUILD = "csvb_mscat_ui_v07_shared_learning_logging_2026-06-26";
 const MSCAT_SOURCE_REF = "DNV M-SCAT 8.2";
 
 const mscat = {
@@ -530,6 +530,7 @@ function ensureCard() {
     <div class="csvb-mscat-actions">
       <button class="btn primary" id="openMscatBtn" type="button">Select M-SCAT Causes / Actions</button>
       <button class="btn btn-muted" id="suggestMscatBtn" type="button">AI Suggest M-SCAT</button>
+      <button class="btn btn-muted" id="markMscatReviewedBtn" type="button">Mark selected M-SCAT as manually reviewed</button>
       <button class="btn btn-muted" id="reloadMscatBtn" type="button">Reload M-SCAT</button>
     </div>
   `;
@@ -553,6 +554,22 @@ function selectedIds() {
   return new Set((mscat.selections || []).map((x) => String(x.taxonomy_id)));
 }
 
+function mscatSelectionStatus() {
+  const rows = mscat.selections || [];
+  const total = rows.length;
+  const ai = rows.filter((x) => String(x.selection_source) === "ai_suggested").length;
+  const manual = rows.filter((x) => String(x.selection_source) === "manual").length;
+
+  if (!total) return { key: "none", label: "Not analysed", total, ai, manual };
+  if (manual > 0 && ai === 0) return { key: "manual", label: "Manual reviewed", total, ai, manual };
+  if (ai > 0 && manual === 0) return { key: "ai", label: "AI populated", total, ai, manual };
+  return { key: "mixed", label: "Mixed AI / Manual", total, ai, manual };
+}
+
+function clearAiSuggestions() {
+  clearAiSuggestions();
+}
+
 function countSection(sectionKey) {
   const selected = selectedIds();
   return (mscat.taxonomy || [])
@@ -565,6 +582,7 @@ function renderCard() {
 
   const required = itemNeedsMscat(mscat.item);
   const selectedCount = (mscat.selections || []).length;
+  const selectionStatus = mscatSelectionStatus();
 
   const statusEl = q("mscatStatusVal");
   const immediateEl = q("mscatImmediateVal");
@@ -572,6 +590,7 @@ function renderCard() {
   const controlEl = q("mscatControlVal");
   const summaryEl = q("mscatSummary");
   const openBtn = q("openMscatBtn");
+  const markReviewedBtn = q("markMscatReviewedBtn");
 
   if (!statusEl || !summaryEl) return;
 
@@ -582,12 +601,14 @@ function renderCard() {
     controlEl.textContent = "0";
     summaryEl.textContent = "M-SCAT analysis is required for Negative and Largely as Expected observations only.";
     if (openBtn) openBtn.disabled = true;
+    if (markReviewedBtn) markReviewedBtn.disabled = true;
     return;
   }
 
   if (openBtn) openBtn.disabled = false;
+  if (markReviewedBtn) markReviewedBtn.disabled = !selectedCount || selectionStatus.key === "manual";
 
-  statusEl.textContent = selectedCount ? "Analysed" : "Not analysed";
+  statusEl.textContent = selectionStatus.label;
   immediateEl.textContent = String(countSection("immediate_cause"));
   basicEl.textContent = String(countSection("basic_cause"));
   controlEl.textContent = String(countSection("control_area"));
@@ -710,7 +731,7 @@ function ensureDialog() {
 
       <div class="csvb-mscat-dialog-actions">
         <button class="btn btn-muted" id="mscatCloseWindowBtn" type="button">Close Window</button>
-        <button class="btn primary" id="mscatSaveBtn" type="button">Save M-SCAT Selection</button>
+        <button class="btn primary" id="mscatSaveBtn" type="button">Save M-SCAT selections</button>
       </div>
     </div>
   `;
@@ -885,68 +906,104 @@ async function saveDialog() {
     return;
   }
 
-  const desired = new Set(
-    Array.from(document.querySelectorAll('input[name="mscatTaxonomyId"]:checked'))
-      .map((x) => String(x.value || "").trim())
-      .filter(Boolean)
+  const desired = Array.from(document.querySelectorAll('input[name="mscatTaxonomyId"]:checked'))
+    .map((x) => String(x.value || "").trim())
+    .filter(Boolean);
+
+  const ok = confirm(
+    `Save ${desired.length} M-SCAT selection(s) for this vetting observation?\n\n` +
+    "Existing M-SCAT selections for this observation will be replaced.\n\n" +
+    "A shared reviewed learning example will also be logged."
   );
 
-  const current = selectedIds();
-  const toAdd = Array.from(desired).filter((id) => !current.has(id));
-  const toRemove = Array.from(current).filter((id) => !desired.has(id));
+  if (!ok) return;
 
-  setTopStatus("Saving M-SCAT…");
+  const reviewComment = prompt(
+    "Optional review comment for the shared M-SCAT learning example.\n\nLeave blank if not required.",
+    ""
+  );
 
-  if (toRemove.length) {
-    const { error } = await mscat.supabase
-      .from("post_inspection_observation_mscat")
-      .delete()
-      .eq("observation_item_id", mscat.item.id)
-      .in("taxonomy_id", toRemove);
+  if (reviewComment === null) return;
 
-    if (error) {
-      console.error(error);
-      setTopStatus("M-SCAT save error");
-      alert("M-SCAT delete failed: " + (error.message || String(error)));
-      return;
-    }
-  }
+  setTopStatus("Saving M-SCAT and logging shared learning…");
 
-  if (toAdd.length) {
-    const rows = toAdd.map((taxonomyId) => {
-      const suggestion = (mscat.aiSuggestions || []).find((s) => String(s.taxonomy_id) === String(taxonomyId));
+  const { error } = await mscat.supabase.rpc("csvb_save_post_inspection_mscat_manual_selection", {
+    p_observation_item_id: mscat.item.id,
+    p_final_taxonomy_ids: desired,
+    p_review_comment: String(reviewComment || "").trim() || null,
+    p_source_app_build: MSCAT_BUILD
+  });
 
-      return {
-        observation_item_id: mscat.item.id,
-        report_id: mscat.item.report_id,
-        company_id: mscat.item.company_id || null,
-        taxonomy_id: taxonomyId,
-        selection_source: suggestion ? "ai_suggested" : "manual",
-        notes: suggestion?.reason || null,
-      };
-    });
-
-    const { error } = await mscat.supabase
-      .from("post_inspection_observation_mscat")
-      .insert(rows);
-
-    if (error) {
-      console.error(error);
-      setTopStatus("M-SCAT save error");
-      alert("M-SCAT insert failed: " + (error.message || String(error)));
-      return;
-    }
+  if (error) {
+    console.error(error);
+    setTopStatus("M-SCAT save error");
+    alert("M-SCAT save failed: " + (error.message || String(error)));
+    return;
   }
 
   await loadSelections();
-  mscat.aiSuggestions = [];
-  mscat.aiSuggestedIds = new Set();
+  clearAiSuggestions();
   renderCard();
 
   const dialog = q("mscatDialog");
   if (dialog?.open) dialog.close();
 
-  setTopStatus("M-SCAT saved");
+  setTopStatus("M-SCAT saved and shared learning logged");
+}
+
+async function markMscatReviewed() {
+  if (!mscat.item?.id) {
+    alert("M-SCAT cannot be reviewed because the observation item is not loaded.");
+    return;
+  }
+
+  if (!(mscat.selections || []).length) {
+    alert("This observation has no M-SCAT selections to mark as reviewed.");
+    return;
+  }
+
+  const status = mscatSelectionStatus();
+
+  if (status.key === "manual") {
+    alert("This observation is already manually reviewed.");
+    return;
+  }
+
+  const ok = confirm(
+    `Mark ${status.total} M-SCAT selection(s) as manually reviewed?\n\n` +
+    "The selected M-SCAT codes will remain unchanged. Only their source will change to Manual.\n\n" +
+    "A shared reviewed learning example will also be logged."
+  );
+
+  if (!ok) return;
+
+  const reviewComment = prompt(
+    "Optional review comment for the shared M-SCAT learning example.\n\nLeave blank if not required.",
+    ""
+  );
+
+  if (reviewComment === null) return;
+
+  setTopStatus("Marking M-SCAT as reviewed and logging shared learning…");
+
+  const { error } = await mscat.supabase.rpc("csvb_mark_post_inspection_mscat_manually_reviewed", {
+    p_observation_item_id: mscat.item.id,
+    p_review_comment: String(reviewComment || "").trim() || null,
+    p_source_app_build: MSCAT_BUILD
+  });
+
+  if (error) {
+    console.error(error);
+    setTopStatus("M-SCAT review error");
+    alert("Mark M-SCAT as reviewed failed: " + (error.message || String(error)));
+    return;
+  }
+
+  await loadSelections();
+  clearAiSuggestions();
+  renderCard();
+
+  setTopStatus("M-SCAT marked as manually reviewed and shared learning logged");
 }
 
 function setAiButtonsBusy(busy) {
@@ -1057,6 +1114,7 @@ async function initMscat() {
 
   q("openMscatBtn").addEventListener("click", openDialog);
   q("suggestMscatBtn").addEventListener("click", suggestMscatWithAi);
+  q("markMscatReviewedBtn").addEventListener("click", markMscatReviewed);
   q("reloadMscatBtn").addEventListener("click", reloadAll);
 
   await reloadAll();
