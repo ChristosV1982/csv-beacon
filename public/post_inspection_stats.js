@@ -225,6 +225,36 @@ function auditTypeLabelFromRow(row) {
   ).trim();
 }
 
+
+function normalizeAuditTypeValue(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function auditTypeSelectedForRow(row, selectedSet) {
+  if (!selectedSet || !selectedSet.size) return true;
+
+  const values = new Set([
+    row?.audit_type_id,
+    row?.audit_type_name,
+    row?.title,
+    row?.report_title,
+    auditTypeKeyFromRow(row),
+    auditTypeLabelFromRow(row),
+  ].map(normalizeAuditTypeValue).filter(Boolean));
+
+  for (const selected of selectedSet) {
+    const selectedNorm = normalizeAuditTypeValue(selected);
+    const option = (state.auditTypeOptions || []).find((x) => normalizeAuditTypeValue(x.value) === selectedNorm);
+    const optionLabel = normalizeAuditTypeValue(option?.label);
+
+    if (values.has(selectedNorm)) return true;
+    if (optionLabel && values.has(optionLabel)) return true;
+  }
+
+  return false;
+}
+
+
 function getSelectedAuditTypes() {
   return selectedCheckboxValues("auditTypeCheckList");
 }
@@ -503,8 +533,7 @@ function filterReportsBase(reportRows) {
     if (!isVettingMode() && sourceSet.size > 0 && !sourceSet.has(recordSource)) return false;
 
     if (auditTypeSet.size > 0 && isAuditRecordSource(recordSource)) {
-      const auditTypeKey = auditTypeKeyFromRow(r);
-      if (!auditTypeSet.has(auditTypeKey)) return false;
+      if (!auditTypeSelectedForRow(r, auditTypeSet)) return false;
     }
 
     if (!inDateRange(r.inspection_date, p_from, p_to)) return false;
@@ -526,8 +555,7 @@ function filterRowsBase(rows, ignoreTypeFilter = false) {
     if (!isVettingMode() && sourceSet.size > 0 && !sourceSet.has(recordSource)) return false;
 
     if (auditTypeSet.size > 0 && isAuditRecordSource(recordSource)) {
-      const auditTypeKey = auditTypeKeyFromRow(r);
-      if (!auditTypeSet.has(auditTypeKey)) return false;
+      if (!auditTypeSelectedForRow(r, auditTypeSet)) return false;
     }
 
     if (!inDateRange(r.inspection_date, p_from, p_to)) return false;
@@ -1194,14 +1222,41 @@ function collectAuditTypeOptions() {
     .sort((a, b) => String(a.label).localeCompare(String(b.label)));
 }
 
-function renderAuditTypeFilter() {
-  state.auditTypeOptions = collectAuditTypeOptions();
+async function loadAuditTypeOptionsForStats() {
+  const { data, error } = await state.supabase.rpc("csvb_audit_types_for_me");
+  if (error) throw error;
 
+  return (data || [])
+    .filter((t) => t.is_active !== false)
+    .map((t) => ({
+      value: String(t.id || t.audit_type_name || "").trim(),
+      label: String(t.audit_type_name || t.name || t.id || "Unspecified audit type").trim(),
+    }))
+    .filter((t) => t.value && t.label)
+    .sort((a, b) => a.label.localeCompare(b.label));
+}
+
+async function renderAuditTypeFilter() {
   const box = safeEl("auditTypeCheckList");
   if (!box) return;
 
+  let options = [];
+
+  try {
+    options = await loadAuditTypeOptionsForStats();
+  } catch (error) {
+    console.warn("Audit type RPC load failed; falling back to analytics rows:", error);
+    options = collectAuditTypeOptions();
+  }
+
+  if (!options.length) {
+    options = collectAuditTypeOptions();
+  }
+
+  state.auditTypeOptions = options;
+
   if (!state.auditTypeOptions.length) {
-    box.innerHTML = `<div class="muted">No audit types found in the current analytics dataset.</div>`;
+    box.innerHTML = `<div class="muted">No audit types found. Check that active audit types exist in Vessel Audit setup.</div>`;
     updateDropSummary("auditTypeDropBtn", "Audit types", 0, 0);
     return;
   }
@@ -2105,7 +2160,7 @@ async function init() {
   renderCheckboxList("vesselCheckList", "vesselChk", state.vessels.map((v) => ({ value: v.id, label: v.name })), true);
   renderCheckboxList("typeCheckList", "typeChk", OBS_TYPES, true);
   renderCheckboxList("recordSourceCheckList", "recordSourceChk", RECORD_SOURCES, true);
-  renderAuditTypeFilter();
+  await renderAuditTypeFilter();
   renderCheckboxList("recurringMonthCheckList", "recMonthChk", MONTHS, true);
 
   const to = new Date();
