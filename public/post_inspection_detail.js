@@ -1,6 +1,6 @@
 import { loadLockedLibraryJson } from "./question_library_loader.js";
 
-const DETAIL_BUILD = "post_inspection_detail_v27_pdf_import_review_modal_2026-06-17";
+const DETAIL_BUILD = "post_inspection_detail_v28_filtered_mscat_recalc_2026-06-29";
 const PDF_BUCKET_DEFAULT = "inspection-reports";
 const PDF_FOLDER_PREFIX = "post_inspections";
 const HUMAN_POSITIVE_FIXED_NOC = "Exceeded normal expectation.";
@@ -1061,6 +1061,235 @@ function applyObsFilters(items) {
   });
 }
 
+function itemNeedsMscatForRecalc(item) {
+  const kind = String(item?.kind || item?.obs_type || "").trim().toLowerCase();
+  return kind === "negative" || kind === "largely";
+}
+
+function currentFilteredMscatItemIds() {
+  return applyObsFilters(state.extractedItems || [])
+    .filter(itemNeedsMscatForRecalc)
+    .filter((item) => !String(item?.id || "").startsWith("legacy-"))
+    .map((item) => String(item.id || "").trim())
+    .filter(Boolean);
+}
+
+async function invokePostInspectionMscatBackfill(body) {
+  const { data, error } = await state.supabase.functions.invoke("backfill-post-inspection-mscat-ai", {
+    body,
+  });
+
+  if (error) throw error;
+  if (!data?.ok) throw new Error(data?.error || "Post-inspection M-SCAT recalculation failed.");
+
+  return data;
+}
+
+async function reloadActiveReportItemsAfterMscatRecalc() {
+  if (!state.activeReport?.id) return;
+
+  state.observationItems = await loadObservationItemsForReport(state.activeReport.id);
+  rebuildExtractedItems();
+
+  try {
+    await loadCurrentObservationRiskForActiveReport();
+  } catch (riskErr) {
+    console.warn("Risk reload after M-SCAT recalculation failed.", riskErr);
+  }
+
+  renderObsTable();
+}
+
+async function recalculateFilteredMscat() {
+  if (!state.activeReport?.id) {
+    alert("No active post-inspection report is loaded.");
+    return;
+  }
+
+  const itemIds = currentFilteredMscatItemIds();
+
+  if (!itemIds.length) {
+    alert(
+      "No eligible filtered observations found.\n\n" +
+      "Only Negative and Largely as Expected observations from the current filtered view are eligible."
+    );
+    return;
+  }
+
+  const dryConfirm = confirm(
+    "Dry-run M-SCAT recalculation for the currently filtered observations?\n\n" +
+    `Filtered eligible observations: ${itemIds.length}\n\n` +
+    "Only Missing or AI-only M-SCAT observations will be considered.\n" +
+    "Manual reviewed and Mixed observations will be locked and not changed."
+  );
+
+  if (!dryConfirm) return;
+
+  const commonBody = {
+    scope: "selected_items",
+    report_id: state.activeReport.id,
+    item_ids: itemIds,
+    skip_existing: false,
+    target_mode: "ai_unreviewed",
+    use_learning: true,
+    max_items: 10,
+    concurrency: 1,
+  };
+
+  let hideBusy = null;
+
+  try {
+    hideBusy = window.CSVB_BUSY?.show(
+      "Preparing vetting M-SCAT dry-run",
+      "Checking currently filtered observations. Manual reviewed and Mixed observations remain locked."
+    );
+
+    setSaveStatus("Running M-SCAT recalculation dry-run…");
+
+    const dry = await invokePostInspectionMscatBackfill({
+      ...commonBody,
+      dry_run: true,
+    });
+
+    if (typeof hideBusy === "function") hideBusy();
+    hideBusy = null;
+
+    const counts = dry.counts || {};
+    const pending = Number(counts.pending_items || 0);
+    const firstBatch = Number(counts.selected_for_processing || 0);
+
+    if (!pending) {
+      setSaveStatus("No eligible M-SCAT recalculation items.");
+      alert(
+        "No eligible observations found.\n\n" +
+        `Filtered eligible observations: ${itemIds.length}\n` +
+        `Manual locked skipped: ${counts.skipped_manual_locked || 0}\n` +
+        `Mixed locked skipped: ${counts.skipped_mixed_locked || 0}\n` +
+        `Not applicable skipped: ${counts.skipped_not_applicable || 0}\n\n` +
+        "Manual reviewed, Mixed, Positive and not applicable observations were not changed."
+      );
+      return;
+    }
+
+    const applyConfirm = confirm(
+      "Dry-run completed. Apply vetting M-SCAT recalculation now?\n\n" +
+      `Eligible observations found: ${pending}\n` +
+      `Will process in repeated batches of up to: ${firstBatch || 10}\n` +
+      `Manual locked skipped: ${counts.skipped_manual_locked || 0}\n` +
+      `Mixed locked skipped: ${counts.skipped_mixed_locked || 0}\n\n` +
+      "This will replace AI-only M-SCAT rows and fill missing M-SCAT rows using shared Audit/Vetting learning.\n" +
+      "Manual reviewed and Mixed observations will not be changed."
+    );
+
+    if (!applyConfirm) {
+      setSaveStatus("M-SCAT recalculation cancelled after dry-run.");
+      return;
+    }
+
+    let totalProcessed = 0;
+    let totalSucceeded = 0;
+    let totalFailed = 0;
+    let totalInserted = 0;
+    let totalLearningUsed = 0;
+    let remaining = pending;
+    let batchNo = 0;
+    const maxBatches = Math.ceil(pending / 10) + 5;
+    const failedSamples = [];
+
+    hideBusy = window.CSVB_BUSY?.show(
+      "Recalculating vetting M-SCAT",
+      `Starting shared-learning recalculation for ${pending} eligible observation(s).`
+    );
+
+    while (remaining > 0 && batchNo < maxBatches) {
+      batchNo += 1;
+
+      window.CSVB_BUSY?.update(
+        "Recalculating vetting M-SCAT",
+        `Batch ${batchNo}. Remaining before this batch: ${remaining}. Manual reviewed and Mixed observations remain locked.`
+      );
+
+      setSaveStatus(`Recalculating M-SCAT batch ${batchNo}…`);
+
+      const apply = await invokePostInspectionMscatBackfill({
+        ...commonBody,
+        dry_run: false,
+      });
+
+      const c = apply.counts || {};
+      const processed = Number(c.processed_items || 0);
+      const succeeded = Number(c.succeeded_items || 0);
+      const failed = Number(c.failed_items || 0);
+      const inserted = Number(c.inserted_rows || 0);
+      const learningUsed = Number(c.learning_examples_used || 0);
+      const newRemaining = Number(c.remaining_pending_after_batch || 0);
+
+      totalProcessed += processed;
+      totalSucceeded += succeeded;
+      totalFailed += failed;
+      totalInserted += inserted;
+      totalLearningUsed += learningUsed;
+
+      if (Array.isArray(apply.failed) && apply.failed.length) {
+        failedSamples.push(...apply.failed.slice(0, 3));
+      }
+
+      if (processed < 1) {
+        remaining = 0;
+        break;
+      }
+
+      if (newRemaining >= remaining && failed > 0 && succeeded === 0) {
+        throw new Error(
+          "Recalculation stopped because a batch failed without progress. " +
+          "Manual-reviewed observations were not touched."
+        );
+      }
+
+      remaining = newRemaining;
+    }
+
+    if (batchNo >= maxBatches && remaining > 0) {
+      throw new Error(
+        `Safety stop reached after ${batchNo} batches with ${remaining} observation(s) still pending.`
+      );
+    }
+
+    window.CSVB_BUSY?.update(
+      "Refreshing post-inspection observations",
+      "Recalculation completed. Refreshing the current report view."
+    );
+
+    await reloadActiveReportItemsAfterMscatRecalc();
+
+    setSaveStatus("M-SCAT recalculation completed.");
+
+    const failedText = failedSamples.length
+      ? `\n\nSample failure:\n${String(failedSamples[0]?.error || "Unknown failure").slice(0, 400)}`
+      : "";
+
+    alert(
+      "Shared-learning vetting M-SCAT recalculation completed.\n\n" +
+      `Batches executed: ${batchNo}\n` +
+      `Processed observations: ${totalProcessed}\n` +
+      `Succeeded: ${totalSucceeded}\n` +
+      `Failed: ${totalFailed}\n` +
+      `Inserted / replaced rows: ${totalInserted}\n` +
+      `Shared examples used: ${totalLearningUsed}\n` +
+      `Remaining pending after final batch: ${remaining}\n\n` +
+      "Manual reviewed and Mixed observations were locked and not changed." +
+      failedText
+    );
+  } catch (err) {
+    console.error(err);
+    setSaveStatus("M-SCAT recalculation error");
+    alert("Vetting M-SCAT recalculation failed: " + (err?.message || String(err)));
+  } finally {
+    if (typeof hideBusy === "function") hideBusy();
+  }
+}
+
+
 function renderObsSummary() {
   if (!state.activeReport) {
     el("obsSummary").textContent = "No report loaded.";
@@ -2105,6 +2334,14 @@ async function init() {
     renderObsSummary();
     renderRiskCard();
   }
+
+
+  const recalcBtn = el("recalcFilteredMscatBtn");
+  if (recalcBtn && !recalcBtn.dataset.csvbMscatRecalcBound) {
+    recalcBtn.dataset.csvbMscatRecalcBound = "1";
+    recalcBtn.addEventListener("click", recalculateFilteredMscat);
+  }
+
 }
 
 (async () => {
