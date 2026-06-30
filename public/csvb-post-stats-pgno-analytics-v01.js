@@ -5,7 +5,7 @@
 (function () {
   "use strict";
 
-  const BUILD = "POST-STATS-PGNO-ANALYTICS-V05-MODAL-WRAP-20260630";
+  const BUILD = "POST-STATS-PGNO-ANALYTICS-V06-EXPAND-FIX-20260630";
   window.CSVB_POST_STATS_PGNO_ANALYTICS_BUILD = BUILD;
 
   function esc(value) {
@@ -103,6 +103,26 @@
         word-break: normal;
         vertical-align: top;
         line-height: 1.32;
+      }
+
+      .csvb-dashboard-group-head {
+        text-align: left !important;
+      }
+
+      .csvb-dashboard-group-head > span:first-child {
+        text-align: left !important;
+        flex: 1 1 auto !important;
+        display: block !important;
+      }
+
+      .csvb-dashboard-group-title,
+      .csvb-dashboard-group-sub {
+        text-align: left !important;
+      }
+
+      #csvbDashboardGroup_question .csvb-dashboard-group-head,
+      #csvbDashboardGroup_pgno .csvb-dashboard-group-head {
+        justify-content: space-between !important;
       }
     `;
 
@@ -400,53 +420,94 @@
 
 
   function hideLegacyPgnoBarsPanel() {
-    const byId = document.getElementById("csvbStatsPgnoBarsPanelV01");
-    if (byId) {
-      byId.style.display = "none";
-      byId.setAttribute("data-csvb-hidden-by-pgno-helper", BUILD);
+    /*
+      Important:
+      Hide only the old display-only PGNO bars helper.
+      Do NOT hide the main PGNO Analytics card/panel, otherwise the dashboard group
+      appears unable to expand.
+    */
+
+    const exact = document.getElementById("csvbStatsPgnoBarsPanelV01");
+    if (exact) {
+      exact.style.display = "none";
+      exact.hidden = true;
+      exact.setAttribute("data-csvb-hidden-by-pgno-helper", BUILD);
     }
 
-    document.querySelectorAll(".csvb-stats-bars-panel,.csvb-bars-panel,.csvb-soc-noc-pgno-bars").forEach((panel) => {
+    document.querySelectorAll(".csvb-snp-bars-panel").forEach((panel) => {
       const text = String(panel.textContent || "");
-      if (/PGNO\s+Analytics\s*-\s*Bars/i.test(text) || /Filtered PGNO bar chart/i.test(text)) {
+      if (/PGNO\s+Analytics\s*-\s*Bars/i.test(text) || /Filtered\s+PGNO\s+bar\s+chart/i.test(text)) {
         panel.style.display = "none";
+        panel.hidden = true;
         panel.setAttribute("data-csvb-hidden-by-pgno-helper", BUILD);
       }
     });
 
-    document.querySelectorAll(".card,.chartBox,.panel").forEach((node) => {
-      const text = String(node.textContent || "");
-      if (/PGNO\s+Analytics\s*-\s*Bars/i.test(text) && /Filtered PGNO bar chart/i.test(text)) {
-        node.style.display = "none";
-        node.setAttribute("data-csvb-hidden-by-pgno-helper", BUILD);
-      }
-    });
+    restorePgnoDashboardPanel();
   }
 
+  function restorePgnoDashboardPanel() {
+    const pgnoTable = document.getElementById("pgnoTableTbody");
+    const pgnoPanel = pgnoTable?.closest(".panel");
+    const pgnoCard = pgnoTable?.closest(".card");
+    const pgnoGroup = document.getElementById("csvbDashboardGroup_pgno");
+    const pgnoBody = pgnoGroup?.querySelector(".csvb-dashboard-group-body");
 
-  function scheduleLegacyPgnoBarsHide() {
-    hideLegacyPgnoBarsPanel();
-    setTimeout(hideLegacyPgnoBarsPanel, 300);
-    setTimeout(hideLegacyPgnoBarsPanel, 900);
-    setTimeout(hideLegacyPgnoBarsPanel, 1800);
-
-    if (!window.__csvbPgnoBarsHideObserver) {
-      window.__csvbPgnoBarsHideObserver = new MutationObserver(() => {
-        hideLegacyPgnoBarsPanel();
-      });
-
-      window.__csvbPgnoBarsHideObserver.observe(document.body, {
-        childList: true,
-        subtree: true,
-      });
+    if (pgnoPanel) {
+      pgnoPanel.style.display = "";
+      pgnoPanel.hidden = false;
     }
+
+    if (pgnoCard) {
+      pgnoCard.style.display = "";
+      pgnoCard.hidden = false;
+    }
+
+    if (pgnoBody && pgnoPanel && !pgnoBody.contains(pgnoPanel)) {
+      pgnoBody.appendChild(pgnoPanel);
+    }
+
+    if (pgnoGroup) {
+      pgnoGroup.style.display = "";
+      pgnoGroup.hidden = false;
+      pgnoGroup.setAttribute("data-csvb-pgno-helper-restored", BUILD);
+    }
+
+    bindPgnoDashboardExpandRepair();
   }
+
+  function bindPgnoDashboardExpandRepair() {
+    const pgnoGroup = document.getElementById("csvbDashboardGroup_pgno");
+    if (!pgnoGroup || pgnoGroup.dataset.csvbPgnoExpandRepairBound === "1") return;
+
+    pgnoGroup.dataset.csvbPgnoExpandRepairBound = "1";
+
+    const head = pgnoGroup.querySelector(".csvb-dashboard-group-head");
+    if (!head) return;
+
+    head.addEventListener("click", () => {
+      setTimeout(() => {
+        restorePgnoDashboardPanel();
+
+        const body = pgnoGroup.querySelector(".csvb-dashboard-group-body");
+        const icon = pgnoGroup.querySelector(".csvb-dashboard-group-icon");
+
+        if (body && !body.hidden) {
+          if (icon) icon.textContent = "−";
+          render();
+        }
+      }, 80);
+    }, false);
+  }
+
+
 
   function renderTopPgnoVisual(assignedRows) {
     const box = document.getElementById("chartPgno");
     if (!box) return [];
 
     hideLegacyPgnoBarsPanel();
+    restorePgnoDashboardPanel();
 
     const expanded = expandPgnoRows(assignedRows);
     const groupedAll = groupTopPgno(expanded);
