@@ -4,7 +4,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "POST-INSPECTION-STATS-DASHBOARD-LAYOUT-V05-FORCE-LEFT-HEADERS-20260630";
+  const BUILD = "POST-INSPECTION-STATS-DASHBOARD-LAYOUT-V06-HARD-LEFT-HEADERS-20260630";
   window.CSVB_POST_STATS_DASHBOARD_LAYOUT_BUILD = BUILD;
 
   const GROUPS = [
@@ -36,6 +36,45 @@
       .csvb-dashboard-group-body>.panel,.csvb-dashboard-group-body>#csvbStatsComparePanelV01,.csvb-dashboard-group-body>#csvbStatsChapterSharePanelV01,.csvb-dashboard-group-body>#csvbStatsCompositionPanelV01{margin:0!important;width:100%!important;}
       .csvb-dashboard-group-body .csvb-stat-section-header{margin-top:0!important;}
       .csvb-dashboard-empty{padding:10px;color:#55708f;font-weight:850;}
+
+      /* V06 hard-left header layout: title block left, icon absolute right */
+      .csvb-dashboard-group-head{
+        position:relative!important;
+        display:block!important;
+        width:100%!important;
+        min-height:58px!important;
+        padding:11px 62px 11px 13px!important;
+        text-align:left!important;
+      }
+      .csvb-dashboard-group-text{
+        display:block!important;
+        width:100%!important;
+        max-width:calc(100% - 8px)!important;
+        margin:0!important;
+        padding:0!important;
+        text-align:left!important;
+      }
+      .csvb-dashboard-group-title{
+        display:block!important;
+        margin:0!important;
+        padding:0!important;
+        text-align:left!important;
+      }
+      .csvb-dashboard-group-sub{
+        display:block!important;
+        margin:3px 0 0 0!important;
+        padding:0!important;
+        text-align:left!important;
+      }
+      .csvb-dashboard-group-icon{
+        position:absolute!important;
+        right:13px!important;
+        top:50%!important;
+        transform:translateY(-50%)!important;
+        justify-self:auto!important;
+        margin:0!important;
+      }
+
       @media(max-width:760px){.csvb-dashboard-toolbar{align-items:flex-start;}.csvb-dashboard-actions{width:100%;}.csvb-dashboard-btn{flex:1 1 auto;}}
     `;
     document.head.appendChild(style);
@@ -90,7 +129,7 @@
     box.id = `csvbDashboardGroup_${group.id}`;
     box.innerHTML = `
       <button class="csvb-dashboard-group-head" type="button">
-        <span><span class="csvb-dashboard-group-title"></span><div class="csvb-dashboard-group-sub"></div></span>
+        <span class="csvb-dashboard-group-text"><span class="csvb-dashboard-group-title"></span><div class="csvb-dashboard-group-sub"></div></span>
         <span class="csvb-dashboard-group-icon"></span>
       </button>
       <div class="csvb-dashboard-group-body"></div>
@@ -129,38 +168,49 @@
 
   function forceHeaderAlignment() {
     document.querySelectorAll(".csvb-dashboard-group-head").forEach((head) => {
-      head.style.setProperty("display", "grid", "important");
-      head.style.setProperty("grid-template-columns", "minmax(0, 1fr) auto", "important");
-      head.style.setProperty("align-items", "center", "important");
-      head.style.setProperty("justify-content", "stretch", "important");
+      head.style.setProperty("position", "relative", "important");
+      head.style.setProperty("display", "block", "important");
+      head.style.setProperty("width", "100%", "important");
+      head.style.setProperty("min-height", "58px", "important");
+      head.style.setProperty("padding", "11px 62px 11px 13px", "important");
       head.style.setProperty("text-align", "left", "important");
 
-      const textWrap = head.querySelector("span:first-child");
+      let textWrap = head.querySelector(".csvb-dashboard-group-text");
+      const title = head.querySelector(".csvb-dashboard-group-title");
+      const sub = head.querySelector(".csvb-dashboard-group-sub");
+
+      if (!textWrap && title) {
+        textWrap = document.createElement("span");
+        textWrap.className = "csvb-dashboard-group-text";
+        head.insertBefore(textWrap, head.firstChild);
+        textWrap.appendChild(title);
+        if (sub) textWrap.appendChild(sub);
+      }
+
       if (textWrap) {
         textWrap.style.setProperty("display", "block", "important");
         textWrap.style.setProperty("width", "100%", "important");
-        textWrap.style.setProperty("min-width", "0", "important");
-        textWrap.style.setProperty("justify-self", "start", "important");
+        textWrap.style.setProperty("max-width", "calc(100% - 8px)", "important");
+        textWrap.style.setProperty("margin", "0", "important");
+        textWrap.style.setProperty("padding", "0", "important");
         textWrap.style.setProperty("text-align", "left", "important");
       }
 
-      const title = head.querySelector(".csvb-dashboard-group-title");
-      if (title) {
-        title.style.setProperty("display", "block", "important");
-        title.style.setProperty("text-align", "left", "important");
-        title.style.setProperty("margin-left", "0", "important");
-      }
-
-      const sub = head.querySelector(".csvb-dashboard-group-sub");
-      if (sub) {
-        sub.style.setProperty("display", "block", "important");
-        sub.style.setProperty("text-align", "left", "important");
-        sub.style.setProperty("margin-left", "0", "important");
-      }
+      [title, sub].forEach((node) => {
+        if (!node) return;
+        node.style.setProperty("display", "block", "important");
+        node.style.setProperty("text-align", "left", "important");
+        node.style.setProperty("margin-left", "0", "important");
+        node.style.setProperty("margin-right", "0", "important");
+      });
 
       const icon = head.querySelector(".csvb-dashboard-group-icon");
       if (icon) {
-        icon.style.setProperty("justify-self", "end", "important");
+        icon.style.setProperty("position", "absolute", "important");
+        icon.style.setProperty("right", "13px", "important");
+        icon.style.setProperty("top", "50%", "important");
+        icon.style.setProperty("transform", "translateY(-50%)", "important");
+        icon.style.setProperty("margin", "0", "important");
       }
     });
   }
