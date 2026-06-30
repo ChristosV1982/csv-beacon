@@ -772,6 +772,70 @@
     </div>
   </div>
 
+
+  <div class="panel" id="mscatAnalyticsPanel">
+    <div class="card">
+      <h3 class="sectionTitle">M-SCAT Analytics</h3>
+      <div class="statL">
+        Planned analytics for Immediate Causes, Basic Causes and Control Areas for Improvement.
+        This section will use both AI-assigned and manually-assigned M-SCAT from Vetting Inspections, Vessel Audits and Combined Analytics.
+      </div>
+
+      <div class="statGrid" style="margin-top:12px;">
+        <div class="stat">
+          <div class="statN">IC</div>
+          <div class="statL">Immediate Causes</div>
+          <div class="statSub">Top immediate causes, trend and vessel benchmarking.</div>
+        </div>
+
+        <div class="stat">
+          <div class="statN">BC</div>
+          <div class="statL">Basic Causes</div>
+          <div class="statSub">Root-cause/basic-cause trends by source, vessel and period.</div>
+        </div>
+
+        <div class="stat">
+          <div class="statN">CA</div>
+          <div class="statL">Control Areas for Improvement</div>
+          <div class="statSub">Control-area trends and prioritisation for corrective action focus.</div>
+        </div>
+      </div>
+
+      <div class="tableWrap" style="margin-top:12px;">
+        <table>
+          <thead>
+            <tr>
+              <th>Source</th>
+              <th>M-SCAT Section</th>
+              <th>Default Output</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Vetting Inspections</td>
+              <td>Immediate / Basic / Control Area</td>
+              <td>Top causes + monthly / quarterly / annual trend</td>
+              <td>Pending Step 7F SQL/RPC calculation layer</td>
+            </tr>
+            <tr>
+              <td>Vessel Audits</td>
+              <td>Immediate / Basic / Control Area</td>
+              <td>Top causes + by audit type / carried out by / vessel</td>
+              <td>Pending Step 7F SQL/RPC calculation layer</td>
+            </tr>
+            <tr>
+              <td>Combined</td>
+              <td>Immediate / Basic / Control Area</td>
+              <td>Vetting vs Audit comparison and benchmark</td>
+              <td>Pending Step 7F SQL/RPC calculation layer</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
   <div id="advancedComparisonAnchor"></div>
 
   <dialog id="drillDialog">
@@ -822,7 +886,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="./auth.js"></script>
   <script src="./csvb-module-guard.js?v=20260522_dashboard_button_guard"></script>
-  <script type="module" src="./post_inspection_stats.js?v=20260630_measurement_sections_v06"></script>
+  <script type="module" src="./post_inspection_stats.js?v=20260630_measurement_sections_mscat_shell_v07"></script>
   <script src="./csvb-post-inspection-stats-linecharts-v01.js?v=20260529_1"></script>
   <script src="./csvb-post-inspection-stats-compare-v03.js?v=20260630_advanced_anchor_v04"></script>
   <script src="./csvb-post-inspection-stats-composition-v02.js?v=20260531_1"></script>
