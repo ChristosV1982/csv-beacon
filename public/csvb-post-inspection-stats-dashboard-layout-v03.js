@@ -4,7 +4,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "POST-INSPECTION-STATS-DASHBOARD-LAYOUT-V04-LEFT-HEADERS-20260630";
+  const BUILD = "POST-INSPECTION-STATS-DASHBOARD-LAYOUT-V05-FORCE-LEFT-HEADERS-20260630";
   window.CSVB_POST_STATS_DASHBOARD_LAYOUT_BUILD = BUILD;
 
   const GROUPS = [
@@ -102,6 +102,7 @@
     box.querySelector(".csvb-dashboard-group-icon").textContent = group.open ? "−" : "+";
     box.querySelector(".csvb-dashboard-group-head").addEventListener("click", () => toggleGroup(box));
     root.appendChild(box);
+    forceHeaderAlignment();
     return box;
   }
 
@@ -122,6 +123,45 @@
     document.querySelectorAll(".csvb-dashboard-group").forEach((box) => {
       const id = String(box.id || "").replace("csvbDashboardGroup_", "");
       toggleGroup(box, id === "comparison" || id === "fleet");
+    });
+  }
+
+
+  function forceHeaderAlignment() {
+    document.querySelectorAll(".csvb-dashboard-group-head").forEach((head) => {
+      head.style.setProperty("display", "grid", "important");
+      head.style.setProperty("grid-template-columns", "minmax(0, 1fr) auto", "important");
+      head.style.setProperty("align-items", "center", "important");
+      head.style.setProperty("justify-content", "stretch", "important");
+      head.style.setProperty("text-align", "left", "important");
+
+      const textWrap = head.querySelector("span:first-child");
+      if (textWrap) {
+        textWrap.style.setProperty("display", "block", "important");
+        textWrap.style.setProperty("width", "100%", "important");
+        textWrap.style.setProperty("min-width", "0", "important");
+        textWrap.style.setProperty("justify-self", "start", "important");
+        textWrap.style.setProperty("text-align", "left", "important");
+      }
+
+      const title = head.querySelector(".csvb-dashboard-group-title");
+      if (title) {
+        title.style.setProperty("display", "block", "important");
+        title.style.setProperty("text-align", "left", "important");
+        title.style.setProperty("margin-left", "0", "important");
+      }
+
+      const sub = head.querySelector(".csvb-dashboard-group-sub");
+      if (sub) {
+        sub.style.setProperty("display", "block", "important");
+        sub.style.setProperty("text-align", "left", "important");
+        sub.style.setProperty("margin-left", "0", "important");
+      }
+
+      const icon = head.querySelector(".csvb-dashboard-group-icon");
+      if (icon) {
+        icon.style.setProperty("justify-self", "end", "important");
+      }
     });
   }
 
@@ -156,6 +196,7 @@
     applying = true;
     injectStyle();
     moveItems();
+    forceHeaderAlignment();
     applying = false;
   }
 
