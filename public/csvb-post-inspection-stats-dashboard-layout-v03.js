@@ -4,7 +4,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "POST-INSPECTION-STATS-DASHBOARD-LAYOUT-V03-20260601";
+  const BUILD = "POST-INSPECTION-STATS-DASHBOARD-LAYOUT-V04-LEFT-HEADERS-20260630";
   window.CSVB_POST_STATS_DASHBOARD_LAYOUT_BUILD = BUILD;
 
   const GROUPS = [
@@ -27,8 +27,11 @@
       .csvb-dashboard-toolbar-title{font-size:1.02rem;font-weight:950;line-height:1.25;}.csvb-dashboard-toolbar-sub{font-size:.82rem;font-weight:850;color:#48628e;line-height:1.3;margin-top:2px;}.csvb-dashboard-actions{display:flex;gap:8px;flex-wrap:wrap;}
       .csvb-dashboard-btn{border:1px solid #bcd6ee;background:#eef7ff;color:#07345f;border-radius:999px;padding:7px 12px;font-weight:950;cursor:pointer;}.csvb-dashboard-btn:hover{background:#dff0ff;}
       .csvb-dashboard-group{border:1px solid #d5deef;border-radius:16px;background:#fff;box-shadow:0 4px 18px rgba(18,44,87,.10);overflow:hidden;}
-      .csvb-dashboard-group-head{width:100%;display:flex;align-items:center;justify-content:space-between;gap:12px;border:0;background:linear-gradient(180deg,#fff,#f4f8ff);color:#06305c;padding:11px 13px;cursor:pointer;text-align:left;}
-      .csvb-dashboard-group-title{font-size:1.08rem;font-weight:950;line-height:1.22;}.csvb-dashboard-group-sub{font-size:.84rem;font-weight:850;color:#48628e;line-height:1.32;margin-top:3px;}.csvb-dashboard-group-icon{font-size:1rem;font-weight:950;background:#eaf5ff;border:1px solid #bfe0f5;border-radius:999px;padding:4px 10px;min-width:36px;text-align:center;}
+      .csvb-dashboard-group-head{width:100%;display:grid!important;grid-template-columns:minmax(0,1fr) auto!important;align-items:center!important;justify-content:stretch!important;gap:12px;border:0;background:linear-gradient(180deg,#fff,#f4f8ff);color:#06305c;padding:11px 13px;cursor:pointer;text-align:left!important;}
+      .csvb-dashboard-group-head>span:first-child{display:block!important;min-width:0!important;width:100%!important;text-align:left!important;justify-self:stretch!important;}
+      .csvb-dashboard-group-title{display:block!important;text-align:left!important;font-size:1.08rem;font-weight:950;line-height:1.22;}
+      .csvb-dashboard-group-sub{display:block!important;text-align:left!important;font-size:.84rem;font-weight:850;color:#48628e;line-height:1.32;margin-top:3px;}
+      .csvb-dashboard-group-icon{font-size:1rem;font-weight:950;background:#eaf5ff;border:1px solid #bfe0f5;border-radius:999px;padding:4px 10px;min-width:36px;text-align:center;justify-self:end!important;}
       .csvb-dashboard-group-body{display:flex;flex-direction:column;gap:10px;padding:10px;}.csvb-dashboard-group-body[hidden]{display:none!important;}
       .csvb-dashboard-group-body>.panel,.csvb-dashboard-group-body>#csvbStatsComparePanelV01,.csvb-dashboard-group-body>#csvbStatsChapterSharePanelV01,.csvb-dashboard-group-body>#csvbStatsCompositionPanelV01{margin:0!important;width:100%!important;}
       .csvb-dashboard-group-body .csvb-stat-section-header{margin-top:0!important;}
