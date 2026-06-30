@@ -8,7 +8,7 @@ import { loadLockedLibraryJson } from "./question_library_loader.js";
 
 const LOCKED_LIBRARY_JSON = "./sire_questions_all_columns_named.json";
 
-const STATS_BUILD = "post_inspection_stats_v11_mscat_analytics_top10_2026-06-30";
+const STATS_BUILD = "post_inspection_stats_v12_mscat_summary_kpi_2026-06-30";
 window.CSVB_POST_INSPECTION_STATS_BUILD = STATS_BUILD;
 
 const OBS_TYPES = [
@@ -1912,6 +1912,14 @@ function mscatTrendRpcArgs() {
   return args;
 }
 
+
+function mscatSummaryRpcArgs() {
+  const args = mscatRpcArgs(1);
+  delete args.p_limit;
+  return args;
+}
+
+
 function mscatSourceDisplay(row) {
   const sg = String(row?.source_group || "").trim();
   if (sg === "vetting_inspection") return "Vetting";
@@ -2021,6 +2029,33 @@ function renderMscatKpis(items) {
     top ? `${mscatItemDisplay(top)} / ${top.selection_count || 0} selection(s).` : "No M-SCAT data for current filters."
   );
 }
+
+
+function renderMscatKpisFromSummary(summaryRows, fallbackItems) {
+  const row = Array.isArray(summaryRows) ? (summaryRows[0] || null) : (summaryRows || null);
+
+  if (!row) {
+    renderMscatKpis(fallbackItems || []);
+    return;
+  }
+
+  const topCode = String(row.top_item_code || row.top_item_no || "—").trim() || "—";
+  const topLabel = String(row.top_item_label || "").trim();
+  const topCount = Number(row.top_selection_count || 0);
+
+  setText("mscatKpiSelections", String(row.selection_count || 0));
+  setText("mscatKpiObservations", String(row.observation_count || 0));
+  setText("mscatKpiReports", String(row.report_count || 0));
+  setText("mscatKpiVessels", String(row.vessel_count || 0));
+  setText("mscatKpiTopItem", topCode);
+  setText(
+    "mscatKpiTopItemSub",
+    topCount
+      ? `${topCode}${topLabel ? " — " + topLabel : ""} / ${topCount} selection(s).`
+      : "No M-SCAT data for current filters."
+  );
+}
+
 
 function renderMscatItemsTable(items) {
   const tbody = safeTbody("mscatItemsTbody");
@@ -2365,16 +2400,23 @@ async function renderMscatAnalyticsPanel() {
 
     const itemArgs = mscatRpcArgs(300);
     const trendArgs = mscatTrendRpcArgs();
+    const summaryArgs = mscatSummaryRpcArgs();
 
-    const [{ data: items, error: itemError }, { data: trend, error: trendError }] = await Promise.all([
+    const [
+      { data: items, error: itemError },
+      { data: trend, error: trendError },
+      { data: summary, error: summaryError },
+    ] = await Promise.all([
       state.supabase.rpc("csvb_stats_mscat_items", itemArgs),
       state.supabase.rpc("csvb_stats_mscat_trend", trendArgs),
+      state.supabase.rpc("csvb_stats_mscat_summary", summaryArgs),
     ]);
 
     if (itemError) throw itemError;
     if (trendError) throw trendError;
+    if (summaryError) throw summaryError;
 
-    renderMscatKpis(items || []);
+    renderMscatKpisFromSummary(summary || [], items || []);
     renderMscatItemsTable(items || []);
     renderMscatTopItemsChart(items || []);
     renderMscatTrendChart(trend || []);
