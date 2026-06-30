@@ -8,7 +8,7 @@ import { loadLockedLibraryJson } from "./question_library_loader.js";
 
 const LOCKED_LIBRARY_JSON = "./sire_questions_all_columns_named.json";
 
-const STATS_BUILD = "post_inspection_stats_v09_mscat_analytics_dedup_records_2026-06-30";
+const STATS_BUILD = "post_inspection_stats_v10_mscat_analytics_records_fix_2026-06-30";
 window.CSVB_POST_INSPECTION_STATS_BUILD = STATS_BUILD;
 
 const OBS_TYPES = [
@@ -2046,6 +2046,101 @@ function renderMscatItemsTable(items) {
 
   bindMscatRecordButtons(tbody);
 }
+
+
+function mscatRecordsRpcArgs(taxonomyId, limit = 500) {
+  const args = mscatRpcArgs(limit);
+
+  return {
+    p_source_scope: args.p_source_scope,
+    p_section_key: args.p_section_key,
+    p_taxonomy_id: taxonomyId || null,
+    p_from: args.p_from,
+    p_to: args.p_to,
+    p_vessel_ids: args.p_vessel_ids,
+    p_observation_types: args.p_observation_types,
+    p_include_ai: args.p_include_ai,
+    p_include_manual: args.p_include_manual,
+    p_audit_type_ids: args.p_audit_type_ids,
+    p_limit: limit,
+  };
+}
+
+function mapMscatRecordToDrillRow(row) {
+  const sourceGroup = String(row?.source_group || "").trim();
+  const recordSource = sourceGroup || (row?.source_family === "vetting" ? "vetting_inspection" : "audit");
+  const itemText = mscatItemDisplay(row);
+
+  return {
+    record_source: recordSource,
+    record_source_label: mscatSourceDisplay(row),
+    vessel_id: row?.vessel_id || null,
+    vessel_name: row?.vessel_name || "",
+    inspection_date: row?.event_date || "",
+    source_report_id: row?.source_report_id || "",
+    source_observation_id: row?.source_observation_item_id || "",
+    report_ref: row?.report_ref || "",
+    title: row?.section_label || "M-SCAT",
+    question_no: row?.question_no || row?.question_base || "",
+    observation_type: row?.obs_type || "",
+    designation: row?.designation || "",
+    soc: row?.soc || "",
+    noc: row?.noc || "",
+    ocimf_inspecting_company: row?.source_family === "vetting" ? "Vetting" : "Audit",
+    inspector_name: row?.selection_source || "—",
+    inspector_company: row?.source_group || "—",
+    pgno_selected: [],
+    remarks: `[${itemText}] ${row?.observation_text || ""}`,
+  };
+}
+
+async function openMscatItemRecords(taxonomyId, itemLabel) {
+  if (!taxonomyId) {
+    alert("No taxonomy ID is available for this M-SCAT item.");
+    return;
+  }
+
+  setStatus("Loading M-SCAT records…");
+
+  try {
+    const { data, error } = await state.supabase.rpc(
+      "csvb_stats_mscat_records",
+      mscatRecordsRpcArgs(taxonomyId, 500)
+    );
+
+    if (error) throw error;
+
+    const records = data || [];
+    const mappedRows = records.map(mapMscatRecordToDrillRow);
+
+    openDrilldown(
+      `M-SCAT Records — ${itemLabel || taxonomyId}`,
+      mappedRows,
+      null,
+      "Collection of observations where this M-SCAT item was recorded under the current filters."
+    );
+
+    setStatus("Ready");
+  } catch (error) {
+    console.error("M-SCAT item records failed:", error);
+    setStatus("Error");
+    alert("M-SCAT item record collection failed: " + (error?.message || String(error)));
+  }
+}
+
+function bindMscatRecordButtons(root = document) {
+  root.querySelectorAll(".mscatItemRecordsBtn").forEach((btn) => {
+    if (btn.dataset.bound === "1") return;
+    btn.dataset.bound = "1";
+
+    btn.addEventListener("click", () => {
+      const taxonomyId = btn.getAttribute("data-taxonomy-id") || "";
+      const label = btn.getAttribute("data-item-label") || "";
+      openMscatItemRecords(taxonomyId, label);
+    });
+  });
+}
+
 
 function renderMscatTopItemsChart(items) {
   const box = safeEl("mscatTopItemsChart");
