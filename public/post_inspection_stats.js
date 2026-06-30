@@ -8,7 +8,7 @@ import { loadLockedLibraryJson } from "./question_library_loader.js";
 
 const LOCKED_LIBRARY_JSON = "./sire_questions_all_columns_named.json";
 
-const STATS_BUILD = "post_inspection_stats_v15_mscat_pairwise_comparison_2026-06-30";
+const STATS_BUILD = "post_inspection_stats_v16_mscat_pairwise_guard_2026-06-30";
 window.CSVB_POST_INSPECTION_STATS_BUILD = STATS_BUILD;
 
 const OBS_TYPES = [
@@ -2463,6 +2463,31 @@ function buildMscatSourceMetricRows(records) {
 }
 
 
+
+function ensureMscatPairwiseDifferent() {
+  const aNode = safeEl("mscatPairSourceA");
+  const bNode = safeEl("mscatPairSourceB");
+
+  if (!aNode || !bNode) {
+    return {
+      sourceA: "vetting_inspection",
+      sourceB: "audit_internal_superintendent",
+    };
+  }
+
+  const sourceA = String(aNode.value || "vetting_inspection").trim();
+  let sourceB = String(bNode.value || "audit_internal_superintendent").trim();
+
+  if (sourceA === sourceB) {
+    const replacement = mscatSourceOrder().find((x) => x !== sourceA) || "audit_internal_superintendent";
+    sourceB = replacement;
+    bNode.value = replacement;
+  }
+
+  return { sourceA, sourceB };
+}
+
+
 function mscatPairSourceA() {
   return String(safeEl("mscatPairSourceA")?.value || "vetting_inspection").trim();
 }
@@ -2517,8 +2542,9 @@ function renderMscatPairwiseComparison(records) {
   const rows = buildMscatSourceMetricRows(records);
   const byGroup = new Map(rows.map((row) => [row.group, row]));
 
-  const sourceA = mscatPairSourceA();
-  const sourceB = mscatPairSourceB();
+  const pair = ensureMscatPairwiseDifferent();
+  const sourceA = pair.sourceA;
+  const sourceB = pair.sourceB;
   const rowA = byGroup.get(sourceA) || null;
   const rowB = byGroup.get(sourceB) || null;
 
