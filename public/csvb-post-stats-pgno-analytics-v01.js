@@ -5,7 +5,7 @@
 (function () {
   "use strict";
 
-  const BUILD = "POST-STATS-PGNO-ANALYTICS-V03-TOP-PGNO-20260630";
+  const BUILD = "POST-STATS-PGNO-ANALYTICS-V04-TOPN-FIX-20260630";
   window.CSVB_POST_STATS_PGNO_ANALYTICS_BUILD = BUILD;
 
   function esc(value) {
@@ -309,9 +309,36 @@
     });
   }
 
+
+  function hideLegacyPgnoBarsPanel() {
+    const byId = document.getElementById("csvbStatsPgnoBarsPanelV01");
+    if (byId) {
+      byId.style.display = "none";
+      byId.setAttribute("data-csvb-hidden-by-pgno-helper", BUILD);
+    }
+
+    document.querySelectorAll(".csvb-stats-bars-panel,.csvb-bars-panel,.csvb-soc-noc-pgno-bars").forEach((panel) => {
+      const text = String(panel.textContent || "");
+      if (/PGNO\s+Analytics\s*-\s*Bars/i.test(text) || /Filtered PGNO bar chart/i.test(text)) {
+        panel.style.display = "none";
+        panel.setAttribute("data-csvb-hidden-by-pgno-helper", BUILD);
+      }
+    });
+
+    document.querySelectorAll(".card,.chartBox,.panel").forEach((node) => {
+      const text = String(node.textContent || "");
+      if (/PGNO\s+Analytics\s*-\s*Bars/i.test(text) && /Filtered PGNO bar chart/i.test(text)) {
+        node.style.display = "none";
+        node.setAttribute("data-csvb-hidden-by-pgno-helper", BUILD);
+      }
+    });
+  }
+
   function renderTopPgnoVisual(assignedRows) {
     const box = document.getElementById("chartPgno");
     if (!box) return [];
+
+    hideLegacyPgnoBarsPanel();
 
     const expanded = expandPgnoRows(assignedRows);
     const groupedAll = groupTopPgno(expanded);
@@ -324,24 +351,32 @@
     }
 
     const max = Math.max(...grouped.map((x) => x.observations), 1);
+    const showLabel = Number.isFinite(limit)
+      ? `Showing Top ${Math.min(limit, groupedAll.length)} of ${groupedAll.length} PGNO(s).`
+      : `Showing all ${groupedAll.length} PGNO(s).`;
 
     box.innerHTML = `
       <div style="display:grid;gap:8px;">
-        ${grouped.map((item) => {
-          const pct = Math.max(4, Math.round((item.observations / max) * 100));
-          return `
-            <div style="display:grid;grid-template-columns:minmax(190px,360px) 1fr 92px 60px;gap:8px;align-items:center;">
-              <div title="${esc(item.key)}" style="font-weight:950;color:#1a4170;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
-                ${esc(item.key)}
+        <div class="statL" style="font-weight:950;color:#1a4170;">${esc(showLabel)}</div>
+
+        <div style="display:grid;gap:8px;max-height:${grouped.length > 12 ? "520px" : "none"};overflow:auto;padding-right:4px;">
+          ${grouped.map((item) => {
+            const pct = Math.max(4, Math.round((item.observations / max) * 100));
+            return `
+              <div style="display:grid;grid-template-columns:minmax(190px,360px) 1fr 92px 60px;gap:8px;align-items:center;">
+                <div title="${esc(item.key)}" style="font-weight:950;color:#1a4170;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                  ${esc(item.key)}
+                </div>
+                <div style="height:13px;border-radius:999px;background:#e8f0fb;overflow:hidden;">
+                  <div style="width:${pct}%;height:100%;border-radius:999px;background:#6d28d9;"></div>
+                </div>
+                <div class="mono" style="text-align:right;">${esc(item.observations)} / ${esc(item.reports)} / ${esc(item.avg.toFixed(2))}</div>
+                <button class="btn btn-muted btn-small csvbPgnoViewBtn" type="button" data-pgno-key="${esc(item.key)}">View</button>
               </div>
-              <div style="height:13px;border-radius:999px;background:#e8f0fb;overflow:hidden;">
-                <div style="width:${pct}%;height:100%;border-radius:999px;background:#6d28d9;"></div>
-              </div>
-              <div class="mono" style="text-align:right;">${esc(item.observations)} / ${esc(item.reports)} / ${esc(item.avg.toFixed(2))}</div>
-              <button class="btn btn-muted btn-small csvbPgnoViewBtn" type="button" data-pgno-key="${esc(item.key)}">View</button>
-            </div>
-          `;
-        }).join("")}
+            `;
+          }).join("")}
+        </div>
+
         <div class="statL">Top PGNO is Vetting-only and uses the PGNO helper filters. Values show observations / reports / average.</div>
       </div>
     `;
@@ -350,12 +385,12 @@
     return groupedAll;
   }
 
-
   function render() {
     const card = findPgnoCard();
     if (!card) return;
 
     ensurePgnoControls(card);
+    hideLegacyPgnoBarsPanel();
 
     const snap = snapshot();
     if (!snap) return;
