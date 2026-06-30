@@ -8,7 +8,7 @@ import { loadLockedLibraryJson } from "./question_library_loader.js";
 
 const LOCKED_LIBRARY_JSON = "./sire_questions_all_columns_named.json";
 
-const STATS_BUILD = "post_inspection_stats_v09_mscat_analytics_dedup_2026-06-30";
+const STATS_BUILD = "post_inspection_stats_v09_mscat_analytics_dedup_records_2026-06-30";
 window.CSVB_POST_INSPECTION_STATS_BUILD = STATS_BUILD;
 
 const OBS_TYPES = [
@@ -2014,7 +2014,7 @@ function renderMscatItemsTable(items) {
   tbody.innerHTML = "";
 
   if (!rows.length) {
-    ensureTbodyMessage(tbody, 11, "No M-SCAT items for current filters.");
+    ensureTbodyMessage(tbody, 12, "No M-SCAT items for current filters.");
     return;
   }
 
@@ -2032,9 +2032,19 @@ function renderMscatItemsTable(items) {
       <td>${esc(row.ai_count || 0)}</td>
       <td>${esc(row.manual_count || 0)}</td>
       <td>${esc(row.last_seen || "—")}</td>
+      <td>
+        <button
+          class="btn btn-muted btn-small mscatItemRecordsBtn"
+          type="button"
+          data-taxonomy-id="${esc(row.taxonomy_id || "")}"
+          data-item-label="${esc(mscatItemDisplay(row))}"
+        >View</button>
+      </td>
     `;
     tbody.appendChild(tr);
   }
+
+  bindMscatRecordButtons(tbody);
 }
 
 function renderMscatTopItemsChart(items) {
@@ -2226,16 +2236,14 @@ async function renderMscatAnalyticsPanel() {
   if (!panel || !state.supabase) return;
 
   const itemsBox = safeTbody("mscatItemsTbody");
-  const trendBox = safeTbody("mscatTrendTbody");
 
   try {
     if (!mscatIncludeAi() && !mscatIncludeManual()) {
       renderMscatKpis([]);
       renderMscatItemsTable([]);
       renderMscatTopItemsChart([]);
-      renderMscatTrendTable([]);
       renderMscatTrendChart([]);
-      if (itemsBox) ensureTbodyMessage(itemsBox, 11, "Select AI assigned and/or Manual to display M-SCAT analytics.");
+      if (itemsBox) ensureTbodyMessage(itemsBox, 12, "Select AI assigned and/or Manual to display M-SCAT analytics.");
       return;
     }
 
@@ -2253,7 +2261,6 @@ async function renderMscatAnalyticsPanel() {
     renderMscatKpis(items || []);
     renderMscatItemsTable(items || []);
     renderMscatTopItemsChart(items || []);
-    renderMscatTrendTable(trend || []);
     renderMscatTrendChart(trend || []);
   } catch (error) {
     console.error("M-SCAT analytics failed:", error);
@@ -2261,8 +2268,7 @@ async function renderMscatAnalyticsPanel() {
     renderMscatTopItemsChart([]);
     renderMscatTrendChart([]);
 
-    if (itemsBox) ensureTbodyMessage(itemsBox, 11, "M-SCAT analytics failed: " + (error?.message || String(error)));
-    if (trendBox) ensureTbodyMessage(trendBox, 9, "M-SCAT trend failed: " + (error?.message || String(error)));
+    if (itemsBox) ensureTbodyMessage(itemsBox, 12, "M-SCAT analytics failed: " + (error?.message || String(error)));
   }
 }
 
