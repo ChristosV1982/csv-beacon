@@ -773,31 +773,113 @@
   </div>
 
 
+
   <div class="panel" id="mscatAnalyticsPanel">
     <div class="card">
       <h3 class="sectionTitle">M-SCAT Analytics</h3>
       <div class="statL">
-        Planned analytics for Immediate Causes, Basic Causes and Control Areas for Improvement.
-        This section will use both AI-assigned and manually-assigned M-SCAT from Vetting Inspections, Vessel Audits and Combined Analytics.
+        Analytics for Immediate Causes, Basic Causes and Control Areas for Improvement.
+        Includes both AI-assigned and manually-assigned M-SCAT selections from Vetting Inspections, Vessel Audits and Combined Analytics.
+      </div>
+
+      <div class="row" style="margin-top:12px;">
+        <div class="field-small">
+          <label for="mscatSourceScope">M-SCAT source</label>
+          <select id="mscatSourceScope">
+            <option value="combined">Combined — Vetting + Vessel Audits</option>
+            <option value="vetting">Vetting Inspections</option>
+            <option value="audits">Vessel Audits</option>
+            <option value="audit_internal_superintendent">Audit — Marine Superintendent</option>
+            <option value="audit_internal_master">Audit — Master</option>
+            <option value="audit_external_contractor">Audit — External Auditor</option>
+          </select>
+        </div>
+
+        <div class="field-small">
+          <label for="mscatSectionKey">M-SCAT section</label>
+          <select id="mscatSectionKey">
+            <option value="all">All M-SCAT sections</option>
+            <option value="Immediate Causes">Immediate Causes</option>
+            <option value="Basic Causes">Basic Causes</option>
+            <option value="Control Areas">Control Areas for Improvement</option>
+          </select>
+        </div>
+
+        <div class="field-small">
+          <label for="mscatGrouping">Trend grouping</label>
+          <select id="mscatGrouping">
+            <option value="month">Monthly</option>
+            <option value="quarter">Quarterly</option>
+            <option value="year">Annual</option>
+          </select>
+        </div>
+
+        <div class="field" style="min-width:340px; flex:1;">
+          <label>M-SCAT observation types</label>
+          <div style="display:flex; gap:14px; flex-wrap:wrap; align-items:center; min-height:36px;">
+            <label class="checkRow" style="margin:0;"><input id="mscatTypeNegative" type="checkbox" checked /> Negative</label>
+            <label class="checkRow" style="margin:0;"><input id="mscatTypeLargely" type="checkbox" /> Largely as expected</label>
+            <label class="checkRow" style="margin:0;"><input id="mscatTypePositive" type="checkbox" /> Positive</label>
+          </div>
+        </div>
+
+        <div class="field" style="min-width:300px; flex:1;">
+          <label>M-SCAT assignment source</label>
+          <div style="display:flex; gap:14px; flex-wrap:wrap; align-items:center; min-height:36px;">
+            <label class="checkRow" style="margin:0;"><input id="mscatIncludeAi" type="checkbox" checked /> AI assigned</label>
+            <label class="checkRow" style="margin:0;"><input id="mscatIncludeManual" type="checkbox" checked /> Manual</label>
+          </div>
+        </div>
+
+        <div class="field-small">
+          <label>&nbsp;</label>
+          <button class="btn btn-muted" id="mscatApplyBtn" type="button">Refresh M-SCAT</button>
+        </div>
       </div>
 
       <div class="statGrid" style="margin-top:12px;">
         <div class="stat">
-          <div class="statN">IC</div>
-          <div class="statL">Immediate Causes</div>
-          <div class="statSub">Top immediate causes, trend and vessel benchmarking.</div>
+          <div class="statN" id="mscatKpiSelections">0</div>
+          <div class="statL">M-SCAT selections</div>
+          <div class="statSub">AI + manual within current M-SCAT filter.</div>
         </div>
 
         <div class="stat">
-          <div class="statN">BC</div>
-          <div class="statL">Basic Causes</div>
-          <div class="statSub">Root-cause/basic-cause trends by source, vessel and period.</div>
+          <div class="statN" id="mscatKpiObservations">0</div>
+          <div class="statL">Linked observations</div>
+          <div class="statSub">Distinct observations with selected M-SCAT items.</div>
         </div>
 
         <div class="stat">
-          <div class="statN">CA</div>
-          <div class="statL">Control Areas for Improvement</div>
-          <div class="statSub">Control-area trends and prioritisation for corrective action focus.</div>
+          <div class="statN" id="mscatKpiReports">0</div>
+          <div class="statL">Reports / audits</div>
+          <div class="statSub">Distinct vetting reports or audit records.</div>
+        </div>
+
+        <div class="stat">
+          <div class="statN" id="mscatKpiVessels">0</div>
+          <div class="statL">Vessels</div>
+          <div class="statSub">Distinct vessels represented.</div>
+        </div>
+
+        <div class="stat">
+          <div class="statN" id="mscatKpiTopItem">—</div>
+          <div class="statL">Top M-SCAT item</div>
+          <div class="statSub" id="mscatKpiTopItemSub">No M-SCAT data loaded yet.</div>
+        </div>
+      </div>
+
+      <div class="chartGrid2" style="margin-top:12px;">
+        <div class="chartBox">
+          <div class="chartTitle">Top M-SCAT Items</div>
+          <div class="chartSub">Compact ranking by selection count.</div>
+          <div id="mscatTopItemsChart"></div>
+        </div>
+
+        <div class="chartBox">
+          <div class="chartTitle">M-SCAT Trend</div>
+          <div class="chartSub">Selections by source family and selected grouping.</div>
+          <div id="mscatTrendChart"></div>
         </div>
       </div>
 
@@ -805,31 +887,42 @@
         <table>
           <thead>
             <tr>
+              <th>Section</th>
+              <th>Subsection</th>
+              <th>M-SCAT Item</th>
               <th>Source</th>
-              <th>M-SCAT Section</th>
-              <th>Default Output</th>
-              <th>Status</th>
+              <th>Selections</th>
+              <th>Observations</th>
+              <th>Reports</th>
+              <th>Vessels</th>
+              <th>AI</th>
+              <th>Manual</th>
+              <th>Last seen</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody id="mscatItemsTbody">
+            <tr><td colspan="11" class="muted">M-SCAT analytics not loaded yet.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="tableWrap" style="margin-top:12px;">
+        <table>
+          <thead>
             <tr>
-              <td>Vetting Inspections</td>
-              <td>Immediate / Basic / Control Area</td>
-              <td>Top causes + monthly / quarterly / annual trend</td>
-              <td>Pending Step 7F SQL/RPC calculation layer</td>
+              <th>Period</th>
+              <th>Source</th>
+              <th>Section</th>
+              <th>Selections</th>
+              <th>Observations</th>
+              <th>Reports</th>
+              <th>Vessels</th>
+              <th>AI</th>
+              <th>Manual</th>
             </tr>
-            <tr>
-              <td>Vessel Audits</td>
-              <td>Immediate / Basic / Control Area</td>
-              <td>Top causes + by audit type / carried out by / vessel</td>
-              <td>Pending Step 7F SQL/RPC calculation layer</td>
-            </tr>
-            <tr>
-              <td>Combined</td>
-              <td>Immediate / Basic / Control Area</td>
-              <td>Vetting vs Audit comparison and benchmark</td>
-              <td>Pending Step 7F SQL/RPC calculation layer</td>
-            </tr>
+          </thead>
+          <tbody id="mscatTrendTbody">
+            <tr><td colspan="9" class="muted">M-SCAT trend not loaded yet.</td></tr>
           </tbody>
         </table>
       </div>
@@ -886,7 +979,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="./auth.js"></script>
   <script src="./csvb-module-guard.js?v=20260522_dashboard_button_guard"></script>
-  <script type="module" src="./post_inspection_stats.js?v=20260630_measurement_sections_mscat_shell_v07"></script>
+  <script type="module" src="./post_inspection_stats.js?v=20260630_mscat_analytics_v08"></script>
   <script src="./csvb-post-inspection-stats-linecharts-v01.js?v=20260529_1"></script>
   <script src="./csvb-post-inspection-stats-compare-v03.js?v=20260630_advanced_anchor_v04"></script>
   <script src="./csvb-post-inspection-stats-composition-v02.js?v=20260531_1"></script>

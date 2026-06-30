@@ -8,7 +8,7 @@ import { loadLockedLibraryJson } from "./question_library_loader.js";
 
 const LOCKED_LIBRARY_JSON = "./sire_questions_all_columns_named.json";
 
-const STATS_BUILD = "post_inspection_stats_v07_measurement_sections_mscat_shell_2026-06-30";
+const STATS_BUILD = "post_inspection_stats_v08_mscat_analytics_v01_2026-06-30";
 window.CSVB_POST_INSPECTION_STATS_BUILD = STATS_BUILD;
 
 const OBS_TYPES = [
@@ -1838,6 +1838,364 @@ function renderPgnoAnalytics(rows, reportRows) {
   bindDrillButtons(tbody);
 }
 
+
+
+function mscatSelectedObservationTypes() {
+  const out = [];
+  if (safeEl("mscatTypeNegative")?.checked) out.push("negative");
+  if (safeEl("mscatTypeLargely")?.checked) out.push("largely");
+  if (safeEl("mscatTypePositive")?.checked) out.push("positive");
+  return out.length ? out : ["negative"];
+}
+
+function mscatSelectedSourceScope() {
+  return String(safeEl("mscatSourceScope")?.value || "combined").trim() || "combined";
+}
+
+function mscatSelectedSectionKey() {
+  return String(safeEl("mscatSectionKey")?.value || "all").trim() || "all";
+}
+
+function mscatSelectedGrouping() {
+  return String(safeEl("mscatGrouping")?.value || "month").trim() || "month";
+}
+
+function mscatIncludeAi() {
+  const node = safeEl("mscatIncludeAi");
+  return node ? !!node.checked : true;
+}
+
+function mscatIncludeManual() {
+  const node = safeEl("mscatIncludeManual");
+  return node ? !!node.checked : true;
+}
+
+function mscatRpcArgs(limit = 50) {
+  const f = getFilters();
+  const vesselIds = Array.isArray(f.selected_vessel_ids) ? f.selected_vessel_ids.filter(Boolean) : [];
+  const auditTypeIds = Array.isArray(f.selected_audit_types) ? f.selected_audit_types.filter(Boolean) : [];
+
+  return {
+    p_source_scope: mscatSelectedSourceScope(),
+    p_section_key: mscatSelectedSectionKey(),
+    p_from: f.p_from || null,
+    p_to: f.p_to || null,
+    p_vessel_ids: vesselIds.length ? vesselIds : null,
+    p_observation_types: mscatSelectedObservationTypes(),
+    p_include_ai: mscatIncludeAi(),
+    p_include_manual: mscatIncludeManual(),
+    p_audit_type_ids: auditTypeIds.length ? auditTypeIds : null,
+    p_limit: limit,
+  };
+}
+
+function mscatTrendRpcArgs() {
+  const args = mscatRpcArgs(100);
+  delete args.p_limit;
+  args.p_grouping = mscatSelectedGrouping();
+  return args;
+}
+
+function mscatSourceDisplay(row) {
+  const sg = String(row?.source_group || "").trim();
+  if (sg === "vetting_inspection") return "Vetting";
+  if (sg === "audit_internal_superintendent") return "Audit — Superintendent";
+  if (sg === "audit_internal_master") return "Audit — Master";
+  if (sg === "audit_external_contractor") return "Audit — External";
+  return sg || String(row?.source_family || "—");
+}
+
+function mscatItemDisplay(row) {
+  const code = String(row?.item_code || row?.item_no || "").trim();
+  const label = String(row?.item_label || "").trim();
+  if (code && label) return `${code} — ${label}`;
+  return label || code || "—";
+}
+
+function renderMscatKpis(items) {
+  const rows = Array.isArray(items) ? items : [];
+  const totals = rows.reduce((acc, row) => {
+    acc.selections += Number(row.selection_count || 0);
+    acc.observations += Number(row.observation_count || 0);
+    acc.reports += Number(row.report_count || 0);
+    acc.vessels += Number(row.vessel_count || 0);
+    return acc;
+  }, { selections: 0, observations: 0, reports: 0, vessels: 0 });
+
+  const top = rows[0] || null;
+
+  setText("mscatKpiSelections", String(totals.selections));
+  setText("mscatKpiObservations", String(totals.observations));
+  setText("mscatKpiReports", String(totals.reports));
+  setText("mscatKpiVessels", String(totals.vessels));
+  setText("mscatKpiTopItem", top ? String(top.item_code || top.item_no || "—") : "—");
+  setText(
+    "mscatKpiTopItemSub",
+    top ? `${mscatItemDisplay(top)} / ${top.selection_count || 0} selection(s).` : "No M-SCAT data for current filters."
+  );
+}
+
+function renderMscatItemsTable(items) {
+  const tbody = safeTbody("mscatItemsTbody");
+  if (!tbody) return;
+
+  const rows = Array.isArray(items) ? items : [];
+  tbody.innerHTML = "";
+
+  if (!rows.length) {
+    ensureTbodyMessage(tbody, 11, "No M-SCAT items for current filters.");
+    return;
+  }
+
+  for (const row of rows.slice(0, 50)) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${esc(row.section_label || row.section_key || "—")}</td>
+      <td>${esc(row.subsection_label || row.subsection_key || "—")}</td>
+      <td>${esc(mscatItemDisplay(row))}</td>
+      <td>${esc(mscatSourceDisplay(row))}</td>
+      <td>${esc(row.selection_count || 0)}</td>
+      <td>${esc(row.observation_count || 0)}</td>
+      <td>${esc(row.report_count || 0)}</td>
+      <td>${esc(row.vessel_count || 0)}</td>
+      <td>${esc(row.ai_count || 0)}</td>
+      <td>${esc(row.manual_count || 0)}</td>
+      <td>${esc(row.last_seen || "—")}</td>
+    `;
+    tbody.appendChild(tr);
+  }
+}
+
+function renderMscatTopItemsChart(items) {
+  const box = safeEl("mscatTopItemsChart");
+  if (!box) return;
+
+  const rows = (Array.isArray(items) ? items : []).slice(0, 10);
+  if (!rows.length) {
+    box.innerHTML = `<div class="mono">No M-SCAT chart data for current filters.</div>`;
+    return;
+  }
+
+  const max = Math.max(...rows.map((r) => Number(r.selection_count || 0)), 1);
+
+  box.innerHTML = `
+    <div style="display:grid;gap:8px;">
+      ${rows.map((row) => {
+        const val = Number(row.selection_count || 0);
+        const pct = Math.max(4, Math.round((val / max) * 100));
+        return `
+          <div style="display:grid;grid-template-columns:minmax(160px,280px) 1fr 70px;gap:8px;align-items:center;">
+            <div title="${esc(mscatItemDisplay(row))}" style="font-weight:900;color:#1a4170;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+              ${esc(row.item_code || row.item_no || "—")}
+            </div>
+            <div style="height:13px;border-radius:999px;background:#e8f0fb;overflow:hidden;">
+              <div style="width:${pct}%;height:100%;border-radius:999px;background:#235aa6;"></div>
+            </div>
+            <div class="mono" style="text-align:right;">${esc(val)}</div>
+          </div>
+        `;
+      }).join("")}
+      <div class="statL">Bars show M-SCAT selection count. Hover item code in table for the full text.</div>
+    </div>
+  `;
+}
+
+function aggregateMscatTrend(trendRows) {
+  const map = new Map();
+
+  for (const row of trendRows || []) {
+    const bucket = String(row.bucket_key || "—");
+    const source = String(row.source_family || "—");
+    const key = `${bucket}|${source}`;
+
+    if (!map.has(key)) {
+      map.set(key, {
+        bucket_key: bucket,
+        source_family: source,
+        selection_count: 0,
+        observation_count: 0,
+        report_count: 0,
+        vessel_count: 0,
+        ai_count: 0,
+        manual_count: 0,
+        sections: new Set(),
+      });
+    }
+
+    const item = map.get(key);
+    item.selection_count += Number(row.selection_count || 0);
+    item.observation_count += Number(row.observation_count || 0);
+    item.report_count += Number(row.report_count || 0);
+    item.vessel_count += Number(row.vessel_count || 0);
+    item.ai_count += Number(row.ai_count || 0);
+    item.manual_count += Number(row.manual_count || 0);
+    if (row.section_label || row.section_key) item.sections.add(String(row.section_label || row.section_key));
+  }
+
+  return [...map.values()].sort((a, b) =>
+    String(a.bucket_key).localeCompare(String(b.bucket_key)) ||
+    String(a.source_family).localeCompare(String(b.source_family))
+  );
+}
+
+function renderMscatTrendTable(trendRows) {
+  const tbody = safeTbody("mscatTrendTbody");
+  if (!tbody) return;
+
+  const rows = aggregateMscatTrend(trendRows);
+  tbody.innerHTML = "";
+
+  if (!rows.length) {
+    ensureTbodyMessage(tbody, 9, "No M-SCAT trend data for current filters.");
+    return;
+  }
+
+  for (const row of rows.slice(-60)) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${esc(row.bucket_key)}</td>
+      <td>${esc(row.source_family === "vetting" ? "Vetting" : row.source_family === "audit" ? "Audit" : row.source_family)}</td>
+      <td>${esc([...row.sections].join(", ") || "Selected")}</td>
+      <td>${esc(row.selection_count)}</td>
+      <td>${esc(row.observation_count)}</td>
+      <td>${esc(row.report_count)}</td>
+      <td>${esc(row.vessel_count)}</td>
+      <td>${esc(row.ai_count)}</td>
+      <td>${esc(row.manual_count)}</td>
+    `;
+    tbody.appendChild(tr);
+  }
+}
+
+function renderMscatTrendChart(trendRows) {
+  const box = safeEl("mscatTrendChart");
+  if (!box) return;
+
+  const rows = aggregateMscatTrend(trendRows);
+  if (!rows.length) {
+    box.innerHTML = `<div class="mono">No M-SCAT trend data for current filters.</div>`;
+    return;
+  }
+
+  const buckets = [...new Set(rows.map((r) => r.bucket_key))].sort();
+  const sources = [...new Set(rows.map((r) => r.source_family))].sort();
+
+  const series = sources.map((src) => ({
+    key: src,
+    label: src === "vetting" ? "Vetting" : src === "audit" ? "Audit" : src,
+    color: src === "vetting" ? "#2563eb" : "#dc2626",
+    values: buckets.map((b) => {
+      const row = rows.find((x) => x.bucket_key === b && x.source_family === src);
+      return Number(row?.selection_count || 0);
+    }),
+  }));
+
+  const width = 620;
+  const height = 220;
+  const padL = 44;
+  const padR = 16;
+  const padT = 18;
+  const padB = 42;
+  const maxY = Math.max(1, ...series.flatMap((s) => s.values));
+
+  const xFor = (idx) => buckets.length <= 1
+    ? padL + (width - padL - padR) / 2
+    : padL + (idx * (width - padL - padR)) / (buckets.length - 1);
+
+  const yFor = (v) => padT + (height - padT - padB) * (1 - Number(v || 0) / maxY);
+
+  const grid = [0, 0.5, 1].map((ratio) => {
+    const y = padT + (height - padT - padB) * (1 - ratio);
+    const val = Math.round(maxY * ratio);
+    return `
+      <line x1="${padL}" y1="${y.toFixed(1)}" x2="${width - padR}" y2="${y.toFixed(1)}" stroke="#e5eefc"></line>
+      <text x="${padL - 8}" y="${(y + 4).toFixed(1)}" text-anchor="end" fill="#35507b" font-size="10" font-weight="800">${esc(val)}</text>
+    `;
+  }).join("");
+
+  const labelIndexes = new Set();
+  if (buckets.length <= 6) buckets.forEach((_, i) => labelIndexes.add(i));
+  else {
+    labelIndexes.add(0);
+    labelIndexes.add(Math.floor((buckets.length - 1) / 2));
+    labelIndexes.add(buckets.length - 1);
+  }
+
+  const xLabels = buckets.map((b, i) => labelIndexes.has(i)
+    ? `<text x="${xFor(i).toFixed(1)}" y="${height - 16}" text-anchor="${i === 0 ? "start" : i === buckets.length - 1 ? "end" : "middle"}" fill="#35507b" font-size="10" font-weight="800">${esc(b)}</text>`
+    : ""
+  ).join("");
+
+  const polylines = series.map((s) => {
+    const points = s.values.map((v, i) => `${xFor(i).toFixed(1)},${yFor(v).toFixed(1)}`).join(" ");
+    return `<polyline points="${points}" fill="none" stroke="${esc(s.color)}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></polyline>`;
+  }).join("");
+
+  const legend = series.map((s) => {
+    const total = s.values.reduce((a, b) => a + Number(b || 0), 0);
+    return `<span style="display:inline-flex;gap:6px;align-items:center;"><i style="width:10px;height:10px;border-radius:999px;background:${esc(s.color)};display:inline-block;"></i>${esc(s.label)}: ${esc(total)}</span>`;
+  }).join("");
+
+  box.innerHTML = `
+    <div style="border:1px solid #dbe8f8;border-radius:14px;background:#fff;padding:8px;overflow:auto;">
+      <svg viewBox="0 0 ${width} ${height}" style="width:100%;max-height:230px;display:block;">
+        ${grid}
+        <line x1="${padL}" y1="${padT}" x2="${padL}" y2="${height - padB}" stroke="#b7cbe6"></line>
+        <line x1="${padL}" y1="${height - padB}" x2="${width - padR}" y2="${height - padB}" stroke="#b7cbe6"></line>
+        ${polylines}
+        ${xLabels}
+      </svg>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;font-weight:900;color:#1a4170;font-size:.78rem;">${legend}</div>
+    </div>
+  `;
+}
+
+async function renderMscatAnalyticsPanel() {
+  const panel = safeEl("mscatAnalyticsPanel");
+  if (!panel || !state.supabase) return;
+
+  const itemsBox = safeTbody("mscatItemsTbody");
+  const trendBox = safeTbody("mscatTrendTbody");
+
+  try {
+    if (!mscatIncludeAi() && !mscatIncludeManual()) {
+      renderMscatKpis([]);
+      renderMscatItemsTable([]);
+      renderMscatTopItemsChart([]);
+      renderMscatTrendTable([]);
+      renderMscatTrendChart([]);
+      if (itemsBox) ensureTbodyMessage(itemsBox, 11, "Select AI assigned and/or Manual to display M-SCAT analytics.");
+      return;
+    }
+
+    const itemArgs = mscatRpcArgs(50);
+    const trendArgs = mscatTrendRpcArgs();
+
+    const [{ data: items, error: itemError }, { data: trend, error: trendError }] = await Promise.all([
+      state.supabase.rpc("csvb_stats_mscat_items", itemArgs),
+      state.supabase.rpc("csvb_stats_mscat_trend", trendArgs),
+    ]);
+
+    if (itemError) throw itemError;
+    if (trendError) throw trendError;
+
+    renderMscatKpis(items || []);
+    renderMscatItemsTable(items || []);
+    renderMscatTopItemsChart(items || []);
+    renderMscatTrendTable(trend || []);
+    renderMscatTrendChart(trend || []);
+  } catch (error) {
+    console.error("M-SCAT analytics failed:", error);
+    renderMscatKpis([]);
+    renderMscatTopItemsChart([]);
+    renderMscatTrendChart([]);
+
+    if (itemsBox) ensureTbodyMessage(itemsBox, 11, "M-SCAT analytics failed: " + (error?.message || String(error)));
+    if (trendBox) ensureTbodyMessage(trendBox, 9, "M-SCAT trend failed: " + (error?.message || String(error)));
+  }
+}
+
+
 function renderSummaryFromRows(rows, reportRows) {
   const counts = typeCountsFromRows(rows);
   const questionSet = new Set((rows || []).map((r) => String(r.question_no || "").trim()).filter(Boolean));
@@ -1920,6 +2278,7 @@ async function renderAllStats(rows, rowsIgnoreTypeFilter, reportRows) {
   renderAverageGroupTable(rows, reportRows, (r) => r.inspector_company, (r) => r.inspector_company, "byInspectorCompanyTbody", "inspector/auditor company");
 
   renderPgnoAnalytics(rows, reportRows);
+  await renderMscatAnalyticsPanel();
 }
 
 function activateCurrentDataset() {
@@ -2235,6 +2594,14 @@ async function init() {
   bindChange("trendYearFilter", refresh);
   bindChange("dateFrom", refresh);
   bindChange("dateTo", refresh);
+
+
+  ["mscatSourceScope", "mscatSectionKey", "mscatGrouping", "mscatTypeNegative", "mscatTypeLargely", "mscatTypePositive", "mscatIncludeAi", "mscatIncludeManual"].forEach((id) => {
+    bindChange(id, refresh);
+  });
+
+  bindClick("mscatApplyBtn", refresh);
+
 
   bindClick("drillCloseBtn", () => {
     const dlg = safeEl("drillDialog");
