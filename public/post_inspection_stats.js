@@ -8,7 +8,7 @@ import { loadLockedLibraryJson } from "./question_library_loader.js";
 
 const LOCKED_LIBRARY_JSON = "./sire_questions_all_columns_named.json";
 
-const STATS_BUILD = "post_inspection_stats_v10_mscat_analytics_records_fix_2026-06-30";
+const STATS_BUILD = "post_inspection_stats_v11_mscat_analytics_top10_2026-06-30";
 window.CSVB_POST_INSPECTION_STATS_BUILD = STATS_BUILD;
 
 const OBS_TYPES = [
@@ -1860,6 +1860,22 @@ function mscatSelectedGrouping() {
   return String(safeEl("mscatGrouping")?.value || "month").trim() || "month";
 }
 
+
+function mscatItemsDisplayLimit() {
+  const raw = String(safeEl("mscatItemsLimit")?.value || "10").trim();
+
+  if (raw === "all") return Infinity;
+
+  const n = Number(raw);
+  return Number.isFinite(n) && n > 0 ? n : 10;
+}
+
+function mscatItemsDisplayLimitLabel(limit, total) {
+  if (!Number.isFinite(limit)) return `Showing all ${total} loaded M-SCAT item(s).`;
+  return `Showing Top ${Math.min(limit, total)} of ${total} loaded M-SCAT item(s).`;
+}
+
+
 function mscatIncludeAi() {
   const node = safeEl("mscatIncludeAi");
   return node ? !!node.checked : true;
@@ -2018,7 +2034,12 @@ function renderMscatItemsTable(items) {
     return;
   }
 
-  for (const row of rows.slice(0, 50)) {
+  const limit = mscatItemsDisplayLimit();
+  const visibleRows = Number.isFinite(limit) ? rows.slice(0, limit) : rows;
+
+  setText("mscatItemsLimitNote", mscatItemsDisplayLimitLabel(limit, rows.length) + " Use View to open the related observation collection.");
+
+  for (const row of visibleRows) {
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>${esc(row.section_label || row.section_key || "—")}</td>
@@ -2342,7 +2363,7 @@ async function renderMscatAnalyticsPanel() {
       return;
     }
 
-    const itemArgs = mscatRpcArgs(50);
+    const itemArgs = mscatRpcArgs(300);
     const trendArgs = mscatTrendRpcArgs();
 
     const [{ data: items, error: itemError }, { data: trend, error: trendError }] = await Promise.all([
@@ -2768,7 +2789,7 @@ async function init() {
   bindChange("dateTo", refresh);
 
 
-  ["mscatSourceScope", "mscatSectionKey", "mscatGrouping", "mscatTypeNegative", "mscatTypeLargely", "mscatTypePositive", "mscatIncludeAi", "mscatIncludeManual"].forEach((id) => {
+  ["mscatSourceScope", "mscatSectionKey", "mscatGrouping", "mscatItemsLimit", "mscatTypeNegative", "mscatTypeLargely", "mscatTypePositive", "mscatIncludeAi", "mscatIncludeManual"].forEach((id) => {
     bindChange(id, refresh);
   });
 
