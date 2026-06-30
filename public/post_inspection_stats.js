@@ -8,7 +8,7 @@ import { loadLockedLibraryJson } from "./question_library_loader.js";
 
 const LOCKED_LIBRARY_JSON = "./sire_questions_all_columns_named.json";
 
-const STATS_BUILD = "post_inspection_stats_v08_mscat_analytics_v01_2026-06-30";
+const STATS_BUILD = "post_inspection_stats_v09_mscat_analytics_dedup_2026-06-30";
 window.CSVB_POST_INSPECTION_STATS_BUILD = STATS_BUILD;
 
 const OBS_TYPES = [
@@ -1912,8 +1912,79 @@ function mscatItemDisplay(row) {
   return label || code || "—";
 }
 
+
+function mscatItemAggregationKey(row) {
+  return String(row?.taxonomy_id || row?.item_code || row?.item_no || row?.item_label || "").trim();
+}
+
+function mscatSourceSummary(row) {
+  if (Array.isArray(row?.source_labels) && row.source_labels.length) {
+    return row.source_labels.join(", ");
+  }
+  return mscatSourceDisplay(row);
+}
+
+function aggregateMscatItems(items) {
+  const map = new Map();
+
+  for (const row of items || []) {
+    const key = mscatItemAggregationKey(row);
+    if (!key) continue;
+
+    if (!map.has(key)) {
+      map.set(key, {
+        ...row,
+        selection_count: 0,
+        observation_count: 0,
+        report_count: 0,
+        vessel_count: 0,
+        ai_count: 0,
+        manual_count: 0,
+        source_labels: [],
+        source_label_set: new Set(),
+        first_seen: row.first_seen || "",
+        last_seen: row.last_seen || "",
+      });
+    }
+
+    const item = map.get(key);
+
+    item.selection_count += Number(row.selection_count || 0);
+    item.observation_count += Number(row.observation_count || 0);
+    item.report_count += Number(row.report_count || 0);
+    item.vessel_count += Number(row.vessel_count || 0);
+    item.ai_count += Number(row.ai_count || 0);
+    item.manual_count += Number(row.manual_count || 0);
+
+    const srcLabel = mscatSourceDisplay(row);
+    if (srcLabel && !item.source_label_set.has(srcLabel)) {
+      item.source_label_set.add(srcLabel);
+      item.source_labels.push(srcLabel);
+    }
+
+    const first = String(row.first_seen || "");
+    const last = String(row.last_seen || "");
+
+    if (first && (!item.first_seen || first < item.first_seen)) item.first_seen = first;
+    if (last && (!item.last_seen || last > item.last_seen)) item.last_seen = last;
+  }
+
+  return [...map.values()]
+    .map((row) => {
+      delete row.source_label_set;
+      row.source_labels = row.source_labels || [];
+      return row;
+    })
+    .sort((a, b) =>
+      Number(b.selection_count || 0) - Number(a.selection_count || 0) ||
+      Number(b.observation_count || 0) - Number(a.observation_count || 0) ||
+      String(a.item_code || a.item_no || "").localeCompare(String(b.item_code || b.item_no || ""))
+    );
+}
+
+
 function renderMscatKpis(items) {
-  const rows = Array.isArray(items) ? items : [];
+  const rows = aggregateMscatItems(Array.isArray(items) ? items : []);
   const totals = rows.reduce((acc, row) => {
     acc.selections += Number(row.selection_count || 0);
     acc.observations += Number(row.observation_count || 0);
@@ -1939,7 +2010,7 @@ function renderMscatItemsTable(items) {
   const tbody = safeTbody("mscatItemsTbody");
   if (!tbody) return;
 
-  const rows = Array.isArray(items) ? items : [];
+  const rows = aggregateMscatItems(Array.isArray(items) ? items : []);
   tbody.innerHTML = "";
 
   if (!rows.length) {
@@ -1953,7 +2024,7 @@ function renderMscatItemsTable(items) {
       <td>${esc(row.section_label || row.section_key || "—")}</td>
       <td>${esc(row.subsection_label || row.subsection_key || "—")}</td>
       <td>${esc(mscatItemDisplay(row))}</td>
-      <td>${esc(mscatSourceDisplay(row))}</td>
+      <td>${esc(mscatSourceSummary(row))}</td>
       <td>${esc(row.selection_count || 0)}</td>
       <td>${esc(row.observation_count || 0)}</td>
       <td>${esc(row.report_count || 0)}</td>
@@ -1970,7 +2041,7 @@ function renderMscatTopItemsChart(items) {
   const box = safeEl("mscatTopItemsChart");
   if (!box) return;
 
-  const rows = (Array.isArray(items) ? items : []).slice(0, 10);
+  const rows = aggregateMscatItems(Array.isArray(items) ? items : []).slice(0, 10);
   if (!rows.length) {
     box.innerHTML = `<div class="mono">No M-SCAT chart data for current filters.</div>`;
     return;
@@ -1995,7 +2066,7 @@ function renderMscatTopItemsChart(items) {
           </div>
         `;
       }).join("")}
-      <div class="statL">Bars show M-SCAT selection count. Hover item code in table for the full text.</div>
+      <div class="statL">Bars show aggregated M-SCAT selection count by taxonomy item across the selected source(s).</div>
     </div>
   `;
 }
