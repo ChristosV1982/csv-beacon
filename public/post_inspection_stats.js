@@ -8,7 +8,7 @@ import { loadLockedLibraryJson } from "./question_library_loader.js";
 
 const LOCKED_LIBRARY_JSON = "./sire_questions_all_columns_named.json";
 
-const STATS_BUILD = "post_inspection_stats_v14_mscat_segmented_comparison_2026-06-30";
+const STATS_BUILD = "post_inspection_stats_v15_mscat_pairwise_comparison_2026-06-30";
 window.CSVB_POST_INSPECTION_STATS_BUILD = STATS_BUILD;
 
 const OBS_TYPES = [
@@ -2462,6 +2462,135 @@ function buildMscatSourceMetricRows(records) {
     });
 }
 
+
+function mscatPairSourceA() {
+  return String(safeEl("mscatPairSourceA")?.value || "vetting_inspection").trim();
+}
+
+function mscatPairSourceB() {
+  return String(safeEl("mscatPairSourceB")?.value || "audit_internal_superintendent").trim();
+}
+
+function mscatPairMetric() {
+  return String(safeEl("mscatPairMetric")?.value || "avg_observations_per_report").trim();
+}
+
+function mscatMetricLabel(metricKey) {
+  const key = String(metricKey || "").trim();
+
+  if (key === "selection_count") return "Selections";
+  if (key === "observation_count") return "Observations";
+  if (key === "report_count") return "Reports / Audits";
+  if (key === "avg_observations_per_report") return "Avg observations / report";
+  if (key === "avg_selections_per_report") return "Avg selections / report";
+
+  return key || "Metric";
+}
+
+function mscatMetricValue(row, metricKey) {
+  if (!row) return 0;
+
+  const key = String(metricKey || "").trim();
+
+  if (key === "selection_count") return Number(row.selections || 0);
+  if (key === "observation_count") return Number(row.observation_count || 0);
+  if (key === "report_count") return Number(row.report_count || 0);
+  if (key === "avg_observations_per_report") return Number(row.avg_observations_per_report || 0);
+  if (key === "avg_selections_per_report") return Number(row.avg_selections_per_report || 0);
+
+  return 0;
+}
+
+function formatMscatMetric(value, metricKey) {
+  const n = Number(value || 0);
+  const key = String(metricKey || "").trim();
+
+  if (key.startsWith("avg_")) return n.toFixed(2);
+  return String(Math.round(n));
+}
+
+function renderMscatPairwiseComparison(records) {
+  const tbody = safeTbody("mscatPairwiseComparisonTbody");
+  const box = safeEl("mscatPairwiseComparisonChart");
+  if (!tbody || !box) return;
+
+  const rows = buildMscatSourceMetricRows(records);
+  const byGroup = new Map(rows.map((row) => [row.group, row]));
+
+  const sourceA = mscatPairSourceA();
+  const sourceB = mscatPairSourceB();
+  const rowA = byGroup.get(sourceA) || null;
+  const rowB = byGroup.get(sourceB) || null;
+
+  const labelA = mscatSourceGroupLabel(sourceA);
+  const labelB = mscatSourceGroupLabel(sourceB);
+
+  setText("mscatPairHeaderA", labelA);
+  setText("mscatPairHeaderB", labelB);
+
+  const metrics = [
+    "observation_count",
+    "report_count",
+    "avg_observations_per_report",
+    "selection_count",
+    "avg_selections_per_report",
+  ];
+
+  tbody.innerHTML = "";
+
+  if (!rowA && !rowB) {
+    box.innerHTML = `<div class="mono">No pairwise M-SCAT data for the selected sources.</div>`;
+    ensureTbodyMessage(tbody, 5, "No pairwise M-SCAT data for the selected sources.");
+    return;
+  }
+
+  for (const metric of metrics) {
+    const a = mscatMetricValue(rowA, metric);
+    const b = mscatMetricValue(rowB, metric);
+    const diff = a - b;
+    const ratio = b ? (a / b) : null;
+
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${esc(mscatMetricLabel(metric))}</td>
+      <td>${esc(formatMscatMetric(a, metric))}</td>
+      <td>${esc(formatMscatMetric(b, metric))}</td>
+      <td>${esc(metric.startsWith("avg_") ? diff.toFixed(2) : String(Math.round(diff)))}</td>
+      <td>${esc(ratio == null ? "N/A" : ratio.toFixed(2))}</td>
+    `;
+    tbody.appendChild(tr);
+  }
+
+  const primaryMetric = mscatPairMetric();
+  const aVal = mscatMetricValue(rowA, primaryMetric);
+  const bVal = mscatMetricValue(rowB, primaryMetric);
+  const max = Math.max(aVal, bVal, 1);
+
+  const bars = [
+    { label: labelA, group: sourceA, value: aVal },
+    { label: labelB, group: sourceB, value: bVal },
+  ];
+
+  box.innerHTML = `
+    <div style="display:grid;gap:10px;">
+      ${bars.map((bar) => {
+        const pct = Math.max(4, Math.round((Number(bar.value || 0) / max) * 100));
+        return `
+          <div style="display:grid;grid-template-columns:minmax(180px,280px) 1fr 90px;gap:10px;align-items:center;">
+            <div style="font-weight:900;color:#1a4170;">${esc(bar.label)}</div>
+            <div style="height:14px;border-radius:999px;background:#e8f0fb;overflow:hidden;">
+              <div style="width:${pct}%;height:100%;border-radius:999px;background:${esc(mscatSourceColor(bar.group))};"></div>
+            </div>
+            <div class="mono" style="text-align:right;">${esc(formatMscatMetric(bar.value, primaryMetric))}</div>
+          </div>
+        `;
+      }).join("")}
+      <div class="statL">Primary metric shown: ${esc(mscatMetricLabel(primaryMetric))}. Table below shows full pairwise comparison.</div>
+    </div>
+  `;
+}
+
+
 function renderMscatObservationComparison(records) {
   const box = safeEl("mscatObservationComparisonChart");
   const tbody = safeTbody("mscatObservationComparisonTbody");
@@ -2934,6 +3063,7 @@ async function renderMscatAnalyticsPanel() {
     renderMscatKpisFromSummary(summary, items);
     renderMscatSourceComparison(records);
     renderMscatObservationComparison(records);
+    renderMscatPairwiseComparison(records);
     renderMscatItemsTable(items);
     renderMscatTopItemsChart(items);
     renderMscatTrendChart(trend);
@@ -3356,7 +3486,7 @@ async function init() {
   bindChange("dateTo", refresh);
 
 
-  ["mscatGrouping", "mscatItemsLimit", "mscatTypeNegative", "mscatTypeLargely", "mscatTypePositive", "mscatIncludeAi", "mscatIncludeManual"].forEach((id) => {
+  ["mscatGrouping", "mscatItemsLimit", "mscatPairSourceA", "mscatPairSourceB", "mscatPairMetric", "mscatTypeNegative", "mscatTypeLargely", "mscatTypePositive", "mscatIncludeAi", "mscatIncludeManual"].forEach((id) => {
     bindChange(id, refresh);
   });
 

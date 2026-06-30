@@ -925,6 +925,64 @@
         </div>
       </div>
 
+
+      <div class="chartBox" id="mscatPairwiseComparisonBox" style="margin-top:12px;">
+        <div class="chartTitle">M-SCAT Pairwise Source Comparison</div>
+        <div class="chartSub">Directly compares two selected sources under the current M-SCAT filters. Use this for Vetting vs Superintendent / Master / External comparisons.</div>
+
+        <div class="row" style="margin-top:10px; align-items:end;">
+          <div class="field-small">
+            <label for="mscatPairSourceA">Source A</label>
+            <select id="mscatPairSourceA">
+              <option value="vetting_inspection" selected>Vetting Inspections</option>
+              <option value="audit_internal_superintendent">Audit — Marine Superintendent</option>
+              <option value="audit_internal_master">Audit — Master</option>
+              <option value="audit_external_contractor">Audit — External Auditor</option>
+            </select>
+          </div>
+
+          <div class="field-small">
+            <label for="mscatPairSourceB">Source B</label>
+            <select id="mscatPairSourceB">
+              <option value="audit_internal_superintendent" selected>Audit — Marine Superintendent</option>
+              <option value="audit_internal_master">Audit — Master</option>
+              <option value="audit_external_contractor">Audit — External Auditor</option>
+              <option value="vetting_inspection">Vetting Inspections</option>
+            </select>
+          </div>
+
+          <div class="field-small">
+            <label for="mscatPairMetric">Primary metric</label>
+            <select id="mscatPairMetric">
+              <option value="avg_observations_per_report" selected>Avg observations / report</option>
+              <option value="observation_count">Observations</option>
+              <option value="selection_count">Selections</option>
+              <option value="report_count">Reports / Audits</option>
+              <option value="avg_selections_per_report">Avg selections / report</option>
+            </select>
+          </div>
+        </div>
+
+        <div id="mscatPairwiseComparisonChart" style="margin-top:10px;"></div>
+
+        <div class="tableWrap" style="margin-top:8px;">
+          <table>
+            <thead>
+              <tr>
+                <th>Metric</th>
+                <th id="mscatPairHeaderA">Source A</th>
+                <th id="mscatPairHeaderB">Source B</th>
+                <th>Difference A - B</th>
+                <th>Ratio A / B</th>
+              </tr>
+            </thead>
+            <tbody id="mscatPairwiseComparisonTbody">
+              <tr><td colspan="5" class="muted">Pairwise comparison not loaded yet.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       <div class="chartGrid2" style="margin-top:12px;">
         <div class="chartBox">
           <div class="chartTitle">Top M-SCAT Items</div>
@@ -1030,7 +1088,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="./auth.js"></script>
   <script src="./csvb-module-guard.js?v=20260522_dashboard_button_guard"></script>
-  <script type="module" src="./post_inspection_stats.js?v=20260630_mscat_segmented_comparison_v14"></script>
+  <script type="module" src="./post_inspection_stats.js?v=20260630_mscat_pairwise_comparison_v15"></script>
   <script src="./csvb-post-inspection-stats-linecharts-v01.js?v=20260529_1"></script>
   <script src="./csvb-post-inspection-stats-compare-v03.js?v=20260630_advanced_anchor_v04"></script>
   <script src="./csvb-post-inspection-stats-composition-v02.js?v=20260531_1"></script>
