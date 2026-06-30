@@ -8,7 +8,7 @@ import { loadLockedLibraryJson } from "./question_library_loader.js";
 
 const LOCKED_LIBRARY_JSON = "./sire_questions_all_columns_named.json";
 
-const STATS_BUILD = "post_inspection_stats_v13_mscat_multiselect_comparison_2026-06-30";
+const STATS_BUILD = "post_inspection_stats_v14_mscat_segmented_comparison_2026-06-30";
 window.CSVB_POST_INSPECTION_STATS_BUILD = STATS_BUILD;
 
 const OBS_TYPES = [
@@ -2034,6 +2034,16 @@ function aggregateMscatItems(items) {
 
     item.selection_count += Number(row.selection_count || 0);
     item.observation_count += Number(row.observation_count || 0);
+
+    if (!item.source_counts) item.source_counts = {};
+    if (row.source_counts && typeof row.source_counts === "object") {
+      for (const [mergeSourceKey, mergeCount] of Object.entries(row.source_counts)) {
+        item.source_counts[mergeSourceKey] = Number(item.source_counts[mergeSourceKey] || 0) + Number(mergeCount || 0);
+      }
+    } else {
+      const mergeSourceKey = recordSourceGroupForMscat(row);
+      if (mergeSourceKey) item.source_counts[mergeSourceKey] = Number(item.source_counts[mergeSourceKey] || 0) + Number(row.selection_count || 0);
+    }
     item.report_count += Number(row.report_count || 0);
     item.vessel_count += Number(row.vessel_count || 0);
     item.ai_count += Number(row.ai_count || 0);
@@ -2180,6 +2190,39 @@ function mscatSourceGroupLabel(group) {
   return group || "—";
 }
 
+
+function mscatSourceColor(group) {
+  const key = String(group || "").trim();
+
+  if (key === "vetting_inspection") return "#2563eb";
+  if (key === "audit_internal_superintendent") return "#dc2626";
+  if (key === "audit_internal_master") return "#f59e0b";
+  if (key === "audit_external_contractor") return "#16a34a";
+
+  return "#64748b";
+}
+
+function mscatSourceShortLabel(group) {
+  const key = String(group || "").trim();
+
+  if (key === "vetting_inspection") return "Vetting";
+  if (key === "audit_internal_superintendent") return "Sup.";
+  if (key === "audit_internal_master") return "Master";
+  if (key === "audit_external_contractor") return "External";
+
+  return key || "Other";
+}
+
+function mscatSourceOrder() {
+  return [
+    "vetting_inspection",
+    "audit_internal_superintendent",
+    "audit_internal_master",
+    "audit_external_contractor",
+  ];
+}
+
+
 function mscatRecordKey(row, field) {
   const family = String(row?.source_family || "").trim();
   return `${family}:${String(row?.[field] || "").trim()}`;
@@ -2214,6 +2257,7 @@ function recordsToMscatItemRows(records) {
         last_seen: "",
         source_labels: [],
         source_label_set: new Set(),
+        source_counts: {},
         observation_keys: new Set(),
         report_keys: new Set(),
         vessel_ids: new Set(),
@@ -2230,7 +2274,10 @@ function recordsToMscatItemRows(records) {
     if (String(row.selection_source || "") === "ai_suggested") item.ai_count += 1;
     if (String(row.selection_source || "") === "manual") item.manual_count += 1;
 
-    const srcLabel = mscatSourceGroupLabel(recordSourceGroupForMscat(row));
+    const sourceGroupKey = recordSourceGroupForMscat(row);
+    item.source_counts[sourceGroupKey] = Number(item.source_counts[sourceGroupKey] || 0) + 1;
+
+    const srcLabel = mscatSourceGroupLabel(sourceGroupKey);
     if (srcLabel && !item.source_label_set.has(srcLabel)) {
       item.source_label_set.add(srcLabel);
       item.source_labels.push(srcLabel);
@@ -2370,10 +2417,8 @@ function mscatTrendRowsFromRecords(records) {
   }));
 }
 
-function renderMscatSourceComparison(records) {
-  const tbody = safeTbody("mscatSourceComparisonTbody");
-  if (!tbody) return;
 
+function buildMscatSourceMetricRows(records) {
   const map = new Map();
 
   for (const row of records || []) {
@@ -2401,15 +2446,88 @@ function renderMscatSourceComparison(records) {
     if (String(row.selection_source || "") === "manual") item.manual += 1;
   }
 
-  const order = [
-    "vetting_inspection",
-    "audit_internal_superintendent",
-    "audit_internal_master",
-    "audit_external_contractor",
-  ];
+  return mscatSourceOrder()
+    .map((key) => map.get(key))
+    .filter(Boolean)
+    .map((row) => {
+      const reportCount = row.reports.size;
+      return {
+        ...row,
+        observation_count: row.observations.size,
+        report_count: reportCount,
+        vessel_count: row.vessels.size,
+        avg_observations_per_report: reportCount ? row.observations.size / reportCount : 0,
+        avg_selections_per_report: reportCount ? row.selections / reportCount : 0,
+      };
+    });
+}
 
-  const rows = order.map((key) => map.get(key)).filter(Boolean);
+function renderMscatObservationComparison(records) {
+  const box = safeEl("mscatObservationComparisonChart");
+  const tbody = safeTbody("mscatObservationComparisonTbody");
+  if (!box || !tbody) return;
 
+  const rows = buildMscatSourceMetricRows(records);
+
+  tbody.innerHTML = "";
+
+  if (!rows.length) {
+    box.innerHTML = `<div class="mono">No M-SCAT observation comparison data for current filters.</div>`;
+    ensureTbodyMessage(tbody, 6, "No M-SCAT observation comparison data for current filters.");
+    return;
+  }
+
+  const maxObs = Math.max(...rows.map((r) => Number(r.observation_count || 0)), 1);
+  const maxAvg = Math.max(...rows.map((r) => Number(r.avg_observations_per_report || 0)), 1);
+
+  box.innerHTML = `
+    <div style="display:grid;gap:10px;">
+      ${rows.map((row) => {
+        const obsPct = Math.max(4, Math.round((Number(row.observation_count || 0) / maxObs) * 100));
+        const avgPct = Math.max(4, Math.round((Number(row.avg_observations_per_report || 0) / maxAvg) * 100));
+
+        return `
+          <div style="display:grid;grid-template-columns:minmax(180px,260px) 1fr 120px;gap:10px;align-items:center;">
+            <div style="font-weight:900;color:#1a4170;">${esc(row.label)}</div>
+            <div style="display:grid;gap:5px;">
+              <div style="height:12px;border-radius:999px;background:#e8f0fb;overflow:hidden;">
+                <div title="Observations: ${esc(row.observation_count)}" style="width:${obsPct}%;height:100%;border-radius:999px;background:${esc(mscatSourceColor(row.group))};"></div>
+              </div>
+              <div style="height:8px;border-radius:999px;background:#edf2f7;overflow:hidden;">
+                <div title="Avg observations/report: ${esc(row.avg_observations_per_report.toFixed(2))}" style="width:${avgPct}%;height:100%;border-radius:999px;background:${esc(mscatSourceColor(row.group))};opacity:.55;"></div>
+              </div>
+            </div>
+            <div class="mono" style="text-align:right;">
+              ${esc(row.observation_count)} obs / ${esc(row.report_count)} reports<br/>
+              avg ${esc(row.avg_observations_per_report.toFixed(2))}
+            </div>
+          </div>
+        `;
+      }).join("")}
+      <div class="statL">Thick bars compare linked observations. Thin bars compare average linked observations per report/audit.</div>
+    </div>
+  `;
+
+  for (const row of rows) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${esc(row.label)}</td>
+      <td>${esc(row.observation_count)}</td>
+      <td>${esc(row.report_count)}</td>
+      <td>${esc(row.avg_observations_per_report.toFixed(2))}</td>
+      <td>${esc(row.selections)}</td>
+      <td>${esc(row.avg_selections_per_report.toFixed(2))}</td>
+    `;
+    tbody.appendChild(tr);
+  }
+}
+
+
+function renderMscatSourceComparison(records) {
+  const tbody = safeTbody("mscatSourceComparisonTbody");
+  if (!tbody) return;
+
+  const rows = buildMscatSourceMetricRows(records);
   tbody.innerHTML = "";
 
   if (!rows.length) {
@@ -2418,23 +2536,20 @@ function renderMscatSourceComparison(records) {
   }
 
   for (const row of rows) {
-    const reportCount = row.reports.size;
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>${esc(row.label)}</td>
       <td>${esc(row.selections)}</td>
-      <td>${esc(row.observations.size)}</td>
-      <td>${esc(reportCount)}</td>
-      <td>${esc(row.vessels.size)}</td>
+      <td>${esc(row.observation_count)}</td>
+      <td>${esc(row.report_count)}</td>
+      <td>${esc(row.vessel_count)}</td>
       <td>${esc(row.ai)}</td>
       <td>${esc(row.manual)}</td>
-      <td>${esc(avg(row.selections, reportCount))}</td>
+      <td>${esc(row.avg_selections_per_report.toFixed(2))}</td>
     `;
     tbody.appendChild(tr);
   }
 }
-
-
 
 function mscatAllRecordsRpcArgs(limit = 20000) {
   const f = getFilters();
@@ -2570,31 +2685,66 @@ function renderMscatTopItemsChart(items) {
   if (!box) return;
 
   const rows = aggregateMscatItems(Array.isArray(items) ? items : []).slice(0, 10);
+
   if (!rows.length) {
     box.innerHTML = `<div class="mono">No M-SCAT chart data for current filters.</div>`;
     return;
   }
 
   const max = Math.max(...rows.map((r) => Number(r.selection_count || 0)), 1);
+  const sourceOrder = mscatSourceOrder();
+
+  const legend = sourceOrder
+    .filter((sourceKey) => rows.some((row) => Number(row.source_counts?.[sourceKey] || 0) > 0))
+    .map((sourceKey) => `
+      <span style="display:inline-flex;align-items:center;gap:6px;">
+        <i style="width:10px;height:10px;border-radius:999px;background:${esc(mscatSourceColor(sourceKey))};display:inline-block;"></i>
+        ${esc(mscatSourceShortLabel(sourceKey))}
+      </span>
+    `).join("");
 
   box.innerHTML = `
     <div style="display:grid;gap:8px;">
       ${rows.map((row) => {
         const val = Number(row.selection_count || 0);
-        const pct = Math.max(4, Math.round((val / max) * 100));
+        const totalWidth = Math.max(4, Math.round((val / max) * 100));
+        const sourceCounts = row.source_counts || {};
+
+        const segments = sourceOrder
+          .map((sourceKey) => ({
+            sourceKey,
+            count: Number(sourceCounts[sourceKey] || 0),
+          }))
+          .filter((x) => x.count > 0);
+
+        const segmentHtml = segments.map((seg) => {
+          const pct = val ? Math.max(2, (seg.count / val) * 100) : 0;
+          return `
+            <div
+              title="${esc(mscatSourceGroupLabel(seg.sourceKey))}: ${esc(seg.count)}"
+              style="width:${pct}%;height:100%;background:${esc(mscatSourceColor(seg.sourceKey))};"
+            ></div>
+          `;
+        }).join("");
+
         return `
-          <div style="display:grid;grid-template-columns:minmax(160px,280px) 1fr 70px;gap:8px;align-items:center;">
+          <div style="display:grid;grid-template-columns:minmax(170px,300px) 1fr 70px;gap:8px;align-items:center;">
             <div title="${esc(mscatItemDisplay(row))}" style="font-weight:900;color:#1a4170;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
               ${esc(row.item_code || row.item_no || "—")}
             </div>
             <div style="height:13px;border-radius:999px;background:#e8f0fb;overflow:hidden;">
-              <div style="width:${pct}%;height:100%;border-radius:999px;background:#235aa6;"></div>
+              <div style="width:${totalWidth}%;height:100%;display:flex;border-radius:999px;overflow:hidden;">
+                ${segmentHtml || `<div style="width:100%;height:100%;background:#235aa6;"></div>`}
+              </div>
             </div>
             <div class="mono" style="text-align:right;">${esc(val)}</div>
           </div>
         `;
       }).join("")}
-      <div class="statL">Bars show aggregated M-SCAT selection count by taxonomy item across the selected source(s).</div>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;font-weight:900;color:#1a4170;font-size:.78rem;">
+        ${legend}
+      </div>
+      <div class="statL">Bars show aggregated M-SCAT selection count by taxonomy item. Bar segments show the source contribution.</div>
     </div>
   `;
 }
@@ -2783,6 +2933,7 @@ async function renderMscatAnalyticsPanel() {
 
     renderMscatKpisFromSummary(summary, items);
     renderMscatSourceComparison(records);
+    renderMscatObservationComparison(records);
     renderMscatItemsTable(items);
     renderMscatTopItemsChart(items);
     renderMscatTrendChart(trend);
