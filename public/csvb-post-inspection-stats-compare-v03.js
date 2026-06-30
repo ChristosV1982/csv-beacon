@@ -6,7 +6,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "POST-INSPECTION-STATS-COMPARE-V03-20260531";
+  const BUILD = "POST-INSPECTION-STATS-COMPARE-V04-20260630";
   window.CSVB_POST_STATS_COMPARE_BUILD = BUILD;
 
   const FAMILIES = {
@@ -123,16 +123,21 @@
       panel.className = "csvb-stats-compare-v03";
       return panel;
     }
+    const advancedAnchor = document.getElementById("advancedComparisonAnchor");
     const statGrid = document.querySelector(".statGrid");
-    if (!statGrid) return null;
+    if (!advancedAnchor && !statGrid) return null;
     panel = document.createElement("div");
     panel.id = "csvbStatsComparePanelV01";
     panel.className = "csvb-stats-compare-v03";
     panel.innerHTML = `
-      <div class="csvb-stats-compare-v03-head"><div><div class="csvb-stats-compare-v03-title">Independent Comparison Charts</div><div class="csvb-stats-compare-v03-sub">Each card has its own family, period and metric criteria.</div></div><div class="csvb-stats-compare-v03-sub">build: ${esc(BUILD)}</div></div>
+      <div class="csvb-stats-compare-v03-head"><div><div class="csvb-stats-compare-v03-title">Advanced Comparison Charts</div><div class="csvb-stats-compare-v03-sub">Optional advanced cross-checking. Each card has its own family, period and metric criteria.</div></div><div class="csvb-stats-compare-v03-sub">build: ${esc(BUILD)}</div></div>
       <div class="csvb-stats-compare-v03-grid" id="csvbStatsCompareCardGridV03"></div>
       <div class="csvb-stats-compare-v03-note">Display-only comparison cards. Existing KPI calculations, filters, drilldowns and exports are not modified.</div>`;
-    statGrid.insertAdjacentElement("afterend", panel);
+    if (advancedAnchor) {
+      advancedAnchor.insertAdjacentElement("afterend", panel);
+    } else {
+      statGrid.insertAdjacentElement("afterend", panel);
+    }
     panel.addEventListener("change", onChange);
     return panel;
   }

@@ -8,7 +8,7 @@ import { loadLockedLibraryJson } from "./question_library_loader.js";
 
 const LOCKED_LIBRARY_JSON = "./sire_questions_all_columns_named.json";
 
-const STATS_BUILD = "post_inspection_stats_v05_modes_audit_type_rpc_negtrend_2026-06-29";
+const STATS_BUILD = "post_inspection_stats_v06_measurement_sections_2026-06-30";
 window.CSVB_POST_INSPECTION_STATS_BUILD = STATS_BUILD;
 
 const OBS_TYPES = [
@@ -1905,7 +1905,7 @@ async function renderAllStats(rows, rowsIgnoreTypeFilter, reportRows) {
   renderSummaryFromRows(rows, reportRows);
 
   renderTypeVisuals(rows, reportRows);
-  renderNegativeSourceTrend(rowsIgnoreTypeFilter);
+  // Step 7E: raw negative source trend removed from main layout; sector comparison will be rebuilt through dedicated analytics.
   renderByVessel(rows, reportRows);
   renderFleetAverage(rows, reportRows);
   renderByType(rowsIgnoreTypeFilter, reportRows);

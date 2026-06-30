@@ -412,8 +412,8 @@
   <div class="wrap">
     <div class="topbar">
       <div>
-        <div class="title">Post-Inspection Statistics (Fleet / Vessel)</div>
-        <div class="sub">DB-driven statistics and exports. Filters apply to all sections below unless otherwise stated.</div>
+        <div class="title">Observation Statistics (Fleet / Vessel)</div>
+        <div class="sub">DB-driven statistics and exports. Statistics are grouped by measurement objective.</div>
       </div>
       <div class="actions">
         <div id="userBadge" style="font-weight:900; opacity:0.95;"></div>
@@ -579,15 +579,43 @@
 
     <div class="panel">
 
-      <div class="card" id="negativeSourceTrendCard">
-        <h3 class="sectionTitle">Negative Observations — Vetting vs Internal Audits vs External Audits</h3>
+
+      <div class="card" id="measurementSectionsCard">
+        <h3 class="sectionTitle">Measurement Sections</h3>
         <div class="statL">
-          One trend diagram with three monthly lines. Applies selected vessel(s), date range, record source(s), and audit type(s). Observation type checkbox filter is ignored for this chart because it is always based on Negative observations.
+          This dashboard will be organised by measurement objective. Negative observations are the default basis for graphs and KPIs unless another observation type is selected.
         </div>
-        <div class="chartBox" style="margin-top:12px;">
-          <div class="chartTitle">Negative Observations — Monthly Source Trend</div>
-          <div class="chartSub">Vetting Observations / Internal Audits / External Audits</div>
-          <div id="chartNegativeSourceTrend"></div>
+
+        <div class="statGrid" style="margin-top:12px;">
+          <div class="stat">
+            <div class="statN">01</div>
+            <div class="statL">Vetting Inspection Observations</div>
+            <div class="statSub">Negative by default. Optional Largely as expected and Positive. Trends by vessel, month, quarter and year.</div>
+          </div>
+
+          <div class="stat">
+            <div class="statN">02</div>
+            <div class="statL">Vessel Audit Findings</div>
+            <div class="statSub">Audits have findings only. Split by Marine Superintendent, Master and External Auditor. Includes NIL audit count.</div>
+          </div>
+
+          <div class="stat">
+            <div class="statN">03</div>
+            <div class="statL">PGNO Analytics</div>
+            <div class="statSub">For negative Vetting Inspection observations. Trends, recurrence and benchmarking by vessel/question.</div>
+          </div>
+
+          <div class="stat">
+            <div class="statN">04</div>
+            <div class="statL">M-SCAT Analytics</div>
+            <div class="statSub">Immediate Causes, Basic Causes and Control Areas. Uses AI and manually assigned M-SCAT until manual review is completed.</div>
+          </div>
+
+          <div class="stat">
+            <div class="statN">05</div>
+            <div class="statL">Sector Analytics</div>
+            <div class="statSub">Navigation, Cargo and Mooring comparisons: Vetting vs Superintendent Audits vs Master Audits vs External Audits.</div>
+          </div>
         </div>
       </div>
 
@@ -744,6 +772,8 @@
     </div>
   </div>
 
+  <div id="advancedComparisonAnchor"></div>
+
   <dialog id="drillDialog">
     <div class="modalHead">
       <div>
@@ -792,9 +822,9 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="./auth.js"></script>
   <script src="./csvb-module-guard.js?v=20260522_dashboard_button_guard"></script>
-  <script type="module" src="./post_inspection_stats.js?v=20260629_modes_audit_type_negtrend_v05"></script>
+  <script type="module" src="./post_inspection_stats.js?v=20260630_measurement_sections_v06"></script>
   <script src="./csvb-post-inspection-stats-linecharts-v01.js?v=20260529_1"></script>
-  <script src="./csvb-post-inspection-stats-compare-v03.js?v=20260531_1"></script>
+  <script src="./csvb-post-inspection-stats-compare-v03.js?v=20260630_advanced_anchor_v04"></script>
   <script src="./csvb-post-inspection-stats-composition-v02.js?v=20260531_1"></script>
   <script src="./csvb-post-inspection-stats-chapter-share-v01.js?v=20260531_1"></script>
   <script src="./csvb-post-inspection-stats-by-vessel-observations-v02.js?v=20260601_1"></script>
