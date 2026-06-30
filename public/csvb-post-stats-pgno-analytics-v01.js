@@ -5,7 +5,7 @@
 (function () {
   "use strict";
 
-  const BUILD = "POST-STATS-PGNO-ANALYTICS-V01-20260630";
+  const BUILD = "POST-STATS-PGNO-ANALYTICS-V02-20260630";
   window.CSVB_POST_STATS_PGNO_ANALYTICS_BUILD = BUILD;
 
   function esc(value) {

@@ -8,7 +8,7 @@ import { loadLockedLibraryJson } from "./question_library_loader.js";
 
 const LOCKED_LIBRARY_JSON = "./sire_questions_all_columns_named.json";
 
-const STATS_BUILD = "post_inspection_stats_v16a_pgno_helper_snapshot_2026-06-30";
+const STATS_BUILD = "post_inspection_stats_v16b_pgno_helper_baseline_2026-06-30";
 window.CSVB_POST_INSPECTION_STATS_BUILD = STATS_BUILD;
 
 const OBS_TYPES = [
