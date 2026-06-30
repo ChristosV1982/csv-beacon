@@ -5,7 +5,7 @@
 (function () {
   "use strict";
 
-  const BUILD = "POST-STATS-PGNO-ANALYTICS-V04-TOPN-FIX-20260630";
+  const BUILD = "POST-STATS-PGNO-ANALYTICS-V05-MODAL-WRAP-20260630";
   window.CSVB_POST_STATS_PGNO_ANALYTICS_BUILD = BUILD;
 
   function esc(value) {
@@ -20,6 +20,95 @@
   function q(selector, root = document) {
     return root.querySelector(selector);
   }
+
+
+  function injectPgnoHelperStyle() {
+    if (document.getElementById("csvbPgnoAnalyticsV05Style")) return;
+
+    const style = document.createElement("style");
+    style.id = "csvbPgnoAnalyticsV05Style";
+    style.textContent = `
+      #csvbPgnoRecordsModal {
+        width: 96vw !important;
+        max-width: 96vw !important;
+      }
+
+      #csvbPgnoRecordsModal .csvb-pgno-modal-scroll {
+        max-height: 70vh;
+        overflow-y: auto;
+        overflow-x: hidden;
+      }
+
+      #csvbPgnoRecordsModal table {
+        width: 100%;
+        table-layout: fixed;
+        border-collapse: collapse;
+      }
+
+      #csvbPgnoRecordsModal th,
+      #csvbPgnoRecordsModal td {
+        white-space: normal !important;
+        overflow-wrap: anywhere !important;
+        word-break: normal;
+        vertical-align: top;
+        line-height: 1.35;
+        padding: 7px 8px;
+        border-bottom: 1px solid #dbe8f8;
+      }
+
+      #csvbPgnoRecordsModal th:nth-child(1),
+      #csvbPgnoRecordsModal td:nth-child(1) { width: 9%; }
+
+      #csvbPgnoRecordsModal th:nth-child(2),
+      #csvbPgnoRecordsModal td:nth-child(2) { width: 7%; }
+
+      #csvbPgnoRecordsModal th:nth-child(3),
+      #csvbPgnoRecordsModal td:nth-child(3) { width: 6%; }
+
+      #csvbPgnoRecordsModal th:nth-child(4),
+      #csvbPgnoRecordsModal td:nth-child(4) { width: 7%; }
+
+      #csvbPgnoRecordsModal th:nth-child(5),
+      #csvbPgnoRecordsModal td:nth-child(5) { width: 8%; }
+
+      #csvbPgnoRecordsModal th:nth-child(6),
+      #csvbPgnoRecordsModal td:nth-child(6) { width: 13%; }
+
+      #csvbPgnoRecordsModal th:nth-child(7),
+      #csvbPgnoRecordsModal td:nth-child(7) { width: 15%; }
+
+      #csvbPgnoRecordsModal th:nth-child(8),
+      #csvbPgnoRecordsModal td:nth-child(8) { width: 35%; }
+
+      #csvbPgnoRecordsModal .csvbPgnoObservationCell {
+        white-space: normal !important;
+        overflow-wrap: anywhere !important;
+        word-break: normal;
+      }
+
+      dialog#drillDialog {
+        width: 96vw !important;
+        max-width: 96vw !important;
+      }
+
+      dialog#drillDialog table {
+        table-layout: fixed;
+        width: 100%;
+      }
+
+      dialog#drillDialog th,
+      dialog#drillDialog td {
+        white-space: normal !important;
+        overflow-wrap: anywhere !important;
+        word-break: normal;
+        vertical-align: top;
+        line-height: 1.32;
+      }
+    `;
+
+    document.head.appendChild(style);
+  }
+
 
   function findPgnoCard() {
     const headings = Array.from(document.querySelectorAll("h1,h2,h3,h4,.sectionTitle"));
@@ -235,8 +324,8 @@
 
     modal = document.createElement("dialog");
     modal.id = "csvbPgnoRecordsModal";
-    modal.style.maxWidth = "1100px";
-    modal.style.width = "92vw";
+    modal.style.maxWidth = "96vw";
+    modal.style.width = "96vw";
     modal.style.border = "1px solid #cfe0f4";
     modal.style.borderRadius = "16px";
     modal.style.padding = "0";
@@ -248,8 +337,8 @@
         </div>
         <button class="btn btn-muted" type="button" id="csvbPgnoModalClose">Close</button>
       </div>
-      <div style="padding:12px 16px;max-height:70vh;overflow:auto;">
-        <table style="width:100%;border-collapse:collapse;">
+      <div class="csvb-pgno-modal-scroll" style="padding:12px 16px;">
+        <table class="csvbPgnoRecordsTable" style="width:100%;border-collapse:collapse;">
           <thead>
             <tr>
               <th>Vessel</th>
@@ -289,7 +378,7 @@
         <td>${esc(row.designation || "")}</td>
         <td>${esc(row.soc || "")}</td>
         <td>${esc(row.noc || "")}</td>
-        <td>${esc(row.remarks || row.observation_text || "")}</td>
+        <td class="csvbPgnoObservationCell">${esc(row.remarks || row.observation_text || "")}</td>
       </tr>
     `).join("") : `<tr><td colspan="8">No related records.</td></tr>`;
 
@@ -332,6 +421,25 @@
         node.setAttribute("data-csvb-hidden-by-pgno-helper", BUILD);
       }
     });
+  }
+
+
+  function scheduleLegacyPgnoBarsHide() {
+    hideLegacyPgnoBarsPanel();
+    setTimeout(hideLegacyPgnoBarsPanel, 300);
+    setTimeout(hideLegacyPgnoBarsPanel, 900);
+    setTimeout(hideLegacyPgnoBarsPanel, 1800);
+
+    if (!window.__csvbPgnoBarsHideObserver) {
+      window.__csvbPgnoBarsHideObserver = new MutationObserver(() => {
+        hideLegacyPgnoBarsPanel();
+      });
+
+      window.__csvbPgnoBarsHideObserver.observe(document.body, {
+        childList: true,
+        subtree: true,
+      });
+    }
   }
 
   function renderTopPgnoVisual(assignedRows) {
@@ -389,8 +497,9 @@
     const card = findPgnoCard();
     if (!card) return;
 
+    injectPgnoHelperStyle();
     ensurePgnoControls(card);
-    hideLegacyPgnoBarsPanel();
+    scheduleLegacyPgnoBarsHide();
 
     const snap = snapshot();
     if (!snap) return;
