@@ -5,7 +5,7 @@
 (function () {
   "use strict";
 
-  const BUILD = "POST-STATS-PGNO-ANALYTICS-V02-20260630";
+  const BUILD = "POST-STATS-PGNO-ANALYTICS-V03-TOP-PGNO-20260630";
   window.CSVB_POST_STATS_PGNO_ANALYTICS_BUILD = BUILD;
 
   function esc(value) {
@@ -145,6 +145,212 @@
     });
   }
 
+
+  function pgnoLabel(pg) {
+    const no = String(pg?.pgno_no || pg?.idx || "").trim();
+    const text = String(pg?.text || pg?.pgno_text || "").trim();
+    if (no && text) return `${no} — ${text}`;
+    return no || text || "Unspecified PGNO";
+  }
+
+  function expandPgnoRows(rows) {
+    const out = [];
+
+    for (const row of rows || []) {
+      const arr = Array.isArray(row.pgno_selected) ? row.pgno_selected : [];
+
+      for (const pg of arr) {
+        out.push({
+          ...row,
+          csvb_pgno_label: pgnoLabel(pg),
+          csvb_pgno_no: String(pg?.pgno_no || pg?.idx || "").trim(),
+          csvb_pgno_text: String(pg?.text || pg?.pgno_text || "").trim(),
+        });
+      }
+    }
+
+    return out;
+  }
+
+  function reportKey(row) {
+    return String(
+      row?.record_source || "vetting_inspection"
+    ) + "::" + String(
+      row?.report_id || row?.source_report_id || row?.report_ref || row?.inspection_date || ""
+    );
+  }
+
+  function groupTopPgno(expandedRows) {
+    const map = new Map();
+
+    for (const row of expandedRows || []) {
+      const key = String(row.csvb_pgno_label || "Unspecified PGNO").trim();
+
+      if (!map.has(key)) {
+        map.set(key, {
+          key,
+          pgno_no: row.csvb_pgno_no || "",
+          pgno_text: row.csvb_pgno_text || "",
+          observations: 0,
+          reportKeys: new Set(),
+          rows: [],
+          last_seen: "",
+        });
+      }
+
+      const item = map.get(key);
+      item.observations += 1;
+      item.reportKeys.add(reportKey(row));
+      item.rows.push(row);
+
+      const d = String(row.inspection_date || "").slice(0, 10);
+      if (d && (!item.last_seen || d > item.last_seen)) item.last_seen = d;
+    }
+
+    return [...map.values()]
+      .map((item) => {
+        const reports = item.reportKeys.size;
+        return {
+          ...item,
+          reports,
+          avg: reports ? item.observations / reports : 0,
+        };
+      })
+      .sort((a, b) =>
+        Number(b.observations || 0) - Number(a.observations || 0) ||
+        String(a.key).localeCompare(String(b.key))
+      );
+  }
+
+  function topLimitValue() {
+    const raw = String(document.getElementById("csvbPgnoTopLimit")?.value || "10").trim();
+    if (raw === "all") return Infinity;
+    const n = Number(raw);
+    return Number.isFinite(n) && n > 0 ? n : 10;
+  }
+
+  function ensurePgnoModal() {
+    let modal = document.getElementById("csvbPgnoRecordsModal");
+    if (modal) return modal;
+
+    modal = document.createElement("dialog");
+    modal.id = "csvbPgnoRecordsModal";
+    modal.style.maxWidth = "1100px";
+    modal.style.width = "92vw";
+    modal.style.border = "1px solid #cfe0f4";
+    modal.style.borderRadius = "16px";
+    modal.style.padding = "0";
+    modal.innerHTML = `
+      <div style="padding:14px 16px;border-bottom:1px solid #dbe8f8;display:flex;justify-content:space-between;gap:12px;align-items:center;">
+        <div>
+          <div style="font-weight:950;color:#082d57;font-size:1.05rem;" id="csvbPgnoModalTitle">PGNO records</div>
+          <div style="font-weight:800;color:#55708f;font-size:.86rem;" id="csvbPgnoModalSub">Related observations</div>
+        </div>
+        <button class="btn btn-muted" type="button" id="csvbPgnoModalClose">Close</button>
+      </div>
+      <div style="padding:12px 16px;max-height:70vh;overflow:auto;">
+        <table style="width:100%;border-collapse:collapse;">
+          <thead>
+            <tr>
+              <th>Vessel</th>
+              <th>Date</th>
+              <th>Question</th>
+              <th>Type</th>
+              <th>Category</th>
+              <th>SOC</th>
+              <th>NOC</th>
+              <th>Observation</th>
+            </tr>
+          </thead>
+          <tbody id="csvbPgnoModalTbody"></tbody>
+        </table>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+    document.getElementById("csvbPgnoModalClose")?.addEventListener("click", () => modal.close());
+
+    return modal;
+  }
+
+  function openPgnoRecords(title, rows) {
+    const modal = ensurePgnoModal();
+    const tbody = document.getElementById("csvbPgnoModalTbody");
+
+    document.getElementById("csvbPgnoModalTitle").textContent = title || "PGNO records";
+    document.getElementById("csvbPgnoModalSub").textContent = `${rows.length} related observation(s).`;
+
+    tbody.innerHTML = rows.length ? rows.map((row) => `
+      <tr>
+        <td>${esc(row.vessel_name || "")}</td>
+        <td>${esc(row.inspection_date || "")}</td>
+        <td>${esc(row.question_no || "")}</td>
+        <td>${esc(row.observation_type || "")}</td>
+        <td>${esc(row.designation || "")}</td>
+        <td>${esc(row.soc || "")}</td>
+        <td>${esc(row.noc || "")}</td>
+        <td>${esc(row.remarks || row.observation_text || "")}</td>
+      </tr>
+    `).join("") : `<tr><td colspan="8">No related records.</td></tr>`;
+
+    modal.showModal();
+  }
+
+  function bindPgnoViewButtons(container, groupedRows) {
+    container.querySelectorAll(".csvbPgnoViewBtn").forEach((btn) => {
+      if (btn.dataset.bound === "1") return;
+      btn.dataset.bound = "1";
+
+      btn.addEventListener("click", () => {
+        const key = btn.getAttribute("data-pgno-key") || "";
+        const item = groupedRows.find((x) => x.key === key);
+        openPgnoRecords(`PGNO: ${key}`, item?.rows || []);
+      });
+    });
+  }
+
+  function renderTopPgnoVisual(assignedRows) {
+    const box = document.getElementById("chartPgno");
+    if (!box) return [];
+
+    const expanded = expandPgnoRows(assignedRows);
+    const groupedAll = groupTopPgno(expanded);
+    const limit = topLimitValue();
+    const grouped = Number.isFinite(limit) ? groupedAll.slice(0, limit) : groupedAll;
+
+    if (!grouped.length) {
+      box.innerHTML = `<div class="mono">No assigned PGNOs for selected PGNO filters.</div>`;
+      return groupedAll;
+    }
+
+    const max = Math.max(...grouped.map((x) => x.observations), 1);
+
+    box.innerHTML = `
+      <div style="display:grid;gap:8px;">
+        ${grouped.map((item) => {
+          const pct = Math.max(4, Math.round((item.observations / max) * 100));
+          return `
+            <div style="display:grid;grid-template-columns:minmax(190px,360px) 1fr 92px 60px;gap:8px;align-items:center;">
+              <div title="${esc(item.key)}" style="font-weight:950;color:#1a4170;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                ${esc(item.key)}
+              </div>
+              <div style="height:13px;border-radius:999px;background:#e8f0fb;overflow:hidden;">
+                <div style="width:${pct}%;height:100%;border-radius:999px;background:#6d28d9;"></div>
+              </div>
+              <div class="mono" style="text-align:right;">${esc(item.observations)} / ${esc(item.reports)} / ${esc(item.avg.toFixed(2))}</div>
+              <button class="btn btn-muted btn-small csvbPgnoViewBtn" type="button" data-pgno-key="${esc(item.key)}">View</button>
+            </div>
+          `;
+        }).join("")}
+        <div class="statL">Top PGNO is Vetting-only and uses the PGNO helper filters. Values show observations / reports / average.</div>
+      </div>
+    `;
+
+    bindPgnoViewButtons(box, groupedAll);
+    return groupedAll;
+  }
+
+
   function render() {
     const card = findPgnoCard();
     if (!card) return;
@@ -157,12 +363,15 @@
     const rows = filteredVettingRows(snap);
     const assigned = rows.filter((row) => Array.isArray(row.pgno_selected) && row.pgno_selected.length > 0);
     const missing = rows.filter((row) => !Array.isArray(row.pgno_selected) || row.pgno_selected.length === 0);
+    const topPgno = renderTopPgnoVisual(assigned);
 
     const assignedKpi = document.getElementById("csvbPgnoAssignedKpi");
     const missingKpi = document.getElementById("csvbPgnoMissingKpi");
+    const scopeKpi = document.getElementById("csvbPgnoScopeKpi");
 
     if (assignedKpi) assignedKpi.textContent = String(assigned.length);
     if (missingKpi) missingKpi.textContent = String(missing.length);
+    if (scopeKpi) scopeKpi.textContent = topPgno[0]?.pgno_no || "Vetting";
 
     card.dataset.csvbPgnoHelperBuild = BUILD;
   }
