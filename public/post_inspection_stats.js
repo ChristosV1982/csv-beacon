@@ -8,7 +8,7 @@ import { loadLockedLibraryJson } from "./question_library_loader.js";
 
 const LOCKED_LIBRARY_JSON = "./sire_questions_all_columns_named.json";
 
-const STATS_BUILD = "post_inspection_stats_v12_mscat_summary_kpi_2026-06-30";
+const STATS_BUILD = "post_inspection_stats_v13_mscat_multiselect_comparison_2026-06-30";
 window.CSVB_POST_INSPECTION_STATS_BUILD = STATS_BUILD;
 
 const OBS_TYPES = [
@@ -25,6 +25,21 @@ const RECORD_SOURCES = [
 ];
 
 const RECORD_SOURCE_LABELS = new Map(RECORD_SOURCES.map((x) => [x.value, x.label]));
+
+const MSCAT_SOURCE_OPTIONS = [
+  { value: "vetting_inspection", label: "Vetting Inspections" },
+  { value: "audit_internal_superintendent", label: "Audit — Marine Superintendent" },
+  { value: "audit_internal_master", label: "Audit — Master" },
+  { value: "audit_external_contractor", label: "Audit — External Auditor" },
+];
+
+const MSCAT_SECTION_OPTIONS = [
+  { value: "Immediate Causes", label: "Immediate Causes" },
+  { value: "Basic Causes", label: "Basic Causes" },
+  { value: "Control Areas", label: "Control Areas for Improvement" },
+];
+
+
 
 const MONTHS = [
   { value: "01", label: "01 — January" },
@@ -104,6 +119,7 @@ const state = {
   currentReportRows: [],
   currentDrillRows: [],
   currentDrillTitle: "records",
+  currentMscatRecords: [],
 };
 
 
@@ -1848,12 +1864,55 @@ function mscatSelectedObservationTypes() {
   return out.length ? out : ["negative"];
 }
 
+function mscatSelectedSourceGroups() {
+  const selected = selectedCheckboxValues("mscatSourceCheckList");
+  if (selected.length) return selected;
+  return [];
+}
+
+function mscatSelectedSectionKeys() {
+  const selected = selectedCheckboxValues("mscatSectionCheckList");
+  if (selected.length) return selected;
+  return [];
+}
+
 function mscatSelectedSourceScope() {
-  return String(safeEl("mscatSourceScope")?.value || "combined").trim() || "combined";
+  // Broad RPC scope. Exact source filtering is applied client-side from csvb_stats_mscat_records.
+  return "combined";
 }
 
 function mscatSelectedSectionKey() {
-  return String(safeEl("mscatSectionKey")?.value || "all").trim() || "all";
+  // Broad RPC scope. Exact section filtering is applied client-side from csvb_stats_mscat_records.
+  return "all";
+}
+
+function mscatSourceGroupMatches(row, selectedSources = null) {
+  const selected = selectedSources || mscatSelectedSourceGroups();
+  if (!selected.length) return false;
+
+  const sourceGroup = String(row?.source_group || "").trim();
+  const sourceFamily = String(row?.source_family || "").trim();
+
+  if (sourceFamily === "vetting") return selected.includes("vetting_inspection");
+  return selected.includes(sourceGroup);
+}
+
+function mscatSectionMatches(row, selectedSections = null) {
+  const selected = selectedSections || mscatSelectedSectionKeys();
+  if (!selected.length) return false;
+
+  const sectionKey = String(row?.section_key || "").trim().toLowerCase();
+  const sectionLabel = String(row?.section_label || "").trim().toLowerCase();
+
+  return selected.some((s) => {
+    const x = String(s || "").trim().toLowerCase();
+    return sectionKey === x || sectionLabel === x || sectionLabel.includes(x);
+  });
+}
+
+function updateMscatFilterSummaries() {
+  updateDropSummary("mscatSourceDropBtn", "M-SCAT sources", mscatSelectedSourceGroups().length, MSCAT_SOURCE_OPTIONS.length);
+  updateDropSummary("mscatSectionDropBtn", "M-SCAT sections", mscatSelectedSectionKeys().length, MSCAT_SECTION_OPTIONS.length);
 }
 
 function mscatSelectedGrouping() {
@@ -2104,6 +2163,310 @@ function renderMscatItemsTable(items) {
 }
 
 
+
+function recordSourceGroupForMscat(row) {
+  const family = String(row?.source_family || "").trim();
+  const group = String(row?.source_group || "").trim();
+
+  if (family === "vetting") return "vetting_inspection";
+  return group || "audit_unknown";
+}
+
+function mscatSourceGroupLabel(group) {
+  if (group === "vetting_inspection") return "Vetting Inspections";
+  if (group === "audit_internal_superintendent") return "Audit — Marine Superintendent";
+  if (group === "audit_internal_master") return "Audit — Master";
+  if (group === "audit_external_contractor") return "Audit — External Auditor";
+  return group || "—";
+}
+
+function mscatRecordKey(row, field) {
+  const family = String(row?.source_family || "").trim();
+  return `${family}:${String(row?.[field] || "").trim()}`;
+}
+
+function recordsToMscatItemRows(records) {
+  const map = new Map();
+
+  for (const row of records || []) {
+    const key = mscatItemAggregationKey(row);
+    if (!key) continue;
+
+    if (!map.has(key)) {
+      map.set(key, {
+        source_family: row.source_family,
+        source_group: row.source_group,
+        section_key: row.section_key,
+        section_label: row.section_label,
+        subsection_key: row.subsection_key,
+        subsection_label: row.subsection_label,
+        taxonomy_id: row.taxonomy_id,
+        item_code: row.item_code,
+        item_no: row.item_no,
+        item_label: row.item_label,
+        selection_count: 0,
+        observation_count: 0,
+        report_count: 0,
+        vessel_count: 0,
+        ai_count: 0,
+        manual_count: 0,
+        first_seen: "",
+        last_seen: "",
+        source_labels: [],
+        source_label_set: new Set(),
+        observation_keys: new Set(),
+        report_keys: new Set(),
+        vessel_ids: new Set(),
+      });
+    }
+
+    const item = map.get(key);
+
+    item.selection_count += 1;
+    item.observation_keys.add(mscatRecordKey(row, "source_observation_item_id"));
+    item.report_keys.add(mscatRecordKey(row, "source_report_id"));
+    if (row.vessel_id) item.vessel_ids.add(String(row.vessel_id));
+
+    if (String(row.selection_source || "") === "ai_suggested") item.ai_count += 1;
+    if (String(row.selection_source || "") === "manual") item.manual_count += 1;
+
+    const srcLabel = mscatSourceGroupLabel(recordSourceGroupForMscat(row));
+    if (srcLabel && !item.source_label_set.has(srcLabel)) {
+      item.source_label_set.add(srcLabel);
+      item.source_labels.push(srcLabel);
+    }
+
+    const d = String(row.event_date || "");
+    if (d && (!item.first_seen || d < item.first_seen)) item.first_seen = d;
+    if (d && (!item.last_seen || d > item.last_seen)) item.last_seen = d;
+  }
+
+  return [...map.values()].map((item) => {
+    item.observation_count = item.observation_keys.size;
+    item.report_count = item.report_keys.size;
+    item.vessel_count = item.vessel_ids.size;
+
+    delete item.source_label_set;
+    delete item.observation_keys;
+    delete item.report_keys;
+    delete item.vessel_ids;
+
+    return item;
+  }).sort((a, b) =>
+    Number(b.selection_count || 0) - Number(a.selection_count || 0) ||
+    Number(b.observation_count || 0) - Number(a.observation_count || 0) ||
+    String(a.item_code || a.item_no || "").localeCompare(String(b.item_code || b.item_no || ""))
+  );
+}
+
+function mscatSummaryFromRecords(records) {
+  const rows = records || [];
+  const obs = new Set();
+  const reps = new Set();
+  const vessels = new Set();
+
+  let ai = 0;
+  let manual = 0;
+  let first = "";
+  let last = "";
+
+  for (const row of rows) {
+    obs.add(mscatRecordKey(row, "source_observation_item_id"));
+    reps.add(mscatRecordKey(row, "source_report_id"));
+    if (row.vessel_id) vessels.add(String(row.vessel_id));
+
+    if (String(row.selection_source || "") === "ai_suggested") ai += 1;
+    if (String(row.selection_source || "") === "manual") manual += 1;
+
+    const d = String(row.event_date || "");
+    if (d && (!first || d < first)) first = d;
+    if (d && (!last || d > last)) last = d;
+  }
+
+  const items = recordsToMscatItemRows(rows);
+  const top = items[0] || {};
+
+  return [{
+    selection_count: rows.length,
+    observation_count: obs.size,
+    report_count: reps.size,
+    vessel_count: vessels.size,
+    ai_count: ai,
+    manual_count: manual,
+    first_seen: first,
+    last_seen: last,
+    top_taxonomy_id: top.taxonomy_id || null,
+    top_item_code: top.item_code || "",
+    top_item_no: top.item_no || "",
+    top_item_label: top.item_label || "",
+    top_section_key: top.section_key || "",
+    top_section_label: top.section_label || "",
+    top_selection_count: top.selection_count || 0,
+  }];
+}
+
+function mscatBucketFromDate(dateValue, grouping) {
+  const d = String(dateValue || "").slice(0, 10);
+  if (!d) return "—";
+
+  const y = d.slice(0, 4);
+  const m = Number(d.slice(5, 7));
+
+  if (grouping === "year") return y;
+  if (grouping === "quarter") return `${y}-Q${Math.ceil(m / 3)}`;
+
+  return d.slice(0, 7);
+}
+
+function mscatTrendRowsFromRecords(records) {
+  const grouping = mscatSelectedGrouping();
+  const map = new Map();
+
+  for (const row of records || []) {
+    const bucket = mscatBucketFromDate(row.event_date, grouping);
+    const sourceFamily = String(row.source_family || "").trim();
+    const sectionKey = String(row.section_key || "").trim();
+    const sectionLabel = String(row.section_label || "").trim();
+    const key = `${bucket}|${sourceFamily}|${sectionKey}|${sectionLabel}`;
+
+    if (!map.has(key)) {
+      map.set(key, {
+        bucket_key: bucket,
+        source_family: sourceFamily,
+        source_group: row.source_group || "",
+        section_key: sectionKey,
+        section_label: sectionLabel,
+        selection_count: 0,
+        observation_keys: new Set(),
+        report_keys: new Set(),
+        vessel_ids: new Set(),
+        ai_count: 0,
+        manual_count: 0,
+      });
+    }
+
+    const item = map.get(key);
+    item.selection_count += 1;
+    item.observation_keys.add(mscatRecordKey(row, "source_observation_item_id"));
+    item.report_keys.add(mscatRecordKey(row, "source_report_id"));
+    if (row.vessel_id) item.vessel_ids.add(String(row.vessel_id));
+
+    if (String(row.selection_source || "") === "ai_suggested") item.ai_count += 1;
+    if (String(row.selection_source || "") === "manual") item.manual_count += 1;
+  }
+
+  return [...map.values()].map((item) => ({
+    bucket_key: item.bucket_key,
+    source_family: item.source_family,
+    source_group: item.source_group,
+    section_key: item.section_key,
+    section_label: item.section_label,
+    selection_count: item.selection_count,
+    observation_count: item.observation_keys.size,
+    report_count: item.report_keys.size,
+    vessel_count: item.vessel_ids.size,
+    ai_count: item.ai_count,
+    manual_count: item.manual_count,
+  }));
+}
+
+function renderMscatSourceComparison(records) {
+  const tbody = safeTbody("mscatSourceComparisonTbody");
+  if (!tbody) return;
+
+  const map = new Map();
+
+  for (const row of records || []) {
+    const group = recordSourceGroupForMscat(row);
+
+    if (!map.has(group)) {
+      map.set(group, {
+        group,
+        label: mscatSourceGroupLabel(group),
+        selections: 0,
+        observations: new Set(),
+        reports: new Set(),
+        vessels: new Set(),
+        ai: 0,
+        manual: 0,
+      });
+    }
+
+    const item = map.get(group);
+    item.selections += 1;
+    item.observations.add(mscatRecordKey(row, "source_observation_item_id"));
+    item.reports.add(mscatRecordKey(row, "source_report_id"));
+    if (row.vessel_id) item.vessels.add(String(row.vessel_id));
+    if (String(row.selection_source || "") === "ai_suggested") item.ai += 1;
+    if (String(row.selection_source || "") === "manual") item.manual += 1;
+  }
+
+  const order = [
+    "vetting_inspection",
+    "audit_internal_superintendent",
+    "audit_internal_master",
+    "audit_external_contractor",
+  ];
+
+  const rows = order.map((key) => map.get(key)).filter(Boolean);
+
+  tbody.innerHTML = "";
+
+  if (!rows.length) {
+    ensureTbodyMessage(tbody, 8, "No M-SCAT source comparison data for current filters.");
+    return;
+  }
+
+  for (const row of rows) {
+    const reportCount = row.reports.size;
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${esc(row.label)}</td>
+      <td>${esc(row.selections)}</td>
+      <td>${esc(row.observations.size)}</td>
+      <td>${esc(reportCount)}</td>
+      <td>${esc(row.vessels.size)}</td>
+      <td>${esc(row.ai)}</td>
+      <td>${esc(row.manual)}</td>
+      <td>${esc(avg(row.selections, reportCount))}</td>
+    `;
+    tbody.appendChild(tr);
+  }
+}
+
+
+
+function mscatAllRecordsRpcArgs(limit = 20000) {
+  const f = getFilters();
+  const vesselIds = Array.isArray(f.selected_vessel_ids) ? f.selected_vessel_ids.filter(Boolean) : [];
+  const auditTypeIds = Array.isArray(f.selected_audit_types) ? f.selected_audit_types.filter(Boolean) : [];
+
+  return {
+    p_source_scope: "combined",
+    p_section_key: "all",
+    p_taxonomy_id: null,
+    p_from: f.p_from || null,
+    p_to: f.p_to || null,
+    p_vessel_ids: vesselIds.length ? vesselIds : null,
+    p_observation_types: mscatSelectedObservationTypes(),
+    p_include_ai: mscatIncludeAi(),
+    p_include_manual: mscatIncludeManual(),
+    p_audit_type_ids: auditTypeIds.length ? auditTypeIds : null,
+    p_limit: limit,
+  };
+}
+
+function filterMscatRecordsForUi(records) {
+  const selectedSources = mscatSelectedSourceGroups();
+  const selectedSections = mscatSelectedSectionKeys();
+
+  return (records || []).filter((row) =>
+    mscatSourceGroupMatches(row, selectedSources) &&
+    mscatSectionMatches(row, selectedSections)
+  );
+}
+
+
 function mscatRecordsRpcArgs(taxonomyId, limit = 500) {
   const args = mscatRpcArgs(limit);
 
@@ -2159,14 +2522,18 @@ async function openMscatItemRecords(taxonomyId, itemLabel) {
   setStatus("Loading M-SCAT records…");
 
   try {
-    const { data, error } = await state.supabase.rpc(
-      "csvb_stats_mscat_records",
-      mscatRecordsRpcArgs(taxonomyId, 500)
-    );
+    let records = (state.currentMscatRecords || []).filter((row) => String(row.taxonomy_id || "") === String(taxonomyId));
 
-    if (error) throw error;
+    if (!records.length) {
+      const { data, error } = await state.supabase.rpc(
+        "csvb_stats_mscat_records",
+        mscatRecordsRpcArgs(taxonomyId, 500)
+      );
 
-    const records = data || [];
+      if (error) throw error;
+      records = data || [];
+    }
+
     const mappedRows = records.map(mapMscatRecordToDrillRow);
 
     openDrilldown(
@@ -2398,28 +2765,27 @@ async function renderMscatAnalyticsPanel() {
       return;
     }
 
-    const itemArgs = mscatRpcArgs(300);
-    const trendArgs = mscatTrendRpcArgs();
-    const summaryArgs = mscatSummaryRpcArgs();
+    updateMscatFilterSummaries();
 
-    const [
-      { data: items, error: itemError },
-      { data: trend, error: trendError },
-      { data: summary, error: summaryError },
-    ] = await Promise.all([
-      state.supabase.rpc("csvb_stats_mscat_items", itemArgs),
-      state.supabase.rpc("csvb_stats_mscat_trend", trendArgs),
-      state.supabase.rpc("csvb_stats_mscat_summary", summaryArgs),
-    ]);
+    const { data: rawRecords, error: recordsError } = await state.supabase.rpc(
+      "csvb_stats_mscat_records",
+      mscatAllRecordsRpcArgs(20000)
+    );
 
-    if (itemError) throw itemError;
-    if (trendError) throw trendError;
-    if (summaryError) throw summaryError;
+    if (recordsError) throw recordsError;
 
-    renderMscatKpisFromSummary(summary || [], items || []);
-    renderMscatItemsTable(items || []);
-    renderMscatTopItemsChart(items || []);
-    renderMscatTrendChart(trend || []);
+    const records = filterMscatRecordsForUi(rawRecords || []);
+    state.currentMscatRecords = records;
+
+    const items = recordsToMscatItemRows(records);
+    const summary = mscatSummaryFromRecords(records);
+    const trend = mscatTrendRowsFromRecords(records);
+
+    renderMscatKpisFromSummary(summary, items);
+    renderMscatSourceComparison(records);
+    renderMscatItemsTable(items);
+    renderMscatTopItemsChart(items);
+    renderMscatTrendChart(trend);
   } catch (error) {
     console.error("M-SCAT analytics failed:", error);
     renderMscatKpis([]);
@@ -2756,6 +3122,8 @@ async function init() {
   renderCheckboxList("recordSourceCheckList", "recordSourceChk", RECORD_SOURCES, true);
   await renderAuditTypeFilter();
   renderCheckboxList("recurringMonthCheckList", "recMonthChk", MONTHS, true);
+  renderCheckboxList("mscatSourceCheckList", "mscatSourceChk", MSCAT_SOURCE_OPTIONS, true);
+  renderCheckboxList("mscatSectionCheckList", "mscatSectionChk", MSCAT_SECTION_OPTIONS, true);
 
   const to = new Date();
   const from = new Date();
@@ -2791,6 +3159,8 @@ async function init() {
   bindDropdown("typeDrop", "typeDropBtn");
   bindDropdown("recYearDrop", "recYearDropBtn");
   bindDropdown("recMonthDrop", "recMonthDropBtn");
+  bindDropdown("mscatSourceDrop", "mscatSourceDropBtn");
+  bindDropdown("mscatSectionDrop", "mscatSectionDropBtn");
 
   document.addEventListener("click", closeAllDropdowns);
   document.addEventListener("keydown", (e) => {
@@ -2817,6 +3187,8 @@ async function init() {
   bindAllNone("typeAllBtn", "typeNoneBtn", "typeCheckList", refresh);
   bindAllNone("recYearAllBtn", "recYearNoneBtn", "recurringYearCheckList", refresh);
   bindAllNone("recMonthAllBtn", "recMonthNoneBtn", "recurringMonthCheckList", refresh);
+  bindAllNone("mscatSourceAllBtn", "mscatSourceNoneBtn", "mscatSourceCheckList", refresh);
+  bindAllNone("mscatSectionAllBtn", "mscatSectionNoneBtn", "mscatSectionCheckList", refresh);
 
   bindCheckboxRefresh("recordSourceCheckList", refresh);
   bindCheckboxRefresh("auditTypeCheckList", refresh);
@@ -2824,6 +3196,8 @@ async function init() {
   bindCheckboxRefresh("typeCheckList", refresh);
   bindCheckboxRefresh("recurringYearCheckList", refresh);
   bindCheckboxRefresh("recurringMonthCheckList", refresh);
+  bindCheckboxRefresh("mscatSourceCheckList", refresh);
+  bindCheckboxRefresh("mscatSectionCheckList", refresh);
 
   bindChange("recurringMinCount", refresh);
   bindChange("trendYearFilter", refresh);
@@ -2831,7 +3205,7 @@ async function init() {
   bindChange("dateTo", refresh);
 
 
-  ["mscatSourceScope", "mscatSectionKey", "mscatGrouping", "mscatItemsLimit", "mscatTypeNegative", "mscatTypeLargely", "mscatTypePositive", "mscatIncludeAi", "mscatIncludeManual"].forEach((id) => {
+  ["mscatGrouping", "mscatItemsLimit", "mscatTypeNegative", "mscatTypeLargely", "mscatTypePositive", "mscatIncludeAi", "mscatIncludeManual"].forEach((id) => {
     bindChange(id, refresh);
   });
 
@@ -2846,6 +3220,7 @@ async function init() {
   bindClick("drillExportBtn", exportDrillCsv);
 
   updateFilterSummaries();
+  updateMscatFilterSummaries();
   await applyFilters();
 }
 

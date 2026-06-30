@@ -784,27 +784,31 @@
       </div>
 
       <div class="row" style="margin-top:12px;">
-        <div class="field-small">
-          <label for="mscatSourceScope">M-SCAT source</label>
-          <select id="mscatSourceScope">
-            <option value="combined">Combined — Vetting + Vessel Audits</option>
-            <option value="vetting">Vetting Inspections</option>
-            <option value="audits">Vessel Audits</option>
-            <option value="audit_internal_superintendent">Audit — Marine Superintendent</option>
-            <option value="audit_internal_master">Audit — Master</option>
-            <option value="audit_external_contractor">Audit — External Auditor</option>
-          </select>
+
+        <div class="filterDrop" id="mscatSourceDrop">
+          <label>M-SCAT source</label>
+          <button type="button" class="filterDropBtn" id="mscatSourceDropBtn">M-SCAT sources: all</button>
+          <div class="filterPanel">
+            <div class="miniActions">
+              <button type="button" class="miniBtn" id="mscatSourceAllBtn">All</button>
+              <button type="button" class="miniBtn" id="mscatSourceNoneBtn">None</button>
+            </div>
+            <div class="checkPanel" id="mscatSourceCheckList"></div>
+          </div>
         </div>
 
-        <div class="field-small">
-          <label for="mscatSectionKey">M-SCAT section</label>
-          <select id="mscatSectionKey">
-            <option value="all">All M-SCAT sections</option>
-            <option value="Immediate Causes">Immediate Causes</option>
-            <option value="Basic Causes">Basic Causes</option>
-            <option value="Control Areas">Control Areas for Improvement</option>
-          </select>
+        <div class="filterDrop" id="mscatSectionDrop">
+          <label>M-SCAT section</label>
+          <button type="button" class="filterDropBtn" id="mscatSectionDropBtn">M-SCAT sections: all</button>
+          <div class="filterPanel">
+            <div class="miniActions">
+              <button type="button" class="miniBtn" id="mscatSectionAllBtn">All</button>
+              <button type="button" class="miniBtn" id="mscatSectionNoneBtn">None</button>
+            </div>
+            <div class="checkPanel" id="mscatSectionCheckList"></div>
+          </div>
         </div>
+
 
         <div class="field-small">
           <label for="mscatGrouping">Trend grouping</label>
@@ -867,6 +871,31 @@
           <div class="statN" id="mscatKpiTopItem">—</div>
           <div class="statL">Top M-SCAT item</div>
           <div class="statSub" id="mscatKpiTopItemSub">No M-SCAT data loaded yet.</div>
+        </div>
+      </div>
+
+
+      <div class="chartBox" id="mscatSourceComparisonBox" style="margin-top:12px;">
+        <div class="chartTitle">M-SCAT Source Comparison</div>
+        <div class="chartSub">Comparison between Vetting, Superintendent Audits, Master Audits and External Audits under the selected M-SCAT filters.</div>
+        <div class="tableWrap" style="margin-top:8px;">
+          <table>
+            <thead>
+              <tr>
+                <th>Source</th>
+                <th>Selections</th>
+                <th>Observations</th>
+                <th>Reports / Audits</th>
+                <th>Vessels</th>
+                <th>AI</th>
+                <th>Manual</th>
+                <th>Avg selections / report</th>
+              </tr>
+            </thead>
+            <tbody id="mscatSourceComparisonTbody">
+              <tr><td colspan="8" class="muted">M-SCAT source comparison not loaded yet.</td></tr>
+            </tbody>
+          </table>
         </div>
       </div>
 
@@ -975,7 +1004,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="./auth.js"></script>
   <script src="./csvb-module-guard.js?v=20260522_dashboard_button_guard"></script>
-  <script type="module" src="./post_inspection_stats.js?v=20260630_mscat_summary_kpi_v12"></script>
+  <script type="module" src="./post_inspection_stats.js?v=20260630_mscat_multiselect_comparison_v13"></script>
   <script src="./csvb-post-inspection-stats-linecharts-v01.js?v=20260529_1"></script>
   <script src="./csvb-post-inspection-stats-compare-v03.js?v=20260630_advanced_anchor_v04"></script>
   <script src="./csvb-post-inspection-stats-composition-v02.js?v=20260531_1"></script>
