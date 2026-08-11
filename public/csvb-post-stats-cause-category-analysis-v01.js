@@ -5,7 +5,7 @@
 (function () {
   "use strict";
 
-  const BUILD = "POST-STATS-CAUSE-CATEGORY-ANALYSIS-V02-FORCE-GROUP-20260811";
+  const BUILD = "POST-STATS-CAUSE-CATEGORY-ANALYSIS-V03-REPAIR-GROUP-20260811";
   window.CSVB_POST_STATS_CAUSE_CATEGORY_BUILD = BUILD;
 
   const SOURCE_OPTIONS = [
@@ -533,6 +533,23 @@
         overflow-wrap:anywhere;
         vertical-align:top;
       }
+
+      #csvbDashboardGroup_cause{
+        display:block!important;
+        visibility:visible!important;
+        opacity:1!important;
+        margin:10px 0!important;
+      }
+      #csvbDashboardGroup_cause .csvb-dashboard-group-head{
+        display:block!important;
+        text-align:left!important;
+      }
+      #csvbDashboardGroup_cause .csvb-dashboard-group-title,
+      #csvbDashboardGroup_cause .csvb-dashboard-group-sub{
+        display:block!important;
+        text-align:left!important;
+      }
+
       @media(max-width:1100px){
         .csvb-cause-controls{grid-template-columns:1fr;}
         .csvb-cause-grid{grid-template-columns:1fr;}
@@ -591,8 +608,119 @@
     return group;
   }
 
+
+  function repairCauseDashboardGroup(group) {
+    if (!group) return null;
+
+    group.style.setProperty("display", "", "important");
+    group.style.removeProperty("visibility");
+    group.style.removeProperty("opacity");
+    group.dataset.csvbCauseGroupRepaired = "1";
+
+    group.classList.add("csvb-dashboard-group");
+
+    let head = group.querySelector(".csvb-dashboard-group-head");
+    let body = group.querySelector(".csvb-dashboard-group-body");
+
+    if (!head) {
+      head = document.createElement("button");
+      head.type = "button";
+      head.className = "csvb-dashboard-group-head";
+      group.prepend(head);
+    }
+
+    if (!body) {
+      body = document.createElement("div");
+      body.className = "csvb-dashboard-group-body";
+      group.appendChild(body);
+    }
+
+    head.innerHTML = `
+      <span class="csvb-dashboard-group-text">
+        <span class="csvb-dashboard-group-title">Cause / Category Analysis</span>
+        <div class="csvb-dashboard-group-sub">Designation, SOC, NOC and composition visuals for root-cause style analysis.</div>
+      </span>
+      <span class="csvb-dashboard-group-icon">${body.hidden ? "+" : "−"}</span>
+    `;
+
+    head.style.setProperty("position", "relative", "important");
+    head.style.setProperty("display", "block", "important");
+    head.style.setProperty("width", "100%", "important");
+    head.style.setProperty("min-height", "58px", "important");
+    head.style.setProperty("padding", "11px 62px 11px 13px", "important");
+    head.style.setProperty("text-align", "left", "important");
+    head.style.setProperty("border", "0", "important");
+    head.style.setProperty("background", "linear-gradient(180deg,#fff,#f4f8ff)", "important");
+    head.style.setProperty("color", "#06305c", "important");
+    head.style.setProperty("cursor", "pointer", "important");
+    head.style.setProperty("border-radius", "12px", "important");
+
+    const text = head.querySelector(".csvb-dashboard-group-text");
+    const title = head.querySelector(".csvb-dashboard-group-title");
+    const sub = head.querySelector(".csvb-dashboard-group-sub");
+    const icon = head.querySelector(".csvb-dashboard-group-icon");
+
+    if (text) {
+      text.style.setProperty("display", "block", "important");
+      text.style.setProperty("text-align", "left", "important");
+      text.style.setProperty("width", "100%", "important");
+    }
+
+    if (title) {
+      title.style.setProperty("display", "block", "important");
+      title.style.setProperty("text-align", "left", "important");
+      title.style.setProperty("font-size", "1.08rem", "important");
+      title.style.setProperty("font-weight", "950", "important");
+      title.style.setProperty("line-height", "1.22", "important");
+    }
+
+    if (sub) {
+      sub.style.setProperty("display", "block", "important");
+      sub.style.setProperty("text-align", "left", "important");
+      sub.style.setProperty("font-size", ".84rem", "important");
+      sub.style.setProperty("font-weight", "850", "important");
+      sub.style.setProperty("color", "#48628e", "important");
+      sub.style.setProperty("line-height", "1.32", "important");
+      sub.style.setProperty("margin-top", "3px", "important");
+    }
+
+    if (icon) {
+      icon.style.setProperty("position", "absolute", "important");
+      icon.style.setProperty("right", "13px", "important");
+      icon.style.setProperty("top", "50%", "important");
+      icon.style.setProperty("transform", "translateY(-50%)", "important");
+      icon.style.setProperty("font-size", "1rem", "important");
+      icon.style.setProperty("font-weight", "950", "important");
+      icon.style.setProperty("background", "#eaf5ff", "important");
+      icon.style.setProperty("border", "1px solid #bfe0f5", "important");
+      icon.style.setProperty("border-radius", "999px", "important");
+      icon.style.setProperty("padding", "4px 10px", "important");
+      icon.style.setProperty("min-width", "36px", "important");
+      icon.style.setProperty("text-align", "center", "important");
+    }
+
+    if (!head.dataset.csvbCauseRepairBound) {
+      head.dataset.csvbCauseRepairBound = "1";
+      head.addEventListener("click", () => {
+        const open = body.hidden;
+        body.hidden = !open;
+        const iconNode = head.querySelector(".csvb-dashboard-group-icon");
+        if (iconNode) iconNode.textContent = open ? "−" : "+";
+        group.dataset.open = open ? "1" : "0";
+      });
+    }
+
+    const question = document.getElementById("csvbDashboardGroup_question");
+    if (question?.parentElement && group.parentElement === question.parentElement && question.nextElementSibling !== group) {
+      question.insertAdjacentElement("afterend", group);
+    }
+
+    return group;
+  }
+
   function causeDashboardBody() {
-    return ensureCauseDashboardGroup()?.querySelector(".csvb-dashboard-group-body") || null;
+    const group = repairCauseDashboardGroup(ensureCauseDashboardGroup());
+    return group?.querySelector(".csvb-dashboard-group-body") || null;
   }
 
   function mountPanel(panel) {
@@ -1054,7 +1182,8 @@
     setTimeout(hideLegacyCauseCategory, 6500);
     setTimeout(hideLegacyCauseCategory, 9000);
     setTimeout(() => { ensureCauseDashboardGroup(); render(); }, 2500);
-    setTimeout(() => { ensureCauseDashboardGroup(); render(); }, 6000);
+    setTimeout(() => { repairCauseDashboardGroup(ensureCauseDashboardGroup()); render(); }, 6000);
+    setTimeout(() => { repairCauseDashboardGroup(ensureCauseDashboardGroup()); render(); }, 9000);
   }
 
   if (document.readyState === "loading") {
