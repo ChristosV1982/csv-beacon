@@ -5,7 +5,7 @@
 (function () {
   "use strict";
 
-  const BUILD = "POST-STATS-CAUSE-CATEGORY-ANALYSIS-V04-FORCE-DISPLAY-20260811";
+  const BUILD = "POST-STATS-CAUSE-CATEGORY-ANALYSIS-V05-FORCE-FN-FIX-20260811";
   window.CSVB_POST_STATS_CAUSE_CATEGORY_BUILD = BUILD;
 
   const SOURCE_OPTIONS = [
@@ -708,6 +708,122 @@
         if (iconNode) iconNode.textContent = open ? "−" : "+";
         group.dataset.open = open ? "1" : "0";
       });
+    }
+
+    const question = document.getElementById("csvbDashboardGroup_question");
+    if (question?.parentElement && group.parentElement === question.parentElement && question.nextElementSibling !== group) {
+      question.insertAdjacentElement("afterend", group);
+    }
+
+    return group;
+  }
+
+
+  function forceCauseGroupDisplay() {
+    const group = document.getElementById("csvbDashboardGroup_cause") || ensureCauseDashboardGroup();
+    if (!group) return null;
+
+    group.hidden = false;
+    group.removeAttribute("hidden");
+    group.style.setProperty("display", "block", "important");
+    group.style.setProperty("visibility", "visible", "important");
+    group.style.setProperty("opacity", "1", "important");
+    group.style.setProperty("height", "auto", "important");
+    group.style.setProperty("max-height", "none", "important");
+    group.style.setProperty("overflow", "visible", "important");
+    group.style.setProperty("margin", "10px 0", "important");
+    group.dataset.csvbCauseForceDisplay = "1";
+
+    let head = group.querySelector(".csvb-dashboard-group-head");
+    let body = group.querySelector(".csvb-dashboard-group-body");
+
+    if (!head) {
+      head = document.createElement("button");
+      head.type = "button";
+      head.className = "csvb-dashboard-group-head";
+      group.prepend(head);
+    }
+
+    if (!body) {
+      body = document.createElement("div");
+      body.className = "csvb-dashboard-group-body";
+      body.hidden = true;
+      group.appendChild(body);
+    }
+
+    if (!head.dataset.csvbCauseForceRepaired) {
+      head.dataset.csvbCauseForceRepaired = "1";
+      head.innerHTML = `
+        <span class="csvb-dashboard-group-text">
+          <span class="csvb-dashboard-group-title">Cause / Category Analysis</span>
+          <div class="csvb-dashboard-group-sub">Designation, SOC, NOC and composition visuals for root-cause style analysis.</div>
+        </span>
+        <span class="csvb-dashboard-group-icon">${body.hidden ? "+" : "−"}</span>
+      `;
+
+      head.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+
+        const open = body.hidden;
+        body.hidden = !open;
+
+        const icon = head.querySelector(".csvb-dashboard-group-icon");
+        if (icon) icon.textContent = open ? "−" : "+";
+
+        group.dataset.open = open ? "1" : "0";
+      });
+    }
+
+    head.hidden = false;
+    head.removeAttribute("hidden");
+    head.style.setProperty("display", "block", "important");
+    head.style.setProperty("visibility", "visible", "important");
+    head.style.setProperty("opacity", "1", "important");
+    head.style.setProperty("position", "relative", "important");
+    head.style.setProperty("width", "100%", "important");
+    head.style.setProperty("min-height", "58px", "important");
+    head.style.setProperty("padding", "11px 62px 11px 13px", "important");
+    head.style.setProperty("text-align", "left", "important");
+    head.style.setProperty("border", "0", "important");
+    head.style.setProperty("background", "linear-gradient(180deg,#fff,#f4f8ff)", "important");
+    head.style.setProperty("color", "#06305c", "important");
+    head.style.setProperty("cursor", "pointer", "important");
+    head.style.setProperty("border-radius", "12px", "important");
+
+    const title = head.querySelector(".csvb-dashboard-group-title");
+    const sub = head.querySelector(".csvb-dashboard-group-sub");
+    const icon = head.querySelector(".csvb-dashboard-group-icon");
+
+    if (title) {
+      title.style.setProperty("display", "block", "important");
+      title.style.setProperty("text-align", "left", "important");
+      title.style.setProperty("font-size", "1.08rem", "important");
+      title.style.setProperty("font-weight", "950", "important");
+    }
+
+    if (sub) {
+      sub.style.setProperty("display", "block", "important");
+      sub.style.setProperty("text-align", "left", "important");
+      sub.style.setProperty("font-size", ".84rem", "important");
+      sub.style.setProperty("font-weight", "850", "important");
+      sub.style.setProperty("color", "#48628e", "important");
+      sub.style.setProperty("margin-top", "3px", "important");
+    }
+
+    if (icon) {
+      icon.style.setProperty("position", "absolute", "important");
+      icon.style.setProperty("right", "13px", "important");
+      icon.style.setProperty("top", "50%", "important");
+      icon.style.setProperty("transform", "translateY(-50%)", "important");
+      icon.style.setProperty("font-size", "1rem", "important");
+      icon.style.setProperty("font-weight", "950", "important");
+      icon.style.setProperty("background", "#eaf5ff", "important");
+      icon.style.setProperty("border", "1px solid #bfe0f5", "important");
+      icon.style.setProperty("border-radius", "999px", "important");
+      icon.style.setProperty("padding", "4px 10px", "important");
+      icon.style.setProperty("min-width", "36px", "important");
+      icon.style.setProperty("text-align", "center", "important");
     }
 
     const question = document.getElementById("csvbDashboardGroup_question");
