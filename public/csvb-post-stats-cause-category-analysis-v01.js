@@ -5,7 +5,7 @@
 (function () {
   "use strict";
 
-  const BUILD = "POST-STATS-CAUSE-CATEGORY-ANALYSIS-V07-SINGLE-PANEL-20260811";
+  const BUILD = "POST-STATS-CAUSE-CATEGORY-ANALYSIS-V08-CLICK-BODY-FIX-20260811";
   window.CSVB_POST_STATS_CAUSE_CATEGORY_BUILD = BUILD;
 
   const SOURCE_OPTIONS = [
@@ -831,12 +831,22 @@
       question.insertAdjacentElement("afterend", group);
     }
 
+    bindCauseDashboardClickV08();
     return group;
   }
 
   function causeDashboardBody() {
     const group = forceCauseGroupDisplay();
-    return group?.querySelector(".csvb-dashboard-group-body") || null;
+    bindCauseDashboardClickV08();
+    const body = group?.querySelector(".csvb-dashboard-group-body") || null;
+    if (body && group?.dataset.open === "1") {
+      body.hidden = false;
+      body.removeAttribute("hidden");
+      body.style.setProperty("display", "block", "important");
+      body.style.setProperty("visibility", "visible", "important");
+      body.style.setProperty("opacity", "1", "important");
+    }
+    return body;
   }
 
   function mountPanel(panel) {
@@ -1315,6 +1325,149 @@
   }
 
 
+
+  function bindCauseDashboardClickV08() {
+    const group = document.getElementById("csvbDashboardGroup_cause") || ensureCauseDashboardGroup();
+    if (!group) return null;
+
+    let head = group.querySelector(".csvb-dashboard-group-head");
+    let body = group.querySelector(".csvb-dashboard-group-body");
+
+    if (!head) {
+      head = document.createElement("button");
+      head.type = "button";
+      head.className = "csvb-dashboard-group-head";
+      group.prepend(head);
+    }
+
+    if (!body) {
+      body = document.createElement("div");
+      body.className = "csvb-dashboard-group-body";
+      body.hidden = true;
+      group.appendChild(body);
+    }
+
+    /*
+      Remove old dashboard-layout click listeners by replacing the head once.
+      This gives this module full control of the Cause group only.
+    */
+    if (!head.dataset.csvbCauseClickBodyFixV08) {
+      const clone = head.cloneNode(true);
+      clone.dataset.csvbCauseClickBodyFixV08 = "1";
+      head.replaceWith(clone);
+      head = clone;
+    }
+
+    head.innerHTML = `
+      <span class="csvb-dashboard-group-text">
+        <span class="csvb-dashboard-group-title">Cause / Category Analysis</span>
+        <div class="csvb-dashboard-group-sub">Designation, SOC, NOC and composition visuals for root-cause style analysis.</div>
+      </span>
+      <span class="csvb-dashboard-group-icon">${body.hidden ? "+" : "−"}</span>
+    `;
+
+    head.style.setProperty("position", "relative", "important");
+    head.style.setProperty("display", "block", "important");
+    head.style.setProperty("width", "100%", "important");
+    head.style.setProperty("min-height", "58px", "important");
+    head.style.setProperty("padding", "11px 62px 11px 13px", "important");
+    head.style.setProperty("text-align", "left", "important");
+    head.style.setProperty("border", "0", "important");
+    head.style.setProperty("background", "linear-gradient(180deg,#fff,#f4f8ff)", "important");
+    head.style.setProperty("color", "#06305c", "important");
+    head.style.setProperty("cursor", "pointer", "important");
+    head.style.setProperty("border-radius", "12px", "important");
+
+    const title = head.querySelector(".csvb-dashboard-group-title");
+    const sub = head.querySelector(".csvb-dashboard-group-sub");
+    const icon = head.querySelector(".csvb-dashboard-group-icon");
+
+    if (title) {
+      title.style.setProperty("display", "block", "important");
+      title.style.setProperty("text-align", "left", "important");
+      title.style.setProperty("font-size", "1.08rem", "important");
+      title.style.setProperty("font-weight", "950", "important");
+    }
+
+    if (sub) {
+      sub.style.setProperty("display", "block", "important");
+      sub.style.setProperty("text-align", "left", "important");
+      sub.style.setProperty("font-size", ".84rem", "important");
+      sub.style.setProperty("font-weight", "850", "important");
+      sub.style.setProperty("color", "#48628e", "important");
+      sub.style.setProperty("margin-top", "3px", "important");
+    }
+
+    if (icon) {
+      icon.style.setProperty("position", "absolute", "important");
+      icon.style.setProperty("right", "13px", "important");
+      icon.style.setProperty("top", "50%", "important");
+      icon.style.setProperty("transform", "translateY(-50%)", "important");
+      icon.style.setProperty("font-size", "1rem", "important");
+      icon.style.setProperty("font-weight", "950", "important");
+      icon.style.setProperty("background", "#eaf5ff", "important");
+      icon.style.setProperty("border", "1px solid #bfe0f5", "important");
+      icon.style.setProperty("border-radius", "999px", "important");
+      icon.style.setProperty("padding", "4px 10px", "important");
+      icon.style.setProperty("min-width", "36px", "important");
+      icon.style.setProperty("text-align", "center", "important");
+    }
+
+    if (!head.dataset.csvbCauseClickBoundV08) {
+      head.dataset.csvbCauseClickBoundV08 = "1";
+
+      head.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+
+        const bodyNow = group.querySelector(".csvb-dashboard-group-body");
+        const iconNow = group.querySelector(".csvb-dashboard-group-icon");
+        if (!bodyNow) return;
+
+        const currentlyClosed =
+          bodyNow.hidden ||
+          getComputedStyle(bodyNow).display === "none" ||
+          bodyNow.style.display === "none";
+
+        if (currentlyClosed) {
+          bodyNow.hidden = false;
+          bodyNow.removeAttribute("hidden");
+          bodyNow.style.setProperty("display", "block", "important");
+          bodyNow.style.setProperty("visibility", "visible", "important");
+          bodyNow.style.setProperty("opacity", "1", "important");
+          group.dataset.open = "1";
+          if (iconNow) iconNow.textContent = "−";
+
+          setTimeout(() => {
+            try {
+              ensurePanel();
+              const inner = document.getElementById("csvbCauseCatBody");
+              const innerIcon = document.getElementById("csvbCauseCatIcon");
+              if (inner) inner.hidden = false;
+              if (innerIcon) innerIcon.textContent = "−";
+              showOnlyNewCausePanel();
+            } catch (error) {
+              console.error("Cause group open failed:", error);
+            }
+          }, 0);
+        } else {
+          bodyNow.hidden = true;
+          bodyNow.style.setProperty("display", "none", "important");
+          group.dataset.open = "0";
+          if (iconNow) iconNow.textContent = "+";
+        }
+      }, true);
+    }
+
+    group.style.setProperty("display", "block", "important");
+    group.style.setProperty("visibility", "visible", "important");
+    group.style.setProperty("opacity", "1", "important");
+    group.dataset.csvbCauseClickBodyFix = "1";
+
+    return group;
+  }
+
   function showOnlyNewCausePanel() {
     const group = document.getElementById("csvbDashboardGroup_cause");
     const panel = document.getElementById("csvbCauseCatPanelV01");
@@ -1374,6 +1527,7 @@
     injectStyle();
     ensureCauseDashboardGroup();
     forceCauseGroupDisplay();
+    bindCauseDashboardClickV08();
     const panel = ensurePanel();
     mountPanel(panel);
     hideLegacyCauseCategory();
@@ -1393,6 +1547,7 @@
   function start() {
     ensureCauseDashboardGroup();
     forceCauseGroupDisplay();
+    bindCauseDashboardClickV08();
     render();
     window.addEventListener("csvb:post-stats-snapshot", render);
     setTimeout(render, 500);
@@ -1420,6 +1575,13 @@
     setTimeout(showOnlyNewCausePanel, 9000);
     setTimeout(showOnlyNewCausePanel, 12500);
     setTimeout(showOnlyNewCausePanel, 16000);
+    setTimeout(bindCauseDashboardClickV08, 300);
+    setTimeout(bindCauseDashboardClickV08, 1200);
+    setTimeout(bindCauseDashboardClickV08, 3000);
+    setTimeout(bindCauseDashboardClickV08, 6500);
+    setTimeout(bindCauseDashboardClickV08, 9000);
+    setTimeout(bindCauseDashboardClickV08, 12500);
+    setTimeout(bindCauseDashboardClickV08, 17000);
     setTimeout(() => { ensureCauseDashboardGroup(); render(); }, 2500);
     setTimeout(() => { repairCauseDashboardGroup(ensureCauseDashboardGroup()); render(); }, 6000);
     setTimeout(() => { repairCauseDashboardGroup(ensureCauseDashboardGroup()); render(); }, 9000);
