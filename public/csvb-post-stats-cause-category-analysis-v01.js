@@ -5,7 +5,7 @@
 (function () {
   "use strict";
 
-  const BUILD = "POST-STATS-CAUSE-CATEGORY-ANALYSIS-V05-FORCE-FN-FIX-20260811";
+  const BUILD = "POST-STATS-CAUSE-CATEGORY-ANALYSIS-V06-HIDE-LEGACY-20260811";
   window.CSVB_POST_STATS_CAUSE_CATEGORY_BUILD = BUILD;
 
   const SOURCE_OPTIONS = [
@@ -852,24 +852,49 @@
   }
 
   function hideLegacyCauseCategory() {
-    const panel = document.getElementById("csvbCauseCatPanelV01");
+    /*
+      V06: hide old duplicated cause/category visuals after the new helper has mounted.
+      Do not hide the new csvbCauseCatPanelV01.
+    */
+    const newPanel = document.getElementById("csvbCauseCatPanelV01");
+    const group = document.getElementById("csvbDashboardGroup_cause");
 
     const hideNode = (node) => {
-      if (!node || panel?.contains(node)) return;
-      node.style.display = "none";
+      if (!node) return;
+      if (newPanel?.contains(node)) return;
+      node.hidden = true;
+      node.style.setProperty("display", "none", "important");
       node.dataset.csvbCauseCatLegacyHidden = "1";
     };
 
-    ["byCategoryTbody", "topSocTbody", "topNocTbody"].forEach((id) => {
+    const hideTableByTbody = (id) => {
       const tbody = document.getElementById(id);
-      hideNode(tbody?.closest("table"));
-    });
+      const table = tbody?.closest("table");
+      hideNode(table);
+
+      /*
+        Also hide the immediate old section/card that contains only this table.
+        Keep the dashboard group body itself visible.
+      */
+      let host =
+        table?.closest(".csvb-stats-layout-collapsible") ||
+        table?.closest(".csvb-visual-section") ||
+        table?.closest(".chartBox") ||
+        table?.closest("section");
+
+      if (host && host !== group && !newPanel?.contains(host)) hideNode(host);
+    };
+
+    hideTableByTbody("byCategoryTbody");
+    hideTableByTbody("topSocTbody");
+    hideTableByTbody("topNocTbody");
 
     [
       "csvbStatsCompositionPanelV01",
       "csvbStatsByCategoryBarsPanelV01",
       "csvbStatsTopSocBarsPanelV01",
       "csvbStatsTopNocBarsPanelV01",
+      "csvbStatsTopPgnoBarsPanelV01"
     ].forEach((id) => hideNode(document.getElementById(id)));
 
     ["chartNegCategory", "chartLargelyCategory"].forEach((id) => {
@@ -877,31 +902,47 @@
       hideNode(node?.closest(".chartBox"));
     });
 
-    const body = causeDashboardBody();
-    if (body) {
-      [...body.querySelectorAll("*")].forEach((node) => {
-        if (!node || panel?.contains(node)) return;
+    /*
+      Text-based cleanup for legacy helper panels whose IDs/classes changed across
+      older display-only helpers.
+    */
+    if (group) {
+      [...group.children].forEach((child) => {
+        if (!child || newPanel?.contains(child)) return;
 
-        const text = String(node.textContent || "").replace(/\s+/g, " ").trim();
-        if (!text) return;
+        const text = String(child.textContent || "").replace(/\s+/g, " ").trim();
 
-        const isOld =
+        const isLegacy =
           /^By Category \/ Designation\b/i.test(text) ||
           /^Top SOC\b/i.test(text) ||
           /^Top NOC\b/i.test(text) ||
-          /^Composition \/ Share Charts\b/i.test(text);
+          /^Composition \/ Share Charts\b/i.test(text) ||
+          /POST-INSPECTION-STATS-GROUP-BARS/i.test(text) ||
+          /POST-INSPECTION-STATS-SOC-NOC-PGNO-BARS/i.test(text) ||
+          /POST-INSPECTION-STATS-COMPOSITION/i.test(text);
 
-        if (isOld) {
-          const host =
-            node.closest(".csvb-visual-section") ||
-            node.closest(".csvb-stats-layout-collapsible") ||
-            node.closest(".panel") ||
-            node.closest("section") ||
-            node.parentElement;
-
-          hideNode(host);
-        }
+        if (isLegacy) hideNode(child);
       });
+
+      const body = group.querySelector(".csvb-dashboard-group-body");
+      if (body) {
+        [...body.children].forEach((child) => {
+          if (!child || newPanel?.contains(child)) return;
+
+          const text = String(child.textContent || "").replace(/\s+/g, " ").trim();
+
+          const isLegacy =
+            /^By Category \/ Designation\b/i.test(text) ||
+            /^Top SOC\b/i.test(text) ||
+            /^Top NOC\b/i.test(text) ||
+            /^Composition \/ Share Charts\b/i.test(text) ||
+            /POST-INSPECTION-STATS-GROUP-BARS/i.test(text) ||
+            /POST-INSPECTION-STATS-SOC-NOC-PGNO-BARS/i.test(text) ||
+            /POST-INSPECTION-STATS-COMPOSITION/i.test(text);
+
+          if (isLegacy) hideNode(child);
+        });
+      }
     }
   }
 
@@ -1305,6 +1346,13 @@
     setTimeout(forceCauseGroupDisplay, 6500);
     setTimeout(forceCauseGroupDisplay, 9000);
     setTimeout(forceCauseGroupDisplay, 12500);
+    setTimeout(hideLegacyCauseCategory, 300);
+    setTimeout(hideLegacyCauseCategory, 1200);
+    setTimeout(hideLegacyCauseCategory, 3000);
+    setTimeout(hideLegacyCauseCategory, 6500);
+    setTimeout(hideLegacyCauseCategory, 9000);
+    setTimeout(hideLegacyCauseCategory, 12500);
+    setTimeout(hideLegacyCauseCategory, 15000);
     setTimeout(() => { ensureCauseDashboardGroup(); render(); }, 2500);
     setTimeout(() => { repairCauseDashboardGroup(ensureCauseDashboardGroup()); render(); }, 6000);
     setTimeout(() => { repairCauseDashboardGroup(ensureCauseDashboardGroup()); render(); }, 9000);
