@@ -5,7 +5,7 @@
 (function () {
   "use strict";
 
-  const BUILD = "POST-STATS-CAUSE-CATEGORY-ANALYSIS-V06-HIDE-LEGACY-20260811";
+  const BUILD = "POST-STATS-CAUSE-CATEGORY-ANALYSIS-V07-SINGLE-PANEL-20260811";
   window.CSVB_POST_STATS_CAUSE_CATEGORY_BUILD = BUILD;
 
   const SOURCE_OPTIONS = [
@@ -847,7 +847,10 @@
       body.prepend(panel);
     }
 
-    panel.style.display = "";
+    panel.hidden = false;
+    panel.style.setProperty("display", "block", "important");
+    panel.style.setProperty("visibility", "visible", "important");
+    panel.style.setProperty("opacity", "1", "important");
     return true;
   }
 
@@ -1311,6 +1314,62 @@
     `;
   }
 
+
+  function showOnlyNewCausePanel() {
+    const group = document.getElementById("csvbDashboardGroup_cause");
+    const panel = document.getElementById("csvbCauseCatPanelV01");
+    if (!group || !panel) return;
+
+    const groupBody = group.querySelector(".csvb-dashboard-group-body");
+    if (!groupBody) return;
+
+    /*
+      Main principle:
+      The Cause dashboard body must contain only the new helper visually.
+      Hide every other direct child, regardless of old ID/class/build text.
+    */
+    [...groupBody.children].forEach((child) => {
+      if (!child) return;
+      if (child === panel || child.contains(panel)) {
+        child.hidden = false;
+        child.style.setProperty("display", "", "important");
+        child.style.setProperty("visibility", "visible", "important");
+        child.style.setProperty("opacity", "1", "important");
+        return;
+      }
+
+      child.hidden = true;
+      child.style.setProperty("display", "none", "important");
+      child.dataset.csvbCauseCatLegacyHidden = "1";
+    });
+
+    /*
+      Keep the new helper open by default. This avoids a second hidden panel
+      below the already expanded dashboard row.
+    */
+    const innerBody = document.getElementById("csvbCauseCatBody");
+    const innerIcon = document.getElementById("csvbCauseCatIcon");
+    const innerHead = document.getElementById("csvbCauseCatHead");
+
+    if (innerBody) innerBody.hidden = false;
+    if (innerIcon) innerIcon.textContent = "−";
+
+    panel.hidden = false;
+    panel.style.setProperty("display", "block", "important");
+    panel.style.setProperty("visibility", "visible", "important");
+    panel.style.setProperty("opacity", "1", "important");
+    panel.dataset.csvbCauseSinglePanel = "1";
+
+    if (innerHead && !innerHead.dataset.csvbCauseSinglePanelBound) {
+      innerHead.dataset.csvbCauseSinglePanelBound = "1";
+      innerHead.addEventListener("click", () => {
+        setTimeout(() => {
+          panel.style.setProperty("display", "block", "important");
+        }, 0);
+      });
+    }
+  }
+
   function render() {
     injectStyle();
     ensureCauseDashboardGroup();
@@ -1326,6 +1385,7 @@
     renderTopGroups(groups);
     renderSourceComparison(rows);
     renderTrend(rows, groups);
+    showOnlyNewCausePanel();
 
     return panel;
   }
@@ -1353,6 +1413,13 @@
     setTimeout(hideLegacyCauseCategory, 9000);
     setTimeout(hideLegacyCauseCategory, 12500);
     setTimeout(hideLegacyCauseCategory, 15000);
+    setTimeout(showOnlyNewCausePanel, 300);
+    setTimeout(showOnlyNewCausePanel, 1200);
+    setTimeout(showOnlyNewCausePanel, 3000);
+    setTimeout(showOnlyNewCausePanel, 6500);
+    setTimeout(showOnlyNewCausePanel, 9000);
+    setTimeout(showOnlyNewCausePanel, 12500);
+    setTimeout(showOnlyNewCausePanel, 16000);
     setTimeout(() => { ensureCauseDashboardGroup(); render(); }, 2500);
     setTimeout(() => { repairCauseDashboardGroup(ensureCauseDashboardGroup()); render(); }, 6000);
     setTimeout(() => { repairCauseDashboardGroup(ensureCauseDashboardGroup()); render(); }, 9000);
