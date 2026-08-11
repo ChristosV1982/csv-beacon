@@ -5,7 +5,7 @@
 (function () {
   "use strict";
 
-  const BUILD = "POST-STATS-CAUSE-CATEGORY-ANALYSIS-V01-20260811";
+  const BUILD = "POST-STATS-CAUSE-CATEGORY-ANALYSIS-V02-FORCE-GROUP-20260811";
   window.CSVB_POST_STATS_CAUSE_CATEGORY_BUILD = BUILD;
 
   const SOURCE_OPTIONS = [
@@ -541,8 +541,58 @@
     document.head.appendChild(style);
   }
 
+  function ensureCauseDashboardGroup() {
+    let group = document.getElementById("csvbDashboardGroup_cause");
+    if (group) return group;
+
+    group = document.createElement("section");
+    group.id = "csvbDashboardGroup_cause";
+    group.className = "csvb-dashboard-group";
+    group.dataset.csvbForcedCauseGroup = "1";
+    group.innerHTML = `
+      <button class="csvb-dashboard-group-head" type="button" style="position:relative;display:block;width:100%;min-height:58px;padding:11px 62px 11px 13px;text-align:left;border:0;background:linear-gradient(180deg,#fff,#f4f8ff);color:#06305c;cursor:pointer;border-radius:12px;">
+        <span class="csvb-dashboard-group-text">
+          <span class="csvb-dashboard-group-title" style="display:block;text-align:left;font-size:1.08rem;font-weight:950;line-height:1.22;">Cause / Category Analysis</span>
+          <div class="csvb-dashboard-group-sub" style="display:block;text-align:left;font-size:.84rem;font-weight:850;color:#48628e;line-height:1.32;margin-top:3px;">Designation, SOC, NOC and composition visuals for root-cause style analysis.</div>
+        </span>
+        <span class="csvb-dashboard-group-icon" style="position:absolute;right:13px;top:50%;transform:translateY(-50%);font-size:1rem;font-weight:950;background:#eaf5ff;border:1px solid #bfe0f5;border-radius:999px;padding:4px 10px;min-width:36px;text-align:center;">+</span>
+      </button>
+      <div class="csvb-dashboard-group-body" hidden></div>
+    `;
+
+    const questionGroup = document.getElementById("csvbDashboardGroup_question");
+    const trendGroup = document.getElementById("csvbDashboardGroup_trend");
+    const dashboardRoot =
+      document.querySelector("#csvbPostStatsDashboardLayoutV03") ||
+      questionGroup?.parentElement ||
+      trendGroup?.parentElement ||
+      document.querySelector(".wrap") ||
+      document.body;
+
+    if (questionGroup?.parentElement) {
+      questionGroup.insertAdjacentElement("afterend", group);
+    } else if (trendGroup?.parentElement) {
+      trendGroup.parentElement.insertBefore(group, trendGroup);
+    } else {
+      dashboardRoot.appendChild(group);
+    }
+
+    const head = group.querySelector(".csvb-dashboard-group-head");
+    const body = group.querySelector(".csvb-dashboard-group-body");
+    const icon = group.querySelector(".csvb-dashboard-group-icon");
+
+    head?.addEventListener("click", () => {
+      const open = body.hidden;
+      body.hidden = !open;
+      if (icon) icon.textContent = open ? "−" : "+";
+      group.dataset.open = open ? "1" : "0";
+    });
+
+    return group;
+  }
+
   function causeDashboardBody() {
-    return document.querySelector("#csvbDashboardGroup_cause .csvb-dashboard-group-body");
+    return ensureCauseDashboardGroup()?.querySelector(".csvb-dashboard-group-body") || null;
   }
 
   function mountPanel(panel) {
@@ -978,6 +1028,7 @@
 
   function render() {
     injectStyle();
+    ensureCauseDashboardGroup();
     const panel = ensurePanel();
     mountPanel(panel);
     hideLegacyCauseCategory();
@@ -994,6 +1045,7 @@
   }
 
   function start() {
+    ensureCauseDashboardGroup();
     render();
     window.addEventListener("csvb:post-stats-snapshot", render);
     setTimeout(render, 500);
@@ -1001,6 +1053,8 @@
     setTimeout(render, 3000);
     setTimeout(hideLegacyCauseCategory, 6500);
     setTimeout(hideLegacyCauseCategory, 9000);
+    setTimeout(() => { ensureCauseDashboardGroup(); render(); }, 2500);
+    setTimeout(() => { ensureCauseDashboardGroup(); render(); }, 6000);
   }
 
   if (document.readyState === "loading") {
