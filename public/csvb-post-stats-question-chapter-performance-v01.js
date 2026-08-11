@@ -5,7 +5,7 @@
 (function () {
   "use strict";
 
-  const BUILD = "POST-STATS-QUESTION-CHAPTER-PERFORMANCE-V01-20260811";
+  const BUILD = "POST-STATS-QUESTION-CHAPTER-PERFORMANCE-V02-MOUNT-FIX-20260811";
   window.CSVB_POST_STATS_QCP_BUILD = BUILD;
 
   const SOURCE_OPTIONS = [
@@ -574,24 +574,51 @@
   }
 
   function hideLegacyQuestionChapter() {
+    /*
+      Important:
+      Do NOT hide the dashboard group or group body. The previous V01 logic used
+      closest(".panel"), which can hide the whole Question / Chapter dashboard body.
+      Hide only the old legacy table and old chapter helper itself.
+    */
+    const qcpPanel = document.getElementById("csvbQcpPanelV01");
+
     const topTbody = document.getElementById("topQnsTbody");
     const topTable = topTbody?.closest("table");
-    const topPanel = topTable?.closest(".panel") || topTable?.parentElement;
-    if (topPanel) {
-      topPanel.style.display = "none";
-      topPanel.dataset.csvbQcpLegacyHidden = "1";
+    if (topTable && !qcpPanel?.contains(topTable)) {
+      topTable.style.display = "none";
+      topTable.dataset.csvbQcpLegacyHidden = "1";
     }
 
     const chapter = document.getElementById("csvbStatsChapterSharePanelV01");
-    if (chapter) {
+    if (chapter && !qcpPanel?.contains(chapter)) {
       chapter.style.display = "none";
       chapter.dataset.csvbQcpLegacyHidden = "1";
     }
   }
 
+  function qcpDashboardBody() {
+    return document.querySelector("#csvbDashboardGroup_question .csvb-dashboard-group-body");
+  }
+
+  function mountQcpPanel(panel) {
+    const body = qcpDashboardBody();
+    if (!body || !panel) return false;
+
+    if (panel.parentElement !== body || body.firstElementChild !== panel) {
+      body.prepend(panel);
+    }
+
+    panel.style.display = "";
+    return true;
+  }
+
   function ensurePanel() {
     let panel = document.getElementById("csvbQcpPanelV01");
-    if (panel) return panel;
+    if (panel) {
+      mountQcpPanel(panel);
+      panel.style.display = "";
+      return panel;
+    }
 
     panel = document.createElement("section");
     panel.id = "csvbQcpPanelV01";
@@ -690,7 +717,7 @@
     `;
 
     const legacyTbody = document.getElementById("topQnsTbody");
-    const dashboardBody = document.querySelector("#csvbDashboardGroup_question .csvb-dashboard-group-body");
+    const dashboardBody = qcpDashboardBody();
 
     if (dashboardBody) {
       dashboardBody.prepend(panel);
@@ -701,6 +728,8 @@
       if (sector?.parentElement) sector.parentElement.insertBefore(panel, sector);
       else document.body.appendChild(panel);
     }
+
+    panel.style.display = "";
 
     const head = panel.querySelector("#csvbQcpHead");
     const body = panel.querySelector("#csvbQcpBody");
@@ -995,6 +1024,7 @@
   function render() {
     injectStyle();
     const panel = ensurePanel();
+    mountQcpPanel(panel);
     hideLegacyQuestionChapter();
 
     const rows = filteredRows();
@@ -1015,6 +1045,7 @@
     setTimeout(render, 500);
     setTimeout(render, 1500);
     setTimeout(render, 3000);
+    setTimeout(render, 5000);
   }
 
   if (document.readyState === "loading") {
