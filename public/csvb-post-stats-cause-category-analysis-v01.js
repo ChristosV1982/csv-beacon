@@ -5,7 +5,7 @@
 (function () {
   "use strict";
 
-  const BUILD = "POST-STATS-CAUSE-CATEGORY-ANALYSIS-V08-CLICK-BODY-FIX-20260811";
+  const BUILD = "POST-STATS-CAUSE-CATEGORY-ANALYSIS-V09-FORCE-OPEN-BODY-20260811";
   window.CSVB_POST_STATS_CAUSE_CATEGORY_BUILD = BUILD;
 
   const SOURCE_OPTIONS = [
@@ -1523,6 +1523,110 @@
     }
   }
 
+
+  function forceCauseOpenV09() {
+    const group = document.getElementById("csvbDashboardGroup_cause") || ensureCauseDashboardGroup();
+    if (!group) return null;
+
+    const body = group.querySelector(".csvb-dashboard-group-body");
+    const icon = group.querySelector(".csvb-dashboard-group-icon");
+
+    group.hidden = false;
+    group.removeAttribute("hidden");
+    group.style.setProperty("display", "block", "important");
+    group.style.setProperty("visibility", "visible", "important");
+    group.style.setProperty("opacity", "1", "important");
+
+    if (body) {
+      body.hidden = false;
+      body.removeAttribute("hidden");
+      body.style.setProperty("display", "block", "important");
+      body.style.setProperty("visibility", "visible", "important");
+      body.style.setProperty("opacity", "1", "important");
+      body.style.setProperty("height", "auto", "important");
+      body.style.setProperty("max-height", "none", "important");
+      body.style.setProperty("overflow", "visible", "important");
+    }
+
+    group.dataset.open = "1";
+    group.dataset.csvbCauseForceOpenBody = "1";
+    if (icon) icon.textContent = "−";
+
+    try {
+      const panel = ensurePanel();
+      if (panel) {
+        panel.hidden = false;
+        panel.style.setProperty("display", "block", "important");
+        panel.style.setProperty("visibility", "visible", "important");
+        panel.style.setProperty("opacity", "1", "important");
+      }
+
+      const innerBody = document.getElementById("csvbCauseCatBody");
+      const innerIcon = document.getElementById("csvbCauseCatIcon");
+
+      if (innerBody) {
+        innerBody.hidden = false;
+        innerBody.removeAttribute("hidden");
+        innerBody.style.setProperty("display", "block", "important");
+        innerBody.style.setProperty("visibility", "visible", "important");
+        innerBody.style.setProperty("opacity", "1", "important");
+      }
+
+      if (innerIcon) innerIcon.textContent = "−";
+
+      if (typeof showOnlyNewCausePanel === "function") showOnlyNewCausePanel();
+    } catch (error) {
+      console.error("forceCauseOpenV09 failed:", error);
+    }
+
+    return group;
+  }
+
+  function bindCauseDocumentClickV09() {
+    if (window.__csvbCauseDocumentClickV09) return;
+    window.__csvbCauseDocumentClickV09 = true;
+
+    document.addEventListener("click", (event) => {
+      const head = event.target?.closest?.("#csvbDashboardGroup_cause .csvb-dashboard-group-head");
+      if (!head) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+
+      const group = document.getElementById("csvbDashboardGroup_cause");
+      const body = group?.querySelector(".csvb-dashboard-group-body");
+      const icon = group?.querySelector(".csvb-dashboard-group-icon");
+
+      if (!group || !body) return;
+
+      const isClosed =
+        body.hidden ||
+        getComputedStyle(body).display === "none" ||
+        body.style.display === "none" ||
+        group.dataset.open !== "1";
+
+      if (isClosed) {
+        body.hidden = false;
+        body.removeAttribute("hidden");
+        body.style.setProperty("display", "block", "important");
+        body.style.setProperty("visibility", "visible", "important");
+        body.style.setProperty("opacity", "1", "important");
+        group.dataset.open = "1";
+        group.dataset.csvbCauseForceOpenBody = "1";
+        if (icon) icon.textContent = "−";
+
+        setTimeout(forceCauseOpenV09, 0);
+        setTimeout(forceCauseOpenV09, 250);
+      } else {
+        body.hidden = true;
+        body.style.setProperty("display", "none", "important");
+        group.dataset.open = "0";
+        if (icon) icon.textContent = "+";
+      }
+    }, true);
+  }
+
   function render() {
     injectStyle();
     ensureCauseDashboardGroup();
@@ -1540,12 +1644,14 @@
     renderSourceComparison(rows);
     renderTrend(rows, groups);
     showOnlyNewCausePanel();
+    forceCauseOpenV09();
 
     return panel;
   }
 
   function start() {
     ensureCauseDashboardGroup();
+    bindCauseDocumentClickV09();
     forceCauseGroupDisplay();
     bindCauseDashboardClickV08();
     render();
@@ -1582,6 +1688,14 @@
     setTimeout(bindCauseDashboardClickV08, 9000);
     setTimeout(bindCauseDashboardClickV08, 12500);
     setTimeout(bindCauseDashboardClickV08, 17000);
+    setTimeout(bindCauseDocumentClickV09, 300);
+    setTimeout(forceCauseOpenV09, 300);
+    setTimeout(forceCauseOpenV09, 1200);
+    setTimeout(forceCauseOpenV09, 3000);
+    setTimeout(forceCauseOpenV09, 6500);
+    setTimeout(forceCauseOpenV09, 9000);
+    setTimeout(forceCauseOpenV09, 12500);
+    setTimeout(forceCauseOpenV09, 18000);
     setTimeout(() => { ensureCauseDashboardGroup(); render(); }, 2500);
     setTimeout(() => { repairCauseDashboardGroup(ensureCauseDashboardGroup()); render(); }, 6000);
     setTimeout(() => { repairCauseDashboardGroup(ensureCauseDashboardGroup()); render(); }, 9000);
