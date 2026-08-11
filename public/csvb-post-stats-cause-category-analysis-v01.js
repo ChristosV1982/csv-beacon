@@ -5,7 +5,7 @@
 (function () {
   "use strict";
 
-  const BUILD = "POST-STATS-CAUSE-CATEGORY-ANALYSIS-V03-REPAIR-GROUP-20260811";
+  const BUILD = "POST-STATS-CAUSE-CATEGORY-ANALYSIS-V04-FORCE-DISPLAY-20260811";
   window.CSVB_POST_STATS_CAUSE_CATEGORY_BUILD = BUILD;
 
   const SOURCE_OPTIONS = [
@@ -719,7 +719,7 @@
   }
 
   function causeDashboardBody() {
-    const group = repairCauseDashboardGroup(ensureCauseDashboardGroup());
+    const group = forceCauseGroupDisplay();
     return group?.querySelector(".csvb-dashboard-group-body") || null;
   }
 
@@ -1157,6 +1157,7 @@
   function render() {
     injectStyle();
     ensureCauseDashboardGroup();
+    forceCauseGroupDisplay();
     const panel = ensurePanel();
     mountPanel(panel);
     hideLegacyCauseCategory();
@@ -1174,6 +1175,7 @@
 
   function start() {
     ensureCauseDashboardGroup();
+    forceCauseGroupDisplay();
     render();
     window.addEventListener("csvb:post-stats-snapshot", render);
     setTimeout(render, 500);
@@ -1181,6 +1183,12 @@
     setTimeout(render, 3000);
     setTimeout(hideLegacyCauseCategory, 6500);
     setTimeout(hideLegacyCauseCategory, 9000);
+    setTimeout(forceCauseGroupDisplay, 300);
+    setTimeout(forceCauseGroupDisplay, 1200);
+    setTimeout(forceCauseGroupDisplay, 3000);
+    setTimeout(forceCauseGroupDisplay, 6500);
+    setTimeout(forceCauseGroupDisplay, 9000);
+    setTimeout(forceCauseGroupDisplay, 12500);
     setTimeout(() => { ensureCauseDashboardGroup(); render(); }, 2500);
     setTimeout(() => { repairCauseDashboardGroup(ensureCauseDashboardGroup()); render(); }, 6000);
     setTimeout(() => { repairCauseDashboardGroup(ensureCauseDashboardGroup()); render(); }, 9000);
