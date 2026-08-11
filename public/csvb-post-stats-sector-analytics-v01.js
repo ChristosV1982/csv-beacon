@@ -5,7 +5,7 @@
 (function () {
   "use strict";
 
-  const BUILD = "POST-STATS-SECTOR-ANALYTICS-V01-20260630";
+  const BUILD = "POST-STATS-SECTOR-ANALYTICS-V02-COMPACT-COLLAPSE-AUDITFIX-20260630";
   window.CSVB_POST_STATS_SECTOR_ANALYTICS_BUILD = BUILD;
 
   const SOURCE_OPTIONS = [
@@ -41,8 +41,16 @@
   function rowsFromSnapshot() {
     const s = snap();
     if (!s) return [];
+
+    /*
+      Sector Analytics must compare Vetting + Audit sources irrespective of the
+      currently selected Statistics mode. Prefer the combined normalized dataset.
+    */
+    if (Array.isArray(s.combinedRows) && s.combinedRows.length) return s.combinedRows;
     if (Array.isArray(s.rowsIgnoreType) && s.rowsIgnoreType.length) return s.rowsIgnoreType;
+    if (Array.isArray(s.allRows) && s.allRows.length) return s.allRows;
     if (Array.isArray(s.rows) && s.rows.length) return s.rows;
+
     return [];
   }
 
@@ -61,7 +69,50 @@
   }
 
   function sourceKey(row) {
-    return String(row?.record_source || "vetting_inspection").trim() || "vetting_inspection";
+    const raw = String(
+      row?.record_source ||
+      row?.source_group ||
+      row?.audit_source_key ||
+      row?.audit_source ||
+      ""
+    ).trim().toLowerCase();
+
+    const sourceText = [
+      row?.record_source_label,
+      row?.audit_source,
+      row?.audit_source_name,
+      row?.audit_by,
+      row?.auditor,
+      row?.inspector_auditor,
+      row?.title,
+      row?.audit_type,
+      row?.audit_type_name,
+      row?.report_title,
+      row?.report_ref,
+      row?.reference,
+    ].map((x) => String(x || "").toLowerCase()).join(" ");
+
+    if (raw === "vetting_inspection" || raw.includes("vetting")) return "vetting_inspection";
+
+    if (raw === "audit_internal_superintendent" || sourceText.includes("superintendent") || sourceText.includes("mrn.")) {
+      return "audit_internal_superintendent";
+    }
+
+    if (raw === "audit_internal_master" || sourceText.includes("master") || sourceText.includes("mstr.")) {
+      return "audit_internal_master";
+    }
+
+    if (
+      raw === "audit_external_contractor" ||
+      raw.includes("external") ||
+      sourceText.includes("external") ||
+      sourceText.includes("real-time") ||
+      sourceText.includes("real time")
+    ) {
+      return "audit_external_contractor";
+    }
+
+    return raw || "vetting_inspection";
   }
 
   function sourceLabel(key) {
@@ -73,7 +124,15 @@
   }
 
   function qno(row) {
-    return String(row?.question_no || row?.question_base || row?.question_meta?.qno || "").trim();
+    return String(
+      row?.question_no ||
+      row?.question_base ||
+      row?.sire_question_no_normalized ||
+      row?.checklist_no_raw ||
+      row?.source_question_no ||
+      row?.question_meta?.qno ||
+      ""
+    ).trim();
   }
 
   function reportKey(row) {
@@ -144,6 +203,31 @@
     return Number.isFinite(n) && n > 0 ? n : 10;
   }
 
+
+  function auditDomainText(row) {
+    return [
+      row?.audit_type,
+      row?.audit_type_name,
+      row?.title,
+      row?.report_title,
+      row?.reference,
+      row?.report_ref,
+      row?.audit_domain,
+      row?.audit_category,
+      row?.file_name,
+    ].map((x) => String(x || "").toLowerCase()).join(" ");
+  }
+
+  function auditSectorFallback(row) {
+    const t = auditDomainText(row);
+
+    if (/(mooring|anchoring|moor|mrn\\.moo|mstr\\.moo|\\.moo)/i.test(t)) return "mooring";
+    if (/(cargo|ballast|mrn\\.car|mstr\\.car|\\.car)/i.test(t)) return "cargo";
+    if (/(navigation|navigational|mrn\\.nav|mstr\\.nav|\\.nav|vdr)/i.test(t)) return "navigation";
+
+    return "other";
+  }
+
   function rowSector(row) {
     const q = qno(row);
 
@@ -155,6 +239,13 @@
 
     if (includeMooring581() && /^5\.8\.1(?:\.|$)/.test(q)) return "mooring";
     if (includeMooring585() && /^5\.8\.5(?:\.|$)/.test(q)) return "mooring";
+
+    /*
+      Audit observations may sometimes lack a normalized SIRE question number.
+      Use the audit type/title/reference as a fallback so that Mooring/Cargo/Nav
+      audit findings are not lost.
+    */
+    if (sourceKey(row) !== "vetting_inspection") return auditSectorFallback(row);
 
     return "other";
   }
@@ -226,7 +317,7 @@
     const map = new Map();
 
     for (const row of rows) {
-      const q = qno(row) || "—";
+      const q = qno(row) || (rowSector(row) === "mooring" ? "Mooring audit finding" : rowSector(row) === "cargo" ? "Cargo audit finding" : rowSector(row) === "navigation" ? "Navigation audit finding" : "—");
       if (!map.has(q)) {
         map.set(q, {
           qno: q,
@@ -270,7 +361,7 @@
         border-radius:16px;
         background:#fff;
         box-shadow:0 4px 18px rgba(18,44,87,.10);
-        padding:12px;
+        padding:8px 10px;
         color:#0a315f;
       }
       .csvb-sector-head{
@@ -292,9 +383,9 @@
       }
       .csvb-sector-controls{
         display:grid;
-        grid-template-columns:180px 180px 160px 1fr;
-        gap:10px;
-        margin-top:12px;
+        grid-template-columns:150px 150px 130px 1fr;
+        gap:6px;
+        margin-top:8px;
         align-items:start;
       }
       .csvb-sector-field label{
@@ -305,28 +396,35 @@
       }
       .csvb-sector-field select{
         width:100%;
-        min-height:36px;
+        min-height:30px;
         border:1px solid #bcd6ee;
-        border-radius:9px;
-        padding:6px 8px;
+        border-radius:8px;
+        padding:4px 7px;
         font-weight:850;
         color:#123b65;
         background:#fff;
       }
       .csvb-sector-box{
         border:1px solid #d5deef;
-        border-radius:12px;
-        padding:8px;
+        border-radius:10px;
+        padding:5px 7px;
         display:grid;
         grid-template-columns:repeat(auto-fit,minmax(170px,1fr));
         gap:6px 12px;
       }
       .csvb-sector-check{
         display:flex;
-        gap:6px;
+        gap:5px;
         align-items:center;
         font-weight:850;
-        font-size:.86rem;
+        font-size:.78rem;
+        line-height:1.15;
+      }
+      .csvb-sector-check input[type="checkbox"]{
+        width:15px!important;
+        height:15px!important;
+        transform:none!important;
+        margin:0!important;
       }
       .csvb-sector-kpis{
         display:grid;
@@ -337,12 +435,12 @@
       .csvb-sector-kpi{
         border:1px solid #cfe0f4;
         border-left:6px solid #2563eb;
-        border-radius:14px;
+        border-radius:12px;
         background:linear-gradient(180deg,#fff,#f8fbff);
-        padding:12px;
+        padding:8px 10px;
       }
       .csvb-sector-kpi-n{
-        font-size:1.45rem;
+        font-size:1.18rem;
         font-weight:950;
         color:#062a5e;
       }
@@ -432,13 +530,14 @@
     panel = document.createElement("section");
     panel.id = "csvbSectorAnalyticsPanelV01";
     panel.innerHTML = `
-      <div class="csvb-sector-head">
-        <div>
-          <div class="csvb-sector-title">Sector Analytics</div>
-          <div class="csvb-sector-sub">Navigation, Cargo and Mooring comparisons: Vetting vs Superintendent Audits vs Master Audits vs External Audits.</div>
-        </div>
-        <div class="csvb-sector-small">build: ${esc(BUILD)}</div>
-      </div>
+      <button class="csvb-sector-collapse-head" id="csvbSectorCollapseHead" type="button" style="width:100%;border:0;background:linear-gradient(180deg,#fff,#f4f8ff);padding:8px 48px 8px 10px;text-align:left;position:relative;border-radius:12px;cursor:pointer;">
+        <div class="csvb-sector-title">Sector Analytics</div>
+        <div class="csvb-sector-sub">Navigation, Cargo and Mooring comparisons: Vetting vs Superintendent Audits vs Master Audits vs External Audits.</div>
+        <span id="csvbSectorCollapseIcon" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);font-weight:950;border:1px solid #bfe0f5;background:#eaf5ff;border-radius:999px;padding:3px 9px;">+</span>
+      </button>
+
+      <div class="csvb-sector-body" id="csvbSectorBody" hidden>
+        <div class="csvb-sector-small" style="text-align:right;margin-top:4px;">build: ${esc(BUILD)}</div>
 
       <div class="csvb-sector-controls">
         <div class="csvb-sector-field">
@@ -548,6 +647,7 @@
         <div class="csvb-sector-small">Dominant questions within the selected sector and filters.</div>
         <div id="csvbSectorTopQuestions"></div>
       </div>
+      </div>
     `;
 
     const mscat = document.getElementById("mscatAnalyticsPanel");
@@ -558,11 +658,36 @@
       root.appendChild(panel);
     }
 
+    bindSectorCollapse(panel);
+
     panel.querySelectorAll("select,input").forEach((node) => {
       node.addEventListener("change", render);
     });
 
     return panel;
+  }
+
+
+  function bindSectorCollapse(panel) {
+    const head = document.getElementById("csvbSectorCollapseHead");
+    const body = document.getElementById("csvbSectorBody");
+    const icon = document.getElementById("csvbSectorCollapseIcon");
+
+    if (!head || !body || head.dataset.bound === "1") return;
+
+    head.dataset.bound = "1";
+
+    const setOpen = (open) => {
+      body.hidden = !open;
+      if (icon) icon.textContent = open ? "−" : "+";
+      panel.setAttribute("data-csvb-sector-open", open ? "1" : "0");
+    };
+
+    setOpen(false);
+
+    head.addEventListener("click", () => {
+      setOpen(body.hidden);
+    });
   }
 
   function setText(id, value) {
@@ -821,9 +946,47 @@
     });
   }
 
+
+  function makeMscatCollapsible() {
+    const panel = document.getElementById("mscatAnalyticsPanel");
+    if (!panel || panel.dataset.csvbMscatCollapsible === "1") return;
+
+    panel.dataset.csvbMscatCollapsible = "1";
+
+    const body = document.createElement("div");
+    body.id = "csvbMscatCollapseBody";
+    body.className = "csvb-sector-body";
+    body.hidden = true;
+
+    while (panel.firstChild) {
+      body.appendChild(panel.firstChild);
+    }
+
+    const head = document.createElement("button");
+    head.type = "button";
+    head.id = "csvbMscatCollapseHead";
+    head.style.cssText = "width:100%;border:0;background:linear-gradient(180deg,#fff,#f4f8ff);padding:8px 48px 8px 10px;text-align:left;position:relative;border-radius:12px;cursor:pointer;";
+    head.innerHTML = `
+      <div class="csvb-sector-title">M-SCAT Analytics</div>
+      <div class="csvb-sector-sub">Immediate Causes, Basic Causes and Control Areas. AI/manual M-SCAT analytics and source comparisons.</div>
+      <span id="csvbMscatCollapseIcon" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);font-weight:950;border:1px solid #bfe0f5;background:#eaf5ff;border-radius:999px;padding:3px 9px;">+</span>
+    `;
+
+    panel.appendChild(head);
+    panel.appendChild(body);
+
+    const icon = head.querySelector("#csvbMscatCollapseIcon");
+
+    head.addEventListener("click", () => {
+      body.hidden = !body.hidden;
+      if (icon) icon.textContent = body.hidden ? "+" : "−";
+    });
+  }
+
   function render() {
     injectStyle();
     ensurePanel();
+    makeMscatCollapsible();
 
     const rows = sectorRows();
     const topQuestions = buildTopQuestions(rows);
@@ -837,6 +1000,7 @@
 
   function start() {
     ensurePanel();
+    makeMscatCollapsible();
     render();
     window.addEventListener("csvb:post-stats-snapshot", render);
     setTimeout(render, 500);

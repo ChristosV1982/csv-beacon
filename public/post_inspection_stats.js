@@ -8,7 +8,7 @@ import { loadLockedLibraryJson } from "./question_library_loader.js";
 
 const LOCKED_LIBRARY_JSON = "./sire_questions_all_columns_named.json";
 
-const STATS_BUILD = "post_inspection_stats_v16b_pgno_helper_baseline_2026-06-30";
+const STATS_BUILD = "post_inspection_stats_v16c_sector_snapshot_2026-06-30";
 window.CSVB_POST_INSPECTION_STATS_BUILD = STATS_BUILD;
 
 const OBS_TYPES = [
@@ -179,6 +179,10 @@ function exposeStatsSnapshot() {
     reportRows,
     postRows: state.postRows,
     postReportRows: state.postReportRows,
+    combinedRows: state.combinedRows,
+    combinedReportRows: state.combinedReportRows,
+    allRows: state.allRows,
+    allReportRows: state.allReportRows,
     vessels: state.vessels,
     questionMetaByNo,
   });
