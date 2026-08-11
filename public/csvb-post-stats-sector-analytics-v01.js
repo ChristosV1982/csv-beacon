@@ -515,6 +515,121 @@
         overflow-wrap:anywhere;
         vertical-align:top;
       }
+
+      /* V01A CSV BEACON compact checkbox polish */
+      #csvbSectorAnalyticsPanelV01 .csvb-sector-box{
+        display:grid!important;
+        grid-template-columns:repeat(auto-fit,minmax(185px,1fr))!important;
+        gap:5px 10px!important;
+        padding:6px 8px!important;
+        min-height:0!important;
+        align-items:center!important;
+      }
+
+      #csvbSectorAnalyticsPanelV01 .csvb-sector-check{
+        display:grid!important;
+        grid-template-columns:18px minmax(0,1fr)!important;
+        gap:7px!important;
+        align-items:center!important;
+        min-height:26px!important;
+        margin:0!important;
+        padding:3px 5px!important;
+        border-radius:9px!important;
+        color:#062A5E!important;
+        font-size:.78rem!important;
+        font-weight:850!important;
+        line-height:1.15!important;
+        cursor:pointer!important;
+      }
+
+      #csvbSectorAnalyticsPanelV01 .csvb-sector-check:hover{
+        background:#F0FBFC!important;
+      }
+
+      #csvbSectorAnalyticsPanelV01 .csvb-sector-check input[type="checkbox"]{
+        appearance:none!important;
+        -webkit-appearance:none!important;
+        width:16px!important;
+        min-width:16px!important;
+        max-width:16px!important;
+        height:16px!important;
+        min-height:16px!important;
+        max-height:16px!important;
+        margin:0!important;
+        padding:0!important;
+        border:1px solid #AFCBE8!important;
+        border-radius:5px!important;
+        background:#FFFFFF!important;
+        box-shadow:inset 0 0 0 1px rgba(255,255,255,.55)!important;
+        display:inline-block!important;
+        position:relative!important;
+        cursor:pointer!important;
+        flex:0 0 16px!important;
+      }
+
+      #csvbSectorAnalyticsPanelV01 .csvb-sector-check input[type="checkbox"]:checked{
+        border-color:#0097A7!important;
+        background:#062A5E!important;
+        box-shadow:0 0 0 2px rgba(0,151,167,.13)!important;
+      }
+
+      #csvbSectorAnalyticsPanelV01 .csvb-sector-check input[type="checkbox"]:checked::after{
+        content:""!important;
+        position:absolute!important;
+        left:4px!important;
+        top:1px!important;
+        width:5px!important;
+        height:9px!important;
+        border:solid #FFFFFF!important;
+        border-width:0 2px 2px 0!important;
+        transform:rotate(45deg)!important;
+      }
+
+      #csvbSectorAnalyticsPanelV01 .csvb-sector-check input[type="checkbox"]:focus{
+        outline:2px solid rgba(0,151,167,.35)!important;
+        outline-offset:2px!important;
+      }
+
+      #csvbSectorAnalyticsPanelV01 .csvb-sector-controls{
+        gap:7px!important;
+        margin-top:8px!important;
+      }
+
+      #csvbSectorAnalyticsPanelV01 .csvb-sector-field label{
+        margin-bottom:3px!important;
+        font-size:.76rem!important;
+      }
+
+      #csvbSectorAnalyticsPanelV01 .csvb-sector-field select{
+        min-height:31px!important;
+        padding:4px 8px!important;
+        font-size:.8rem!important;
+      }
+
+      #csvbSectorAnalyticsPanelV01 .csvb-sector-small{
+        font-size:.74rem!important;
+        line-height:1.2!important;
+      }
+
+      #csvbSectorAnalyticsPanelV01 .csvb-sector-kpis{
+        gap:7px!important;
+        margin-top:8px!important;
+      }
+
+      #csvbSectorAnalyticsPanelV01 .csvb-sector-kpi{
+        padding:8px 10px!important;
+        border-radius:12px!important;
+      }
+
+      #csvbSectorAnalyticsPanelV01 .csvb-sector-kpi-n{
+        font-size:1.15rem!important;
+      }
+
+      #csvbSectorAnalyticsPanelV01 .csvb-sector-kpi-l{
+        margin-top:4px!important;
+        font-size:.78rem!important;
+      }
+
       @media(max-width:1100px){
         .csvb-sector-controls{grid-template-columns:1fr;}
         .csvb-sector-grid{grid-template-columns:1fr;}
