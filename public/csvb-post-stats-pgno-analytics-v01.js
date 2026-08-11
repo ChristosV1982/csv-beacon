@@ -5,7 +5,7 @@
 (function () {
   "use strict";
 
-  const BUILD = "POST-STATS-PGNO-ANALYTICS-V06-EXPAND-FIX-20260630";
+  const BUILD = "POST-STATS-PGNO-ANALYTICS-V07-SCHEDULE-FIX-20260811";
   window.CSVB_POST_STATS_PGNO_ANALYTICS_BUILD = BUILD;
 
   function esc(value) {
@@ -552,6 +552,29 @@
 
     bindPgnoViewButtons(box, groupedAll);
     return groupedAll;
+  }
+
+
+  function scheduleLegacyPgnoBarsHide() {
+    /*
+      Compatibility shim. Earlier PGNO helper versions call this function from
+      render(); some later drafts renamed/removed the implementation. Keep it
+      safe and display-only.
+    */
+    const run = () => {
+      try {
+        if (typeof hideLegacyPgnoBarsPanel === "function") {
+          hideLegacyPgnoBarsPanel();
+        }
+      } catch (error) {
+        console.warn("PGNO legacy bars hide skipped:", error);
+      }
+    };
+
+    run();
+    setTimeout(run, 250);
+    setTimeout(run, 1000);
+    setTimeout(run, 2500);
   }
 
   function render() {

@@ -5,7 +5,7 @@
 (function () {
   "use strict";
 
-  const BUILD = "POST-STATS-QUESTION-CHAPTER-PERFORMANCE-V02-MOUNT-FIX-20260811";
+  const BUILD = "POST-STATS-QUESTION-CHAPTER-PERFORMANCE-V03-LEGACY-CLEANUP-20260811";
   window.CSVB_POST_STATS_QCP_BUILD = BUILD;
 
   const SOURCE_OPTIONS = [
@@ -575,24 +575,56 @@
 
   function hideLegacyQuestionChapter() {
     /*
-      Important:
-      Do NOT hide the dashboard group or group body. The previous V01 logic used
-      closest(".panel"), which can hide the whole Question / Chapter dashboard body.
-      Hide only the old legacy table and old chapter helper itself.
+      Hide only legacy Question/Chapter visual helpers. Do not hide the dashboard
+      group or the group body. QCP V03 replaces these legacy visuals.
     */
     const qcpPanel = document.getElementById("csvbQcpPanelV01");
 
+    const hideNode = (node) => {
+      if (!node || qcpPanel?.contains(node)) return;
+      node.style.display = "none";
+      node.dataset.csvbQcpLegacyHidden = "1";
+    };
+
     const topTbody = document.getElementById("topQnsTbody");
     const topTable = topTbody?.closest("table");
-    if (topTable && !qcpPanel?.contains(topTable)) {
-      topTable.style.display = "none";
-      topTable.dataset.csvbQcpLegacyHidden = "1";
-    }
+    hideNode(topTable);
 
     const chapter = document.getElementById("csvbStatsChapterSharePanelV01");
-    if (chapter && !qcpPanel?.contains(chapter)) {
-      chapter.style.display = "none";
-      chapter.dataset.csvbQcpLegacyHidden = "1";
+    hideNode(chapter);
+
+    /*
+      Older helper: csvb-post-inspection-stats-top-recurring-bars-v01.js
+      It has varied root markup across prior builds, so detect it by title text
+      inside the Question dashboard group only.
+    */
+    const groupBody = qcpDashboardBody();
+    if (groupBody) {
+      [...groupBody.querySelectorAll("*")].forEach((node) => {
+        if (!node || qcpPanel?.contains(node)) return;
+
+        const text = String(node.textContent || "").replace(/\s+/g, " ").trim();
+        if (!text) return;
+
+        const isOldTopRecurring =
+          /^Top Recurring Questions\b/i.test(text) &&
+          !node.closest("#csvbQcpPanelV01");
+
+        const isOldSireChapterShare =
+          /^SIRE Chapter Share\b/i.test(text) &&
+          !node.closest("#csvbQcpPanelV01");
+
+        if (isOldTopRecurring || isOldSireChapterShare) {
+          const host =
+            node.closest(".csvb-visual-section") ||
+            node.closest(".csvb-stats-layout-collapsible") ||
+            node.closest(".panel") ||
+            node.closest("section") ||
+            node.parentElement;
+
+          hideNode(host);
+        }
+      });
     }
   }
 
@@ -1046,6 +1078,8 @@
     setTimeout(render, 1500);
     setTimeout(render, 3000);
     setTimeout(render, 5000);
+    setTimeout(hideLegacyQuestionChapter, 6500);
+    setTimeout(hideLegacyQuestionChapter, 9000);
   }
 
   if (document.readyState === "loading") {
