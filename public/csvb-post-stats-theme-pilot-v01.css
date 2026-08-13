@@ -310,3 +310,49 @@ html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .csvb-dashb
   color: #FFFFFF !important;
 }
 
+
+/*
+  STEP8B1E — final page-scoped dark support for generated headers/charts.
+  CSS support only. Inline !important values are handled by csvb-post-stats-theme-pilot-v01.js.
+*/
+
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] #csvbMscatCollapseHead,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] #csvbMscatCollapseHead *,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] #csvbDashboardGroup_cause .csvb-dashboard-group-head,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] #csvbDashboardGroup_cause .csvb-dashboard-group-head *,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] #csvbDashboardGroup_mscat .csvb-dashboard-group-head,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] #csvbDashboardGroup_mscat .csvb-dashboard-group-head *{
+  color: var(--text, #EAF3FB) !important;
+}
+
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] #csvbMscatCollapseHead,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] #csvbDashboardGroup_cause .csvb-dashboard-group-head,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] #csvbDashboardGroup_mscat .csvb-dashboard-group-head{
+  background: linear-gradient(180deg, #102B4D, #071D3A) !important;
+  border-color: var(--border, #20466F) !important;
+}
+
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .chartBox svg,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .csvb-line-chart-v01-wrap svg,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .oi-trend-wrap svg{
+  background: var(--surface-2, #071D3A) !important;
+}
+
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] svg [fill="#fff"],
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] svg [fill="#ffffff"],
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] svg [fill="#FFFFFF"],
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] svg [fill="white"],
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] svg [fill="#f8fbff"],
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] svg [fill="#F8FBFF"],
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] svg [fill="#f1f6ff"],
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] svg [fill="#F1F6FF"]{
+  fill: var(--surface-2, #071D3A) !important;
+}
+
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] svg [fill="#35507b"],
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] svg [fill="#1a4170"],
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] svg [fill="#062A5E"],
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] svg [fill="#062a5e"],
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] svg [fill="#082d57"]{
+  fill: var(--text, #EAF3FB) !important;
+}
