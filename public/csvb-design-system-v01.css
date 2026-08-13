@@ -504,3 +504,141 @@ html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] .topbar #switc
   background: rgba(255,255,255,.24) !important;
   border-color: rgba(255,255,255,.46) !important;
 }
+
+/*
+  STEP8C-4 — registered_device.html full-width layout and uniform device controls.
+
+  Corrections:
+  - use available screen width
+  - equal control height
+  - readable but not bold control fonts
+  - Check / Request buttons use the same quiet visual style
+  - no excessive buffer inside controls
+*/
+
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"]{
+  --csvb-ds-page-max: none;
+  --csvb-ds-page-pad: 8px;
+  --csvb-ds-control-h: 34px;
+  --csvb-ds-control-font: 13px;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] .wrap{
+  width: calc(100vw - 16px) !important;
+  max-width: none !important;
+  margin: 0 auto !important;
+  padding: 8px !important;
+  box-sizing: border-box !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] .pageTitle,
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] #csvbRegisteredDeviceCompactRoot{
+  width: 100% !important;
+  max-width: none !important;
+  box-sizing: border-box !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] #csvbRegisteredDeviceCompactRoot{
+  padding: 10px !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] #csvbRegisteredDeviceCompactRoot .csvb-registered-device-toolbar{
+  align-items: center !important;
+  gap: 8px !important;
+  margin-bottom: 9px !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] #csvbRegisteredDeviceCompactRoot .csvb-registered-device-controls{
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 6px !important;
+  flex-wrap: nowrap !important;
+  min-width: 0 !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] #csvbRegisteredDeviceCompactStatus{
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  white-space: nowrap !important;
+  margin-right: 2px !important;
+}
+
+/* One height/font standard for generated device controls. */
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] #csvbRegisteredDeviceCompactRoot input,
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] #csvbRegisteredDeviceCompactRoot select,
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] #csvbRegisteredDeviceCompactRoot button{
+  box-sizing: border-box !important;
+  height: var(--csvb-ds-control-h) !important;
+  min-height: var(--csvb-ds-control-h) !important;
+  max-height: var(--csvb-ds-control-h) !important;
+  padding: 0 9px !important;
+  border-radius: 8px !important;
+  font-size: var(--csvb-ds-control-font) !important;
+  font-weight: 500 !important;
+  line-height: var(--csvb-ds-control-h) !important;
+  font-family: var(--csvb-ds-font) !important;
+  box-shadow: none !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] #csvbRegisteredDeviceCompactRoot input{
+  width: 170px !important;
+  min-width: 170px !important;
+  max-width: 170px !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] #csvbRegisteredDeviceCompactRoot select{
+  width: 150px !important;
+  min-width: 150px !important;
+  max-width: 150px !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] #csvbRegisteredDeviceCompactRoot button,
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] #csvbRegisteredDeviceCompactRoot button.primary{
+  width: 76px !important;
+  min-width: 76px !important;
+  max-width: 76px !important;
+  background: rgba(11, 106, 136, .10) !important;
+  color: #064762 !important;
+  border: 1px solid rgba(11, 106, 136, .38) !important;
+  font-weight: 500 !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] #csvbRegisteredDeviceCompactRoot button:hover,
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] #csvbRegisteredDeviceCompactRoot button.primary:hover{
+  background: rgba(11, 106, 136, .18) !important;
+  border-color: rgba(11, 106, 136, .52) !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] #csvbRegisteredDeviceCompactRoot .csvb-registered-device-title{
+  font-size: 1rem !important;
+  font-weight: 650 !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] #csvbRegisteredDeviceCompactRoot .csvb-registered-device-note{
+  font-size: .82rem !important;
+  font-weight: 450 !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] #csvbRegisteredDeviceCompactRoot th{
+  font-weight: 650 !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] #csvbRegisteredDeviceCompactRoot td{
+  font-weight: 450 !important;
+}
+
+/* Keep controls usable on narrow screens without affecting desktop. */
+@media (max-width: 900px){
+  html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] #csvbRegisteredDeviceCompactRoot .csvb-registered-device-controls{
+    flex-wrap: wrap !important;
+    justify-content: flex-start !important;
+  }
+
+  html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] #csvbRegisteredDeviceCompactRoot input,
+  html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] #csvbRegisteredDeviceCompactRoot select{
+    width: 100% !important;
+    max-width: none !important;
+    min-width: 0 !important;
+  }
+}
