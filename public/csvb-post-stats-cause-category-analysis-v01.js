@@ -5,7 +5,7 @@
 (function () {
   "use strict";
 
-  const BUILD = "POST-STATS-CAUSE-CATEGORY-ANALYSIS-V09-FORCE-OPEN-BODY-20260811";
+  const BUILD = "POST-STATS-CAUSE-CATEGORY-ANALYSIS-V10-MSCAT-DIMENSIONS-20260811";
   window.CSVB_POST_STATS_CAUSE_CATEGORY_BUILD = BUILD;
 
   const SOURCE_OPTIONS = [
@@ -26,7 +26,21 @@
     ["designation", "Designation"],
     ["soc", "SOC"],
     ["noc", "NOC"],
+    ["mscat_immediate_cause", "M-SCAT — Immediate Cause"],
+    ["mscat_basic_cause", "M-SCAT — Basic Cause"],
+    ["mscat_control_area", "M-SCAT — Control Area"],
   ];
+
+  const MSCAT_DIMENSION_SECTIONS = {
+    mscat_immediate_cause: "immediate_cause",
+    mscat_basic_cause: "basic_cause",
+    mscat_control_area: "control_area",
+  };
+
+  let mscatRowsCacheKey = "";
+  let mscatRowsCache = [];
+  let mscatRowsLoading = false;
+  let mscatRowsError = "";
 
   function esc(value) {
     return String(value ?? "")
@@ -161,6 +175,165 @@
     return DIMENSIONS.find((x) => x[0] === key)?.[1] || key;
   }
 
+  function isMscatDimension(dim = selectedDimension()) {
+    return Object.prototype.hasOwnProperty.call(MSCAT_DIMENSION_SECTIONS, dim);
+  }
+
+  function selectedMscatSectionKey() {
+    return MSCAT_DIMENSION_SECTIONS[selectedDimension()] || "all";
+  }
+
+  function selectedMscatSectionLabel() {
+    const dim = selectedDimension();
+    if (dim === "mscat_immediate_cause") return "M-SCAT Immediate Cause";
+    if (dim === "mscat_basic_cause") return "M-SCAT Basic Cause";
+    if (dim === "mscat_control_area") return "M-SCAT Control Area";
+    return "M-SCAT";
+  }
+
+  async function ensureSupabaseClient() {
+    if (window.AUTH && typeof window.AUTH.ensureSupabase === "function") {
+      return await window.AUTH.ensureSupabase();
+    }
+
+    if (window.supabaseClient) return window.supabaseClient;
+    if (window.sb) return window.sb;
+
+    throw new Error("Supabase client is not available on this page.");
+  }
+
+  function selectedObservationTypesArray() {
+    return [...selectedTypes()];
+  }
+
+  function mscatRpcArgs() {
+    const { from, to } = currentDateRange();
+
+    return {
+      p_source_scope: "combined",
+      p_section_key: selectedMscatSectionKey(),
+      p_taxonomy_id: null,
+      p_from: from || null,
+      p_to: to || null,
+      p_vessel_ids: null,
+      p_observation_types: selectedObservationTypesArray(),
+      p_include_ai: true,
+      p_include_manual: true,
+      p_audit_type_ids: null,
+      p_limit: 20000,
+    };
+  }
+
+  function mscatCacheKey() {
+    return JSON.stringify({
+      dim: selectedDimension(),
+      args: mscatRpcArgs(),
+      sources: [...selectedSources()].sort(),
+    });
+  }
+
+  function mapMscatRecord(row) {
+    const sourceGroup = String(row?.source_group || "").trim() || "vetting_inspection";
+    const itemNo = String(row?.item_no || row?.item_code || "").trim();
+    const itemLabel = String(row?.item_label || "").trim();
+    const itemText = [itemNo, itemLabel].filter(Boolean).join(" — ") || "Unmapped M-SCAT item";
+
+    return {
+      ...row,
+      record_source: sourceGroup,
+      record_source_label: sourceLabel(sourceGroup),
+      vessel_id: row?.vessel_id || "",
+      vessel_name: row?.vessel_name || "",
+      inspection_date: row?.event_date || "",
+      audit_date: row?.event_date || "",
+      event_date: row?.event_date || "",
+      report_id: row?.source_report_id || "",
+      source_report_id: row?.source_report_id || "",
+      item_id: row?.source_observation_item_id || "",
+      source_observation_item_id: row?.source_observation_item_id || "",
+      question_no: row?.question_no || "",
+      question_base: row?.question_base || "",
+      observation_type: row?.obs_type || "negative",
+      obs_type: row?.obs_type || "negative",
+      designation: row?.designation || "",
+      soc: row?.soc || "",
+      noc: row?.noc || "",
+      remarks: row?.observation_text || "",
+      observation_text: row?.observation_text || "",
+      mscat_section_key: row?.section_key || "",
+      mscat_section_label: row?.section_label || "",
+      mscat_item_text: itemText,
+      mscat_item_no: itemNo,
+      mscat_item_label: itemLabel,
+      taxonomy_id: row?.taxonomy_id || "",
+      selection_source: row?.selection_source || "",
+    };
+  }
+
+  async function loadMscatRowsForDimension() {
+    const key = mscatCacheKey();
+
+    if (key === mscatRowsCacheKey && Array.isArray(mscatRowsCache)) {
+      return mscatRowsCache;
+    }
+
+    mscatRowsLoading = true;
+    mscatRowsError = "";
+    updateMscatLoadingNote();
+
+    try {
+      const sb = await ensureSupabaseClient();
+      const { data, error } = await sb.rpc("csvb_stats_mscat_records", mscatRpcArgs());
+
+      if (error) throw error;
+
+      const selectedSourcesSet = selectedSources();
+      const mapped = (Array.isArray(data) ? data : [])
+        .map(mapMscatRecord)
+        .filter((row) => selectedSourcesSet.has(sourceKey(row)));
+
+      mscatRowsCacheKey = key;
+      mscatRowsCache = mapped;
+      return mapped;
+    } catch (error) {
+      console.error("Cause / Category M-SCAT rows failed:", error);
+      mscatRowsError = error?.message || String(error);
+      mscatRowsCacheKey = key;
+      mscatRowsCache = [];
+      return [];
+    } finally {
+      mscatRowsLoading = false;
+      updateMscatLoadingNote();
+    }
+  }
+
+  function updateMscatLoadingNote() {
+    const note = document.getElementById("csvbCauseCatMscatNote");
+    if (!note) return;
+
+    if (!isMscatDimension()) {
+      note.textContent = "Objective fields: Designation, SOC and NOC.";
+      return;
+    }
+
+    if (mscatRowsLoading) {
+      note.textContent = "Loading M-SCAT records from Supabase…";
+      return;
+    }
+
+    if (mscatRowsError) {
+      note.textContent = "M-SCAT records failed to load: " + mscatRowsError;
+      return;
+    }
+
+    note.textContent = `${selectedMscatSectionLabel()} uses saved AI/manual M-SCAT selections from Supabase. Counts are selection-based.`;
+  }
+
+  async function rowsForSelectedDimension() {
+    if (isMscatDimension()) return await loadMscatRowsForDimension();
+    return filteredRows();
+  }
+
   function selectedGrouping() {
     return String(document.getElementById("csvbCauseCatGrouping")?.value || "month").trim();
   }
@@ -198,12 +371,18 @@
     if (dim === "soc") return String(row?.soc || row?.nature_of_concern || "").trim();
     if (dim === "noc") return String(row?.noc || row?.classification_coding || "").trim();
 
+    if (isMscatDimension(dim)) {
+      return String(row?.mscat_item_text || row?.item_label || row?.item_no || row?.item_code || "").trim();
+    }
+
     return "";
   }
 
   function dimensionValue(row, dim = selectedDimension()) {
     const raw = rawDimensionValue(row, dim);
     if (raw) return raw;
+
+    if (isMscatDimension(dim)) return `Unmapped ${dimensionLabel(dim)}`;
     return `Unmapped / blank ${dimensionLabel(dim)}`;
   }
 
@@ -986,6 +1165,9 @@
               <option value="designation" selected>Designation</option>
               <option value="soc">SOC</option>
               <option value="noc">NOC</option>
+              <option value="mscat_immediate_cause">M-SCAT — Immediate Cause</option>
+              <option value="mscat_basic_cause">M-SCAT — Basic Cause</option>
+              <option value="mscat_control_area">M-SCAT — Control Area</option>
             </select>
           </div>
 
@@ -1030,6 +1212,10 @@
               `).join("")}
             </div>
           </div>
+        </div>
+
+        <div class="csvb-cause-small" id="csvbCauseCatMscatNote" style="margin-top:7px;">
+          Objective fields: Designation, SOC and NOC.
         </div>
 
         <div class="csvb-cause-kpis">
@@ -1081,7 +1267,7 @@
     });
 
     panel.querySelectorAll("select,input").forEach((node) => {
-      node.addEventListener("change", render);
+      node.addEventListener("change", () => { render().catch((error) => console.error("Cause / Category render failed:", error)); });
     });
 
     return panel;
@@ -1627,7 +1813,7 @@
     }, true);
   }
 
-  function render() {
+  async function render() {
     injectStyle();
     ensureCauseDashboardGroup();
     forceCauseGroupDisplay();
@@ -1635,8 +1821,9 @@
     const panel = ensurePanel();
     mountPanel(panel);
     hideLegacyCauseCategory();
+    updateMscatLoadingNote();
 
-    const rows = filteredRows();
+    const rows = await rowsForSelectedDimension();
     const groups = buildGroups(rows);
 
     renderKpis(rows, groups);
@@ -1654,11 +1841,11 @@
     bindCauseDocumentClickV09();
     forceCauseGroupDisplay();
     bindCauseDashboardClickV08();
-    render();
+    render().catch((error) => console.error("Cause / Category render failed:", error));
     window.addEventListener("csvb:post-stats-snapshot", render);
-    setTimeout(render, 500);
-    setTimeout(render, 1500);
-    setTimeout(render, 3000);
+    setTimeout(() => render().catch((error) => console.error('Cause / Category render failed:', error)), 500);
+    setTimeout(() => render().catch((error) => console.error('Cause / Category render failed:', error)), 1500);
+    setTimeout(() => render().catch((error) => console.error('Cause / Category render failed:', error)), 3000);
     setTimeout(hideLegacyCauseCategory, 6500);
     setTimeout(hideLegacyCauseCategory, 9000);
     setTimeout(forceCauseGroupDisplay, 300);
