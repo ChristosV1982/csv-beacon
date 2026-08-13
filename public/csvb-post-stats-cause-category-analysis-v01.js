@@ -5,7 +5,7 @@
 (function () {
   "use strict";
 
-  const BUILD = "POST-STATS-CAUSE-CATEGORY-ANALYSIS-V10-MSCAT-DIMENSIONS-20260811";
+  const BUILD = "POST-STATS-CAUSE-CATEGORY-ANALYSIS-V11-MSCAT-DRILLDOWN-20260813";
   window.CSVB_POST_STATS_CAUSE_CATEGORY_BUILD = BUILD;
 
   const SOURCE_OPTIONS = [
@@ -699,6 +699,10 @@
         border-radius:16px;
         padding:0;
       }
+      .csvb-cause-modal{
+        width:96vw!important;
+        max-width:96vw!important;
+      }
       .csvb-cause-modal table{
         width:100%;
         table-layout:fixed;
@@ -1309,6 +1313,43 @@
     `;
   }
 
+
+  function isMscatRecord(row) {
+    return Boolean(
+      row?.mscat_item_text ||
+      row?.mscat_item_no ||
+      row?.mscat_item_label ||
+      row?.mscat_section_key ||
+      row?.mscat_section_label ||
+      row?.taxonomy_id ||
+      row?.selection_source
+    );
+  }
+
+  function selectionSourceLabel(value) {
+    const s = String(value || "").trim().toLowerCase();
+
+    if (s === "ai_suggested" || s === "ai") return "AI";
+    if (s === "manual" || s === "manually_reviewed") return "Manual";
+    if (!s) return "—";
+
+    return value;
+  }
+
+  function mscatSectionText(row) {
+    return String(row?.mscat_section_label || row?.section_label || row?.mscat_section_key || row?.section_key || "—").trim();
+  }
+
+  function mscatItemText(row) {
+    return String(
+      row?.mscat_item_text ||
+      [row?.mscat_item_no || row?.item_no || row?.item_code || "", row?.mscat_item_label || row?.item_label || ""]
+        .filter(Boolean)
+        .join(" — ") ||
+      "—"
+    ).trim();
+  }
+
   function ensureModal() {
     let modal = document.getElementById("csvbCauseCatRecordsModal");
     if (modal) return modal;
@@ -1326,7 +1367,7 @@
       </div>
       <div style="padding:12px 16px;max-height:70vh;overflow:auto;">
         <table>
-          <thead>
+          <thead id="csvbCauseCatModalThead">
             <tr>
               <th>Source</th><th>Vessel</th><th>Date</th><th>Report Ref</th><th>Question</th><th>Type</th><th>Designation</th><th>SOC</th><th>NOC</th><th>Observation</th>
             </tr>
@@ -1345,24 +1386,86 @@
   function openRecords(title, rows) {
     const modal = ensureModal();
     const tbody = document.getElementById("csvbCauseCatModalTbody");
+    const thead = document.getElementById("csvbCauseCatModalThead");
+    const safeRows = Array.isArray(rows) ? rows : [];
+    const mscatMode = safeRows.some(isMscatRecord) || isMscatDimension();
 
     document.getElementById("csvbCauseCatModalTitle").textContent = title;
-    document.getElementById("csvbCauseCatModalSub").textContent = `${rows.length} related observation(s).`;
+    document.getElementById("csvbCauseCatModalSub").textContent = mscatMode
+      ? `${safeRows.length} related M-SCAT selection record(s).`
+      : `${safeRows.length} related observation(s).`;
 
-    tbody.innerHTML = rows.map((row) => `
-      <tr>
-        <td>${esc(sourceLabel(sourceKey(row)))}</td>
-        <td>${esc(row.vessel_name || "")}</td>
-        <td>${esc(eventDate(row))}</td>
-        <td>${esc(row.report_ref || row.reference || "")}</td>
-        <td>${esc(qno(row))}</td>
-        <td>${esc(row.observation_type || "")}</td>
-        <td>${esc(row.designation || "")}</td>
-        <td>${esc(row.soc || row.nature_of_concern || "")}</td>
-        <td>${esc(row.noc || row.classification_coding || "")}</td>
-        <td>${esc(row.remarks || row.observation_text || "")}</td>
-      </tr>
-    `).join("") || `<tr><td colspan="10">No records.</td></tr>`;
+    if (thead) {
+      thead.innerHTML = mscatMode
+        ? `
+            <tr>
+              <th>Source</th>
+              <th>Vessel</th>
+              <th>Date</th>
+              <th>Report Ref</th>
+              <th>Question</th>
+              <th>Type</th>
+              <th>M-SCAT Section</th>
+              <th>M-SCAT Item</th>
+              <th>AI / Manual</th>
+              <th>Designation</th>
+              <th>SOC</th>
+              <th>NOC</th>
+              <th>Taxonomy ID</th>
+              <th>Observation</th>
+            </tr>
+          `
+        : `
+            <tr>
+              <th>Source</th>
+              <th>Vessel</th>
+              <th>Date</th>
+              <th>Report Ref</th>
+              <th>Question</th>
+              <th>Type</th>
+              <th>Designation</th>
+              <th>SOC</th>
+              <th>NOC</th>
+              <th>Observation</th>
+            </tr>
+          `;
+    }
+
+    if (mscatMode) {
+      tbody.innerHTML = safeRows.map((row) => `
+        <tr>
+          <td>${esc(sourceLabel(sourceKey(row)))}</td>
+          <td>${esc(row.vessel_name || "")}</td>
+          <td>${esc(eventDate(row))}</td>
+          <td>${esc(row.report_ref || row.reference || row.source_report_id || "")}</td>
+          <td>${esc(qno(row))}</td>
+          <td>${esc(row.observation_type || row.obs_type || "")}</td>
+          <td>${esc(mscatSectionText(row))}</td>
+          <td>${esc(mscatItemText(row))}</td>
+          <td>${esc(selectionSourceLabel(row.selection_source))}</td>
+          <td>${esc(row.designation || "")}</td>
+          <td>${esc(row.soc || row.nature_of_concern || "")}</td>
+          <td>${esc(row.noc || row.classification_coding || "")}</td>
+          <td class="mono">${esc(row.taxonomy_id || "")}</td>
+          <td>${esc(row.remarks || row.observation_text || "")}</td>
+        </tr>
+      `).join("") || `<tr><td colspan="14">No M-SCAT records.</td></tr>`;
+    } else {
+      tbody.innerHTML = safeRows.map((row) => `
+        <tr>
+          <td>${esc(sourceLabel(sourceKey(row)))}</td>
+          <td>${esc(row.vessel_name || "")}</td>
+          <td>${esc(eventDate(row))}</td>
+          <td>${esc(row.report_ref || row.reference || "")}</td>
+          <td>${esc(qno(row))}</td>
+          <td>${esc(row.observation_type || "")}</td>
+          <td>${esc(row.designation || "")}</td>
+          <td>${esc(row.soc || row.nature_of_concern || "")}</td>
+          <td>${esc(row.noc || row.classification_coding || "")}</td>
+          <td>${esc(row.remarks || row.observation_text || "")}</td>
+        </tr>
+      `).join("") || `<tr><td colspan="10">No records.</td></tr>`;
+    }
 
     modal.showModal();
   }
