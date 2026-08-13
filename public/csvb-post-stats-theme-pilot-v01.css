@@ -1,0 +1,165 @@
+/*
+  CSV BEACON — Post-Inspection Statistics theme pilot
+  STEP8B1B — page-scoped dark-mode repair only.
+
+  Scope:
+  - post_inspection_stats.html only
+  - active only when html[data-theme="dark"]
+  - no global theme-system replacement
+*/
+
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"]{
+  --bg-main: var(--bg, #06162E);
+  --bg-card: var(--surface, #0B2447);
+  --border-soft: var(--border, #20466F);
+  --text-main: var(--text, #EAF3FB);
+  --text-muted: var(--muted, #9EB7D3);
+
+  --csvb-soft-border: var(--border, #20466F);
+  --csvb-soft-bg: var(--surface-2, #071D3A);
+  --csvb-deep-blue: var(--text, #EAF3FB);
+  --csvb-text: var(--text, #EAF3FB);
+  --csvb-muted: var(--muted, #9EB7D3);
+}
+
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] body{
+  background: var(--bg, #06162E) !important;
+  color: var(--text, #EAF3FB) !important;
+}
+
+html[data-csvb-page="post_inspection_stats.html"] #themeSelect,
+html[data-csvb-page="post_inspection_stats.html"] #themeSelect option{
+  background: #FFFFFF !important;
+  color: #062A5E !important;
+}
+
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] #themeSelect,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] #themeSelect option{
+  background: var(--surface, #0B2447) !important;
+  color: var(--text, #EAF3FB) !important;
+  border-color: var(--border, #20466F) !important;
+}
+
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .panel,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .card,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .chartBox,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .stat,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .drillSummary > div,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .csvb-dashboard-group,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .csvb-dashboard-toolbar,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] #mscatAnalyticsPanel,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] #csvbCauseCatPanelV01,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] #csvbQcpPanelV01,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] #csvbSectorAnalyticsPanelV01{
+  background: var(--surface, #0B2447) !important;
+  color: var(--text, #EAF3FB) !important;
+  border-color: var(--border, #20466F) !important;
+}
+
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .statN,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .statL,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .statSub,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .chartTitle,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .chartSub,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .tableTitle,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .mono,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] label{
+  color: var(--text, #EAF3FB) !important;
+}
+
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .muted,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .small,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .csvb-cause-small,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .csvb-qcp-small,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .csvb-sector-small{
+  color: var(--muted, #9EB7D3) !important;
+}
+
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] input,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] select,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] textarea,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .filterDropBtn,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .filterPanel,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .checkPanel,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .miniBtn{
+  background: var(--surface-2, #071D3A) !important;
+  color: var(--text, #EAF3FB) !important;
+  border-color: var(--border, #20466F) !important;
+}
+
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] input::placeholder,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] textarea::placeholder{
+  color: var(--muted, #9EB7D3) !important;
+}
+
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .checkRow,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .csvb-cause-check,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .csvb-qcp-check,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .csvb-sector-check{
+  background: var(--surface-2, #071D3A) !important;
+  color: var(--text, #EAF3FB) !important;
+  border-color: var(--border, #20466F) !important;
+}
+
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] table{
+  background: var(--surface, #0B2447) !important;
+  color: var(--text, #EAF3FB) !important;
+}
+
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] th{
+  background: #102B4D !important;
+  color: var(--text, #EAF3FB) !important;
+  border-color: var(--border, #20466F) !important;
+}
+
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] td{
+  background: transparent !important;
+  color: var(--text, #EAF3FB) !important;
+  border-color: var(--border, #20466F) !important;
+}
+
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] tr:hover td{
+  background: rgba(255,255,255,.05) !important;
+}
+
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .csvb-dashboard-group-head,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .csvb-cause-head,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .csvb-qcp-head,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .csvb-sector-collapse-head{
+  background: linear-gradient(180deg, #102B4D, #071D3A) !important;
+  color: var(--text, #EAF3FB) !important;
+  border-color: var(--border, #20466F) !important;
+}
+
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .csvb-dashboard-group-title,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .csvb-cause-title,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .csvb-qcp-title,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .csvb-sector-title{
+  color: var(--text, #EAF3FB) !important;
+}
+
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .csvb-dashboard-group-sub,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .csvb-cause-sub,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .csvb-qcp-sub,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .csvb-sector-sub{
+  color: var(--muted, #9EB7D3) !important;
+}
+
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] dialog,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .csvb-cause-modal,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .csvb-qcp-modal,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .csvb-sector-modal{
+  background: var(--surface, #0B2447) !important;
+  color: var(--text, #EAF3FB) !important;
+  border-color: var(--border, #20466F) !important;
+}
+
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .modalBody,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .modalSub,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .modalTitle{
+  color: var(--text, #EAF3FB) !important;
+}
+
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .modalBody{
+  background: var(--surface, #0B2447) !important;
+}
