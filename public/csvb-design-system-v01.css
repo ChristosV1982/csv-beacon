@@ -766,3 +766,233 @@ html[data-csvb-ds="v01"] a.danger:hover{
   border-color: rgba(155, 28, 28, .55) !important;
   color: #8b1d1d !important;
 }
+
+/*
+  STEP8D-2 — login.html design-system pilot.
+
+  Scope:
+  - login.html only
+  - visual styling only
+  - no login/auth/Supabase logic
+  - light-mode pilot only
+*/
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] body.csvb-login-page{
+  min-height: 100vh !important;
+  height: auto !important;
+  margin: 0 !important;
+  padding: 18px 14px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background:
+    radial-gradient(900px 520px at 22% 8%, rgba(21,128,162,.55) 0%, rgba(10,106,136,.32) 34%, rgba(3,27,63,.94) 100%) !important;
+  color: #ffffff !important;
+  font-family: var(--csvb-ds-font) !important;
+  box-sizing: border-box !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .login-shell{
+  width: min(760px, calc(100vw - 28px)) !important;
+  max-width: 760px !important;
+  max-height: none !important;
+  padding: 18px 20px 18px 20px !important;
+  border-radius: 16px !important;
+  background: rgba(12,33,58,.58) !important;
+  border: 1px solid rgba(213,222,239,.34) !important;
+  box-shadow: 0 10px 34px rgba(0,0,0,.32) !important;
+  color: #ffffff !important;
+  backdrop-filter: blur(3px) !important;
+  box-sizing: border-box !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .login-shell > div:first-child{
+  margin-bottom: 10px !important;
+  max-height: 92px !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-brand-logo-full{
+  max-width: 260px !important;
+  max-height: 88px !important;
+  width: auto !important;
+  display: block !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .title{
+  margin: 0 0 8px 0 !important;
+  color: #ffffff !important;
+  font-size: 1.32rem !important;
+  font-weight: 650 !important;
+  letter-spacing: .015em !important;
+  text-align: center !important;
+  text-shadow: 0 2px 8px rgba(0,0,0,.24) !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .subtitle{
+  margin: 0 0 14px 0 !important;
+  color: rgba(255,255,255,.88) !important;
+  font-size: .94rem !important;
+  line-height: 1.32 !important;
+  text-align: center !important;
+  font-weight: 450 !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .subtitle b{
+  font-weight: 600 !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .build{
+  margin-top: 5px !important;
+  font-size: .8rem !important;
+  opacity: .82 !important;
+  font-weight: 450 !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .card{
+  background: #ffffff !important;
+  border: 1px solid var(--csvb-ds-border) !important;
+  border-radius: 12px !important;
+  padding: 14px !important;
+  box-shadow: 0 4px 18px rgba(18,44,87,.14) !important;
+  color: var(--csvb-ds-text) !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] label{
+  display: block !important;
+  margin: 10px 0 5px 0 !important;
+  font-weight: 550 !important;
+  color: var(--csvb-ds-navy) !important;
+  font-size: 13px !important;
+  line-height: 1.2 !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] input{
+  width: 100% !important;
+  box-sizing: border-box !important;
+  height: 36px !important;
+  min-height: 36px !important;
+  padding: 0 9px !important;
+  border-radius: 8px !important;
+  border: 1px solid var(--csvb-ds-border-strong) !important;
+  outline: none !important;
+  font-size: 14px !important;
+  font-weight: 450 !important;
+  line-height: 36px !important;
+  font-family: var(--csvb-ds-font) !important;
+  background: #ffffff !important;
+  color: var(--csvb-ds-text) !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] input:focus{
+  border-color: var(--csvb-ds-teal) !important;
+  box-shadow: 0 0 0 3px rgba(0,151,167,.14) !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .actions{
+  display: flex !important;
+  gap: 8px !important;
+  flex-wrap: wrap !important;
+  align-items: center !important;
+  margin-top: 13px !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .btn-primary,
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .btn-muted,
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .btn-outline{
+  box-sizing: border-box !important;
+  height: 32px !important;
+  min-height: 32px !important;
+  padding: 0 10px !important;
+  border-radius: 8px !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  line-height: 32px !important;
+  cursor: pointer !important;
+  text-decoration: none !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-shadow: none !important;
+  white-space: nowrap !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .btn-primary{
+  min-width: 84px !important;
+  background: rgba(11,106,136,.14) !important;
+  color: #064762 !important;
+  border: 1px solid rgba(11,106,136,.42) !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .btn-muted,
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .btn-outline{
+  min-width: 104px !important;
+  background: rgba(11,106,136,.07) !important;
+  color: #064762 !important;
+  border: 1px solid rgba(11,106,136,.32) !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .btn-primary:hover,
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .btn-muted:hover,
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .btn-outline:hover{
+  background: rgba(11,106,136,.17) !important;
+  border-color: rgba(11,106,136,.52) !important;
+  filter: none !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .error{
+  margin-top: 11px !important;
+  padding: 8px 10px !important;
+  border-radius: 8px !important;
+  border: 1px solid rgba(155,28,28,.32) !important;
+  background: rgba(155,28,28,.06) !important;
+  color: var(--csvb-ds-err) !important;
+  font-weight: 500 !important;
+  font-size: 13px !important;
+  line-height: 1.32 !important;
+  white-space: pre-wrap !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .hint{
+  margin-top: 11px !important;
+  color: var(--csvb-ds-muted) !important;
+  font-size: 13px !important;
+  line-height: 1.34 !important;
+  font-weight: 450 !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .hint b{
+  font-weight: 600 !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .mono{
+  font-family: var(--csvb-ds-mono) !important;
+  font-size: 13px !important;
+  color: #35507b !important;
+  font-weight: 450 !important;
+}
+
+@media (max-width: 700px){
+  html[data-csvb-ds="v01"][data-csvb-page="login.html"] body.csvb-login-page{
+    padding: 10px 8px !important;
+    align-items: flex-start !important;
+  }
+
+  html[data-csvb-ds="v01"][data-csvb-page="login.html"] .login-shell{
+    width: calc(100vw - 16px) !important;
+    padding: 14px !important;
+  }
+
+  html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-brand-logo-full{
+    max-width: 220px !important;
+  }
+
+  html[data-csvb-ds="v01"][data-csvb-page="login.html"] .actions{
+    align-items: stretch !important;
+  }
+
+  html[data-csvb-ds="v01"][data-csvb-page="login.html"] .btn-primary,
+  html[data-csvb-ds="v01"][data-csvb-page="login.html"] .btn-muted,
+  html[data-csvb-ds="v01"][data-csvb-page="login.html"] .btn-outline{
+    flex: 1 1 120px !important;
+  }
+}
