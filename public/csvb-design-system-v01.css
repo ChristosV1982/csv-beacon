@@ -996,3 +996,140 @@ html[data-csvb-ds="v01"][data-csvb-page="login.html"] .mono{
     flex: 1 1 120px !important;
   }
 }
+
+/*
+  STEP8D-3 — login.html refinement after browser review.
+
+  Corrections:
+  - reduce heavy logo block
+  - slightly wider / better-proportioned panel
+  - tighter vertical rhythm
+  - standard quiet buttons
+  - visual only; no auth/login logic
+*/
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] body.csvb-login-page{
+  padding: 14px 12px !important;
+  background:
+    radial-gradient(780px 460px at 18% 5%, rgba(174,219,229,.78) 0%, rgba(21,128,162,.40) 33%, rgba(5,48,78,.94) 72%, rgba(3,27,63,.98) 100%) !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .login-shell{
+  width: min(860px, calc(100vw - 32px)) !important;
+  max-width: 860px !important;
+  padding: 16px 18px 16px 18px !important;
+  border-radius: 14px !important;
+  background: rgba(12,33,58,.50) !important;
+  border: 1px solid rgba(213,222,239,.30) !important;
+  box-shadow: 0 8px 28px rgba(0,0,0,.28) !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .login-shell > div:first-child{
+  margin-bottom: 6px !important;
+  max-height: 72px !important;
+}
+
+/*
+  The source logo image has a white rectangular field.
+  Use multiply blending to reduce the hard white box while keeping the mark visible.
+*/
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-brand-logo-full{
+  max-width: 230px !important;
+  max-height: 70px !important;
+  mix-blend-mode: multiply !important;
+  opacity: .92 !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .title{
+  margin: 0 0 5px 0 !important;
+  font-size: 1.24rem !important;
+  font-weight: 600 !important;
+  letter-spacing: .01em !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .subtitle{
+  margin: 0 0 11px 0 !important;
+  font-size: .9rem !important;
+  line-height: 1.28 !important;
+  font-weight: 430 !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .build{
+  margin-top: 4px !important;
+  font-size: .76rem !important;
+  font-weight: 430 !important;
+  opacity: .78 !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .card{
+  padding: 13px 14px !important;
+  border-radius: 12px !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] label{
+  margin: 9px 0 4px 0 !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] input{
+  height: 34px !important;
+  min-height: 34px !important;
+  line-height: 34px !important;
+  padding: 0 8px !important;
+  font-size: 14px !important;
+  font-weight: 430 !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .actions{
+  gap: 7px !important;
+  margin-top: 11px !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .btn-primary,
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .btn-muted,
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .btn-outline{
+  height: 30px !important;
+  min-height: 30px !important;
+  line-height: 30px !important;
+  padding: 0 9px !important;
+  border-radius: 8px !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .btn-primary{
+  min-width: 78px !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .btn-muted{
+  min-width: 78px !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .btn-outline{
+  min-width: 112px !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .hint{
+  margin-top: 10px !important;
+  font-size: 13px !important;
+  line-height: 1.3 !important;
+  font-weight: 430 !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .mono{
+  font-size: 13px !important;
+  font-weight: 430 !important;
+}
+
+@media (max-width: 700px){
+  html[data-csvb-ds="v01"][data-csvb-page="login.html"] .login-shell{
+    width: calc(100vw - 16px) !important;
+    padding: 13px !important;
+  }
+
+  html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-brand-logo-full{
+    max-width: 210px !important;
+    max-height: 66px !important;
+  }
+}
