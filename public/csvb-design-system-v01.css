@@ -1,0 +1,298 @@
+/*
+  CSV BEACON Design System V01
+  Step 8C-1 pilot.
+
+  Scope:
+  - Only pages that explicitly opt in with html[data-csvb-ds="v01"].
+  - First approved pilot: registered_device.html.
+  - Light theme only for this step.
+  - No application logic.
+  - No dark mode.
+*/
+
+html[data-csvb-ds="v01"]{
+  --csvb-ds-bg: #f4f8fc;
+  --csvb-ds-surface: #ffffff;
+  --csvb-ds-surface-soft: #f7fafe;
+  --csvb-ds-border: #d6e4f5;
+  --csvb-ds-border-strong: #b8d8ea;
+
+  --csvb-ds-navy: #062a5e;
+  --csvb-ds-navy-dark: #031b3f;
+  --csvb-ds-text: #17324d;
+  --csvb-ds-muted: #5e6f86;
+  --csvb-ds-teal: #0097a7;
+  --csvb-ds-teal-soft: #e8f8fa;
+
+  --csvb-ds-ok: #087334;
+  --csvb-ds-warn: #8a5a00;
+  --csvb-ds-err: #9b1c1c;
+
+  --csvb-ds-font: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  --csvb-ds-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  --csvb-ds-page-max: 1420px;
+  --csvb-ds-page-pad: 12px;
+  --csvb-ds-gap: 10px;
+
+  --csvb-ds-radius-sm: 8px;
+  --csvb-ds-radius: 10px;
+  --csvb-ds-radius-lg: 12px;
+  --csvb-ds-radius-xl: 16px;
+
+  --csvb-ds-shadow: 0 8px 22px rgba(3, 27, 63, .07);
+  --csvb-ds-shadow-topbar: 0 8px 22px rgba(3, 27, 63, .16);
+}
+
+html[data-csvb-ds="v01"],
+html[data-csvb-ds="v01"] body{
+  background: var(--csvb-ds-bg) !important;
+  color: var(--csvb-ds-text) !important;
+  font-family: var(--csvb-ds-font) !important;
+  font-size: 14px !important;
+}
+
+html[data-csvb-ds="v01"] .topbar{
+  background: linear-gradient(90deg, var(--csvb-ds-navy-dark), var(--csvb-ds-navy)) !important;
+  color: #ffffff !important;
+  padding: 10px 14px !important;
+  min-height: 56px !important;
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  gap: var(--csvb-ds-gap) !important;
+  flex-wrap: wrap !important;
+  box-shadow: var(--csvb-ds-shadow-topbar) !important;
+}
+
+html[data-csvb-ds="v01"] .brand{
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  font-weight: 700 !important;
+  letter-spacing: .01em !important;
+}
+
+html[data-csvb-ds="v01"] .brand img{
+  width: 34px !important;
+  height: 34px !important;
+  object-fit: contain !important;
+}
+
+html[data-csvb-ds="v01"] .sub{
+  font-size: .78rem !important;
+  color: rgba(255,255,255,.78) !important;
+  font-weight: 500 !important;
+  margin-top: 2px !important;
+}
+
+html[data-csvb-ds="v01"] .row{
+  display: flex !important;
+  gap: 8px !important;
+  align-items: center !important;
+  flex-wrap: wrap !important;
+}
+
+html[data-csvb-ds="v01"] .wrap{
+  width: min(var(--csvb-ds-page-max), calc(100vw - 24px)) !important;
+  margin: 0 auto !important;
+  padding: var(--csvb-ds-page-pad) !important;
+}
+
+html[data-csvb-ds="v01"] .pageTitle,
+html[data-csvb-ds="v01"] .card,
+html[data-csvb-ds="v01"] .panel{
+  background: var(--csvb-ds-surface) !important;
+  color: var(--csvb-ds-text) !important;
+  border: 1px solid var(--csvb-ds-border) !important;
+  border-radius: var(--csvb-ds-radius-lg) !important;
+  box-shadow: var(--csvb-ds-shadow) !important;
+}
+
+html[data-csvb-ds="v01"] .pageTitle{
+  padding: 12px 14px !important;
+  margin-bottom: 12px !important;
+}
+
+html[data-csvb-ds="v01"] .pageTitle h1{
+  margin: 0 !important;
+  color: var(--csvb-ds-navy) !important;
+  font-size: 1.22rem !important;
+  font-weight: 700 !important;
+}
+
+html[data-csvb-ds="v01"] .pageTitle p{
+  margin: 5px 0 0 !important;
+  color: var(--csvb-ds-muted) !important;
+  font-size: .9rem !important;
+  font-weight: 500 !important;
+  line-height: 1.4 !important;
+}
+
+html[data-csvb-ds="v01"] .btn,
+html[data-csvb-ds="v01"] .btn2,
+html[data-csvb-ds="v01"] button,
+html[data-csvb-ds="v01"] a.btn,
+html[data-csvb-ds="v01"] a.btn2{
+  border-radius: var(--csvb-ds-radius) !important;
+  padding: 7px 10px !important;
+  font-size: .88rem !important;
+  font-weight: 600 !important;
+  line-height: 1.2 !important;
+  cursor: pointer !important;
+  text-decoration: none !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 6px !important;
+  border: 1px solid var(--csvb-ds-border-strong) !important;
+  background: var(--csvb-ds-teal-soft) !important;
+  color: var(--csvb-ds-navy) !important;
+}
+
+html[data-csvb-ds="v01"] .btn,
+html[data-csvb-ds="v01"] button.btn{
+  background: var(--csvb-ds-navy) !important;
+  color: #ffffff !important;
+  border-color: var(--csvb-ds-navy) !important;
+}
+
+html[data-csvb-ds="v01"] .btn2,
+html[data-csvb-ds="v01"] button.btn2,
+html[data-csvb-ds="v01"] a.btn2{
+  background: var(--csvb-ds-teal-soft) !important;
+  color: var(--csvb-ds-navy) !important;
+  border-color: var(--csvb-ds-border-strong) !important;
+}
+
+html[data-csvb-ds="v01"] .topbar .btn,
+html[data-csvb-ds="v01"] .topbar .btn2,
+html[data-csvb-ds="v01"] .topbar button,
+html[data-csvb-ds="v01"] .topbar a{
+  min-height: 32px !important;
+}
+
+html[data-csvb-ds="v01"] input,
+html[data-csvb-ds="v01"] select,
+html[data-csvb-ds="v01"] textarea{
+  border: 1px solid var(--csvb-ds-border-strong) !important;
+  border-radius: var(--csvb-ds-radius-sm) !important;
+  background: #ffffff !important;
+  color: var(--csvb-ds-text) !important;
+  padding: 7px 8px !important;
+  font-size: .9rem !important;
+  font-weight: 500 !important;
+  font-family: var(--csvb-ds-font) !important;
+}
+
+html[data-csvb-ds="v01"] table{
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--csvb-ds-surface) !important;
+}
+
+html[data-csvb-ds="v01"] th,
+html[data-csvb-ds="v01"] td{
+  border-bottom: 1px solid #e6eef7 !important;
+  padding: 8px 7px !important;
+  text-align: left !important;
+  vertical-align: middle !important;
+  font-size: .84rem !important;
+}
+
+html[data-csvb-ds="v01"] th{
+  color: var(--csvb-ds-navy) !important;
+  background: var(--csvb-ds-surface-soft) !important;
+  font-weight: 700 !important;
+}
+
+html[data-csvb-ds="v01"] td{
+  color: var(--csvb-ds-text) !important;
+  font-weight: 500 !important;
+}
+
+/* registered_device.html pilot: generated compact component */
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] #csvbRegisteredDeviceCompactRoot{
+  border: 1px solid var(--csvb-ds-border) !important;
+  border-radius: var(--csvb-ds-radius-lg) !important;
+  background: var(--csvb-ds-surface) !important;
+  box-shadow: var(--csvb-ds-shadow) !important;
+  padding: 12px !important;
+  margin-bottom: 12px !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] #csvbRegisteredDeviceCompactRoot .csvb-registered-device-title{
+  color: var(--csvb-ds-navy) !important;
+  font-size: 1rem !important;
+  font-weight: 700 !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] #csvbRegisteredDeviceCompactRoot .csvb-registered-device-note{
+  color: var(--csvb-ds-muted) !important;
+  font-size: .82rem !important;
+  font-weight: 500 !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] #csvbRegisteredDeviceCompactRoot button{
+  border-radius: var(--csvb-ds-radius-sm) !important;
+  padding: 7px 10px !important;
+  font-weight: 600 !important;
+  background: var(--csvb-ds-teal-soft) !important;
+  color: var(--csvb-ds-navy) !important;
+  border: 1px solid var(--csvb-ds-border-strong) !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] #csvbRegisteredDeviceCompactRoot button.primary{
+  background: var(--csvb-ds-navy) !important;
+  color: #ffffff !important;
+  border-color: var(--csvb-ds-navy) !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] #csvbRegisteredDeviceCompactRoot input,
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] #csvbRegisteredDeviceCompactRoot select{
+  font-weight: 500 !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] #csvbRegisteredDeviceCompactRoot .csvb-registered-device-table-wrap{
+  border: 1px solid var(--csvb-ds-border) !important;
+  border-radius: var(--csvb-ds-radius-lg) !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] #csvbRegisteredDeviceCompactRoot th{
+  color: var(--csvb-ds-navy) !important;
+  background: var(--csvb-ds-surface-soft) !important;
+  font-weight: 700 !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] #csvbRegisteredDeviceCompactRoot td{
+  color: var(--csvb-ds-text) !important;
+  font-weight: 500 !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] #csvbRegisteredDeviceCompactRoot .csvb-device-status-pill{
+  font-weight: 700 !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] #csvbRegisteredDeviceCompactRoot .csvb-device-id{
+  font-family: var(--csvb-ds-mono) !important;
+  font-weight: 500 !important;
+}
+
+@media (max-width: 850px){
+  html[data-csvb-ds="v01"] .wrap{
+    width: calc(100vw - 16px) !important;
+    padding: 8px !important;
+  }
+
+  html[data-csvb-ds="v01"] .topbar{
+    padding: 9px 10px !important;
+  }
+
+  html[data-csvb-ds="v01"] .btn,
+  html[data-csvb-ds="v01"] .btn2,
+  html[data-csvb-ds="v01"] button,
+  html[data-csvb-ds="v01"] input,
+  html[data-csvb-ds="v01"] select{
+    min-height: 40px !important;
+  }
+}
