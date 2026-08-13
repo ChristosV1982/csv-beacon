@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-csvb-page="post_inspection_stats.html">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
@@ -394,33 +394,6 @@
       white-space:normal;
       line-height:1.35;
     }
-  
-    /* STEP8B1 post stats theme selector */
-    html[data-csvb-page="post_inspection_stats.html"] .csvb-poststats-themeCtl{
-      display:inline-flex;
-      align-items:center;
-      gap:6px;
-      margin:0;
-      color:#fff;
-      font-weight:700;
-      white-space:nowrap;
-    }
-    html[data-csvb-page="post_inspection_stats.html"] .csvb-poststats-themeCtl .themeCtl-label{
-      color:#fff;
-      opacity:.92;
-      font-size:.84rem;
-      font-weight:700;
-    }
-    html[data-csvb-page="post_inspection_stats.html"] .csvb-poststats-themeCtl select{
-      min-height:32px;
-      width:auto;
-      max-width:120px;
-      padding:5px 8px;
-      font-size:.84rem;
-      font-weight:700;
-      border-radius:8px;
-    }
-
   </style>
   <link rel="stylesheet" href="./csvb-ui-polish.css?v=20260430_1" />
   <link rel="stylesheet" href="./csvb-help-tooltips.css?v=20260430_1" />
@@ -433,7 +406,6 @@
   <link rel="stylesheet" href="./csvb-post-inspection-mobile-tables-v3.css?v=20260529_1" />
   <link rel="stylesheet" href="./csvb-post-inspection-stats-colours-v01.css?v=20260529_1" />
   <link rel="stylesheet" href="./csvb-post-inspection-stats-chapter-share-fonts-v01.css?v=20260531_1" />
-  <link rel="stylesheet" href="./csvb-post-stats-theme-pilot-v01.css?v=20260813_step8b1e_inline_dark_repair" />
 </head>
 
 <body>
@@ -445,14 +417,6 @@
       </div>
       <div class="actions">
         <div id="userBadge" style="font-weight:900; opacity:0.95;"></div>
-        <label class="themeCtl csvb-poststats-themeCtl" for="themeSelect" title="Theme">
-          <span class="themeCtl-label">Theme</span>
-          <select id="themeSelect" class="btn btn-muted themeCtl-select">
-            <option value="system">System</option>
-            <option value="light">Light</option>
-            <option value="dark">Dark</option>
-          </select>
-        </label>
         <a class="btn btn-outline" href="./q-dashboard.html">Dashboard</a>
         <a class="btn btn-outline" href="./post_inspection.html">Post-Inspection</a>
         <a class="btn btn-outline" href="./audit_observations.html">Audit Observations</a>
@@ -1123,7 +1087,6 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="./auth.js"></script>
-  <script defer src="./theme.js?v=20260813_post_stats_theme_selector_v01"></script>
   <script src="./csvb-module-guard.js?v=20260522_dashboard_button_guard"></script>
   <script type="module" src="./post_inspection_stats.js?v=20260630_sector_snapshot_v16c"></script>
   <script src="./csvb-post-stats-pgno-analytics-v01.js?v=20260811_pgno_schedule_fix_v07"></script>
@@ -1145,7 +1108,6 @@
   <script src="./csvb-ui-polish.js?v=20260430_1"></script>
   <script src="./csvb-help-tooltips.js?v=20260430_1"></script>
   <script src="./csvb-100pct-fit.js?v=20260430_1"></script>
-  <script src="./csvb-post-stats-theme-pilot-v01.js?v=20260813_step8b1e_inline_dark_repair"></script>
   <!-- disabled during Post-Inspection Stats stabilization: <script src="./csvb-post-inspection-stats-polish.js?v=20260430_1"></script> -->
   <script src="./csvb-build-badge.js?v=20260528_01"></script>
   <script src="./csvb-global-busy.js?v=20260629_global_busy_v01"></script>
