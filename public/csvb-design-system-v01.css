@@ -403,3 +403,104 @@ html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] #csvbRegistere
   font-size: .84rem !important;
   font-weight: 500 !important;
 }
+
+/*
+  STEP8C-3 — registered_device.html topbar/button correction after user review.
+
+  Corrections:
+  - remove duplicate global pseudo-logo from the topbar
+  - keep the real logo visible by placing it on a light translucent tile
+  - standardize topbar buttons to the same box size
+  - restore readable 13px button text
+  - reduce padding/buffer
+  - keep button styling quiet/semi-transparent
+*/
+
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] .topbar::before,
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] header.topbar::before{
+  content: none !important;
+  display: none !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] .topbar{
+  min-height: 46px !important;
+  padding: 6px 10px !important;
+  background: linear-gradient(90deg, #0a6a88, #1580a2) !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] .brand{
+  gap: 8px !important;
+  font-weight: 600 !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] .brand img{
+  width: 30px !important;
+  height: 30px !important;
+  padding: 3px !important;
+  border-radius: 8px !important;
+  background: rgba(255,255,255,.82) !important;
+  border: 1px solid rgba(255,255,255,.55) !important;
+  box-shadow: 0 1px 4px rgba(3,27,63,.16) !important;
+  box-sizing: border-box !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] .brand > div > div:first-child{
+  font-size: .94rem !important;
+  font-weight: 650 !important;
+  line-height: 1.1 !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] .sub{
+  font-size: .72rem !important;
+  font-weight: 400 !important;
+  line-height: 1.15 !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] .topbar .row{
+  gap: 6px !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] #userBadge{
+  font-size: .9rem !important;
+  font-weight: 600 !important;
+  margin-right: 4px !important;
+}
+
+/* Equal compact topbar buttons. */
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] .topbar a.btn,
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] .topbar a.btn2,
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] .topbar button.btn,
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] .topbar button.btn2,
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] .topbar #logoutBtn,
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] .topbar #switchUserBtn{
+  box-sizing: border-box !important;
+  width: 88px !important;
+  min-width: 88px !important;
+  max-width: 88px !important;
+  height: 30px !important;
+  min-height: 30px !important;
+  padding: 0 6px !important;
+  border-radius: 8px !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  line-height: 30px !important;
+  text-align: center !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background: rgba(255,255,255,.14) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255,255,255,.32) !important;
+  box-shadow: none !important;
+  white-space: nowrap !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] .topbar a.btn:hover,
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] .topbar a.btn2:hover,
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] .topbar button.btn:hover,
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] .topbar button.btn2:hover,
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] .topbar #logoutBtn:hover,
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] .topbar #switchUserBtn:hover{
+  background: rgba(255,255,255,.24) !important;
+  border-color: rgba(255,255,255,.46) !important;
+}
