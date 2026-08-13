@@ -1257,3 +1257,93 @@ html[data-csvb-ds="v01"][data-csvb-page="login.html"] .title{
     max-height: 100px !important;
   }
 }
+
+/*
+  STEP8D-6 — login transparent logo visibility refinement.
+
+  Correction:
+  - keep transparent logo asset
+  - remove hard white badge/rectangle
+  - improve contrast with a soft integrated light field
+  - make the logo larger and clearer
+  - visual only; no login/auth logic
+*/
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .login-shell{
+  background:
+    linear-gradient(180deg, rgba(186,224,232,.13) 0%, rgba(12,33,58,.50) 34%, rgba(12,33,58,.50) 100%) !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .login-shell > div:first-child{
+  position: relative !important;
+  overflow: visible !important;
+  min-height: auto !important;
+  max-height: none !important;
+  padding: 10px 0 8px 0 !important;
+  margin-bottom: 4px !important;
+  display: block !important;
+  text-align: center !important;
+  isolation: isolate !important;
+}
+
+/* Soft glow behind logo: not a separate badge, only an integrated contrast field. */
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .login-shell > div:first-child::before{
+  content: "" !important;
+  position: absolute !important;
+  left: 50% !important;
+  top: 50% !important;
+  width: min(560px, 86%) !important;
+  height: 145px !important;
+  transform: translate(-50%, -52%) !important;
+  background:
+    radial-gradient(ellipse at center,
+      rgba(211,244,249,.38) 0%,
+      rgba(174,224,233,.24) 34%,
+      rgba(174,224,233,.10) 56%,
+      rgba(174,224,233,0) 76%) !important;
+  border: 0 !important;
+  border-radius: 999px !important;
+  filter: blur(.2px) !important;
+  z-index: -1 !important;
+  pointer-events: none !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-brand-logo-full{
+  position: static !important;
+  width: min(500px, 78%) !important;
+  max-width: 500px !important;
+  max-height: 150px !important;
+  height: auto !important;
+  display: block !important;
+  margin: 0 auto 4px auto !important;
+  opacity: 1 !important;
+  mix-blend-mode: normal !important;
+  filter:
+    drop-shadow(0 2px 5px rgba(255,255,255,.25))
+    drop-shadow(0 7px 16px rgba(0,0,0,.36))
+    brightness(1.12)
+    contrast(1.16)
+    saturate(1.10) !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  z-index: 1 !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .title{
+  margin-top: 0 !important;
+  text-shadow: 0 2px 8px rgba(0,0,0,.34) !important;
+}
+
+@media (max-width: 700px){
+  html[data-csvb-ds="v01"][data-csvb-page="login.html"] .login-shell > div:first-child::before{
+    width: min(410px, 90%) !important;
+    height: 118px !important;
+  }
+
+  html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-brand-logo-full{
+    width: min(340px, 84%) !important;
+    max-width: 340px !important;
+    max-height: 112px !important;
+  }
+}
