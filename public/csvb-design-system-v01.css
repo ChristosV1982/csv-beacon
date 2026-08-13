@@ -1133,3 +1133,73 @@ html[data-csvb-ds="v01"][data-csvb-page="login.html"] .mono{
     max-height: 66px !important;
   }
 }
+
+/*
+  STEP8D-4 — login logo background integration.
+
+  User-approved intent:
+  - larger / bolder logo presence
+  - logo should be incorporated into the overall background
+  - no separate badge-like feeling
+  - all other login visuals remain as already approved
+  - visual only; no login/auth logic
+*/
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .login-shell{
+  position: relative !important;
+  overflow: hidden !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .login-shell > div:first-child{
+  position: relative !important;
+  min-height: 150px !important;
+  padding-top: 18px !important;
+  padding-bottom: 10px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+}
+
+/* Turn the existing logo into a large integrated background mark */
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-brand-logo-full{
+  position: absolute !important;
+  left: 50% !important;
+  top: 4px !important;
+  transform: translateX(-50%) !important;
+  width: min(430px, 72%) !important;
+  max-width: 430px !important;
+  max-height: none !important;
+  height: auto !important;
+  opacity: 0.14 !important;
+  mix-blend-mode: screen !important;
+  filter: contrast(1.05) brightness(1.08) saturate(0.92) !important;
+  pointer-events: none !important;
+  z-index: 0 !important;
+}
+
+/* Keep text above the integrated logo */
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .title,
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .subtitle,
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .build{
+  position: relative !important;
+  z-index: 1 !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .title{
+  margin-top: 0 !important;
+}
+
+@media (max-width: 700px){
+  html[data-csvb-ds="v01"][data-csvb-page="login.html"] .login-shell > div:first-child{
+    min-height: 132px !important;
+    padding-top: 14px !important;
+  }
+
+  html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-brand-logo-full{
+    width: min(340px, 80%) !important;
+    max-width: 340px !important;
+    top: 6px !important;
+    opacity: 0.16 !important;
+  }
+}
