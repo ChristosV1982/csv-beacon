@@ -163,3 +163,150 @@ html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .modalTitle
 html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .modalBody{
   background: var(--surface, #0B2447) !important;
 }
+
+/*
+  STEP8B1D — targeted dark contrast repair.
+  Evidence-based from browser diagnosis:
+  - remaining light backgrounds: generated comparison cards, by-vessel cards, cause cards, chart wrappers, bar tracks
+  - remaining low-contrast text: section titles, bar labels/values, generated inline navy text
+*/
+
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .sectionTitle,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .pageTitle,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .panel-title,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .section-title,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .tableCount,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .barRow,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .barLabel,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .barValue,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .barMeta,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .csvb-line-chart-v01-title,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .csvb-line-chart-v01-sub,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .csvb-line-chart-v01-label,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .csvb-line-chart-v01-value{
+  color: var(--text, #EAF3FB) !important;
+}
+
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .barTrack{
+  background: rgba(234,243,251,.16) !important;
+  border: 1px solid rgba(158,183,211,.22) !important;
+}
+
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .csvb-stats-compare-v03-card,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .csvb-stats-compare-v03-options,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .csvb-stats-compare-v03-field,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .csvb-stat-attached-visual,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] #csvbStatsByVesselObsPanelV01,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .csvb-by-vessel-card,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .csvb-by-vessel-type-box,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .csvb-by-vessel-year-box,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .csvb-cause-box,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .csvb-cause-card,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .csvb-qcp-card,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .csvb-sector-card,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .csvb-sector-box,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .csvb-qcp-box,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .csvb-pgno-box,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .csvb-pgno-card{
+  background: var(--surface, #0B2447) !important;
+  color: var(--text, #EAF3FB) !important;
+  border-color: var(--border, #20466F) !important;
+}
+
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .csvb-stats-compare-v03-card *,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .csvb-stats-compare-v03-options *,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .csvb-stat-attached-visual *,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .csvb-by-vessel-card *,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .csvb-by-vessel-type-box *,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .csvb-by-vessel-year-box *,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .csvb-cause-box *,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .csvb-cause-card *,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .csvb-qcp-card *,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .csvb-sector-card *,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .csvb-sector-box *,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .csvb-qcp-box *{
+  color: var(--text, #EAF3FB) !important;
+}
+
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .csvb-dashboard-group-icon,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .csvb-cause-icon,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .csvb-qcp-icon,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] #csvbSectorCollapseIcon,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] #csvbMscatCollapseIcon{
+  background: rgba(234,243,251,.14) !important;
+  color: var(--text, #EAF3FB) !important;
+  border-color: var(--border, #20466F) !important;
+}
+
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .csvb-line-chart-v01-wrap,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .csvb-line-chart-v01-card,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .oi-trend-wrap,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .chartBox > div[style*="background:#fff"],
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .chartBox > div[style*="background: #fff"],
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] div[style*="border:1px solid #dbe8f8"][style*="background:#fff"],
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] div[style*="border:1px solid #dbe8f8"][style*="background: #fff"]{
+  background: var(--surface-2, #071D3A) !important;
+  color: var(--text, #EAF3FB) !important;
+  border-color: var(--border, #20466F) !important;
+}
+
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] svg text,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .oi-axis-label{
+  fill: var(--text, #EAF3FB) !important;
+  color: var(--text, #EAF3FB) !important;
+}
+
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .oi-grid-line{
+  stroke: rgba(158,183,211,.22) !important;
+}
+
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .oi-axis{
+  stroke: rgba(158,183,211,.55) !important;
+}
+
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .oi-legend,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .oi-legend span{
+  color: var(--text, #EAF3FB) !important;
+}
+
+/* Generated inline navy text repairs. Scoped to Post Stats dark mode only. */
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] [style*="color:#1a4170"],
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] [style*="color: #1a4170"],
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] [style*="color:#062A5E"],
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] [style*="color: #062A5E"],
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] [style*="color:#062a5e"],
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] [style*="color: #062a5e"],
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] [style*="color:#082d57"],
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] [style*="color: #082d57"],
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] [style*="color:#223a66"],
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] [style*="color: #223a66"],
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] [style*="color:#35507b"],
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] [style*="color: #35507b"]{
+  color: var(--text, #EAF3FB) !important;
+}
+
+/* Generated inline light background repairs. Scoped to Post Stats dark mode only. */
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] [style*="background:#fff"],
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] [style*="background: #fff"],
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] [style*="background:#ffffff"],
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] [style*="background: #ffffff"],
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] [style*="background:#f8fbff"],
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] [style*="background: #f8fbff"],
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] [style*="background:#f4f8ff"],
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] [style*="background: #f4f8ff"],
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] [style*="background:#eaf5ff"],
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] [style*="background: #eaf5ff"],
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] [style*="background:linear-gradient(180deg,#fff,#f4f8ff)"],
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] [style*="background: linear-gradient(180deg,#fff,#f4f8ff)"]{
+  background: var(--surface-2, #071D3A) !important;
+  color: var(--text, #EAF3FB) !important;
+  border-color: var(--border, #20466F) !important;
+}
+
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .btn,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .btn-muted,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .btn-outline,
+html[data-theme="dark"][data-csvb-page="post_inspection_stats.html"] .csvb-dashboard-btn{
+  color: #FFFFFF !important;
+}
+
