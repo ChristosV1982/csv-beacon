@@ -1203,3 +1203,57 @@ html[data-csvb-ds="v01"][data-csvb-page="login.html"] .title{
     opacity: 0.16 !important;
   }
 }
+
+/*
+  STEP8D-5 — login transparent logo asset.
+
+  Correction:
+  - replace white-background logo with generated transparent-background logo
+  - make logo larger and bolder
+  - remove separate badge/background feeling
+  - keep the rest of the approved login layout unchanged
+  - visual only; no login/auth logic
+*/
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .login-shell > div:first-child{
+  min-height: auto !important;
+  max-height: none !important;
+  padding-top: 2px !important;
+  padding-bottom: 6px !important;
+  margin-bottom: 4px !important;
+  display: block !important;
+  text-align: center !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-brand-logo-full{
+  position: static !important;
+  left: auto !important;
+  top: auto !important;
+  transform: none !important;
+  width: min(380px, 74%) !important;
+  max-width: 380px !important;
+  max-height: 120px !important;
+  height: auto !important;
+  display: block !important;
+  margin: 0 auto 4px auto !important;
+  opacity: 1 !important;
+  mix-blend-mode: normal !important;
+  filter: drop-shadow(0 4px 12px rgba(0,0,0,.22)) contrast(1.04) saturate(1.04) !important;
+  pointer-events: auto !important;
+  z-index: auto !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .title{
+  margin-top: 0 !important;
+}
+
+@media (max-width: 700px){
+  html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-brand-logo-full{
+    width: min(300px, 82%) !important;
+    max-width: 300px !important;
+    max-height: 100px !important;
+  }
+}
