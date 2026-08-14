@@ -1453,3 +1453,38 @@ html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-brand-logo-full{
     max-height: 116px !important;
   }
 }
+
+/*
+  STEP8D-8 — login-optimized transparent logo.
+
+  Correction:
+  - use login-specific transparent logo with reduced white glare
+  - built-in subtitle colour improved in asset
+  - keep soft integrated light field
+  - visual only; no login/auth logic
+*/
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .login-shell > div:first-child::before{
+  width: min(640px, 92%) !important;
+  height: 168px !important;
+  background:
+    radial-gradient(
+      ellipse at center,
+      rgba(218,248,252,.58) 0%,
+      rgba(186,233,241,.40) 30%,
+      rgba(132,205,222,.22) 54%,
+      rgba(132,205,222,.08) 70%,
+      rgba(132,205,222,0) 84%
+    ) !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-brand-logo-full{
+  width: min(520px, 80%) !important;
+  max-width: 520px !important;
+  max-height: 156px !important;
+  filter:
+    drop-shadow(0 4px 11px rgba(0,0,0,.28))
+    contrast(1.06)
+    saturate(1.04)
+    brightness(1.02) !important;
+}
