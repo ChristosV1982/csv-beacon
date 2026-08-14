@@ -1488,3 +1488,82 @@ html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-brand-logo-full{
     saturate(1.04)
     brightness(1.02) !important;
 }
+
+/*
+  STEP8D-9 — approved login logo asset.
+
+  Final login-logo direction:
+  - use login-only approved transparent logo asset
+  - all C.S.V. BEACON letters are consistent dark navy
+  - Marine Assurance & Compliance Platform is normal white
+  - no hard white rectangle
+  - soft integrated light field remains
+  - visual only; no login/auth logic
+*/
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .login-shell > div:first-child{
+  position: relative !important;
+  overflow: visible !important;
+  min-height: auto !important;
+  max-height: none !important;
+  padding: 10px 0 8px 0 !important;
+  margin-bottom: 4px !important;
+  display: block !important;
+  text-align: center !important;
+  isolation: isolate !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .login-shell > div:first-child::before{
+  content: "" !important;
+  position: absolute !important;
+  left: 50% !important;
+  top: 50% !important;
+  width: min(640px, 92%) !important;
+  height: 168px !important;
+  transform: translate(-50%, -52%) !important;
+  background:
+    radial-gradient(
+      ellipse at center,
+      rgba(218,248,252,.58) 0%,
+      rgba(186,233,241,.40) 30%,
+      rgba(132,205,222,.22) 54%,
+      rgba(132,205,222,.08) 70%,
+      rgba(132,205,222,0) 84%
+    ) !important;
+  border-radius: 999px !important;
+  z-index: -1 !important;
+  pointer-events: none !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-brand-logo-full{
+  position: static !important;
+  left: auto !important;
+  top: auto !important;
+  transform: none !important;
+  width: min(520px, 80%) !important;
+  max-width: 520px !important;
+  max-height: 156px !important;
+  height: auto !important;
+  display: block !important;
+  margin: 0 auto 4px auto !important;
+  opacity: 1 !important;
+  mix-blend-mode: normal !important;
+  filter: drop-shadow(0 4px 11px rgba(0,0,0,.28)) !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  z-index: 1 !important;
+}
+
+@media (max-width: 700px){
+  html[data-csvb-ds="v01"][data-csvb-page="login.html"] .login-shell > div:first-child::before{
+    width: min(440px, 92%) !important;
+    height: 126px !important;
+  }
+
+  html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-brand-logo-full{
+    width: min(360px, 86%) !important;
+    max-width: 360px !important;
+    max-height: 116px !important;
+  }
+}
