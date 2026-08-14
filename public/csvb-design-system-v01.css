@@ -1567,3 +1567,120 @@ html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-brand-logo-full{
     max-height: 116px !important;
   }
 }
+
+/*
+  STEP8D-10 — login brand rebuilt with icon image + real text.
+
+  Correction:
+  - stop using raster text for C.S.V. BEACON
+  - use icon-only transparent image
+  - render C.S.V. BEACON as real browser text so all letters match
+  - render Marine Assurance & Compliance Platform as normal white text
+  - visual only; no login/auth logic
+*/
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-login-brand-hero{
+  position: relative !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 18px !important;
+  min-height: 154px !important;
+  padding: 10px 0 8px 0 !important;
+  margin: 0 auto 4px auto !important;
+  text-align: left !important;
+  isolation: isolate !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-login-brand-hero::before{
+  content: "" !important;
+  position: absolute !important;
+  left: 50% !important;
+  top: 50% !important;
+  width: min(650px, 92%) !important;
+  height: 168px !important;
+  transform: translate(-50%, -52%) !important;
+  background:
+    radial-gradient(
+      ellipse at center,
+      rgba(218,248,252,.58) 0%,
+      rgba(186,233,241,.40) 30%,
+      rgba(132,205,222,.22) 54%,
+      rgba(132,205,222,.08) 70%,
+      rgba(132,205,222,0) 84%
+    ) !important;
+  border-radius: 999px !important;
+  z-index: -1 !important;
+  pointer-events: none !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-login-brand-icon{
+  width: 136px !important;
+  max-width: 136px !important;
+  height: auto !important;
+  display: block !important;
+  filter: drop-shadow(0 4px 10px rgba(0,0,0,.28)) !important;
+  flex: 0 0 auto !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-login-brand-copy{
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  min-width: 0 !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-login-brand-main{
+  color: #00184e !important;
+  font-family: var(--csvb-ds-font) !important;
+  font-size: clamp(2rem, 4.2vw, 3.55rem) !important;
+  line-height: .98 !important;
+  font-weight: 800 !important;
+  letter-spacing: .055em !important;
+  white-space: nowrap !important;
+  text-shadow: 0 2px 7px rgba(255,255,255,.16), 0 4px 12px rgba(0,0,0,.18) !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-login-brand-subline{
+  margin-top: 10px !important;
+  color: #ffffff !important;
+  font-family: var(--csvb-ds-font) !important;
+  font-size: clamp(.95rem, 1.45vw, 1.25rem) !important;
+  line-height: 1.15 !important;
+  font-weight: 600 !important;
+  letter-spacing: .012em !important;
+  white-space: nowrap !important;
+  text-shadow: 0 2px 8px rgba(0,0,0,.36) !important;
+}
+
+/* Prevent old experimental full-logo rules from affecting the new brand block. */
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-login-brand-hero .csvb-brand-logo-full{
+  display: none !important;
+}
+
+@media (max-width: 700px){
+  html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-login-brand-hero{
+    flex-direction: column !important;
+    gap: 8px !important;
+    min-height: auto !important;
+    padding: 8px 0 10px 0 !important;
+    text-align: center !important;
+  }
+
+  html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-login-brand-icon{
+    width: 118px !important;
+    max-width: 118px !important;
+  }
+
+  html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-login-brand-main{
+    font-size: 2rem !important;
+    white-space: normal !important;
+    text-align: center !important;
+  }
+
+  html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-login-brand-subline{
+    font-size: .95rem !important;
+    white-space: normal !important;
+    text-align: center !important;
+  }
+}
