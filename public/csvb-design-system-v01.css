@@ -1785,3 +1785,126 @@ html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-login-brand-subline{
     white-space: normal !important;
   }
 }
+
+/*
+  STEP8D-12 — login brand horizontal alignment.
+
+  Correction:
+  - keep lighthouse/icon and text at the same visual level
+  - prevent medium-width browser windows from stacking the text below the icon
+  - preserve the approved font weight
+  - keep subtitle white
+  - visual only; no login/auth logic
+*/
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-login-brand-hero{
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 18px !important;
+  width: min(700px, 94%) !important;
+  min-height: 142px !important;
+  margin: 0 auto 6px auto !important;
+  padding: 8px 0 8px 0 !important;
+  text-align: left !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-login-brand-hero::before{
+  width: min(690px, 100%) !important;
+  height: 154px !important;
+  transform: translate(-50%, -50%) !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-login-brand-icon{
+  width: 132px !important;
+  max-width: 132px !important;
+  flex: 0 0 132px !important;
+  margin: 0 !important;
+  align-self: center !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-login-brand-copy{
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  justify-content: center !important;
+  text-align: left !important;
+  transform: translateY(2px) !important;
+  min-width: 0 !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-login-brand-main{
+  font-size: clamp(1.95rem, 3.3vw, 3rem) !important;
+  font-weight: 650 !important;
+  line-height: 1 !important;
+  letter-spacing: .055em !important;
+  white-space: nowrap !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-login-brand-subline{
+  margin-top: 7px !important;
+  color: #ffffff !important;
+  font-size: clamp(.9rem, 1.18vw, 1.05rem) !important;
+  font-weight: 500 !important;
+  white-space: nowrap !important;
+}
+
+/*
+  Override the previous <=700px column rule.
+  Keep row layout also on medium-width browser windows.
+*/
+@media (max-width: 700px){
+  html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-login-brand-hero{
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 12px !important;
+    width: 100% !important;
+    min-height: 120px !important;
+    text-align: left !important;
+  }
+
+  html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-login-brand-icon{
+    width: 92px !important;
+    max-width: 92px !important;
+    flex: 0 0 92px !important;
+  }
+
+  html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-login-brand-copy{
+    align-items: flex-start !important;
+    text-align: left !important;
+    transform: translateY(1px) !important;
+  }
+
+  html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-login-brand-main{
+    font-size: 1.72rem !important;
+    font-weight: 650 !important;
+    white-space: nowrap !important;
+  }
+
+  html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-login-brand-subline{
+    font-size: .82rem !important;
+    white-space: nowrap !important;
+  }
+}
+
+/*
+  Only very narrow phone screens may stack.
+*/
+@media (max-width: 480px){
+  html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-login-brand-hero{
+    flex-direction: column !important;
+    gap: 8px !important;
+    text-align: center !important;
+  }
+
+  html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-login-brand-copy{
+    align-items: center !important;
+    text-align: center !important;
+  }
+
+  html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-login-brand-subline{
+    white-space: normal !important;
+  }
+}
