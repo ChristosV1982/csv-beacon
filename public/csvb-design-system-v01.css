@@ -1400,3 +1400,56 @@ html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-brand-logo-full{
     max-height: 116px !important;
   }
 }
+
+/*
+  STEP8D-7 — login logo refinement
+  Approved corrections:
+  - reduce white/over-bright effect between letters
+  - make the integrated light field a bit stronger
+  - visual only
+*/
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .login-shell > div:first-child::before{
+  width: min(620px, 90%) !important;
+  height: 165px !important;
+  transform: translate(-50%, -52%) !important;
+  background:
+    radial-gradient(
+      ellipse at center,
+      rgba(214,244,249,.52) 0%,
+      rgba(186,231,240,.34) 30%,
+      rgba(154,214,226,.18) 52%,
+      rgba(154,214,226,.06) 68%,
+      rgba(154,214,226,0) 82%
+    ) !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-brand-logo-full{
+  width: min(520px, 80%) !important;
+  max-width: 520px !important;
+  max-height: 156px !important;
+
+  /*
+    Reduce the white "splitting" / over-glow effect in the letters,
+    while keeping the logo visible on the dark background.
+  */
+  filter:
+    drop-shadow(0 1px 2px rgba(255,255,255,.10))
+    drop-shadow(0 4px 10px rgba(0,0,0,.30))
+    brightness(1.04)
+    contrast(1.08)
+    saturate(1.06) !important;
+}
+
+@media (max-width: 700px){
+  html[data-csvb-ds="v01"][data-csvb-page="login.html"] .login-shell > div:first-child::before{
+    width: min(440px, 92%) !important;
+    height: 126px !important;
+  }
+
+  html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-brand-logo-full{
+    width: min(360px, 86%) !important;
+    max-width: 360px !important;
+    max-height: 116px !important;
+  }
+}
