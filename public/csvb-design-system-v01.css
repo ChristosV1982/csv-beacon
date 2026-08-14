@@ -1684,3 +1684,104 @@ html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-login-brand-hero .cs
     text-align: center !important;
   }
 }
+
+/*
+  STEP8D-11 — login brand text centering and font refinement.
+
+  Corrections:
+  - reduce heavy/bold appearance of C.S.V. BEACON
+  - center the text group over the soft light glow
+  - keep real browser text so all BEACON letters match
+  - keep subtitle normal white
+  - visual only; no login/auth logic
+*/
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-login-brand-hero{
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 16px !important;
+  width: min(650px, 92%) !important;
+  min-height: 150px !important;
+  margin: 0 auto 6px auto !important;
+  padding: 8px 0 8px 0 !important;
+  text-align: center !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-login-brand-hero::before{
+  left: 50% !important;
+  top: 50% !important;
+  width: min(660px, 100%) !important;
+  height: 160px !important;
+  transform: translate(-50%, -50%) !important;
+  background:
+    radial-gradient(
+      ellipse at center,
+      rgba(218,248,252,.62) 0%,
+      rgba(186,233,241,.43) 28%,
+      rgba(132,205,222,.24) 54%,
+      rgba(132,205,222,.09) 72%,
+      rgba(132,205,222,0) 86%
+    ) !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-login-brand-icon{
+  width: 126px !important;
+  max-width: 126px !important;
+  margin: 0 !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-login-brand-copy{
+  align-items: flex-start !important;
+  justify-content: center !important;
+  text-align: left !important;
+  transform: translateY(-1px) !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-login-brand-main{
+  color: #00184e !important;
+  font-size: clamp(1.85rem, 3.55vw, 3.05rem) !important;
+  line-height: 1.02 !important;
+  font-weight: 650 !important;
+  letter-spacing: .06em !important;
+  text-shadow:
+    0 1px 3px rgba(255,255,255,.16),
+    0 3px 9px rgba(0,0,0,.18) !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-login-brand-subline{
+  margin-top: 7px !important;
+  color: #ffffff !important;
+  font-size: clamp(.9rem, 1.25vw, 1.08rem) !important;
+  line-height: 1.15 !important;
+  font-weight: 500 !important;
+  letter-spacing: .01em !important;
+  text-shadow: 0 2px 8px rgba(0,0,0,.36) !important;
+}
+
+@media (max-width: 700px){
+  html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-login-brand-hero{
+    flex-direction: column !important;
+    gap: 8px !important;
+    width: 100% !important;
+    min-height: auto !important;
+    text-align: center !important;
+  }
+
+  html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-login-brand-copy{
+    align-items: center !important;
+    text-align: center !important;
+    transform: none !important;
+  }
+
+  html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-login-brand-main{
+    font-size: 1.85rem !important;
+    font-weight: 650 !important;
+    white-space: normal !important;
+  }
+
+  html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-login-brand-subline{
+    font-size: .92rem !important;
+    white-space: normal !important;
+  }
+}
