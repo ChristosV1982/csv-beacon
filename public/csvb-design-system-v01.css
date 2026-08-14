@@ -2206,3 +2206,56 @@ html[data-csvb-ds="v01"][data-csvb-page="login.html"] body.csvb-login-page .logi
     white-space: normal !important;
   }
 }
+
+/*
+  STEP8D-15 — center login glow to actual logo group.
+
+  Correction:
+  - previous glow was centered in a wide container, not behind the logo group
+  - make brand hero content-width
+  - reduce glow size
+  - keep lighthouse/text layout unchanged
+  - visual only; no login/auth logic
+*/
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] body.csvb-login-page .login-shell .csvb-login-brand-hero{
+  width: fit-content !important;
+  max-width: 92% !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+  grid-template-columns: 150px auto !important;
+  column-gap: 18px !important;
+  justify-content: center !important;
+  justify-items: start !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] body.csvb-login-page .login-shell .csvb-login-brand-hero::before{
+  left: 50% !important;
+  top: 50% !important;
+  width: min(520px, 106%) !important;
+  height: 124px !important;
+  transform: translate(-50%, -50%) !important;
+  background:
+    radial-gradient(
+      ellipse at center,
+      rgba(218,248,252,.56) 0%,
+      rgba(186,233,241,.36) 30%,
+      rgba(132,205,222,.17) 56%,
+      rgba(132,205,222,.05) 72%,
+      rgba(132,205,222,0) 86%
+    ) !important;
+}
+
+@media (max-width: 700px){
+  html[data-csvb-ds="v01"][data-csvb-page="login.html"] body.csvb-login-page .login-shell .csvb-login-brand-hero{
+    width: fit-content !important;
+    max-width: 96% !important;
+    grid-template-columns: 112px auto !important;
+    column-gap: 12px !important;
+  }
+
+  html[data-csvb-ds="v01"][data-csvb-page="login.html"] body.csvb-login-page .login-shell .csvb-login-brand-hero::before{
+    width: min(400px, 108%) !important;
+    height: 102px !important;
+  }
+}
