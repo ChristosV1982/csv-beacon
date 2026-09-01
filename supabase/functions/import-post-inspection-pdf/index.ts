@@ -1,7 +1,7 @@
 export const config = {
   verify_jwt: false
 };
-const FUNCTION_VERSION = "cors-jwt-off-v40_photo_highlight_and_lae_qa_cleanup";
+const FUNCTION_VERSION = "cors-jwt-off-v41_controlled_noc_wrapped_line_fix";
 import { createClient } from "npm:@supabase/supabase-js@2.45.4";
 import * as pdfjsLib from "npm:pdfjs-dist@4.2.67/legacy/build/pdf.mjs";
 /**
@@ -514,6 +514,113 @@ function isLikelyHardwareCodeLine(line) {
   if (/^[A-Za-z0-9/&(),'\- ]{5,}:\s+.{4,}$/.test(line)) return true;
   return false;
 }
+
+function comparableTaxonomyText(value) {
+  return normSpaces(String(value ?? ""))
+    .toLowerCase()
+    .replace(/[‐‑‒–—]/g, "-");
+}
+
+async function loadControlledNocTaxonomy(supabaseAdmin) {
+  const { data, error } = await supabaseAdmin
+    .from("risk_noc_scores")
+    .select("designation,noc_text,sort_order")
+    .in("designation", ["Process", "Hardware"])
+    .order("sort_order", { ascending: true });
+
+  if (error) {
+    throw new Error(`NOC taxonomy lookup failed: ${error.message || String(error)}`);
+  }
+
+  const controlled = {
+    Process: [],
+    Hardware: [],
+  };
+
+  for (const row of data || []) {
+    const designation = String(row?.designation || "").trim();
+    const nocText = normSpaces(String(row?.noc_text || ""));
+
+    if (!nocText || !Array.isArray(controlled[designation])) continue;
+
+    const key = comparableTaxonomyText(nocText);
+    const exists = controlled[designation].some(
+      (value) => comparableTaxonomyText(value) === key
+    );
+
+    if (!exists) controlled[designation].push(nocText);
+  }
+
+  controlled.Process.sort((a, b) => b.length - a.length);
+  controlled.Hardware.sort((a, b) => b.length - a.length);
+
+  return controlled;
+}
+
+function findControlledSocNoc(tailLines, designation, controlledNocs) {
+  if (designation !== "Process" && designation !== "Hardware") return null;
+
+  const firstLine = normSpaces(String(tailLines?.[0] || ""));
+  const validStart =
+    designation === "Process"
+      ? isLikelyProcessCodeLine(firstLine)
+      : isLikelyHardwareCodeLine(firstLine);
+
+  if (!validStart) return null;
+
+  const options = Array.isArray(controlledNocs?.[designation])
+    ? controlledNocs[designation]
+    : [];
+
+  if (!options.length) return null;
+
+  let combined = "";
+  const maximumLines = Math.min(6, tailLines.length);
+
+  for (let index = 0; index < maximumLines; index++) {
+    const line = normSpaces(String(tailLines[index] || ""));
+    if (!line) continue;
+
+    if (
+      index > 0 &&
+      (
+        parseResponseStart(line) ||
+        isQuestionHeaderStart(line) ||
+        isReportSectionHeading(line) ||
+        isOperatorCommentsStart(line)
+      )
+    ) {
+      break;
+    }
+
+    combined = normSpaces(`${combined} ${line}`);
+
+    for (const option of options) {
+      const canonicalNoc = normSpaces(String(option || ""));
+      const comparableCombined = comparableTaxonomyText(combined);
+      const comparableSuffix = comparableTaxonomyText(`: ${canonicalNoc}`);
+
+      if (!comparableCombined.endsWith(comparableSuffix)) continue;
+
+      const prefix = combined
+        .slice(0, combined.length - canonicalNoc.length)
+        .trimEnd();
+
+      if (!prefix.endsWith(":")) continue;
+
+      const soc = prefix.slice(0, -1).trim();
+      if (!soc) continue;
+
+      return {
+        classification_coding: soc,
+        nature_of_concern: canonicalNoc,
+        consumed_line_count: index + 1,
+      };
+    }
+  }
+
+  return null;
+}
 // NEW IN v31
 function isOperatorCommentsStart(line) {
   const t = line.trim();
@@ -528,40 +635,101 @@ function isOperatorCommentsStart(line) {
   if (/^\d{1,2}\s+[A-Za-z]{3}\s+\d{4}\s+\d{2}:\d{2}\s+uploaded by\b/i.test(t)) return true;
   return false;
 }
-function parseResponseBlock(block) {
+function parseResponseBlock(block, controlledNocs = {}) {
   if (!isExtractableResponseType(block.response_type)) return null;
+
   const headerLine = block.lines[0]?.text ?? "";
-  const tailLines = block.lines.slice(1).map((x)=>x.text).filter(Boolean);
-  let classification_coding = null;
+  const tailLines = block.lines
+    .slice(1)
+    .map((x) => x.text)
+    .filter(Boolean);
+
+  const controlledSocNoc =
+    block.response_type === "negative"
+      ? findControlledSocNoc(
+          tailLines,
+          block.designation,
+          controlledNocs
+        )
+      : null;
+
+  let classification_coding =
+    controlledSocNoc?.classification_coding ?? null;
+
+  let nature_of_concern =
+    controlledSocNoc?.nature_of_concern ??
+    block.nature_of_concern;
+
+  const consumedLineCount =
+    Number(controlledSocNoc?.consumed_line_count || 0);
+
   const commentParts = [];
-  for (const line of tailLines){
-    const t = normSpaces(line);
+
+  for (let lineIndex = 0; lineIndex < tailLines.length; lineIndex++) {
+    if (lineIndex < consumedLineCount) continue;
+
+    const t = normSpaces(tailLines[lineIndex]);
     if (!t) continue;
     if (isReportHeaderOrFooter(t)) continue;
     if (/^PIQ additional data$/i.test(t)) continue;
     if (isReportSectionHeading(t)) break;
-    // NEW IN v31:
-    // hard stop before operator comments / corrective-action workflow
+
     if (isOperatorCommentsStart(t)) break;
-    if (block.designation === "Process" && isLikelyProcessCodeLine(t)) {
+
+    if (
+      block.designation === "Process" &&
+      isLikelyProcessCodeLine(t)
+    ) {
       classification_coding = classification_coding ?? t;
       continue;
     }
-    if (block.designation === "Human" && isLikelyHumanPifLine(t)) {
+
+    if (
+      block.designation === "Human" &&
+      isLikelyHumanPifLine(t)
+    ) {
       classification_coding = classification_coding ?? t;
       continue;
     }
-    if (block.designation === "Hardware" && isLikelyHardwareCodeLine(t)) {
+
+    if (
+      block.designation === "Hardware" &&
+      isLikelyHardwareCodeLine(t)
+    ) {
       classification_coding = classification_coding ?? t;
       continue;
     }
+
     commentParts.push(t);
   }
-  const observation_text = cleanOcimfFooterFragments(commentParts.join(" "));
-  const positive_rank = block.response_type === "positive" && block.designation === "Human" ? block.rank : null;
-  const finding_kind = block.response_type === "negative" ? "negative_observation" : block.response_type === "positive" ? "positive_observation" : "note_improvement";
-  const counts_as_observation = block.response_type !== "largely";
-  const confidence = block.designation === "Human" ? 0.95 : block.designation === "Process" ? 0.93 : 0.93;
+
+  const observation_text = cleanOcimfFooterFragments(
+    commentParts.join(" ")
+  );
+
+  const positive_rank =
+    block.response_type === "positive" &&
+    block.designation === "Human"
+      ? block.rank
+      : null;
+
+  const finding_kind =
+    block.response_type === "negative"
+      ? "negative_observation"
+      : block.response_type === "positive"
+        ? "positive_observation"
+        : "note_improvement";
+
+  const counts_as_observation =
+    block.response_type !== "largely";
+
+  const confidence =
+    block.designation === "Human"
+      ? 0.95
+      : block.designation === "Process"
+        ? 0.93
+        : 0.93;
+
   return {
     obs_type: block.response_type,
     finding_kind,
@@ -569,13 +737,13 @@ function parseResponseBlock(block) {
     question_base: block.question_base,
     question_full: block.question_full,
     designation: block.designation,
-    nature_of_concern: block.nature_of_concern,
+    nature_of_concern,
     classification_coding,
     positive_rank,
     observation_text,
     page_hint: block.page_hint,
     confidence,
-    source_excerpt: headerLine || null
+    source_excerpt: headerLine || null,
   };
 }
 function dedupeObservations(observations) {
@@ -603,7 +771,7 @@ function previewText(value, max = 240) {
   return `${s.slice(0, max)}…`;
 }
 
-function buildImportQaDebug(pages, header, observations, question_sections_count, response_blocks_count) {
+function buildImportQaDebug(pages, header, observations, question_sections_count, response_blocks_count, controlledNocs = {}) {
   const flatLines = flattenPages(pages);
   const questionSections = buildQuestionSections(flatLines);
   const warnings = [];
@@ -682,6 +850,27 @@ function buildImportQaDebug(pages, header, observations, question_sections_count
       warnings.push(`${label}: classification_coding was not detected.`);
     }
 
+    if (
+      obs.obs_type === "negative" &&
+      (obs.designation === "Process" || obs.designation === "Hardware")
+    ) {
+      const controlledOptions = Array.isArray(controlledNocs?.[obs.designation])
+        ? controlledNocs[obs.designation]
+        : [];
+
+      const nocIsControlled = controlledOptions.some(
+        (value) =>
+          comparableTaxonomyText(value) ===
+          comparableTaxonomyText(obs.nature_of_concern || "")
+      );
+
+      if (controlledOptions.length && !nocIsControlled) {
+        warnings.push(
+          `${label}: NOC did not match the controlled ${obs.designation} taxonomy.`
+        );
+      }
+    }
+
     if (obs.designation === "Human" && obs.obs_type !== "positive" && !String(obs.classification_coding || "").trim()) {
       warnings.push(`${label}: Human PIF/classification line was not detected.`);
     }
@@ -695,7 +884,7 @@ function buildImportQaDebug(pages, header, observations, question_sections_count
   const duplicate_findings_removed = Math.max(0, Number(response_blocks_count || 0) - Number((observations || []).length || 0));
 
   return {
-    schema_version: "post_inspection_import_qa_debug_v1",
+    schema_version: "post_inspection_import_qa_debug_v2",
     generated_at: new Date().toISOString(),
     function_version: FUNCTION_VERSION,
     page_count: pages.length,
@@ -726,24 +915,35 @@ function buildImportQaDebug(pages, header, observations, question_sections_count
 }
 
 
-function extractFindingsFromPages(pages) {
+function extractFindingsFromPages(pages, controlledNocs = {}) {
   const flatLines = flattenPages(pages);
   const questionSections = buildQuestionSections(flatLines);
-  const examined_questions = questionSections.map((s)=>s.question_base);
+  const examined_questions = questionSections.map(
+    (section) => section.question_base
+  );
+
   const observations = [];
-  for (const section of questionSections){
+
+  for (const section of questionSections) {
     const blocks = buildResponseBlocks(section);
-    for (const block of blocks){
-      const obs = parseResponseBlock(block);
-      if (obs) observations.push(obs);
+
+    for (const block of blocks) {
+      const observation = parseResponseBlock(
+        block,
+        controlledNocs
+      );
+
+      if (observation) observations.push(observation);
     }
   }
+
   const dedup = dedupeObservations(observations);
+
   return {
     observations: dedup,
     examined_questions,
     question_sections_count: questionSections.length,
-    response_blocks_count: observations.length
+    response_blocks_count: observations.length,
   };
 }
 Deno.serve(async (req)=>{
@@ -798,11 +998,12 @@ Deno.serve(async (req)=>{
     const pdfBytes = new Uint8Array(await pdfBlob.arrayBuffer());
     // 5) Extract pages with line breaks
     const pages = await extractPagesAsLines(pdfBytes);
+    const controlledNocs = await loadControlledNocTaxonomy(supabaseAdmin);
     // 6) Header
     const headerWindow = pages.slice(0, 8).join("\n\n");
     const header = extractHeaderFromText(headerWindow);
     // 7) Structured findings + examined questions
-    const { observations, examined_questions, question_sections_count, response_blocks_count } = extractFindingsFromPages(pages);
+    const { observations, examined_questions, question_sections_count, response_blocks_count } = extractFindingsFromPages(pages, controlledNocs);
     const extracted = {
       header,
       observations,
@@ -818,6 +1019,10 @@ Deno.serve(async (req)=>{
         question_sections_count,
         response_blocks_count,
         raw_findings: observations.length,
+        controlled_noc_counts: {
+          Process: controlledNocs.Process.length,
+          Hardware: controlledNocs.Hardware.length
+        },
         examined_count: examined_questions.length,
         examined_sample: examined_questions.slice(0, 20)
       }
@@ -828,7 +1033,8 @@ Deno.serve(async (req)=>{
         header,
         observations,
         question_sections_count,
-        response_blocks_count
+        response_blocks_count,
+        controlledNocs
       );
     }
     return json(req, responseBody);
