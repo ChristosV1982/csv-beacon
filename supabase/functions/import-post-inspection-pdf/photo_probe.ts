@@ -1,0 +1,393 @@
+import {
+  PDFArray,
+  PDFDict,
+  PDFDocument,
+  PDFName,
+  PDFNumber,
+  PDFRawStream,
+  decodePDFRawStream,
+} from "npm:pdf-lib@1.17.1";
+
+// Metadata-only embedded-photo probe for post-inspection PDF imports.
+// This module does not upload files or write to Storage or the database.
+
+function multiplyPdfMatrices(left, right) {
+  const [a, b, c, d, e, f] = left;
+  const [g, h, i, j, k, l] = right;
+  return [
+    a * g + c * h,
+    b * g + d * h,
+    a * i + c * j,
+    b * i + d * j,
+    a * k + c * l + e,
+    b * k + d * l + f,
+  ];
+}
+
+function tokenizePdfContent(source) {
+  const tokens = [];
+  let index = 0;
+
+  const isWhitespace = (char) =>
+    char === "\u0000" || char === "\t" || char === "\n" ||
+    char === "\f" || char === "\r" || char === " ";
+
+  const isDelimiter = (char) =>
+    !char || isWhitespace(char) || "()<>[]{}/%".includes(char);
+
+  while (index < source.length) {
+    const char = source[index];
+
+    if (isWhitespace(char)) {
+      index += 1;
+      continue;
+    }
+
+    if (char === "%") {
+      while (
+        index < source.length &&
+        source[index] !== "\r" &&
+        source[index] !== "\n"
+      ) index += 1;
+      continue;
+    }
+
+    if (char === "(") {
+      let depth = 1;
+      index += 1;
+      while (index < source.length && depth > 0) {
+        if (source[index] === "\\") {
+          index += 2;
+          continue;
+        }
+        if (source[index] === "(") depth += 1;
+        else if (source[index] === ")") depth -= 1;
+        index += 1;
+      }
+      tokens.push({ type: "other" });
+      continue;
+    }
+
+    if (char === "<") {
+      if (source[index + 1] === "<") {
+        tokens.push({ type: "operator", value: "<<" });
+        index += 2;
+        continue;
+      }
+      index += 1;
+      while (index < source.length && source[index] !== ">") index += 1;
+      index += 1;
+      tokens.push({ type: "other" });
+      continue;
+    }
+
+    if (char === ">" && source[index + 1] === ">") {
+      tokens.push({ type: "operator", value: ">>" });
+      index += 2;
+      continue;
+    }
+
+    if (char === "/") {
+      const start = ++index;
+      while (index < source.length && !isDelimiter(source[index])) index += 1;
+      tokens.push({ type: "name", value: source.slice(start, index) });
+      continue;
+    }
+
+    if ("[]{}".includes(char)) {
+      tokens.push({ type: "operator", value: char });
+      index += 1;
+      continue;
+    }
+
+    const start = index;
+    while (index < source.length && !isDelimiter(source[index])) index += 1;
+    const value = source.slice(start, index);
+
+    if (/^[-+]?(?:\d+\.?\d*|\.\d+)$/.test(value)) {
+      tokens.push({ type: "number", value: Number(value) });
+    } else {
+      tokens.push({ type: "operator", value });
+    }
+  }
+
+  return tokens;
+}
+
+function imagePlacementsFromContent(source, pageHeight) {
+  let matrix = [1, 0, 0, 1, 0, 0];
+  const matrixStack = [];
+  let operands = [];
+  const placements = [];
+
+  for (const token of tokenizePdfContent(source)) {
+    if (token.type === "number" || token.type === "name") {
+      operands.push(token);
+      continue;
+    }
+
+    const operator = token.value;
+
+    if (operator === "q") {
+      matrixStack.push([...matrix]);
+    } else if (operator === "Q") {
+      matrix = matrixStack.pop() || [1, 0, 0, 1, 0, 0];
+    } else if (operator === "cm") {
+      const values = operands.slice(-6);
+      if (values.length === 6 && values.every((value) => value.type === "number")) {
+        matrix = multiplyPdfMatrices(matrix, values.map((value) => value.value));
+      }
+    } else if (operator === "Do") {
+      const name = [...operands].reverse().find((value) => value.type === "name");
+      if (name) {
+        const [a, b, c, d, e, f] = matrix;
+        const points = [[0, 0], [1, 0], [0, 1], [1, 1]].map(
+          ([x, y]) => [a * x + c * y + e, b * x + d * y + f]
+        );
+        const xs = points.map((point) => point[0]);
+        const ys = points.map((point) => point[1]);
+        const x0 = Math.min(...xs);
+        const x1 = Math.max(...xs);
+        const pdfY0 = Math.min(...ys);
+        const pdfY1 = Math.max(...ys);
+
+        placements.push({
+          resource_name: name.value,
+          display_x: x0,
+          display_y: pageHeight - pdfY1,
+          display_width: x1 - x0,
+          display_height: pdfY1 - pdfY0,
+        });
+      }
+    }
+
+    operands = [];
+  }
+
+  return placements;
+}
+
+function pdfNumber(dict, key) {
+  const value = dict.lookupMaybe(PDFName.of(key), PDFNumber);
+  return value ? value.asNumber() : 0;
+}
+
+function pdfNameList(value) {
+  if (value instanceof PDFName) return [value.decodeText()];
+  if (value instanceof PDFArray) {
+    const names = [];
+    for (let index = 0; index < value.size(); index++) {
+      const name = value.lookupMaybe(index, PDFName);
+      if (name) names.push(name.decodeText());
+    }
+    return names;
+  }
+  return [];
+}
+
+function decodedPageContent(page) {
+  const contents = page.node.Contents();
+  const streams = [];
+
+  if (contents instanceof PDFRawStream) {
+    streams.push(contents);
+  } else if (contents instanceof PDFArray) {
+    for (let index = 0; index < contents.size(); index++) {
+      const stream = contents.lookup(index);
+      if (stream instanceof PDFRawStream) streams.push(stream);
+    }
+  }
+
+  const decoder = new TextDecoder("latin1");
+  return streams
+    .map((stream) => decoder.decode(decodePDFRawStream(stream).decode()))
+    .join("\n");
+}
+
+async function sha256Hex(bytes) {
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return [...new Uint8Array(digest)]
+    .map((value) => value.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+export async function extractEmbeddedPhotoMetadata(pdfBytes, positionedPages, parseQuestionHeader) {
+  const document = await PDFDocument.load(pdfBytes, {
+    ignoreEncryption: false,
+    updateMetadata: false,
+  });
+
+  const pages = document.getPages();
+  const placementPages = [];
+  let allImagePlacements = 0;
+
+  for (let pageIndex = 0; pageIndex < pages.length; pageIndex++) {
+    const page = pages[pageIndex];
+    const resources = page.node.Resources();
+    const xObjects = resources?.lookupMaybe(PDFName.of("XObject"), PDFDict);
+    const imageResources = new Map();
+
+    if (xObjects) {
+      for (const [key, reference] of xObjects.entries()) {
+        const object = document.context.lookup(reference);
+        if (!(object instanceof PDFRawStream)) continue;
+
+        const subtype = object.dict.lookupMaybe(PDFName.of("Subtype"), PDFName);
+        if (subtype?.decodeText() !== "Image") continue;
+
+        const filters = pdfNameList(object.dict.lookup(PDFName.of("Filter")));
+        imageResources.set(key.decodeText(), {
+          filters,
+          width: pdfNumber(object.dict, "Width"),
+          height: pdfNumber(object.dict, "Height"),
+          bytes: object.getContents(),
+        });
+      }
+    }
+
+    const placements = imagePlacementsFromContent(
+      decodedPageContent(page),
+      page.getHeight()
+    )
+      .filter((placement) => imageResources.has(placement.resource_name))
+      .map((placement) => ({
+        ...placement,
+        ...imageResources.get(placement.resource_name),
+      }))
+      .sort((left, right) =>
+        left.display_y - right.display_y || left.display_x - right.display_x
+      );
+
+    allImagePlacements += placements.length;
+    placementPages.push(placements);
+  }
+
+  let activeQuestion = null;
+  const photos = [];
+  const warnings = [];
+  let likelyPhotoPlacements = 0;
+  let unassignedPhotos = 0;
+  let unsupportedPhotos = 0;
+  let ignoredImages = 0;
+
+  for (let pageIndex = 0; pageIndex < placementPages.length; pageIndex++) {
+    const positioned = positionedPages[pageIndex] || { lines: [] };
+    const events = [];
+
+    for (const line of positioned.lines || []) {
+      const question = parseQuestionHeader(line.text);
+      if (question) {
+        events.push({
+          type: "question",
+          y_top: Number(line.y_top || 0),
+          question_no: question.qno,
+        });
+      } else if (/^Operator uploaded photos$/i.test(String(line.text || "").trim())) {
+        events.push({
+          type: "operator_photos",
+          y_top: Number(line.y_top || 0),
+        });
+      }
+    }
+
+    for (const placement of placementPages[pageIndex]) {
+      events.push({
+        type: "image",
+        y_top: placement.display_y,
+        placement,
+      });
+    }
+
+    const eventOrder = { question: 0, operator_photos: 1, image: 2 };
+    events.sort((left, right) =>
+      left.y_top - right.y_top || eventOrder[left.type] - eventOrder[right.type]
+    );
+
+    let pagePhotoIndex = 0;
+
+    for (const event of events) {
+      if (event.type === "question") {
+        activeQuestion = {
+          question_no: event.question_no,
+          operator_photos: false,
+        };
+        continue;
+      }
+
+      if (event.type === "operator_photos") {
+        if (activeQuestion) activeQuestion.operator_photos = true;
+        continue;
+      }
+
+      const image = event.placement;
+      const likelyPhoto =
+        image.width >= 300 &&
+        image.height >= 300 &&
+        image.width * image.height >= 250000 &&
+        image.display_width >= 70 &&
+        image.display_height >= 60;
+
+      if (!likelyPhoto) {
+        ignoredImages += 1;
+        continue;
+      }
+
+      likelyPhotoPlacements += 1;
+
+      if (!activeQuestion || !activeQuestion.operator_photos) {
+        unassignedPhotos += 1;
+        warnings.push(
+          `Page ${pageIndex + 1}: likely photo ${image.resource_name} was not inside an Operator uploaded photos block.`
+        );
+        continue;
+      }
+
+      pagePhotoIndex += 1;
+
+      const directJpeg =
+        image.filters.length === 1 && image.filters[0] === "DCTDecode";
+
+      if (!directJpeg) {
+        unsupportedPhotos += 1;
+        warnings.push(
+          `Page ${pageIndex + 1} / ${activeQuestion.question_no}: unsupported image filters ${image.filters.join(", ") || "none"}.`
+        );
+        continue;
+      }
+
+      photos.push({
+        question_no: activeQuestion.question_no,
+        source_page: pageIndex + 1,
+        page_image_index: pagePhotoIndex,
+        source_kind: activeQuestion.question_no.startsWith("11.1.")
+          ? "chapter_11_representative"
+          : "operator_uploaded",
+        resource_name: image.resource_name,
+        mime_type: "image/jpeg",
+        size_bytes: image.bytes.length,
+        width: image.width,
+        height: image.height,
+        display_x: Number(image.display_x.toFixed(3)),
+        display_y: Number(image.display_y.toFixed(3)),
+        display_width: Number(image.display_width.toFixed(3)),
+        display_height: Number(image.display_height.toFixed(3)),
+        content_sha256: await sha256Hex(image.bytes),
+        sort_index: photos.length,
+      });
+    }
+  }
+
+  return {
+    counts: {
+      all_image_placements: allImagePlacements,
+      likely_photo_placements: likelyPhotoPlacements,
+      photos_assigned_supported: photos.length,
+      photos_unassigned: unassignedPhotos,
+      photos_unsupported: unsupportedPhotos,
+      images_ignored_as_non_photos: ignoredImages,
+      warnings_count: warnings.length,
+    },
+    photos,
+    warnings,
+  };
+}

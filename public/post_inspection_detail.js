@@ -1979,7 +1979,8 @@ async function importReportPdfQaDebugFromFile(file) {
   if (!file) return;
 
   const ok = confirm(
-    "QA Debug JSON will upload this PDF temporarily, call the extraction function with debug=true, and download a JSON diagnostic file.\n\n" +
+    "QA Debug JSON will upload this PDF temporarily, call the extraction function with debug=true, " +
+    "automatically delete the temporary PDF, and download a JSON diagnostic file.\n\n" +
     "It will NOT create/update the report and will NOT replace extracted observations.\n\n" +
     "Continue?"
   );
@@ -1993,65 +1994,144 @@ async function importReportPdfQaDebugFromFile(file) {
   const safeName = String(file.name || "report.pdf").replace(/[^a-zA-Z0-9._-]+/g, "_");
   const tempPath = `${PDF_FOLDER_PREFIX}/tmp/debug_${Date.now()}_${safeName}`;
 
-  const { error: upErr } = await state.supabase
-    .storage
-    .from(PDF_BUCKET_DEFAULT)
-    .upload(tempPath, file, { upsert: true, contentType: "application/pdf" });
+  let uploaded = false;
+  let data = null;
 
-  if (upErr) throw upErr;
+  const cleanupResult = {
+    attempted: false,
+    removed: false,
+    error: null,
+  };
 
-  setSaveStatus("Extracting QA debug…");
+  try {
+    const { error: upErr } = await state.supabase
+      .storage
+      .from(PDF_BUCKET_DEFAULT)
+      .upload(tempPath, file, {
+        upsert: true,
+        contentType: "application/pdf",
+      });
 
-  const { data, error } = await state.supabase.functions.invoke(
-    "import-post-inspection-pdf",
-    {
-      body: {
-        report_id: state.activeReport?.id || "temp",
-        pdf_storage_path: tempPath,
-        debug: true,
-      },
+    if (upErr) throw upErr;
+    uploaded = true;
+
+    setSaveStatus("Extracting QA debug…");
+
+    const invokeResult = await state.supabase.functions.invoke(
+      "import-post-inspection-pdf",
+      {
+        body: {
+          report_id: state.activeReport?.id || "temp",
+          pdf_storage_path: tempPath,
+          debug: true,
+          photo_probe: true,
+        },
+      }
+    );
+
+    if (invokeResult.error) throw invokeResult.error;
+
+    data = invokeResult.data;
+
+    if (!data?.ok) {
+      throw new Error(data?.error || "QA debug extraction failed");
     }
-  );
+  } finally {
+    if (uploaded) {
+      cleanupResult.attempted = true;
 
-  if (error) throw error;
-  if (!data?.ok) throw new Error(data?.error || "QA debug extraction failed");
+      try {
+        const { error: cleanupErr } = await state.supabase
+          .storage
+          .from(PDF_BUCKET_DEFAULT)
+          .remove([tempPath]);
+
+        if (cleanupErr) {
+          cleanupResult.error =
+            cleanupErr.message ||
+            JSON.stringify(cleanupErr);
+          console.warn(
+            "QA temporary PDF cleanup failed:",
+            cleanupErr
+          );
+        } else {
+          cleanupResult.removed = true;
+        }
+      } catch (cleanupThrown) {
+        cleanupResult.error =
+          cleanupThrown?.message ||
+          String(cleanupThrown);
+        console.warn(
+          "QA temporary PDF cleanup threw an error:",
+          cleanupThrown
+        );
+      }
+    }
+  }
 
   const extracted = data.extracted || {};
+
   const qaPayload = {
     export_type: "post_inspection_pdf_import_qa_debug",
     exported_at: nowIso(),
     source_file_name: file.name || null,
     temp_pdf_storage_path: tempPath,
+    temp_pdf_cleanup: cleanupResult,
     active_report_id: state.activeReport?.id || null,
     active_report_ref: state.activeReport?.report_ref || null,
     function_version: data.function_version || null,
     basic_debug: data.debug || null,
     extracted_summary: {
-      report_reference: extracted?.header?.report_reference || null,
-      vessel_name: extracted?.header?.vessel_name || null,
-      inspection_date: extracted?.header?.inspection_date || null,
-      examined_count: Number(extracted?.examined_count || 0),
-      observations_count: Array.isArray(extracted?.observations) ? extracted.observations.length : 0,
+      report_reference:
+        extracted?.header?.report_reference || null,
+      vessel_name:
+        extracted?.header?.vessel_name || null,
+      inspection_date:
+        extracted?.header?.inspection_date || null,
+      examined_count:
+        Number(extracted?.examined_count || 0),
+      observations_count:
+        Array.isArray(extracted?.observations)
+          ? extracted.observations.length
+          : 0,
     },
     edge_response: data,
   };
 
-  downloadJsonFile(qaPayload, qaDebugExportFilename(file, data));
+  downloadJsonFile(
+    qaPayload,
+    qaDebugExportFilename(file, data)
+  );
 
-  const warningsCount = Number(data?.qa_debug?.counts?.warnings_count || 0);
-  const unparsedCount = Number(data?.qa_debug?.counts?.unparsed_response_lines_count || 0);
+  const warningsCount =
+    Number(data?.qa_debug?.counts?.warnings_count || 0);
 
-  setSaveStatus("QA debug JSON downloaded");
+  const unparsedCount =
+    Number(
+      data?.qa_debug?.counts
+        ?.unparsed_response_lines_count || 0
+    );
+
+  setSaveStatus(
+    cleanupResult.removed
+      ? "QA debug JSON downloaded; temporary PDF removed"
+      : "QA debug JSON downloaded; cleanup warning"
+  );
+
   alert(
     "QA Debug JSON downloaded.\n\n" +
     `Function version: ${data.function_version || "unknown"}\n` +
     `Questions examined: ${qaPayload.extracted_summary.examined_count}\n` +
     `Observations extracted: ${qaPayload.extracted_summary.observations_count}\n` +
     `Warnings: ${warningsCount}\n` +
-    `Unparsed response-like lines: ${unparsedCount}`
+    `Unparsed response-like lines: ${unparsedCount}\n` +
+    `Temporary PDF cleanup: ${
+      cleanupResult.removed
+        ? "Removed successfully"
+        : `FAILED - ${cleanupResult.error || "unknown error"}`
+    }`
   );
 }
-
 
 function buildExportPayload() {
   if (!state.activeReport) return null;

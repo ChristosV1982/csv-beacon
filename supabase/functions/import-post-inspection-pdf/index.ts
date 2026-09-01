@@ -1,9 +1,10 @@
 export const config = {
   verify_jwt: false
 };
-const FUNCTION_VERSION = "cors-jwt-off-v41_controlled_noc_wrapped_line_fix";
+const FUNCTION_VERSION = "cors-jwt-off-v42_photo_metadata_probe";
 import { createClient } from "npm:@supabase/supabase-js@2.45.4";
 import * as pdfjsLib from "npm:pdfjs-dist@4.2.67/legacy/build/pdf.mjs";
+import { extractEmbeddedPhotoMetadata } from "./photo_probe.ts";
 /**
  * CORS
  */ function buildCorsHeaders(req) {
@@ -97,16 +98,22 @@ function monthToNum(mon) {
   return map[m] ?? "";
 }
 /**
- * PDF -> page texts with line breaks (reconstructed)
- */ async function extractPagesAsLines(pdfBytes) {
+ * PDF -> page texts plus positioned lines for the metadata-only photo probe.
+ */ async function extractPdfTextData(pdfBytes) {
   const loadingTask = pdfjsLib.getDocument({
-    data: pdfBytes,
+    // PDF.js may transfer/detach its input. Preserve the original bytes for
+    // the independent embedded-image metadata pass.
+    data: pdfBytes.slice(),
     disableWorker: true
   });
   const pdf = await loadingTask.promise;
   const pages = [];
+  const positionedPages = [];
   for(let pageNo = 1; pageNo <= pdf.numPages; pageNo++){
     const page = await pdf.getPage(pageNo);
+    const viewport = page.getViewport({
+      scale: 1
+    });
     const content = await page.getTextContent();
     // deno-lint-ignore no-explicit-any
     const items = content.items;
@@ -135,6 +142,7 @@ function monthToNum(mon) {
     }
     const yKeys = Array.from(byY.keys()).sort((a, b)=>b - a);
     const lines = [];
+    const positionedLines = [];
     for (const y of yKeys){
       const parts = byY.get(y) ?? [];
       parts.sort((a, b)=>a.x - b.x);
@@ -142,10 +150,23 @@ function monthToNum(mon) {
       const cleaned = normSpaces(line);
       if (!cleaned) continue;
       lines.push(cleaned);
+      positionedLines.push({
+        text: cleaned,
+        y_top: viewport.height - y
+      });
     }
     pages.push(lines.join("\n"));
+    positionedPages.push({
+      page: pageNo,
+      width: viewport.width,
+      height: viewport.height,
+      lines: positionedLines
+    });
   }
-  return pages;
+  return {
+    pages,
+    positionedPages
+  };
 }
 function extractHeaderFromText(headerText) {
   const t = headerText;
@@ -979,6 +1000,14 @@ Deno.serve(async (req)=>{
     // 3) Read payload
     const payload = await req.json();
     const want_debug = payload?.debug === true || payload?.debug === "true";
+    const want_photo_probe =
+      payload?.photo_probe === true || payload?.photo_probe === "true";
+    if (want_photo_probe && !want_debug) {
+      return json(req, {
+        ok: false,
+        error: "photo_probe requires debug=true"
+      }, 400);
+    }
     const report_id = payload?.report_id;
     const pdf_storage_path = payload?.pdf_storage_path;
     if (!report_id) return json(req, {
@@ -997,7 +1026,7 @@ Deno.serve(async (req)=>{
     }
     const pdfBytes = new Uint8Array(await pdfBlob.arrayBuffer());
     // 5) Extract pages with line breaks
-    const pages = await extractPagesAsLines(pdfBytes);
+    const { pages, positionedPages } = await extractPdfTextData(pdfBytes);
     const controlledNocs = await loadControlledNocTaxonomy(supabaseAdmin);
     // 6) Header
     const headerWindow = pages.slice(0, 8).join("\n\n");
@@ -1036,6 +1065,16 @@ Deno.serve(async (req)=>{
         response_blocks_count,
         controlledNocs
       );
+
+      if (want_photo_probe) {
+        const photoProbe = await extractEmbeddedPhotoMetadata(
+          pdfBytes,
+          positionedPages,
+          isQuestionHeaderStart
+        );
+        responseBody.debug.photo_counts = photoProbe.counts;
+        responseBody.qa_debug.photo_extraction = photoProbe;
+      }
     }
     return json(req, responseBody);
   } catch (e) {
