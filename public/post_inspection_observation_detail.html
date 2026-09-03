@@ -189,6 +189,50 @@
       .grid-2{ grid-template-columns: 1fr; }
       .grid-3{ grid-template-columns: 1fr; }
     }
+    .inspector-photo-status{
+      margin-bottom:12px;
+      color:var(--pi-muted);
+      font-weight:800;
+    }
+
+    .inspector-photo-grid{
+      display:grid;
+      grid-template-columns:
+        repeat(auto-fit, minmax(280px, 420px));
+      gap:16px;
+      align-items:start;
+    }
+
+    .inspector-photo-item{
+      margin:0;
+      padding:12px;
+      border:1px solid var(--pi-border);
+      border-radius:14px;
+      background:#f7fbff;
+    }
+
+    .inspector-photo-item a{
+      display:block;
+      border-radius:10px;
+      overflow:hidden;
+      background:#071523;
+    }
+
+    .inspector-photo-item img{
+      display:block;
+      width:100%;
+      height:auto;
+      max-height:560px;
+      object-fit:contain;
+    }
+
+    .inspector-photo-caption{
+      margin-top:10px;
+      color:#22364d;
+      font-size:13px;
+      font-weight:800;
+      line-height:1.45;
+    }
   </style>
   <script src="./csvb-module-guard.js?v=20260522_dashboard_button_guard"></script>
   <link rel="stylesheet" href="./csvb-ui-polish.css?v=20260430_1" />
@@ -257,6 +301,21 @@
         <label>Observation Text</label>
         <textarea id="supportingCommentField" style="min-height:140px;"></textarea>
       </div>
+    </div>
+
+
+    <div class="pi-card" id="inspectorPhotoCard" hidden>
+      <h2>Inspector Uploaded Photos</h2>
+      <div
+        class="inspector-photo-status"
+        id="inspectorPhotoStatus"
+      >
+        Loading Inspector uploaded photos…
+      </div>
+      <div
+        class="inspector-photo-grid"
+        id="inspectorPhotoGrid"
+      ></div>
     </div>
 
     <div class="pi-card csvb-risk-card" id="observationRiskCard">
@@ -429,7 +488,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js" defer></script>
   <script src="./app-config.js" defer></script>
   <script src="./auth.js" defer></script>
-  <script type="module" src="./post_inspection_observation_detail.js?v=20260529_ddmmyyyy_datetime_v34"></script>
+  <script type="module" src="./post_inspection_observation_detail.js?v=20260903_inspector_photos_v35"></script>
   <script type="module" src="./post_inspection_mscat_ui.js?v=20260629_shared_learning_ai_v08"></script>
   <script src="./csvb-post-obs-thread-link.js?v=20260505_1"></script>
   <script src="./csvb-ui-polish.js?v=20260430_1"></script>

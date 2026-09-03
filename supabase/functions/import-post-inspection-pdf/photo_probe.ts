@@ -292,13 +292,18 @@ export async function extractEmbeddedPhotoMetadata(
       observationsByQuestion.get(questionNo) || [];
 
     candidates.push({
+      question_no: questionNo,
+      question_full: observation?.question_full || null,
       obs_type: observationType,
       finding_kind: observation?.finding_kind || null,
       designation: observation?.designation || null,
+      positive_rank: observation?.positive_rank || null,
       nature_of_concern: observation?.nature_of_concern || null,
       classification_coding: observation?.classification_coding || null,
       observation_text: observation?.observation_text || null,
       page_hint: observation?.page_hint || null,
+      source_excerpt: observation?.source_excerpt || null,
+      confidence: observation?.confidence ?? null,
     });
 
     observationsByQuestion.set(questionNo, candidates);
@@ -307,6 +312,7 @@ export async function extractEmbeddedPhotoMetadata(
   let activeQuestion = null;
   const photos = [];
   const warnings = [];
+  const eligiblePhotoPayloads = [];
 
   let likelyPhotoPlacements = 0;
   let unassignedPhotos = 0;
@@ -512,7 +518,10 @@ export async function extractEmbeddedPhotoMetadata(
         }
       }
 
-      photos.push({
+      const contentSha256 =
+        await sha256Hex(image.bytes);
+
+      const photoMetadata = {
         question_no: activeQuestion.question_no,
         source_page: pageIndex + 1,
         page_image_index: pagePhotoIndex,
@@ -543,9 +552,23 @@ export async function extractEmbeddedPhotoMetadata(
         display_height:
           Number(image.display_height.toFixed(3)),
         content_sha256:
-          await sha256Hex(image.bytes),
+          contentSha256,
         sort_index: photos.length,
-      });
+      };
+
+      photos.push(photoMetadata);
+
+      if (
+        photoSource === "inspector_uploaded" &&
+        eligibilityStatus === "eligible" &&
+        associationStatus ===
+          "exact_question_single_finding"
+      ) {
+        eligiblePhotoPayloads.push({
+          photo: photoMetadata,
+          bytes: image.bytes.slice(),
+        });
+      }
     }
   }
 
@@ -578,5 +601,7 @@ export async function extractEmbeddedPhotoMetadata(
     },
     photos,
     warnings,
+    eligible_photo_payloads:
+      eligiblePhotoPayloads,
   };
 }

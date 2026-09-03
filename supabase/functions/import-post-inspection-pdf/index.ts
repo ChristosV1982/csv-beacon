@@ -1,7 +1,7 @@
 export const config = {
   verify_jwt: false
 };
-const FUNCTION_VERSION = "cors-jwt-off-v43_ch11_inspector_photo_classifier";
+const FUNCTION_VERSION = "cors-jwt-off-v45_inspector_photo_structured_pgno";
 import { createClient } from "npm:@supabase/supabase-js@2.45.4";
 import * as pdfjsLib from "npm:pdfjs-dist@4.2.67/legacy/build/pdf.mjs";
 import { extractEmbeddedPhotoMetadata } from "./photo_probe.ts";
@@ -1008,120 +1008,729 @@ function extractFindingsFromPages(pages, controlledNocs = {}) {
     response_blocks_count: observations.length,
   };
 }
-Deno.serve(async (req)=>{
-  if (req.method === "OPTIONS") return noContent(req, 204);
+function photoPersistenceMode(value) {
+  const mode =
+    String(value || "").trim().toLowerCase();
+
+  if (!mode) return "";
+
+  if (mode !== "preview" && mode !== "apply") {
+    throw new Error(
+      "Bad request: photo_persistence_mode must be preview or apply"
+    );
+  }
+
+  return mode;
+}
+
+function sanitizePgnoByQuestion(value) {
+  const result = {};
+
+  if (
+    !value ||
+    typeof value !== "object" ||
+    Array.isArray(value)
+  ) {
+    return result;
+  }
+
+  for (const [questionNo, selected] of
+    Object.entries(value)) {
+    const normalizedQuestionNo =
+      String(questionNo || "").trim();
+
+    if (
+      !normalizedQuestionNo ||
+      !Array.isArray(selected)
+    ) {
+      continue;
+    }
+
+    result[normalizedQuestionNo] =
+      selected
+        .map((entry) => {
+          if (typeof entry === "string") {
+            const legacyText =
+              String(entry || "").trim();
+
+            return legacyText || null;
+          }
+
+          if (
+            !entry ||
+            typeof entry !== "object" ||
+            Array.isArray(entry)
+          ) {
+            return null;
+          }
+
+          const pgnoNo =
+            String(entry.pgno_no || "").trim();
+
+          const text =
+            String(entry.text || "").trim();
+
+          if (!pgnoNo && !text) {
+            return null;
+          }
+
+          return {
+            pgno_no: pgnoNo,
+            text,
+          };
+        })
+        .filter(Boolean);
+  }
+
+  return result;
+}
+
+async function requirePersistenceReportAccess(
+  supabaseUrl,
+  anonKey,
+  jwt,
+  reportId,
+  pdfStoragePath
+) {
+  const userClient = createClient(
+    supabaseUrl,
+    anonKey,
+    {
+      global: {
+        headers: {
+          Authorization: `Bearer ${jwt}`,
+        },
+      },
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+        detectSessionInUrl: false,
+      },
+    }
+  );
+
+  const { data: report, error } =
+    await userClient
+      .from("post_inspection_reports")
+      .select(
+        "id, report_ref, pdf_storage_path"
+      )
+      .eq("id", reportId)
+      .maybeSingle();
+
+  if (error || !report) {
+    throw new Error("Forbidden");
+  }
+
+  if (
+    String(report.pdf_storage_path || "") !==
+    String(pdfStoragePath || "")
+  ) {
+    throw new Error(
+      "Bad request: PDF path does not match the selected report"
+    );
+  }
+
+  return report;
+}
+
+function buildPersistenceEntry(
+  eligiblePayload,
+  pgnoByQuestion
+) {
+  const photo = eligiblePayload?.photo;
+
+  if (
+    !photo ||
+    photo.source_kind !== "inspector_uploaded" ||
+    photo.eligibility_status !== "eligible" ||
+    photo.association_status !==
+      "exact_question_single_finding"
+  ) {
+    throw new Error(
+      "Bad request: ineligible photo reached persistence preparation"
+    );
+  }
+
+  const candidates =
+    Array.isArray(photo.observation_candidates)
+      ? photo.observation_candidates
+      : [];
+
+  if (candidates.length !== 1) {
+    throw new Error(
+      "Bad request: eligible photo does not have exactly one finding"
+    );
+  }
+
+  const candidate = candidates[0];
+  const questionNo =
+    String(photo.question_no || "").trim();
+
+  return {
+    observation: {
+      question_no: questionNo,
+      question_full:
+        candidate?.question_full || null,
+      obs_type:
+        candidate?.obs_type || null,
+      designation:
+        candidate?.designation || null,
+      positive_rank:
+        candidate?.positive_rank || null,
+      nature_of_concern:
+        candidate?.nature_of_concern || null,
+      classification_coding:
+        candidate?.classification_coding || null,
+      observation_text:
+        candidate?.observation_text || null,
+      pgno_selected:
+        pgnoByQuestion[questionNo] || [],
+      page_hint:
+        candidate?.page_hint ?? null,
+      source_excerpt:
+        candidate?.source_excerpt || null,
+      confidence:
+        candidate?.confidence ?? null,
+    },
+    photo: {
+      content_sha256:
+        photo.content_sha256,
+      size_bytes:
+        photo.size_bytes,
+      width:
+        photo.width,
+      height:
+        photo.height,
+      source_page:
+        photo.source_page,
+      resource_name:
+        photo.resource_name || null,
+      association_status:
+        photo.association_status,
+    },
+  };
+}
+
+async function persistEligiblePhotoPayloads(
+  supabaseAdmin,
+  reportId,
+  createdBy,
+  eligiblePayloads,
+  pgnoByQuestion
+) {
+  if (!Array.isArray(eligiblePayloads)) {
+    throw new Error(
+      "Bad request: eligible photo payloads are invalid"
+    );
+  }
+
+  if (eligiblePayloads.length > 100) {
+    throw new Error(
+      "Bad request: more than 100 eligible photos were supplied"
+    );
+  }
+
+  if (!eligiblePayloads.length) {
+    return {
+      ok: true,
+      report_id: reportId,
+      entries_processed: 0,
+      observations_created: 0,
+      photo_assets_created: 0,
+      photo_links_created: 0,
+      storage_objects_uploaded: 0,
+      results: [],
+    };
+  }
+
+  const photoBucket =
+    "post-inspection-photos";
+
+  const uploadedPaths = [];
+  const preparedStoragePaths = new Set();
+  const entries = [];
+
   try {
-    if (req.method !== "POST") return json(req, {
-      error: "Use POST"
-    }, 405);
-    const auth = req.headers.get("Authorization") || "";
-    const jwt = auth.startsWith("Bearer ") ? auth.slice(7) : "";
+    for (const eligiblePayload of
+      eligiblePayloads) {
+      const photo = eligiblePayload?.photo;
+      const bytes = eligiblePayload?.bytes;
+
+      if (!(bytes instanceof Uint8Array)) {
+        throw new Error(
+          "Bad request: eligible photo bytes are unavailable"
+        );
+      }
+
+      const hash =
+        String(
+          photo?.content_sha256 || ""
+        ).trim().toLowerCase();
+
+      const storagePath =
+        `${reportId}/${hash}.jpg`;
+
+      const { data: existingAsset, error: assetError } =
+        await supabaseAdmin
+          .from("post_inspection_photo_assets")
+          .select(
+            "id, storage_path, content_sha256"
+          )
+          .eq("report_id", reportId)
+          .eq("content_sha256", hash)
+          .maybeSingle();
+
+      if (assetError) {
+        throw new Error(
+          `Photo asset lookup failed: ${assetError.message}`
+        );
+      }
+
+      if (
+        !existingAsset &&
+        !preparedStoragePaths.has(storagePath)
+      ) {
+        const { error: uploadError } =
+          await supabaseAdmin
+            .storage
+            .from(photoBucket)
+            .upload(
+              storagePath,
+              bytes,
+              {
+                upsert: false,
+                contentType: "image/jpeg",
+                cacheControl: "3600",
+              }
+            );
+
+        if (uploadError) {
+          throw new Error(
+            `Inspector photo upload failed: ${uploadError.message}`
+          );
+        }
+
+        uploadedPaths.push(storagePath);
+        preparedStoragePaths.add(storagePath);
+      } else if (
+        existingAsset &&
+        existingAsset.storage_path !==
+          storagePath
+      ) {
+        throw new Error(
+          "Existing photo asset has an unexpected Storage path"
+        );
+      }
+
+      entries.push(
+        buildPersistenceEntry(
+          eligiblePayload,
+          pgnoByQuestion
+        )
+      );
+    }
+
+    const { data: persisted, error: persistError } =
+      await supabaseAdmin.rpc(
+        "csvb_persist_post_inspection_observation_photos",
+        {
+          p_report_id: reportId,
+          p_created_by: createdBy,
+          p_entries: entries,
+        }
+      );
+
+    if (persistError) {
+      throw new Error(
+        `Photo persistence RPC failed: ${persistError.message}`
+      );
+    }
+
+    return {
+      ...(persisted || {}),
+      storage_objects_uploaded:
+        uploadedPaths.length,
+    };
+  } catch (error) {
+    let cleanupError = null;
+
+    if (uploadedPaths.length) {
+      const { error: removeError } =
+        await supabaseAdmin
+          .storage
+          .from(photoBucket)
+          .remove(uploadedPaths);
+
+      if (removeError) {
+        cleanupError =
+          removeError.message ||
+          String(removeError);
+      }
+    }
+
+    const message =
+      error instanceof Error
+        ? error.message
+        : String(error);
+
+    if (cleanupError) {
+      throw new Error(
+        `${message}; Storage rollback failed: ${cleanupError}`
+      );
+    }
+
+    throw error;
+  }
+}
+
+Deno.serve(async (req)=>{
+  if (req.method === "OPTIONS") {
+    return noContent(req, 204);
+  }
+
+  try {
+    if (req.method !== "POST") {
+      return json(req, {
+        error: "Use POST"
+      }, 405);
+    }
+
+    const auth =
+      req.headers.get("Authorization") || "";
+
+    const jwt =
+      auth.startsWith("Bearer ")
+        ? auth.slice(7)
+        : "";
+
     if (!jwt) {
       return json(req, {
         ok: false,
-        error: "Missing Authorization Bearer token"
+        error:
+          "Missing Authorization Bearer token"
       }, 401);
     }
-    const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
-    const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    const PDF_BUCKET = Deno.env.get("POST_INSPECTION_PDF_BUCKET");
-    if (!SUPABASE_URL || !SERVICE_ROLE_KEY || !PDF_BUCKET) {
+
+    const SUPABASE_URL =
+      Deno.env.get("SUPABASE_URL");
+
+    const SERVICE_ROLE_KEY =
+      Deno.env.get(
+        "SUPABASE_SERVICE_ROLE_KEY"
+      );
+
+    const SUPABASE_ANON_KEY =
+      Deno.env.get("SUPABASE_ANON_KEY");
+
+    const PDF_BUCKET =
+      Deno.env.get(
+        "POST_INSPECTION_PDF_BUCKET"
+      );
+
+    if (
+      !SUPABASE_URL ||
+      !SERVICE_ROLE_KEY ||
+      !PDF_BUCKET
+    ) {
       return json(req, {
         ok: false,
-        error: "Missing function secrets (SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY / POST_INSPECTION_PDF_BUCKET)"
+        error:
+          "Missing function secrets (SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY / POST_INSPECTION_PDF_BUCKET)"
       }, 500);
     }
-    const supabaseAdmin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
-    // 1) Validate token -> uid
-    const user = await getUserFromJwt(SUPABASE_URL, SERVICE_ROLE_KEY, jwt);
+
+    const supabaseAdmin =
+      createClient(
+        SUPABASE_URL,
+        SERVICE_ROLE_KEY
+      );
+
+    const user =
+      await getUserFromJwt(
+        SUPABASE_URL,
+        SERVICE_ROLE_KEY,
+        jwt
+      );
+
     const uid = user?.id;
-    if (!uid) throw new Error("Unauthorized");
-    // 2) Role check
-    await requireAdminRole(supabaseAdmin, uid);
-    // 3) Read payload
+
+    if (!uid) {
+      throw new Error("Unauthorized");
+    }
+
+    const caller =
+      await requireAdminRole(
+        supabaseAdmin,
+        uid
+      );
+
     const payload = await req.json();
-    const want_debug = payload?.debug === true || payload?.debug === "true";
-    const want_photo_probe =
-      payload?.photo_probe === true || payload?.photo_probe === "true";
-    if (want_photo_probe && !want_debug) {
+
+    const wantDebug =
+      payload?.debug === true ||
+      payload?.debug === "true";
+
+    const wantPhotoProbe =
+      payload?.photo_probe === true ||
+      payload?.photo_probe === "true";
+
+    const persistenceMode =
+      photoPersistenceMode(
+        payload?.photo_persistence_mode
+      );
+
+    const wantPhotoPersistence =
+      Boolean(persistenceMode);
+
+    if (wantPhotoProbe && !wantDebug) {
       return json(req, {
         ok: false,
-        error: "photo_probe requires debug=true"
+        error:
+          "photo_probe requires debug=true"
       }, 400);
     }
-    const report_id = payload?.report_id;
-    const pdf_storage_path = payload?.pdf_storage_path;
-    if (!report_id) return json(req, {
-      ok: false,
-      error: "report_id is required"
-    }, 400);
-    if (!pdf_storage_path) return json(req, {
-      ok: false,
-      error: "pdf_storage_path is required"
-    }, 400);
-    // 4) Download PDF
-    const { data: pdfBlob, error: dlErr } = await supabaseAdmin.storage.from(PDF_BUCKET).download(pdf_storage_path);
-    if (dlErr || !pdfBlob) {
-      const details = dlErr ? JSON.stringify(dlErr, Object.getOwnPropertyNames(dlErr)) : "no blob";
-      throw new Error(`Storage download failed: bucket=${PDF_BUCKET} path=${pdf_storage_path} err=${details}`);
+
+    if (
+      wantPhotoPersistence &&
+      !SUPABASE_ANON_KEY
+    ) {
+      throw new Error(
+        "Missing function secret SUPABASE_ANON_KEY"
+      );
     }
-    const pdfBytes = new Uint8Array(await pdfBlob.arrayBuffer());
-    // 5) Extract pages with line breaks
-    const { pages, positionedPages } = await extractPdfTextData(pdfBytes);
-    const controlledNocs = await loadControlledNocTaxonomy(supabaseAdmin);
-    // 6) Header
-    const headerWindow = pages.slice(0, 8).join("\n\n");
-    const header = extractHeaderFromText(headerWindow);
-    // 7) Structured findings + examined questions
-    const { observations, examined_questions, question_sections_count, response_blocks_count } = extractFindingsFromPages(pages, controlledNocs);
+
+    const reportId =
+      String(
+        payload?.report_id || ""
+      ).trim();
+
+    const pdfStoragePath =
+      String(
+        payload?.pdf_storage_path || ""
+      ).trim();
+
+    if (!reportId) {
+      return json(req, {
+        ok: false,
+        error: "report_id is required"
+      }, 400);
+    }
+
+    if (!pdfStoragePath) {
+      return json(req, {
+        ok: false,
+        error:
+          "pdf_storage_path is required"
+      }, 400);
+    }
+
+    let persistenceReport = null;
+
+    if (wantPhotoPersistence) {
+      persistenceReport =
+        await requirePersistenceReportAccess(
+          SUPABASE_URL,
+          SUPABASE_ANON_KEY,
+          jwt,
+          reportId,
+          pdfStoragePath
+        );
+    }
+
+    const { data: pdfBlob, error: dlErr } =
+      await supabaseAdmin
+        .storage
+        .from(PDF_BUCKET)
+        .download(pdfStoragePath);
+
+    if (dlErr || !pdfBlob) {
+      const details = dlErr
+        ? JSON.stringify(
+            dlErr,
+            Object.getOwnPropertyNames(dlErr)
+          )
+        : "no blob";
+
+      throw new Error(
+        `Storage download failed: bucket=${PDF_BUCKET} path=${pdfStoragePath} err=${details}`
+      );
+    }
+
+    const pdfBytes =
+      new Uint8Array(
+        await pdfBlob.arrayBuffer()
+      );
+
+    const { pages, positionedPages } =
+      await extractPdfTextData(pdfBytes);
+
+    const controlledNocs =
+      await loadControlledNocTaxonomy(
+        supabaseAdmin
+      );
+
+    const headerWindow =
+      pages.slice(0, 8).join("\n\n");
+
+    const header =
+      extractHeaderFromText(headerWindow);
+
+    const {
+      observations,
+      examined_questions,
+      question_sections_count,
+      response_blocks_count
+    } = extractFindingsFromPages(
+      pages,
+      controlledNocs
+    );
+
+    if (
+      persistenceReport?.report_ref &&
+      header?.report_reference &&
+      String(
+        persistenceReport.report_ref
+      ).trim().toUpperCase() !==
+        String(
+          header.report_reference
+        ).trim().toUpperCase()
+    ) {
+      throw new Error(
+        "Bad request: PDF report reference does not match the selected report"
+      );
+    }
+
     const extracted = {
       header,
       observations,
       examined_questions,
-      examined_count: examined_questions.length
+      examined_count:
+        examined_questions.length
     };
+
     const responseBody = {
       ok: true,
       extracted,
-      function_version: FUNCTION_VERSION,
+      function_version:
+        FUNCTION_VERSION,
       debug: {
         pages: pages.length,
         question_sections_count,
         response_blocks_count,
-        raw_findings: observations.length,
+        raw_findings:
+          observations.length,
         controlled_noc_counts: {
-          Process: controlledNocs.Process.length,
-          Hardware: controlledNocs.Hardware.length
+          Process:
+            controlledNocs.Process.length,
+          Hardware:
+            controlledNocs.Hardware.length
         },
-        examined_count: examined_questions.length,
-        examined_sample: examined_questions.slice(0, 20)
+        examined_count:
+          examined_questions.length,
+        examined_sample:
+          examined_questions.slice(0, 20)
       }
     };
-    if (want_debug) {
-      responseBody.qa_debug = buildImportQaDebug(
-        pages,
-        header,
-        observations,
-        question_sections_count,
-        response_blocks_count,
-        controlledNocs
-      );
 
-      if (want_photo_probe) {
-        const photoProbe = await extractEmbeddedPhotoMetadata(
+    if (wantDebug) {
+      responseBody.qa_debug =
+        buildImportQaDebug(
+          pages,
+          header,
+          observations,
+          question_sections_count,
+          response_blocks_count,
+          controlledNocs
+        );
+    }
+
+    if (
+      wantPhotoProbe ||
+      wantPhotoPersistence
+    ) {
+      const photoProbe =
+        await extractEmbeddedPhotoMetadata(
           pdfBytes,
           positionedPages,
           isQuestionHeaderStart,
           observations
         );
-        responseBody.debug.photo_counts = photoProbe.counts;
-        responseBody.qa_debug.photo_extraction = photoProbe;
+
+      const {
+        eligible_photo_payloads:
+          eligiblePhotoPayloads = [],
+        ...photoProbeForResponse
+      } = photoProbe;
+
+      if (wantDebug) {
+        responseBody.debug.photo_counts =
+          photoProbeForResponse.counts;
+
+        responseBody.qa_debug.photo_extraction =
+          photoProbeForResponse;
+      }
+
+      if (wantPhotoPersistence) {
+        const eligiblePhotos =
+          photoProbeForResponse.photos.filter(
+            (photo) =>
+              photo.source_kind ===
+                "inspector_uploaded" &&
+              photo.eligibility_status ===
+                "eligible" &&
+              photo.association_status ===
+                "exact_question_single_finding"
+          );
+
+        const persistenceSummary = {
+          mode: persistenceMode,
+          counts:
+            photoProbeForResponse.counts,
+          eligible_photos:
+            eligiblePhotos,
+          applied: false,
+        };
+
+        if (persistenceMode === "apply") {
+          const pgnoByQuestion =
+            sanitizePgnoByQuestion(
+              payload?.pgno_by_question
+            );
+
+          persistenceSummary.result =
+            await persistEligiblePhotoPayloads(
+              supabaseAdmin,
+              reportId,
+              caller.uid,
+              eligiblePhotoPayloads,
+              pgnoByQuestion
+            );
+
+          persistenceSummary.applied = true;
+        }
+
+        responseBody.photo_persistence =
+          persistenceSummary;
       }
     }
+
     return json(req, responseBody);
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    const status = msg.startsWith("Unauthorized") ? 401 : msg === "Forbidden" ? 403 : 500;
+    const msg =
+      e instanceof Error
+        ? e.message
+        : String(e);
+
+    const status =
+      msg.startsWith("Unauthorized")
+        ? 401
+        : msg === "Forbidden"
+          ? 403
+          : msg.startsWith("Bad request:")
+            ? 400
+            : 500;
+
     return json(req, {
       ok: false,
       error: msg

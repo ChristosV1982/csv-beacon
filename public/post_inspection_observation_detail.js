@@ -1,6 +1,6 @@
 import { loadLockedLibraryJson } from "./question_library_loader.js";
 
-const OBS_DETAIL_BUILD = "post_inspection_observation_detail_v34_ddmmyyyy_datetime_display_2026-05-29";
+const OBS_DETAIL_BUILD = "post_inspection_observation_detail_v35_inspector_photos_2026-09-03";
 
 
 
@@ -393,6 +393,239 @@ const state = {
   libByNo: new Map(),
   libCanonToExact: new Map(),
 };
+
+async function loadInspectorObservationPhotos() {
+  const card = el("inspectorPhotoCard");
+  const status = el("inspectorPhotoStatus");
+  const grid = el("inspectorPhotoGrid");
+
+  if (!card || !status || !grid) return;
+
+  card.hidden = true;
+  grid.replaceChildren();
+  status.textContent =
+    "Loading Inspector uploaded photos…";
+
+  const itemId =
+    String(state.item?.id || "").trim();
+
+  if (
+    !itemId ||
+    itemId.startsWith("legacy-")
+  ) {
+    return;
+  }
+
+  try {
+    const {
+      data: links,
+      error: linksError,
+    } = await state.supabase
+      .from(
+        "post_inspection_observation_photos"
+      )
+      .select(
+        [
+          "id",
+          "photo_asset_id",
+          "source_kind",
+          "source_heading",
+          "source_page",
+          "association_status",
+          "sort_index",
+        ].join(",")
+      )
+      .eq("observation_item_id", itemId)
+      .order("sort_index", {
+        ascending: true,
+      });
+
+    if (linksError) throw linksError;
+
+    const inspectorLinks =
+      (links || []).filter(
+        (link) =>
+          link.source_kind ===
+            "inspector_uploaded" &&
+          link.association_status ===
+            "exact_question_single_finding"
+      );
+
+    if (!inspectorLinks.length) {
+      return;
+    }
+
+    const assetIds = [
+      ...new Set(
+        inspectorLinks
+          .map((link) =>
+            String(
+              link.photo_asset_id || ""
+            ).trim()
+          )
+          .filter(Boolean)
+      ),
+    ];
+
+    const {
+      data: assets,
+      error: assetsError,
+    } = await state.supabase
+      .from("post_inspection_photo_assets")
+      .select(
+        [
+          "id",
+          "storage_bucket",
+          "storage_path",
+          "mime_type",
+          "size_bytes",
+          "width",
+          "height",
+        ].join(",")
+      )
+      .in("id", assetIds);
+
+    if (assetsError) throw assetsError;
+
+    const assetById = new Map(
+      (assets || []).map(
+        (asset) => [
+          String(asset.id),
+          asset,
+        ]
+      )
+    );
+
+    let rendered = 0;
+
+    for (const link of inspectorLinks) {
+      const asset =
+        assetById.get(
+          String(link.photo_asset_id)
+        );
+
+      if (!asset) continue;
+
+      const {
+        data: signed,
+        error: signedError,
+      } = await state.supabase
+        .storage
+        .from(asset.storage_bucket)
+        .createSignedUrl(
+          asset.storage_path,
+          600
+        );
+
+      if (signedError) throw signedError;
+
+      const signedUrl =
+        String(signed?.signedUrl || "");
+
+      if (!signedUrl) {
+        throw new Error(
+          "A signed photo URL was not returned."
+        );
+      }
+
+      const figure =
+        document.createElement("figure");
+
+      figure.className =
+        "inspector-photo-item";
+
+      const linkElement =
+        document.createElement("a");
+
+      linkElement.href = signedUrl;
+      linkElement.target = "_blank";
+      linkElement.rel = "noopener";
+
+      const image =
+        document.createElement("img");
+
+      const questionNo =
+        canonicalQno(
+          state.item?.question_base ||
+          state.item?.question_no ||
+          ""
+        );
+
+      image.src = signedUrl;
+      image.alt =
+        "Inspector uploaded photo for " +
+        (
+          questionNo
+            ? `question ${questionNo}`
+            : "this observation"
+        );
+
+      linkElement.appendChild(image);
+
+      const caption =
+        document.createElement("figcaption");
+
+      caption.className =
+        "inspector-photo-caption";
+
+      const sourcePage =
+        Number(link.source_page || 0);
+
+      const dimensions =
+        Number(asset.width || 0) > 0 &&
+        Number(asset.height || 0) > 0
+          ? (
+              ` • ${asset.width} × ` +
+              `${asset.height} px`
+            )
+          : "";
+
+      caption.textContent =
+        "Inspector uploaded photo" +
+        (
+          sourcePage
+            ? ` • Report page ${sourcePage}`
+            : ""
+        ) +
+        dimensions;
+
+      figure.appendChild(linkElement);
+      figure.appendChild(caption);
+      grid.appendChild(figure);
+
+      rendered += 1;
+    }
+
+    if (!rendered) {
+      status.textContent =
+        "No accessible Inspector uploaded photo was found.";
+      card.hidden = false;
+      return;
+    }
+
+    status.textContent =
+      `${rendered} Inspector uploaded ` +
+      `photo${rendered === 1 ? "" : "s"} ` +
+      "linked to this observation. " +
+      "Select a photo to open it at full size.";
+
+    card.hidden = false;
+  } catch (error) {
+    console.error(
+      "Inspector observation photo loading failed:",
+      error
+    );
+
+    status.textContent =
+      "Inspector uploaded photos could not be loaded: " +
+      (
+        error?.message ||
+        String(error)
+      );
+
+    card.hidden = false;
+  }
+}
 
 async function loadReportById(reportId) {
   const { data, error } = await state.supabase
@@ -1275,6 +1508,8 @@ async function init() {
   state.item = await loadObservationItem(reportId, itemId);
 
   if (!state.item) throw new Error("Observation item not found.");
+
+  await loadInspectorObservationPhotos();
 
   el("backToInspectionBtn").addEventListener("click", () => {
     window.location.href = `./post_inspection_detail.html?report_id=${encodeURIComponent(reportId)}`;

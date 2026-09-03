@@ -1,6 +1,6 @@
 import { loadLockedLibraryJson } from "./question_library_loader.js";
 
-const DETAIL_BUILD = "post_inspection_detail_v28_filtered_mscat_recalc_2026-06-29";
+const DETAIL_BUILD = "post_inspection_detail_v29_inspector_observation_photos_2026-09-03";
 const PDF_BUCKET_DEFAULT = "inspection-reports";
 const PDF_FOLDER_PREFIX = "post_inspections";
 const HUMAN_POSITIVE_FIXED_NOC = "Exceeded normal expectation.";
@@ -2133,6 +2133,426 @@ async function importReportPdfQaDebugFromFile(file) {
   );
 }
 
+function normalizePhotoPersistencePgno(value) {
+  let selected = value;
+
+  if (typeof selected === "string") {
+    const trimmed = selected.trim();
+
+    if (!trimmed) return [];
+
+    try {
+      selected = JSON.parse(trimmed);
+    } catch {
+      selected = [trimmed];
+    }
+  }
+
+  if (!Array.isArray(selected)) return [];
+
+  return selected
+    .map((entry) => {
+      if (typeof entry === "string") {
+        const text = entry.trim();
+        return text || null;
+      }
+
+      if (
+        !entry ||
+        typeof entry !== "object" ||
+        Array.isArray(entry)
+      ) {
+        return null;
+      }
+
+      const pgnoNo =
+        String(entry.pgno_no || "").trim();
+
+      const text =
+        String(entry.text || "").trim();
+
+      if (!pgnoNo && !text) return null;
+
+      return {
+        pgno_no: pgnoNo,
+        text,
+      };
+    })
+    .filter(Boolean);
+}
+
+function buildPhotoPersistencePgnoByQuestion(
+  extractedObservations
+) {
+  const result = {};
+  const storedItems =
+    Array.isArray(state.observationItems)
+      ? state.observationItems
+      : [];
+
+  for (const extractedItem of
+    Array.isArray(extractedObservations)
+      ? extractedObservations
+      : []) {
+    const questionNo = canonicalQno(
+      extractedItem?.question_base ||
+      extractedItem?.question_no ||
+      ""
+    );
+
+    if (!questionNo) continue;
+
+    const obsType =
+      String(extractedItem?.obs_type || "")
+        .trim()
+        .toLowerCase();
+
+    if (
+      obsType !== "negative" &&
+      obsType !== "largely"
+    ) {
+      continue;
+    }
+
+    const observationText =
+      String(
+        extractedItem?.observation_text ||
+        extractedItem?.remarks ||
+        ""
+      )
+        .trim()
+        .replace(/\s+/g, " ")
+        .toLowerCase();
+
+    const storedItem = storedItems.find((item) => {
+      const storedQuestionNo = canonicalQno(
+        item?.question_base ||
+        item?.question_no ||
+        ""
+      );
+
+      const storedObsType =
+        String(item?.obs_type || "")
+          .trim()
+          .toLowerCase();
+
+      const storedText =
+        String(
+          item?.observation_text ||
+          item?.remarks ||
+          ""
+        )
+          .trim()
+          .replace(/\s+/g, " ")
+          .toLowerCase();
+
+      return (
+        storedQuestionNo === questionNo &&
+        storedObsType === obsType &&
+        storedText === observationText
+      );
+    });
+
+    let selected =
+      normalizePhotoPersistencePgno(
+        storedItem?.pgno_selected
+      );
+
+    if (!selected.length) {
+      selected =
+        normalizePhotoPersistencePgno(
+          autoMatchPgnoForImportedItem({
+            ...extractedItem,
+            question_no: questionNo,
+            question_base: questionNo,
+          })
+        );
+    }
+
+    if (selected.length) {
+      result[questionNo] = selected;
+    }
+  }
+
+  return result;
+}
+
+async function invokeInspectorPhotoPersistence(
+  mode,
+  pgnoByQuestion = {}
+) {
+  const report = state.activeReport;
+
+  if (!report?.id) {
+    throw new Error(
+      "Open a stored Post-Inspection Report first."
+    );
+  }
+
+  if (!String(report.pdf_storage_path || "").trim()) {
+    throw new Error(
+      "The stored report does not have a linked PDF."
+    );
+  }
+
+  const { data, error } =
+    await state.supabase.functions.invoke(
+      "import-post-inspection-pdf",
+      {
+        body: {
+          report_id: report.id,
+          pdf_storage_path:
+            String(report.pdf_storage_path).trim(),
+          debug: true,
+          photo_probe: true,
+          photo_persistence_mode: mode,
+          pgno_by_question: pgnoByQuestion,
+        },
+      }
+    );
+
+  if (error) throw error;
+
+  if (!data?.ok) {
+    throw new Error(
+      data?.error ||
+      "Inspector-photo operation failed."
+    );
+  }
+
+  if (
+    data.function_version !==
+    "cors-jwt-off-v45_inspector_photo_structured_pgno"
+  ) {
+    throw new Error(
+      "Unexpected Edge Function version: " +
+      String(data.function_version || "unknown")
+    );
+  }
+
+  if (!data.photo_persistence) {
+    throw new Error(
+      "The Edge Function did not return the photo-persistence summary."
+    );
+  }
+
+  return data;
+}
+
+async function reloadReportItemsAfterPhotoPersistence() {
+  if (!state.activeReport?.id) return;
+
+  state.observationItems =
+    await loadObservationItemsForReport(
+      state.activeReport.id
+    );
+
+  rebuildExtractedItems();
+  renderObsTable();
+  renderObsSummary();
+
+  try {
+    await loadCurrentRiskForActiveReport();
+    await loadCurrentObservationRiskForActiveReport();
+  } catch (riskError) {
+    console.warn(
+      "Risk refresh after inspector-photo import failed:",
+      riskError
+    );
+  }
+
+  renderObsTable();
+}
+
+async function importInspectorObservationPhotos() {
+  const button =
+    el("inspectorObservationPhotosBtn");
+
+  const originalText =
+    button?.textContent ||
+    "Import Inspector Photos";
+
+  try {
+    if (button) {
+      button.disabled = true;
+      button.textContent = "Checking PDF…";
+    }
+
+    setSaveStatus(
+      "Previewing inspector observation photos…"
+    );
+
+    const preview =
+      await invokeInspectorPhotoPersistence(
+        "preview"
+      );
+
+    const summary =
+      preview.photo_persistence || {};
+
+    const counts =
+      summary.counts || {};
+
+    const eligiblePhotos =
+      Array.isArray(summary.eligible_photos)
+        ? summary.eligible_photos
+        : [];
+
+    const inspectorCount =
+      Number(
+        counts.photos_inspector_uploaded || 0
+      );
+
+    const operatorCount =
+      Number(
+        counts.photos_operator_uploaded || 0
+      );
+
+    const eligibleCount =
+      Number(
+        counts.photos_eligible ||
+        eligiblePhotos.length ||
+        0
+      );
+
+    const manualReviewCount =
+      Number(
+        counts.photos_manual_review || 0
+      );
+
+    const eligibleList =
+      eligiblePhotos
+        .map((photo) => {
+          const questionNo =
+            String(
+              photo?.question_no || "Unknown"
+            );
+
+          const sourcePage =
+            Number(photo?.source_page || 0);
+
+          return (
+            `Q${questionNo}` +
+            (
+              sourcePage
+                ? ` — report page ${sourcePage}`
+                : ""
+            )
+          );
+        })
+        .join("\n");
+
+    if (!eligiblePhotos.length) {
+      setSaveStatus(
+        "No eligible inspector photos found"
+      );
+
+      alert(
+        "Inspector-photo preview completed.\n\n" +
+        `Inspector uploaded photos: ${inspectorCount}\n` +
+        `Eligible for automatic persistence: ${eligibleCount}\n` +
+        `Operator uploaded photos excluded: ${operatorCount}\n` +
+        `Manual review required: ${manualReviewCount}\n\n` +
+        "No database or Storage changes were made."
+      );
+
+      return;
+    }
+
+    const proceed = confirm(
+      "Inspector-photo preview completed.\n\n" +
+      `Inspector uploaded photos: ${inspectorCount}\n` +
+      `Eligible for automatic persistence: ${eligibleCount}\n` +
+      `Operator uploaded photos excluded: ${operatorCount}\n` +
+      `Manual review required: ${manualReviewCount}\n\n` +
+      "Eligible photos:\n" +
+      eligibleList +
+      "\n\n" +
+      "Only Inspector uploaded photos linked to one exact " +
+      "Negative or Largely as Expected observation will be saved.\n" +
+      "Operator uploaded photos will not be saved.\n\n" +
+      "Apply these changes now?"
+    );
+
+    if (!proceed) {
+      setSaveStatus(
+        "Inspector-photo import cancelled after preview"
+      );
+      return;
+    }
+
+    const pgnoByQuestion =
+      buildPhotoPersistencePgnoByQuestion(
+        preview?.extracted?.observations || []
+      );
+
+    if (button) {
+      button.textContent =
+        "Saving Inspector Photos…";
+    }
+
+    setSaveStatus(
+      "Saving eligible inspector photos…"
+    );
+
+    const applied =
+      await invokeInspectorPhotoPersistence(
+        "apply",
+        pgnoByQuestion
+      );
+
+    const result =
+      applied?.photo_persistence?.result || {};
+
+    await reloadReportItemsAfterPhotoPersistence();
+
+    const observationsCreated =
+      Number(result.observations_created || 0);
+
+    const assetsCreated =
+      Number(result.photo_assets_created || 0);
+
+    const linksCreated =
+      Number(result.photo_links_created || 0);
+
+    const entriesProcessed =
+      Number(result.entries_processed || 0);
+
+    setSaveStatus(
+      "Inspector observation photos saved"
+    );
+
+    alert(
+      "Inspector-photo import completed.\n\n" +
+      `Eligible entries processed: ${entriesProcessed}\n` +
+      `Observations created: ${observationsCreated}\n` +
+      `Photo assets created: ${assetsCreated}\n` +
+      `Observation-photo links created: ${linksCreated}\n` +
+      `Operator uploaded photos saved: 0\n\n` +
+      "Open the corresponding observation to view its Inspector uploaded photo."
+    );
+  } catch (error) {
+    console.error(error);
+
+    setSaveStatus(
+      "Inspector-photo import failed"
+    );
+
+    alert(
+      "Inspector-photo import failed:\n\n" +
+      (
+        error?.message ||
+        String(error)
+      )
+    );
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.textContent = originalText;
+    }
+  }
+}
+
 function buildExportPayload() {
   if (!state.activeReport) return null;
   return {
@@ -2351,6 +2771,13 @@ async function init() {
       e.target.value = "";
     }
   });
+
+
+  el("inspectorObservationPhotosBtn")
+    .addEventListener(
+      "click",
+      importInspectorObservationPhotos
+    );
 
   el("exportBtn").addEventListener("click", exportJson);
   el("importBtn").addEventListener("click", () => el("importFile").click());
