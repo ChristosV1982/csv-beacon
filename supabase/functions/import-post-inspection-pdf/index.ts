@@ -1,7 +1,7 @@
 export const config = {
   verify_jwt: false
 };
-const FUNCTION_VERSION = "cors-jwt-off-v42_photo_metadata_probe";
+const FUNCTION_VERSION = "cors-jwt-off-v43_ch11_inspector_photo_classifier";
 import { createClient } from "npm:@supabase/supabase-js@2.45.4";
 import * as pdfjsLib from "npm:pdfjs-dist@4.2.67/legacy/build/pdf.mjs";
 import { extractEmbeddedPhotoMetadata } from "./photo_probe.ts";
@@ -328,6 +328,12 @@ function parseResponsePhrase(phrase) {
       nature_of_concern: "Free from obvious deterioration or deficiency."
     };
   }
+  if (/^Photo not representative\.$/i.test(p)) {
+    return {
+      response_type: "negative",
+      nature_of_concern: "Photo not representative."
+    };
+  }
   if (/^Photo provided representative\.$/i.test(p)) {
     return {
       response_type: "as_expected",
@@ -405,6 +411,20 @@ function parseResponseStart(line) {
     rank: null
   };
 }
+function isPhotoUploadHeading(line) {
+  const t = normSpaces(String(line || ""));
+  return /^(Inspector|Operator) uploaded photos$/i.test(t);
+}
+
+function parsePhotoFindingClassification(line) {
+  const t = normSpaces(String(line || ""));
+  const match = t.match(/^Photograph supplied:\s*(.+)$/i);
+
+  return match?.[1]
+    ? normSpaces(match[1])
+    : null;
+}
+
 function isReportSectionHeading(line) {
   const t = String(line || "").trim();
   if (!t) return false;
@@ -424,6 +444,7 @@ function isQuestionSectionBreakLine(line) {
   if (isReportHeaderOrFooter(t)) return true;
   if (/^PIQ additional data$/i.test(t)) return true;
   if (/^Unvalidated PIQ Responses$/i.test(t)) return true;
+  if (isPhotoUploadHeading(t)) return true;
   if (isReportSectionHeading(t)) return true;
   if (parseResponseStart(t)) return true;
   if (isQuestionHeaderStart(t)) return true;
@@ -480,6 +501,7 @@ function buildResponseBlocks(section) {
     const line = section.lines[i];
     const t = line.text.trim();
     if (isReportHeaderOrFooter(t)) continue;
+    if (isPhotoUploadHeading(t)) continue;
     if (i === 0 && isQuestionHeaderStart(t)) continue;
     const rs = parseResponseStart(t);
     if (rs) {
@@ -721,6 +743,21 @@ function parseResponseBlock(block, controlledNocs = {}) {
       continue;
     }
 
+    const photoClassification =
+      parsePhotoFindingClassification(t);
+
+    if (
+      block.designation === "Photo" &&
+      photoClassification
+    ) {
+      classification_coding =
+        classification_coding ??
+        photoClassification;
+      continue;
+    }
+
+    if (isPhotoUploadHeading(t)) continue;
+
     commentParts.push(t);
   }
 
@@ -817,7 +854,11 @@ function buildImportQaDebug(pages, header, observations, question_sections_count
       });
     }
 
-    if (/^(Hardware|Process|Human|Photo|Photograph)\b/i.test(t) && !parseResponseStart(t)) {
+    if (
+      /^(Hardware|Process|Human|Photo|Photograph)\b/i.test(t) &&
+      !parseResponseStart(t) &&
+      !parsePhotoFindingClassification(t)
+    ) {
       unparsed_response_lines.push({
         page: line.page,
         text: previewText(t, 220)
@@ -1070,7 +1111,8 @@ Deno.serve(async (req)=>{
         const photoProbe = await extractEmbeddedPhotoMetadata(
           pdfBytes,
           positionedPages,
-          isQuestionHeaderStart
+          isQuestionHeaderStart,
+          observations
         );
         responseBody.debug.photo_counts = photoProbe.counts;
         responseBody.qa_debug.photo_extraction = photoProbe;

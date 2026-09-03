@@ -211,7 +211,12 @@ async function sha256Hex(bytes) {
     .join("");
 }
 
-export async function extractEmbeddedPhotoMetadata(pdfBytes, positionedPages, parseQuestionHeader) {
+export async function extractEmbeddedPhotoMetadata(
+  pdfBytes,
+  positionedPages,
+  parseQuestionHeader,
+  observations = []
+) {
   const document = await PDFDocument.load(pdfBytes, {
     ignoreEncryption: false,
     updateMetadata: false,
@@ -262,35 +267,105 @@ export async function extractEmbeddedPhotoMetadata(pdfBytes, positionedPages, pa
     placementPages.push(placements);
   }
 
+  const observationsByQuestion = new Map();
+
+  for (
+    const observation of
+      Array.isArray(observations) ? observations : []
+  ) {
+    const observationType =
+      String(observation?.obs_type || "").trim();
+
+    if (
+      observationType !== "negative" &&
+      observationType !== "largely"
+    ) {
+      continue;
+    }
+
+    const questionNo =
+      String(observation?.question_base || "").trim();
+
+    if (!questionNo) continue;
+
+    const candidates =
+      observationsByQuestion.get(questionNo) || [];
+
+    candidates.push({
+      obs_type: observationType,
+      finding_kind: observation?.finding_kind || null,
+      designation: observation?.designation || null,
+      nature_of_concern: observation?.nature_of_concern || null,
+      classification_coding: observation?.classification_coding || null,
+      observation_text: observation?.observation_text || null,
+      page_hint: observation?.page_hint || null,
+    });
+
+    observationsByQuestion.set(questionNo, candidates);
+  }
+
   let activeQuestion = null;
   const photos = [];
   const warnings = [];
+
   let likelyPhotoPlacements = 0;
   let unassignedPhotos = 0;
   let unsupportedPhotos = 0;
   let ignoredImages = 0;
+  let inspectorUploadedPhotos = 0;
+  let operatorUploadedPhotos = 0;
+  let eligiblePhotos = 0;
+  let excludedPhotos = 0;
+  let manualReviewPhotos = 0;
 
-  for (let pageIndex = 0; pageIndex < placementPages.length; pageIndex++) {
-    const positioned = positionedPages[pageIndex] || { lines: [] };
+  for (
+    let pageIndex = 0;
+    pageIndex < placementPages.length;
+    pageIndex++
+  ) {
+    const positioned =
+      positionedPages[pageIndex] || { lines: [] };
+
     const events = [];
 
     for (const line of positioned.lines || []) {
-      const question = parseQuestionHeader(line.text);
+      const lineText =
+        String(line.text || "").trim();
+
+      const question =
+        parseQuestionHeader(lineText);
+
       if (question) {
         events.push({
           type: "question",
           y_top: Number(line.y_top || 0),
           question_no: question.qno,
         });
-      } else if (/^Operator uploaded photos$/i.test(String(line.text || "").trim())) {
+      } else if (
+        /^Inspector uploaded photos$/i.test(lineText)
+      ) {
         events.push({
-          type: "operator_photos",
+          type: "photo_section",
           y_top: Number(line.y_top || 0),
+          photo_source: "inspector_uploaded",
+          photo_heading: lineText,
+        });
+      } else if (
+        /^Operator uploaded photos$/i.test(lineText)
+      ) {
+        events.push({
+          type: "photo_section",
+          y_top: Number(line.y_top || 0),
+          photo_source: "operator_uploaded",
+          photo_heading: lineText,
         });
       }
     }
 
-    for (const placement of placementPages[pageIndex]) {
+    for (
+      const placement of
+        placementPages[pageIndex]
+    ) {
       events.push({
         type: "image",
         y_top: placement.display_y,
@@ -298,9 +373,17 @@ export async function extractEmbeddedPhotoMetadata(pdfBytes, positionedPages, pa
       });
     }
 
-    const eventOrder = { question: 0, operator_photos: 1, image: 2 };
-    events.sort((left, right) =>
-      left.y_top - right.y_top || eventOrder[left.type] - eventOrder[right.type]
+    const eventOrder = {
+      question: 0,
+      photo_section: 1,
+      image: 2,
+    };
+
+    events.sort(
+      (left, right) =>
+        left.y_top - right.y_top ||
+        eventOrder[left.type] -
+          eventOrder[right.type]
     );
 
     let pagePhotoIndex = 0;
@@ -309,17 +392,24 @@ export async function extractEmbeddedPhotoMetadata(pdfBytes, positionedPages, pa
       if (event.type === "question") {
         activeQuestion = {
           question_no: event.question_no,
-          operator_photos: false,
+          photo_source: null,
+          photo_heading: null,
         };
         continue;
       }
 
-      if (event.type === "operator_photos") {
-        if (activeQuestion) activeQuestion.operator_photos = true;
+      if (event.type === "photo_section") {
+        if (activeQuestion) {
+          activeQuestion.photo_source =
+            event.photo_source;
+          activeQuestion.photo_heading =
+            event.photo_heading;
+        }
         continue;
       }
 
       const image = event.placement;
+
       const likelyPhoto =
         image.width >= 300 &&
         image.height >= 300 &&
@@ -334,44 +424,126 @@ export async function extractEmbeddedPhotoMetadata(pdfBytes, positionedPages, pa
 
       likelyPhotoPlacements += 1;
 
-      if (!activeQuestion || !activeQuestion.operator_photos) {
+      if (
+        !activeQuestion ||
+        !activeQuestion.photo_source
+      ) {
         unassignedPhotos += 1;
+
         warnings.push(
-          `Page ${pageIndex + 1}: likely photo ${image.resource_name} was not inside an Operator uploaded photos block.`
+          `Page ${pageIndex + 1}: likely photo ` +
+          `${image.resource_name} was not inside ` +
+          `an Inspector or Operator uploaded photos block.`
         );
+
         continue;
       }
 
       pagePhotoIndex += 1;
 
       const directJpeg =
-        image.filters.length === 1 && image.filters[0] === "DCTDecode";
+        image.filters.length === 1 &&
+        image.filters[0] === "DCTDecode";
 
       if (!directJpeg) {
         unsupportedPhotos += 1;
+
         warnings.push(
-          `Page ${pageIndex + 1} / ${activeQuestion.question_no}: unsupported image filters ${image.filters.join(", ") || "none"}.`
+          `Page ${pageIndex + 1} / ` +
+          `${activeQuestion.question_no}: ` +
+          `unsupported image filters ` +
+          `${image.filters.join(", ") || "none"}.`
         );
+
         continue;
+      }
+
+      const photoSource =
+        activeQuestion.photo_source;
+
+      const observationCandidates =
+        observationsByQuestion.get(
+          activeQuestion.question_no
+        ) || [];
+
+      let eligibilityStatus = "excluded";
+      let exclusionReason = null;
+      let associationStatus = "not_applicable";
+
+      if (photoSource === "operator_uploaded") {
+        operatorUploadedPhotos += 1;
+        excludedPhotos += 1;
+        exclusionReason =
+          "operator_uploaded_photo";
+        associationStatus =
+          "excluded_by_source";
+      } else {
+        inspectorUploadedPhotos += 1;
+
+        if (observationCandidates.length === 1) {
+          eligiblePhotos += 1;
+          eligibilityStatus = "eligible";
+          associationStatus =
+            "exact_question_single_finding";
+        } else if (
+          observationCandidates.length === 0
+        ) {
+          excludedPhotos += 1;
+          exclusionReason =
+            "no_negative_or_largely_observation";
+          associationStatus =
+            "no_matching_finding";
+        } else {
+          manualReviewPhotos += 1;
+          eligibilityStatus = "manual_review";
+          exclusionReason =
+            "multiple_negative_or_largely_observations";
+          associationStatus =
+            "ambiguous_multiple_findings";
+
+          warnings.push(
+            `Page ${pageIndex + 1} / ` +
+            `${activeQuestion.question_no}: ` +
+            `inspector photo requires manual review ` +
+            `because ${observationCandidates.length} ` +
+            `Negative/LAE findings were extracted ` +
+            `for the question.`
+          );
+        }
       }
 
       photos.push({
         question_no: activeQuestion.question_no,
         source_page: pageIndex + 1,
         page_image_index: pagePhotoIndex,
-        source_kind: activeQuestion.question_no.startsWith("11.1.")
-          ? "chapter_11_representative"
-          : "operator_uploaded",
+        source_kind: photoSource,
+        source_heading:
+          activeQuestion.photo_heading,
+        eligibility_status:
+          eligibilityStatus,
+        exclusion_reason:
+          exclusionReason,
+        association_status:
+          associationStatus,
+        observation_match_count:
+          observationCandidates.length,
+        observation_candidates:
+          observationCandidates,
         resource_name: image.resource_name,
         mime_type: "image/jpeg",
         size_bytes: image.bytes.length,
         width: image.width,
         height: image.height,
-        display_x: Number(image.display_x.toFixed(3)),
-        display_y: Number(image.display_y.toFixed(3)),
-        display_width: Number(image.display_width.toFixed(3)),
-        display_height: Number(image.display_height.toFixed(3)),
-        content_sha256: await sha256Hex(image.bytes),
+        display_x:
+          Number(image.display_x.toFixed(3)),
+        display_y:
+          Number(image.display_y.toFixed(3)),
+        display_width:
+          Number(image.display_width.toFixed(3)),
+        display_height:
+          Number(image.display_height.toFixed(3)),
+        content_sha256:
+          await sha256Hex(image.bytes),
         sort_index: photos.length,
       });
     }
@@ -379,13 +551,30 @@ export async function extractEmbeddedPhotoMetadata(pdfBytes, positionedPages, pa
 
   return {
     counts: {
-      all_image_placements: allImagePlacements,
-      likely_photo_placements: likelyPhotoPlacements,
-      photos_assigned_supported: photos.length,
-      photos_unassigned: unassignedPhotos,
-      photos_unsupported: unsupportedPhotos,
-      images_ignored_as_non_photos: ignoredImages,
-      warnings_count: warnings.length,
+      all_image_placements:
+        allImagePlacements,
+      likely_photo_placements:
+        likelyPhotoPlacements,
+      photos_assigned_supported:
+        photos.length,
+      photos_inspector_uploaded:
+        inspectorUploadedPhotos,
+      photos_operator_uploaded:
+        operatorUploadedPhotos,
+      photos_eligible:
+        eligiblePhotos,
+      photos_excluded:
+        excludedPhotos,
+      photos_manual_review:
+        manualReviewPhotos,
+      photos_unassigned:
+        unassignedPhotos,
+      photos_unsupported:
+        unsupportedPhotos,
+      images_ignored_as_non_photos:
+        ignoredImages,
+      warnings_count:
+        warnings.length,
     },
     photos,
     warnings,
