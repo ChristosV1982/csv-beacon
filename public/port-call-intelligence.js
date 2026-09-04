@@ -1,8 +1,8 @@
-// C.S.V. BEACON — Port Call Intelligence application interface v2.
+// C.S.V. BEACON — Port Call Intelligence application interface v3.
 (() => {
   "use strict";
 
-  const BUILD = "PCI-UI-2026-09-04-V02";
+  const BUILD = "PCI-UI-2026-09-04-V03";
   const BUCKET = "port-call-intelligence-private";
   const MAX_FILE = 5 * 1024 * 1024;
   const MAX_CALL = 100 * 1024 * 1024;
@@ -17,7 +17,7 @@
   ];
 
   const state = {
-    sb: null, bundle: null, permissions: null, ports: [], facilities: [], selectedCountryCode: "",
+    sb: null, bundle: null, permissions: null, countries: [], ports: [], facilities: [], vessels: [], selectedCountryCode: "",
     selectedPortId: "", selectedFacilityId: "", activeTab: "profile",
     profiles: [], calls: [], officeItems: [], officeRevisions: [], profileValues: [], proposals: [],
     fields: [], options: [], selectedCallId: "", callDetails: new Map(), busy: 0
@@ -164,20 +164,38 @@
     dbError(fieldError); dbError(optionError); state.fields = fields || []; state.options = options || [];
   }
 
-  async function loadPorts() {
-    const { data, error } = await state.sb.from("pci_v_ports_list").select("*").order("country_name").order("port_name");
-    dbError(error, "Could not load the controlled port register.");
-    state.ports = data || []; renderCountryOptions(); renderPortOptions();
+  async function loadCountries() {
+    const { data, error } = await state.sb.from("pci_v_countries_list").select("*").order("country_name");
+    dbError(error, "Could not load the controlled country register.");
+    state.countries = data || [];
+    if (state.selectedCountryCode && !state.countries.some((country) => country.country_code === state.selectedCountryCode)) state.selectedCountryCode = "";
+    renderCountryOptions();
+  }
+
+  async function loadPortsForCountry(countryCode) {
+    state.ports = [];
+    if (!countryCode) { renderPortOptions(); return; }
+    const pageSize = 1000;
+    for (let from = 0; ; from += pageSize) {
+      const { data, error } = await state.sb.from("pci_v_ports_list").select("*").eq("country_code", countryCode).order("port_name").order("port_id").range(from, from + pageSize - 1);
+      dbError(error, "Could not load the selected country's controlled port register.");
+      const page = data || [];
+      state.ports.push(...page);
+      if (page.length < pageSize) break;
+    }
+    renderPortOptions();
+  }
+
+  async function loadCompanyVessels() {
+    state.vessels = [];
+    if (!state.permissions.canCreateOfficeCall) return;
+    const { data, error } = await state.sb.rpc("pci_list_company_vessels", { p_company_id: state.permissions.companyId });
+    dbError(error, "Could not load the Company's active vessel register.");
+    state.vessels = data || [];
   }
 
   function renderCountryOptions() {
-    const countries = new Map();
-    state.ports.forEach((p) => {
-      const code = clean(p.country_code), name = clean(p.country_name || p.country_code);
-      if (code && !countries.has(code)) countries.set(code, name);
-    });
-    const rows = [...countries.entries()].sort((a, b) => a[1].localeCompare(b[1], undefined, { sensitivity: "base" }));
-    $("countrySelect").innerHTML = '<option value="">Select a country…</option>' + rows.map(([code, name]) => `<option value="${attr(code)}"${code === state.selectedCountryCode ? " selected" : ""}>${esc(name)} (${esc(code)})</option>`).join("");
+    $("countrySelect").innerHTML = '<option value="">Select a country…</option>' + state.countries.map((country) => `<option value="${attr(country.country_code)}"${country.country_code === state.selectedCountryCode ? " selected" : ""}>${esc(country.country_name || country.country_code)} (${esc(country.country_code)})</option>`).join("");
   }
 
   function renderPortOptions() {
@@ -223,8 +241,9 @@
   async function selectCountry(countryCode) {
     state.selectedCountryCode = countryCode || "";
     state.selectedPortId = ""; state.selectedFacilityId = ""; state.facilities = [];
-    renderPortOptions(); renderTerminalOptions(); clearPortPanels();
+    state.ports = []; renderPortOptions(); renderTerminalOptions(); clearPortPanels();
     $("portMeta").textContent = state.selectedCountryCode ? "Select a port." : "Select a country, then a port.";
+    if (state.selectedCountryCode) await task("Loading ports for the selected country…", () => loadPortsForCountry(state.selectedCountryCode));
   }
 
   async function selectPort(portId) {
@@ -388,7 +407,7 @@
 
   function renderCalls() {
     const calls = filteredCalls();
-    $("callList").innerHTML = calls.length ? calls.map((c) => `<button type="button" class="pci-list-item${c.id === state.selectedCallId ? " is-selected" : ""}" data-action="open-call" data-id="${attr(c.id)}" data-pci-tip="Open this vessel call as a separate report."><div class="pci-list-title"><span>${esc(c.vessel_name_snapshot)}</span>${statusPill(c.status)}</div><div class="pci-list-sub">${esc(c.call_reference)} • ${esc(c.terminal_name_snapshot)} / ${esc(c.berth_name_snapshot)}</div><div class="pci-list-sub">All Lines Fast: ${esc(c.all_lines_fast_utc ? isoDate(c.all_lines_fast_utc) : "not entered")}</div></button>`).join("") : '<div class="pci-empty">No visible call reports match these filters.</div>';
+    $("callList").innerHTML = calls.length ? calls.map((c) => `<button type="button" class="pci-list-item${c.id === state.selectedCallId ? " is-selected" : ""}" data-action="open-call" data-id="${attr(c.id)}" data-pci-tip="Open this vessel call as a separate report."><div class="pci-list-title"><span>${esc(c.vessel_name_snapshot)}</span>${statusPill(c.status)}</div><div class="pci-list-sub">${esc(c.call_reference)} • ${esc(c.terminal_name_snapshot)} / ${esc(c.berth_name_snapshot)}</div><div class="pci-list-sub">${c.report_origin === "office" ? "Office-entered • " : ""}All Lines Fast: ${esc(c.all_lines_fast_utc ? isoDate(c.all_lines_fast_utc) : "not entered")}</div></button>`).join("") : '<div class="pci-empty">No visible call reports match these filters.</div>';
     bindActionRoot($("callList"));
   }
 
@@ -417,25 +436,29 @@
     });
   }
 
-  function canMasterEdit(call) { return state.permissions.canCreateCall && call.created_by === state.permissions.userId && call.vessel_id === state.permissions.vesselId && ["draft", "submitted"].includes(call.status); }
+  function canAuthorEdit(call) {
+    if (call.created_by !== state.permissions.userId || !["draft", "submitted"].includes(call.status)) return false;
+    if (call.report_origin === "office") return state.permissions.canCreateOfficeCall;
+    return state.permissions.canCreateVesselCall && call.vessel_id === state.permissions.vesselId;
+  }
   function callActions(call) {
     const out = [];
-    if (canMasterEdit(call) && call.status === "draft") {
+    if (canAuthorEdit(call) && call.status === "draft") {
       out.push(button("Edit Draft", "btn", "Edit and save this Draft report.", "edit-call"));
       out.push(button("Submit", "btn", "Validate the core fields and all section confirmations, then submit this report to the office.", "submit-call"));
       out.push(button("Delete Draft", "pci-danger", "Permanently delete this Draft report after confirmation. Finalised reports cannot be deleted.", "delete-call"));
-    } else if (canMasterEdit(call) && call.status === "submitted" && !call.review_started_at) {
+    } else if (canAuthorEdit(call) && call.status === "submitted" && !call.review_started_at) {
       out.push(button("Return to Draft", "btn2", "Withdraw this unreviewed submission back to Draft for further editing.", "retract-call"));
     }
     if (state.permissions.canReview && call.status === "submitted") {
       out.push(button("Start Review", "btn", "Mark this submitted report as under office review.", "start-review"));
-      out.push(button("Return", "btn2", "Return this report to the Master with a required reason.", "return-call"));
+      if (!canAuthorEdit(call)) out.push(button("Return", "btn2", "Return this report to its author with a required reason.", "return-call"));
     }
     if (state.permissions.canReview && call.status === "under_review") {
-      out.push(button("Return", "btn2", "Return this report to the Master with a required reason.", "return-call"));
+      out.push(button("Return", "btn2", "Return this report to its author with a required reason.", "return-call"));
       out.push(button("Finalise", "btn", "Lock this report as permanent call evidence and generate profile differences for review.", "finalise-call"));
     }
-    if (call.status === "finalised" && (state.permissions.canReview || (state.permissions.canCreateCall && call.vessel_id === state.permissions.vesselId))) {
+    if (call.status === "finalised" && (state.permissions.canReview || (state.permissions.canCreateVesselCall && call.vessel_id === state.permissions.vesselId))) {
       out.push(button("Request Amendment", "btn2", "Create a controlled amendment request without altering the finalised evidence.", "request-amendment"));
     }
     return out.map((html) => html.replace('data-action="', `data-id="${attr(call.id)}" data-action="`)).join("");
@@ -458,7 +481,7 @@
     const attachmentHtml = detail.attachments.length ? `<section class="pci-section"><h3>Attachments</h3>${detail.attachments.map((a) => `<div class="pci-attachment"><div><strong>${esc(a.original_file_name)}</strong><div class="pci-source">${esc(a.category_key)} • ${bytes(a.size_bytes)}${a.description ? ` • ${esc(a.description)}` : ""}</div></div><div>${button("Download", "btn2", "Create a short-lived secure link and download this attachment.", "download-attachment").replace('data-action="', `data-id="${attr(a.id)}" data-action="`)}</div></div>`).join("")}</section>` : "";
     const amendmentHtml = detail.amendments.length ? `<section class="pci-section"><h3>Controlled amendments</h3>${detail.amendments.map((a) => `<div class="pci-field-row"><div>${statusPill(a.status)}</div><div><strong>${esc(a.request_origin)} request:</strong> ${esc(a.reason)}<div class="pci-source">${esc(isoDate(a.requested_at))}</div></div></div>`).join("")}</section>` : "";
     $("callDetail").innerHTML = `<header class="pci-detail-head"><div><div class="pci-kicker">${esc(call.call_reference)}</div><h2>${esc(call.vessel_name_snapshot)} — ${esc(call.port_name_snapshot)}</h2><div>${statusPill(call.status)}</div></div><div class="pci-actions">${callActions(call)}</div></header>
-      <div class="pci-summary-grid"><div class="pci-summary-cell"><span>Terminal / Berth</span>${esc(call.terminal_name_snapshot)} / ${esc(call.berth_name_snapshot)}</div><div class="pci-summary-cell"><span>All Lines Fast</span>${esc(localDate(call.all_lines_fast_local))} (UTC ${formatOffset(call.all_lines_fast_utc_offset_minutes)})</div><div class="pci-summary-cell"><span>All Lines Clear</span>${esc(localDate(call.all_lines_clear_local))} (UTC ${formatOffset(call.all_lines_clear_utc_offset_minutes)})</div><div class="pci-summary-cell"><span>Cargo operation</span>${esc(call.cargo_operation_type || "—")}</div></div>
+      <div class="pci-summary-grid"><div class="pci-summary-cell"><span>Report source</span>${call.report_origin === "office" ? "Office-entered on behalf of vessel" : "Vessel Master"}</div><div class="pci-summary-cell"><span>Terminal / Berth</span>${esc(call.terminal_name_snapshot)} / ${esc(call.berth_name_snapshot)}</div><div class="pci-summary-cell"><span>All Lines Fast</span>${esc(localDate(call.all_lines_fast_local))} (UTC ${formatOffset(call.all_lines_fast_utc_offset_minutes)})</div><div class="pci-summary-cell"><span>All Lines Clear</span>${esc(localDate(call.all_lines_clear_local))} (UTC ${formatOffset(call.all_lines_clear_utc_offset_minutes)})</div><div class="pci-summary-cell"><span>Cargo operation</span>${esc(call.cargo_operation_type || "—")}</div></div>
       ${call.return_reason ? `<div class="pci-conflict"><strong>Returned for correction:</strong> ${esc(call.return_reason)}</div>` : ""}
       ${coreCallDetail(call)}${sectionsHtml || '<div class="pci-empty">No detailed values have been entered for this call.</div>'}${hazardHtml}${attachmentHtml}${amendmentHtml}`;
     bindActionRoot($("callDetail"));
@@ -522,6 +545,8 @@
   async function openCallEditor(call = null) {
     if (!state.selectedPortId) return showMessage("warn", "Select a port before creating a report.");
     if (!state.facilities.length) return showMessage("warn", "No terminal is registered for this port. Use Add Terminal before creating the report.");
+    const officeAuthored = call ? call.report_origin === "office" : state.permissions.canCreateOfficeCall;
+    if (!call && officeAuthored && !state.vessels.length) return showMessage("warn", "No active Company vessel is available for this office-entered call report.");
     const detail = call ? await task("Opening Draft…", () => loadCallDetails(call.id, true)) : { values: [], repeatRows: [], repeatValues: [], sections: [], hazards: [], attachments: [] };
     const valueMap = new Map(detail.values.map((v) => [v.field_definition_id, v]));
     const fields = state.fields.filter((f) => f.storage_target === "call_value");
@@ -529,7 +554,11 @@
     const callProfile = call ? state.profiles.find((p) => p.id === call.profile_id) : null;
     const selectedTerminalId = callProfile?.port_facility_id || state.selectedFacilityId || "";
     const terminalOptions = '<option value="">Select a terminal…</option>' + visibleFacilities().map((f) => `<option value="${attr(f.port_facility_id)}"${f.port_facility_id === selectedTerminalId ? " selected" : ""}>${esc(facilityName(f))}${f.company_id ? " — Company entry" : ""}</option>`).join("");
+    const selectedVesselId = call?.vessel_id || "";
+    const vesselOptions = '<option value="">Select the vessel that made the call…</option>' + state.vessels.map((vessel) => `<option value="${attr(vessel.vessel_id)}"${vessel.vessel_id === selectedVesselId ? " selected" : ""}>${esc(vessel.vessel_name)}${vessel.imo_number ? ` — IMO ${esc(vessel.imo_number)}` : ""}</option>`).join("");
+    const vesselField = officeAuthored ? `<div class="pci-form-field"><label for="pciVessel">Vessel <span class="pci-required">*</span></label><select id="pciVessel" required${call ? " disabled" : ""}>${vesselOptions}</select><div class="pci-help">The office is entering this report on behalf of the selected Company vessel. This association cannot be changed after the Draft is created.</div></div>` : "";
     const core = `<section class="pci-form-section"><h3>Core call details</h3><div class="pci-form-grid">
+      ${vesselField}
       ${inputField({ id: "pciTerminal", label: "Terminal", required: true, options: terminalOptions, help: "If the terminal is missing, close this panel and use Add Terminal beside the main terminal selector." })}
       ${inputField({ id: "pciBerth", label: "Berth", value: call?.berth_name_snapshot || "", required: true })}
       ${inputField({ id: "pciALF", label: "Arrival — All Lines Fast (local)", type: "datetime-local", value: call?.all_lines_fast_local || "", required: true })}
@@ -546,14 +575,14 @@
       ${inputField({ id: "pciUkcResult", label: "UKC result (m)", type: "number", value: call?.ukc_result ?? "" })}
       ${inputField({ id: "pciUkcNotes", label: "UKC notes", type: "textarea", value: call?.ukc_notes || "", wide: true })}
       ${inputField({ id: "pciCargo", label: "Cargo-operation type", value: call?.cargo_operation_type || "", required: true })}
-      ${inputField({ id: "pciMasterConfirm", label: "Master completion confirmation", type: "checkbox", value: call?.master_completion_confirmed === true, wide: true, help: "I confirm that this report reflects the vessel's actual call experience and has been reviewed for completeness." })}
+      ${inputField({ id: "pciMasterConfirm", label: officeAuthored ? "Office completion confirmation" : "Master completion confirmation", type: "checkbox", value: call?.master_completion_confirmed === true, wide: true, help: officeAuthored ? "I confirm that the Office has entered this report on behalf of the selected vessel and reviewed it for completeness." : "I confirm that this report reflects the vessel's actual call experience and has been reviewed for completeness." })}
     </div></section>`;
     const dynamic = [...sections.entries()].map(([label, list]) => `<section class="pci-form-section"><h3>${esc(label)}</h3><div class="pci-form-grid">${list.map((f) => dynamicInput(f, valueMap.get(f.id))).join("")}</div></section>`).join("");
     const repeats = renderRepeatEditor(detail);
     const confirmations = renderSectionConfirmationEditor(detail);
     const hazards = renderHazardEditor(detail);
     const attachments = call ? renderAttachmentEditor(call, detail) : '<section class="pci-form-section"><h3>Attachments</h3><div class="pci-repeat-note">Save the Draft first, then reopen it to upload attachments securely.</div></section>';
-    openDrawer("Vessel call report", call ? `Edit ${call.call_reference}` : `New Draft — ${selectedPort()?.port_name || "Port"}`, `<form id="pciCallForm" class="pci-form" novalidate>${core}${dynamic}${repeats}${confirmations}${hazards}${attachments}</form>`, `<button id="cancelCallBtn" class="btn2" type="button" data-pci-tip="Close without saving unsaved changes.">Cancel</button><button id="saveCallBtn" class="btn" type="button" data-pci-tip="Save all entered information as a Draft. You can continue later.">Save Draft</button>`);
+    openDrawer(officeAuthored ? "Office-entered vessel call report" : "Vessel call report", call ? `Edit ${call.call_reference}` : `New Draft — ${selectedPort()?.port_name || "Port"}`, `<form id="pciCallForm" class="pci-form" novalidate>${core}${dynamic}${repeats}${confirmations}${hazards}${attachments}</form>`, `<button id="cancelCallBtn" class="btn2" type="button" data-pci-tip="Close without saving unsaved changes.">Cancel</button><button id="saveCallBtn" class="btn" type="button" data-pci-tip="Save all entered information as a Draft. You can continue later.">Save Draft</button>`);
     $("cancelCallBtn").onclick = closeDrawer; $("saveCallBtn").onclick = () => saveCallEditor(call);
     installRepeatAndHazardControls(); if (call) installUploadControl(call, detail);
   }
@@ -609,6 +638,7 @@
 
   function validateCallForm() {
     const required = ["pciTerminal", "pciBerth", "pciALF", "pciALFOffset", "pciALC", "pciALCOffset", "pciEntry", "pciEntryOffset", "pciDraftF", "pciDraftA", "pciCargo"];
+    if ($("pciVessel")) required.unshift("pciVessel");
     let first = null;
     required.forEach((id) => { const el = $(id), bad = !clean(el?.value); el?.classList.toggle("pci-form-error", bad); if (bad && !first) first = el; });
     if (nullable("pciALF") && nullable("pciALC")) {
@@ -626,9 +656,10 @@
     dbError(result.error, "Could not create the terminal/berth profile scope."); return result.data;
   }
 
-  function callHeaderPayload(profile) {
+  function callHeaderPayload(profile, existingCall = null) {
+    const vesselId = existingCall?.vessel_id || (state.permissions.canCreateOfficeCall ? nullable("pciVessel") : state.permissions.vesselId);
     return {
-      company_id: state.permissions.companyId, vessel_id: state.permissions.vesselId, port_id: state.selectedPortId, profile_id: profile.id,
+      company_id: state.permissions.companyId, vessel_id: vesselId, port_id: state.selectedPortId, profile_id: profile.id,
       status: "draft", all_lines_fast_local: nullable("pciALF"), all_lines_fast_utc_offset_minutes: nullableNumber("pciALFOffset"),
       all_lines_clear_local: nullable("pciALC"), all_lines_clear_utc_offset_minutes: nullableNumber("pciALCOffset"),
       port_entry_local: nullable("pciEntry"), port_entry_utc_offset_minutes: nullableNumber("pciEntryOffset"),
@@ -654,7 +685,7 @@
       const profile = await ensureProfile(facility, berth);
       let call;
       if (existingCall) {
-        const { data, error } = await state.sb.from("pci_port_calls").update(callHeaderPayload(profile)).eq("id", existingCall.id).select("*").single(); dbError(error); call = data;
+        const { data, error } = await state.sb.from("pci_port_calls").update(callHeaderPayload(profile, existingCall)).eq("id", existingCall.id).select("*").single(); dbError(error); call = data;
       } else {
         const { data, error } = await state.sb.from("pci_port_calls").insert(callHeaderPayload(profile)).select("*").single(); dbError(error); call = data;
       }
@@ -746,8 +777,8 @@
     const call = state.calls.find((c) => c.id === id), detail = await loadCallDetails(id, true); if (!call) return;
     const missing = majorSections().filter(([key]) => !detail.sections.some((s) => s.section_key === key));
     if (missing.length) return showMessage("warn", `Submission is blocked: ${missing.length} section${missing.length === 1 ? " has" : "s have"} not been confirmed. Edit the Draft and complete the Section completion area.`);
-    if (!call.master_completion_confirmed) return showMessage("warn", "Submission is blocked until the Master completion confirmation is selected.");
-    if (!await confirmAction({ title: "Submit vessel-call report?", message: "The office will receive this report for review. You can return it to Draft only until office review begins.", label: "Submit Report", danger: false })) return;
+    if (!call.master_completion_confirmed) return showMessage("warn", `Submission is blocked until the ${call.report_origin === "office" ? "Office" : "Master"} completion confirmation is selected.`);
+    if (!await confirmAction({ title: "Submit vessel-call report?", message: call.report_origin === "office" ? "This office-entered report will move to Submitted and can then enter the controlled office review workflow." : "The office will receive this report for review. You can return it to Draft only until office review begins.", label: "Submit Report", danger: false })) return;
     await changeCallStatus(id, "submitted", "Report submitted to the office.");
   }
 
@@ -912,7 +943,17 @@
     $("portSelect").onchange = () => selectPort($("portSelect").value);
     $("terminalSelect").onchange = () => selectTerminal($("terminalSelect").value);
     $("addTerminalBtn").onclick = openAddTerminal; $("editTerminalBtn").onclick = openEditTerminal;
-    $("reloadBtn").onclick = async () => task("Reloading…", async () => { await loadPorts(); if (state.selectedPortId) { await loadFacilities(state.selectedPortId); await loadSelectedPort(); } showMessage("ok", "Port Call Intelligence was reloaded."); });
+    $("reloadBtn").onclick = async () => task("Reloading…", async () => {
+      const countryCode = state.selectedCountryCode, portId = state.selectedPortId;
+      await Promise.all([loadCountries(), loadCompanyVessels()]);
+      if (countryCode && state.countries.some((country) => country.country_code === countryCode)) {
+        state.selectedCountryCode = countryCode; await loadPortsForCountry(countryCode);
+      }
+      if (portId && state.ports.some((port) => port.port_id === portId)) {
+        state.selectedPortId = portId; await loadFacilities(portId); await loadSelectedPort();
+      }
+      showMessage("ok", "Port Call Intelligence was reloaded.");
+    });
     $("newCallBtn").onclick = () => openCallEditor(); $("newOfficeInfoBtn").onclick = () => openOfficeEditor();
     $("callStatusFilter").onchange = renderCalls; $("callSearch").oninput = renderCalls; $("officeCategoryFilter").onchange = renderOfficeInfo;
     $("closeDrawerBtn").onclick = closeDrawer; $("pciDrawerBackdrop").onclick = closeDrawer;
@@ -925,11 +966,11 @@
     state.bundle = bundle; state.sb = window.AUTH.ensureSupabase(); window.AUTH.fillUserBadge(bundle);
     await window.AUTH.setupAuthButtons(); state.permissions = await window.PCI_PERMISSIONS.load(bundle);
     if (!state.permissions.canView) throw new Error("Your current Rights Matrix permissions do not allow Port Call Intelligence viewing.");
-    await task("Loading Port Call Intelligence…", async () => { await Promise.all([loadDefinitions(), loadPorts()]); });
+    await task("Loading Port Call Intelligence…", async () => { await Promise.all([loadDefinitions(), loadCountries(), loadCompanyVessels()]); });
     $("newCallBtn").hidden = !state.permissions.canCreateCall; $("newOfficeInfoBtn").hidden = !state.permissions.canManageOfficeInfo;
     updateTerminalActions();
     if (state.permissions.platform && !state.permissions.companyContextReady) showMessage("warn", "Platform view is read-only until you select a Company context from the dashboard. Company office information and Company terminal changes are disabled.");
-    if (!state.ports.length) showMessage("warn", "No ports are available to this Company and user.");
+    if (!state.countries.length) showMessage("warn", "No countries or ports are available to this Company and user.");
   }
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", () => init().catch((e) => showMessage("warn", e?.message || String(e))));

@@ -20,7 +20,9 @@
     const simulatedCompanyId = platform ? (localStorage.getItem("csvb_superuser_company_view_id") || null) : null;
     const companyId = profile.company_id || simulatedCompanyId || null;
     const companyContextReady = Boolean(companyId);
-    const canCreateCall = vesselRole && companyContextReady && onboardActive && !window.CSVB_READ_ONLY_ACCESS && granted(rows, "edit");
+    const canCreateVesselCall = vesselRole && companyContextReady && onboardActive && !window.CSVB_READ_ONLY_ACCESS && granted(rows, "edit");
+    const canCreateOfficeCall = officeRole && companyContextReady && !window.CSVB_READ_ONLY_ACCESS && (platform || granted(rows, "edit") || granted(rows, "review") || granted(rows, "admin"));
+    const canCreateCall = canCreateVesselCall || canCreateOfficeCall;
     const canManageOfficeInfo = officeRole && companyContextReady && !window.CSVB_READ_ONLY_ACCESS && (platform || granted(rows, "review") || granted(rows, "admin"));
     return {
       rows,
@@ -29,6 +31,8 @@
       canReview: companyContextReady && officeRole && (platform || granted(rows, "review") || granted(rows, "admin")),
       canAdmin: companyContextReady && officeRole && (platform || granted(rows, "admin")),
       canCreateCall,
+      canCreateVesselCall,
+      canCreateOfficeCall,
       canManageOfficeInfo,
       canAddTerminal: companyContextReady && (canCreateCall || canManageOfficeInfo),
       canManageTerminals: canManageOfficeInfo,
