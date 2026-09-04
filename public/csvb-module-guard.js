@@ -62,6 +62,8 @@
     "mooring-anchoring-component.html": "mooring_anchoring_inventories",
     "mooring-anchoring-operations.html": "mooring_anchoring_inventories",
 
+    "port-call-intelligence.html": "port_call_intelligence",
+
     "portable-lifting-appliances-wires.html": "portable_lifting_appliances_wires",
     "portable-lifting-appliances-wire-component.html": "portable_lifting_appliances_wires",
 
@@ -284,6 +286,7 @@
       threads: "THREADS",
       company_policy: "COMPANY_POLICY",
       mooring_anchoring_inventories: "MOORING_ANCHORING_INVENTORIES",
+      port_call_intelligence: "PORT_CALL_INTELLIGENCE",
       portable_lifting_appliances_wires: "PORTABLE_LIFTING_APPLIANCES_WIRES",
       platform_administration: "SU_ADMIN"
     };

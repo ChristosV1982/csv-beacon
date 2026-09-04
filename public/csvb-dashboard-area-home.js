@@ -181,6 +181,19 @@
           ],
         },
         {
+          title: "Port information and call experience",
+          items: [
+            {
+              label: "Port Call Intelligence",
+              text:
+                "Company port profiles, permanent vessel-call reports, report-by-report consultation and controlled office guidance.",
+              href: "./port-call-intelligence.html",
+              cardKey: "port_call_intelligence",
+              icon: "🧭",
+            },
+          ],
+        },
+        {
           title: "Portable lifting appliances and wires",
           items: [
             {

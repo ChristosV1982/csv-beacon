@@ -221,6 +221,14 @@
         </div>
       </div>
 
+      <div class="card" data-card="port_call_intelligence">
+        <div class="title">Port Call Intelligence</div>
+        <div class="muted">Company port profiles, permanent vessel-call reports and controlled office guidance.</div>
+        <div style="margin-top:12px;">
+          <button class="btn2" type="button" onclick="location.href='./port-call-intelligence.html'">Open</button>
+        </div>
+      </div>
+
       <div class="card" data-card="portable_lifting_appliances_wires">
         <div class="title">Portable Lifting Appliances & Wires</div>
         <div class="muted">
@@ -334,6 +342,7 @@
       threads: "threads",
       company_policy: "company_policy",
       mooring_anchoring_inventories: "mooring_anchoring_inventories",
+      port_call_intelligence: "port_call_intelligence",
       portable_lifting_appliances_wires: "portable_lifting_appliances_wires",
       suadmin: "platform_administration"
     };
@@ -532,6 +541,7 @@
           "threads",
           "company_policy",
           "mooring_anchoring_inventories",
+          "port_call_intelligence",
           "portable_lifting_appliances_wires",
           "suadmin"
         ].forEach(k => setVisible(k, true, moduleAccess));
@@ -553,6 +563,7 @@
         setVisible("threads", true, moduleAccess);
         setVisible("company_policy", true, moduleAccess);
         setVisible("mooring_anchoring_inventories", true, moduleAccess);
+        setVisible("port_call_intelligence", true, moduleAccess);
         setVisible("portable_lifting_appliances_wires", true, moduleAccess);
         setVisible("suadmin", false, moduleAccess);
         return;
@@ -574,6 +585,7 @@
           "threads",
           "company_policy",
           "mooring_anchoring_inventories",
+          "port_call_intelligence",
           "portable_lifting_appliances_wires"
         ].forEach(k => setVisible(k, true, moduleAccess));
         setVisible("suadmin", false, moduleAccess);
@@ -595,6 +607,7 @@
         setVisible("threads", true, moduleAccess);
         setVisible("company_policy", true, moduleAccess);
         setVisible("mooring_anchoring_inventories", true, moduleAccess);
+        setVisible("port_call_intelligence", true, moduleAccess);
         setVisible("portable_lifting_appliances_wires", true, moduleAccess);
         setVisible("suadmin", false, moduleAccess);
         return;
@@ -610,6 +623,7 @@
         setVisible("qeditor", false, moduleAccess);
         setVisible("risq_questions_editor", false, moduleAccess);
         setVisible("company_policy", true, moduleAccess);
+        setVisible("port_call_intelligence", false, moduleAccess);
         setVisible("portable_lifting_appliances_wires", false, moduleAccess);
         setVisible("suadmin", false, moduleAccess);
         return;
