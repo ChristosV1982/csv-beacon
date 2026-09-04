@@ -18,18 +18,26 @@
     const vesselRole = profile.role === "vessel";
     const onboardActive = profile.onboard_access_enabled !== false && profile.onboard_status !== "inactive" && profile.onboard_status !== "disembarked";
     const simulatedCompanyId = platform ? (localStorage.getItem("csvb_superuser_company_view_id") || null) : null;
+    const companyId = profile.company_id || simulatedCompanyId || null;
+    const companyContextReady = Boolean(companyId);
+    const canCreateCall = vesselRole && companyContextReady && onboardActive && !window.CSVB_READ_ONLY_ACCESS && granted(rows, "edit");
+    const canManageOfficeInfo = officeRole && companyContextReady && !window.CSVB_READ_ONLY_ACCESS && (platform || granted(rows, "review") || granted(rows, "admin"));
     return {
       rows,
       canView: platform || granted(rows, "view"),
       canEdit: !window.CSVB_READ_ONLY_ACCESS && (platform || granted(rows, "edit")),
-      canReview: officeRole && (platform || granted(rows, "review") || granted(rows, "admin")),
-      canAdmin: officeRole && (platform || granted(rows, "admin")),
-      canCreateCall: vesselRole && onboardActive && !window.CSVB_READ_ONLY_ACCESS && granted(rows, "edit"),
-      canManageOfficeInfo: officeRole && !window.CSVB_READ_ONLY_ACCESS && (platform || granted(rows, "review") || granted(rows, "admin")),
+      canReview: companyContextReady && officeRole && (platform || granted(rows, "review") || granted(rows, "admin")),
+      canAdmin: companyContextReady && officeRole && (platform || granted(rows, "admin")),
+      canCreateCall,
+      canManageOfficeInfo,
+      canAddTerminal: companyContextReady && (canCreateCall || canManageOfficeInfo),
+      canManageTerminals: canManageOfficeInfo,
+      companyContextReady,
+      platform,
       officeRole,
       vesselRole,
       userId: bundle?.user?.id || null,
-      companyId: profile.company_id || simulatedCompanyId || null,
+      companyId,
       vesselId: profile.vessel_id || null
     };
   }

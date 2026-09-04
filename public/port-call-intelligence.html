@@ -6,7 +6,7 @@
   <title>C.S.V. BEACON – Port Call Intelligence</title>
   <link rel="stylesheet" href="./csv-beacon-theme.css?v=20260428_3" />
   <link rel="stylesheet" href="./style.css?v=20260428_3" />
-  <link rel="stylesheet" href="./port-call-intelligence.css?v=20260904_1" />
+  <link rel="stylesheet" href="./port-call-intelligence.css?v=20260904_2" />
   <link rel="stylesheet" href="./csvb-mobile-polish.css?v=20260528_1" />
   <link rel="stylesheet" href="./csvb-mobile-fixes-20260528-2.css?v=20260528_2" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -48,11 +48,25 @@
       </div>
     </section>
 
-    <section class="pci-port-picker" aria-label="Port selection">
-      <label for="portSearch">Find a port</label>
+    <section class="pci-port-picker" aria-label="Port and terminal selection">
+      <div class="pci-port-picker-title">Find a port or terminal</div>
       <div class="pci-port-row">
-        <input id="portSearch" type="search" autocomplete="off" placeholder="Search by port, country or UN/LOCODE…" />
-        <select id="portSelect" aria-label="Selected port"><option value="">Loading ports…</option></select>
+        <div class="pci-picker-field">
+          <label for="countrySelect">1. Country</label>
+          <select id="countrySelect" aria-label="Country"><option value="">Loading countries…</option></select>
+        </div>
+        <div class="pci-picker-field">
+          <label for="portSelect">2. Port</label>
+          <select id="portSelect" aria-label="Port" disabled><option value="">Select a country first…</option></select>
+        </div>
+        <div class="pci-picker-field">
+          <label for="terminalSelect">3. Terminal (if applicable)</label>
+          <select id="terminalSelect" aria-label="Terminal" disabled><option value="">Select a port first…</option></select>
+        </div>
+        <div class="pci-terminal-actions">
+          <button id="addTerminalBtn" class="btn2" type="button" hidden data-pci-tip="Add a missing terminal to this Company's shared terminal list for the selected port.">+ Add Terminal</button>
+          <button id="editTerminalBtn" class="btn2" type="button" hidden data-pci-tip="Correct the selected Company-added terminal name or deactivate the entry.">Edit Terminal</button>
+        </div>
       </div>
       <div id="portMeta" class="pci-meta">Select a port to view its Company information.</div>
     </section>
@@ -117,8 +131,8 @@
   <div id="pciTooltip" class="pci-tooltip" role="tooltip" hidden></div>
   <div id="pciBusy" class="pci-busy" hidden><div class="pci-spinner"></div><span>Working…</span></div>
 
-  <script src="./port-call-intelligence-permissions-v1.js?v=20260904_1"></script>
-  <script src="./port-call-intelligence.js?v=20260904_1"></script>
+  <script src="./port-call-intelligence-permissions-v1.js?v=20260904_2"></script>
+  <script src="./port-call-intelligence.js?v=20260904_2"></script>
   <script src="./csvb-build-badge.js?v=20260528_01"></script>
 </body>
 </html>

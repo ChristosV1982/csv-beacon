@@ -1,8 +1,8 @@
-// C.S.V. BEACON — Port Call Intelligence application interface v1.
+// C.S.V. BEACON — Port Call Intelligence application interface v2.
 (() => {
   "use strict";
 
-  const BUILD = "PCI-UI-2026-09-04-V01";
+  const BUILD = "PCI-UI-2026-09-04-V02";
   const BUCKET = "port-call-intelligence-private";
   const MAX_FILE = 5 * 1024 * 1024;
   const MAX_CALL = 100 * 1024 * 1024;
@@ -17,7 +17,8 @@
   ];
 
   const state = {
-    sb: null, bundle: null, permissions: null, ports: [], selectedPortId: "", activeTab: "profile",
+    sb: null, bundle: null, permissions: null, ports: [], facilities: [], selectedCountryCode: "",
+    selectedPortId: "", selectedFacilityId: "", activeTab: "profile",
     profiles: [], calls: [], officeItems: [], officeRevisions: [], profileValues: [], proposals: [],
     fields: [], options: [], selectedCallId: "", callDetails: new Map(), busy: 0
   };
@@ -31,6 +32,8 @@
   const statusLabel = (value) => String(value || "").replace(/^office_info_/, "").replaceAll("_", " ");
   const bytes = (n) => n < 1024 * 1024 ? `${Math.ceil(n / 1024)} KB` : `${(n / (1024 * 1024)).toFixed(1)} MB`;
   const selectedPort = () => state.ports.find((p) => p.port_id === state.selectedPortId) || null;
+  const selectedFacility = () => state.facilities.find((f) => f.port_facility_id === state.selectedFacilityId) || null;
+  const facilityName = (facility) => clean(facility?.facility_name || facility?.berth_or_terminal_name);
   const fieldById = (id) => state.fields.find((f) => f.id === id) || null;
 
   function showMessage(kind, message) {
@@ -94,6 +97,8 @@
     if (action === "delete-office") return confirmDeleteOfficeInfo(id);
     if (action === "withdraw-office") return openWithdrawOfficeInfo(id);
     if (action === "decide-proposal") return openProposalDecision(id);
+    if (action === "add-terminal") return openAddTerminal();
+    if (action === "edit-terminal") return openEditTerminal();
   }
 
   function installTooltips() {
@@ -162,21 +167,124 @@
   async function loadPorts() {
     const { data, error } = await state.sb.from("pci_v_ports_list").select("*").order("country_name").order("port_name");
     dbError(error, "Could not load the controlled port register.");
-    state.ports = data || []; renderPortOptions();
+    state.ports = data || []; renderCountryOptions(); renderPortOptions();
   }
 
-  function renderPortOptions(filter = "") {
-    const term = clean(filter).toLowerCase();
-    const rows = state.ports.filter((p) => !term || [p.port_name, p.country_name, p.country_code, p.unlocode].some((v) => String(v || "").toLowerCase().includes(term)));
-    $("portSelect").innerHTML = `<option value="">Select a port…</option>` + rows.map((p) => `<option value="${attr(p.port_id)}"${p.port_id === state.selectedPortId ? " selected" : ""}>${esc(p.port_name)} — ${esc(p.country_name || p.country_code || "")}${p.unlocode ? ` (${esc(p.unlocode)})` : ""}</option>`).join("");
+  function renderCountryOptions() {
+    const countries = new Map();
+    state.ports.forEach((p) => {
+      const code = clean(p.country_code), name = clean(p.country_name || p.country_code);
+      if (code && !countries.has(code)) countries.set(code, name);
+    });
+    const rows = [...countries.entries()].sort((a, b) => a[1].localeCompare(b[1], undefined, { sensitivity: "base" }));
+    $("countrySelect").innerHTML = '<option value="">Select a country…</option>' + rows.map(([code, name]) => `<option value="${attr(code)}"${code === state.selectedCountryCode ? " selected" : ""}>${esc(name)} (${esc(code)})</option>`).join("");
+  }
+
+  function renderPortOptions() {
+    const rows = state.ports.filter((p) => p.country_code === state.selectedCountryCode);
+    $("portSelect").disabled = !state.selectedCountryCode;
+    $("portSelect").innerHTML = state.selectedCountryCode
+      ? '<option value="">Select a port…</option>' + rows.map((p) => `<option value="${attr(p.port_id)}"${p.port_id === state.selectedPortId ? " selected" : ""}>${esc(p.port_name)}${p.unlocode ? ` (${esc(p.unlocode)})` : ""}</option>`).join("")
+      : '<option value="">Select a country first…</option>';
+  }
+
+  function visibleFacilities() {
+    return state.facilities.filter((f) => f.company_id === null || f.company_id === state.permissions.companyId);
+  }
+
+  function renderTerminalOptions() {
+    const rows = visibleFacilities().sort((a, b) => facilityName(a).localeCompare(facilityName(b), undefined, { sensitivity: "base" }));
+    $("terminalSelect").disabled = !state.selectedPortId;
+    $("terminalSelect").innerHTML = state.selectedPortId
+      ? '<option value="">All terminals / port-wide</option>' + rows.map((f) => `<option value="${attr(f.port_facility_id)}"${f.port_facility_id === state.selectedFacilityId ? " selected" : ""}>${esc(facilityName(f))}${f.company_id ? " — Company entry" : ""}</option>`).join("")
+      : '<option value="">Select a port first…</option>';
+    updateTerminalActions();
+  }
+
+  function updateTerminalActions() {
+    const facility = selectedFacility();
+    $("addTerminalBtn").hidden = !(state.selectedPortId && state.permissions.canAddTerminal);
+    $("editTerminalBtn").hidden = !(facility && state.permissions.canManageTerminals && facility.company_id === state.permissions.companyId);
+  }
+
+  async function loadFacilities(portId) {
+    if (!portId) { state.facilities = []; renderTerminalOptions(); return; }
+    let query = state.sb.from("pci_v_port_facilities_list").select("*").eq("port_id", portId).order("facility_name");
+    query = state.permissions.companyId
+      ? query.or(`company_id.is.null,company_id.eq.${state.permissions.companyId}`)
+      : query.is("company_id", null);
+    const { data, error } = await query;
+    dbError(error, "Could not load the controlled terminal register.");
+    state.facilities = data || [];
+    if (state.selectedFacilityId && !state.facilities.some((f) => f.port_facility_id === state.selectedFacilityId)) state.selectedFacilityId = "";
+    renderTerminalOptions();
+  }
+
+  async function selectCountry(countryCode) {
+    state.selectedCountryCode = countryCode || "";
+    state.selectedPortId = ""; state.selectedFacilityId = ""; state.facilities = [];
+    renderPortOptions(); renderTerminalOptions(); clearPortPanels();
+    $("portMeta").textContent = state.selectedCountryCode ? "Select a port." : "Select a country, then a port.";
   }
 
   async function selectPort(portId) {
-    state.selectedPortId = portId || ""; state.selectedCallId = ""; state.callDetails.clear();
+    state.selectedPortId = portId || ""; state.selectedFacilityId = ""; state.selectedCallId = ""; state.callDetails.clear();
     const p = selectedPort();
     $("portMeta").textContent = p ? [p.port_name, p.country_name, p.unlocode].filter(Boolean).join(" • ") : "Select a port to view its Company information.";
-    if (!p) { clearPortPanels(); return; }
-    await task("Loading port information…", loadSelectedPort);
+    if (!p) { state.facilities = []; renderTerminalOptions(); clearPortPanels(); return; }
+    await task("Loading port and terminal information…", async () => { await loadFacilities(portId); await loadSelectedPort(); });
+  }
+
+  function selectTerminal(facilityId) {
+    state.selectedFacilityId = facilityId || "";
+    updateTerminalActions(); renderProfile(); renderCalls(); renderOfficeInfo(); updateCounts();
+    const p = selectedPort(), f = selectedFacility();
+    $("portMeta").textContent = [p?.port_name, p?.country_name, p?.unlocode, f ? facilityName(f) : "All terminals / port-wide"].filter(Boolean).join(" • ");
+  }
+
+  function openAddTerminal() {
+    if (!state.permissions.companyContextReady) return showMessage("warn", "Select a Company context before adding a terminal.");
+    if (!state.selectedPortId) return showMessage("warn", "Select a port before adding a terminal.");
+    openDrawer("Shared Company terminal register", `Add terminal — ${selectedPort()?.port_name || "Port"}`, `<form class="pci-form"><section class="pci-form-section"><h3>New terminal</h3><div class="pci-form-grid">${inputField({ id: "pciNewTerminalName", label: "Terminal name", required: true, wide: true, help: "The terminal will become available to authorised users in this Company after it is saved." })}</div></section></form>`, `<button id="cancelTerminalBtn" class="btn2" type="button" data-pci-tip="Close without adding a terminal.">Cancel</button><button id="saveTerminalBtn" class="btn" type="button" data-pci-tip="Add this terminal to the selected port's shared Company terminal list.">Add Terminal</button>`);
+    $("cancelTerminalBtn").onclick = closeDrawer;
+    $("saveTerminalBtn").onclick = async () => {
+      const name = clean($("pciNewTerminalName").value);
+      if (!name) { $("pciNewTerminalName").classList.add("pci-form-error"); return; }
+      await task("Adding terminal…", async () => {
+        const { data, error } = await state.sb.rpc("pci_add_company_terminal", { p_company_id: state.permissions.companyId, p_port_id: state.selectedPortId, p_terminal_name: name });
+        dbError(error, "Could not add the terminal.");
+        const saved = Array.isArray(data) ? data[0] : data;
+        closeDrawer(); await loadFacilities(state.selectedPortId);
+        state.selectedFacilityId = saved?.port_facility_id || ""; renderTerminalOptions(); selectTerminal(state.selectedFacilityId);
+        showMessage("ok", `${name} is now available in the shared Company terminal list.`);
+      });
+    };
+  }
+
+  function openEditTerminal() {
+    const facility = selectedFacility();
+    if (!facility || facility.company_id !== state.permissions.companyId || !state.permissions.canManageTerminals) return showMessage("warn", "Only authorised office users may manage Company-added terminals.");
+    openDrawer("Shared Company terminal register", "Correct terminal name", `<form class="pci-form"><section class="pci-form-section"><h3>Terminal details</h3><div class="pci-form-grid">${inputField({ id: "pciEditTerminalName", label: "Correct terminal name", value: facilityName(facility), required: true, wide: true, help: "The corrected name will be used for future selections. Existing vessel-call report snapshots will remain unchanged." })}</div></section></form>`, `<button id="cancelEditTerminalBtn" class="btn2" type="button" data-pci-tip="Close without changing the terminal.">Cancel</button><button id="deactivateTerminalBtn" class="pci-danger" type="button" data-pci-tip="Deactivate this Company-added terminal so it is no longer available for future selection. Historical reports remain unchanged.">Deactivate Terminal</button><button id="saveTerminalNameBtn" class="btn" type="button" data-pci-tip="Save the corrected terminal name for future Company use.">Save Corrected Name</button>`);
+    $("cancelEditTerminalBtn").onclick = closeDrawer;
+    $("saveTerminalNameBtn").onclick = async () => {
+      const name = clean($("pciEditTerminalName").value);
+      if (!name) { $("pciEditTerminalName").classList.add("pci-form-error"); return; }
+      await task("Correcting terminal name…", async () => {
+        const { error } = await state.sb.rpc("pci_manage_company_terminal", { p_company_id: state.permissions.companyId, p_port_facility_id: facility.port_facility_id, p_terminal_name: name, p_is_active: true });
+        dbError(error, "Could not correct the terminal name.");
+        closeDrawer(); await loadFacilities(state.selectedPortId); state.selectedFacilityId = facility.port_facility_id; renderTerminalOptions(); selectTerminal(state.selectedFacilityId);
+        showMessage("ok", "The terminal name was corrected. Historical call reports were not changed.");
+      });
+    };
+    $("deactivateTerminalBtn").onclick = async () => {
+      if (!await confirmAction({ title: "Deactivate terminal?", message: `“${facilityName(facility)}” will no longer be available for future selection. Existing reports and audit evidence will remain unchanged.`, label: "Deactivate Terminal" })) return;
+      await task("Deactivating terminal…", async () => {
+        const { error } = await state.sb.rpc("pci_manage_company_terminal", { p_company_id: state.permissions.companyId, p_port_facility_id: facility.port_facility_id, p_terminal_name: facilityName(facility), p_is_active: false });
+        dbError(error, "Could not deactivate the terminal.");
+        closeDrawer(); state.selectedFacilityId = ""; await loadFacilities(state.selectedPortId); selectTerminal("");
+        showMessage("ok", "The terminal was deactivated. Historical reports remain unchanged.");
+      });
+    };
   }
 
   function clearPortPanels() {
@@ -189,10 +297,15 @@
 
   async function loadSelectedPort() {
     const portId = state.selectedPortId;
+    if (!state.permissions.companyContextReady) {
+      state.profiles = []; state.calls = []; state.officeItems = []; state.officeRevisions = []; state.profileValues = []; state.proposals = [];
+      renderProfile(); renderCalls(); renderOfficeInfo(); updateCounts();
+      return;
+    }
     const [profilesR, callsR, officeR] = await Promise.all([
-      state.sb.from("pci_port_profiles").select("*").eq("port_id", portId).order("terminal_name").order("berth_name"),
-      state.sb.from("pci_port_calls").select("*").eq("port_id", portId).order("all_lines_fast_utc", { ascending: false, nullsFirst: false }).order("created_at", { ascending: false }),
-      state.sb.from("pci_port_information_items").select("*").eq("port_id", portId).order("updated_at", { ascending: false })
+      state.sb.from("pci_port_profiles").select("*").eq("company_id", state.permissions.companyId).eq("port_id", portId).order("terminal_name").order("berth_name"),
+      state.sb.from("pci_port_calls").select("*").eq("company_id", state.permissions.companyId).eq("port_id", portId).order("all_lines_fast_utc", { ascending: false, nullsFirst: false }).order("created_at", { ascending: false }),
+      state.sb.from("pci_port_information_items").select("*").eq("company_id", state.permissions.companyId).eq("port_id", portId).order("updated_at", { ascending: false })
     ]);
     [profilesR, callsR, officeR].forEach((r) => dbError(r.error));
     state.profiles = profilesR.data || []; state.calls = callsR.data || []; state.officeItems = officeR.data || [];
@@ -210,18 +323,25 @@
   }
 
   function updateCounts() {
-    $("profileCount").textContent = String(state.profileValues.length);
-    $("callCount").textContent = String(state.calls.length);
-    $("officeCount").textContent = String(state.officeItems.filter((x) => x.status !== "office_info_withdrawn" || state.permissions?.officeRole).length);
+    const profileIds = new Set(filteredProfiles().map((p) => p.id));
+    $("profileCount").textContent = String(state.profileValues.filter((v) => profileIds.has(v.profile_id)).length);
+    $("callCount").textContent = String(filteredCalls().length);
+    $("officeCount").textContent = String(filteredOfficeItems().filter((x) => x.status !== "office_info_withdrawn" || state.permissions?.officeRole).length);
+  }
+
+  function filteredProfiles() {
+    return state.profiles.filter((p) => !state.selectedFacilityId || p.port_facility_id === state.selectedFacilityId);
   }
 
   function profileScopeLabel(profile) {
     if (!profile) return "Port-wide";
-    return [profile.terminal_name || "Port-wide", profile.berth_name].filter(Boolean).join(" / ");
+    const directoryFacility = state.facilities.find((f) => f.port_facility_id === profile.port_facility_id);
+    return [facilityName(directoryFacility) || profile.terminal_name || "Port-wide", profile.berth_name].filter(Boolean).join(" / ");
   }
 
   function renderProfile() {
-    const scopes = [{ id: "", label: "All scopes" }, ...state.profiles.map((p) => ({ id: p.id, label: profileScopeLabel(p) }))];
+    const profiles = filteredProfiles();
+    const scopes = [{ id: "", label: state.selectedFacilityId ? "All berths" : "All scopes" }, ...profiles.map((p) => ({ id: p.id, label: profileScopeLabel(p) }))];
     $("profileScope").innerHTML = scopes.map((s, i) => `<button type="button" class="pci-chip${i === 0 ? " is-active" : ""}" data-profile-scope="${attr(s.id)}">${esc(s.label)}</button>`).join("");
     $("profileScope").querySelectorAll("[data-profile-scope]").forEach((b) => b.addEventListener("click", () => {
       $("profileScope").querySelectorAll(".pci-chip").forEach((x) => x.classList.toggle("is-active", x === b));
@@ -231,7 +351,8 @@
   }
 
   function renderProfileValues(scopeId = "") {
-    const values = state.profileValues.filter((v) => !scopeId || v.profile_id === scopeId);
+    const profileIds = new Set(filteredProfiles().map((p) => p.id));
+    const values = state.profileValues.filter((v) => profileIds.has(v.profile_id) && (!scopeId || v.profile_id === scopeId));
     if (!values.length) { $("profileContent").innerHTML = '<div class="pci-empty">No approved consolidated information has been published for this scope yet. Finalised call evidence remains available under Call Reports.</div>'; return; }
     $("profileContent").innerHTML = values.map((v) => {
       const f = fieldById(v.field_definition_id), p = state.profiles.find((x) => x.id === v.profile_id), source = state.calls.find((x) => x.id === v.source_call_id);
@@ -240,7 +361,8 @@
   }
 
   function renderProposals() {
-    const pending = state.proposals;
+    const profileIds = new Set(filteredProfiles().map((p) => p.id));
+    const pending = state.proposals.filter((p) => profileIds.has(p.profile_id));
     $("conflictBanner").hidden = pending.length === 0;
     $("conflictBanner").textContent = pending.length ? `${pending.length} new or conflicting report item${pending.length === 1 ? " is" : "s are"} awaiting office review. The approved profile remains in force.` : "";
     $("proposalPanel").hidden = !pending.length || !state.permissions.canReview;
@@ -260,7 +382,8 @@
 
   function filteredCalls() {
     const status = $("callStatusFilter").value, term = clean($("callSearch").value).toLowerCase();
-    return state.calls.filter((c) => (!status || c.status === status) && (!term || [c.call_reference, c.vessel_name_snapshot, c.terminal_name_snapshot, c.berth_name_snapshot].some((v) => String(v || "").toLowerCase().includes(term))));
+    const profileIds = new Set(filteredProfiles().map((p) => p.id));
+    return state.calls.filter((c) => (!state.selectedFacilityId || profileIds.has(c.profile_id)) && (!status || c.status === status) && (!term || [c.call_reference, c.vessel_name_snapshot, c.terminal_name_snapshot, c.berth_name_snapshot].some((v) => String(v || "").toLowerCase().includes(term))));
   }
 
   function renderCalls() {
@@ -398,12 +521,16 @@
 
   async function openCallEditor(call = null) {
     if (!state.selectedPortId) return showMessage("warn", "Select a port before creating a report.");
+    if (!state.facilities.length) return showMessage("warn", "No terminal is registered for this port. Use Add Terminal before creating the report.");
     const detail = call ? await task("Opening Draft…", () => loadCallDetails(call.id, true)) : { values: [], repeatRows: [], repeatValues: [], sections: [], hazards: [], attachments: [] };
     const valueMap = new Map(detail.values.map((v) => [v.field_definition_id, v]));
     const fields = state.fields.filter((f) => f.storage_target === "call_value");
     const sections = new Map(); fields.forEach((f) => { if (!sections.has(f.section_label)) sections.set(f.section_label, []); sections.get(f.section_label).push(f); });
+    const callProfile = call ? state.profiles.find((p) => p.id === call.profile_id) : null;
+    const selectedTerminalId = callProfile?.port_facility_id || state.selectedFacilityId || "";
+    const terminalOptions = '<option value="">Select a terminal…</option>' + visibleFacilities().map((f) => `<option value="${attr(f.port_facility_id)}"${f.port_facility_id === selectedTerminalId ? " selected" : ""}>${esc(facilityName(f))}${f.company_id ? " — Company entry" : ""}</option>`).join("");
     const core = `<section class="pci-form-section"><h3>Core call details</h3><div class="pci-form-grid">
-      ${inputField({ id: "pciTerminal", label: "Terminal", value: call?.terminal_name_snapshot || "", required: true })}
+      ${inputField({ id: "pciTerminal", label: "Terminal", required: true, options: terminalOptions, help: "If the terminal is missing, close this panel and use Add Terminal beside the main terminal selector." })}
       ${inputField({ id: "pciBerth", label: "Berth", value: call?.berth_name_snapshot || "", required: true })}
       ${inputField({ id: "pciALF", label: "Arrival — All Lines Fast (local)", type: "datetime-local", value: call?.all_lines_fast_local || "", required: true })}
       ${inputField({ id: "pciALFOffset", label: "All Lines Fast UTC offset", required: true, options: offsetOptions(call?.all_lines_fast_utc_offset_minutes) })}
@@ -490,11 +617,12 @@
     if (first) { first.scrollIntoView({ behavior: "smooth", block: "center" }); first.focus(); throw new Error("Complete the highlighted core fields before saving the Draft."); }
   }
 
-  async function ensureProfile(terminal, berth) {
-    const match = state.profiles.find((p) => clean(p.terminal_name).toLowerCase() === terminal.toLowerCase() && clean(p.berth_name).toLowerCase() === berth.toLowerCase());
+  async function ensureProfile(facility, berth) {
+    const terminal = facilityName(facility);
+    const match = state.profiles.find((p) => p.port_facility_id === facility.port_facility_id && clean(p.berth_name).toLowerCase() === berth.toLowerCase());
     if (match) return match;
-    let result = await state.sb.from("pci_port_profiles").insert({ company_id: state.permissions.companyId, port_id: state.selectedPortId, terminal_name: terminal, berth_name: berth }).select("*").single();
-    if (result.error?.code === "23505") result = await state.sb.from("pci_port_profiles").select("*").eq("port_id", state.selectedPortId).ilike("terminal_name", terminal).ilike("berth_name", berth).single();
+    let result = await state.sb.from("pci_port_profiles").insert({ company_id: state.permissions.companyId, port_id: state.selectedPortId, port_facility_id: facility.port_facility_id, terminal_name: terminal, berth_name: berth }).select("*").single();
+    if (result.error?.code === "23505") result = await state.sb.from("pci_port_profiles").select("*").eq("port_id", state.selectedPortId).eq("port_facility_id", facility.port_facility_id).ilike("berth_name", berth).single();
     dbError(result.error, "Could not create the terminal/berth profile scope."); return result.data;
   }
 
@@ -521,7 +649,9 @@
   async function saveCallEditor(existingCall) {
     await task("Saving Draft…", async () => {
       validateCallForm();
-      const terminal = clean($("pciTerminal").value), berth = clean($("pciBerth").value), profile = await ensureProfile(terminal, berth);
+      const facility = state.facilities.find((f) => f.port_facility_id === $("pciTerminal").value), berth = clean($("pciBerth").value);
+      if (!facility) throw new Error("Select a valid terminal from the controlled list.");
+      const profile = await ensureProfile(facility, berth);
       let call;
       if (existingCall) {
         const { data, error } = await state.sb.from("pci_port_calls").update(callHeaderPayload(profile)).eq("id", existingCall.id).select("*").single(); dbError(error); call = data;
@@ -671,11 +801,17 @@
     return rows.find((r) => r.revision_number === item.current_revision_number) || rows[0] || null;
   }
 
+  function filteredOfficeItems() {
+    if (!state.selectedFacilityId) return state.officeItems;
+    const facility = selectedFacility(), name = facilityName(facility).toLowerCase();
+    return state.officeItems.filter((i) => i.port_facility_id === state.selectedFacilityId || (!i.port_facility_id && clean(i.terminal_name).toLowerCase() === name));
+  }
+
   function renderOfficeInfo() {
     const cat = $("officeCategoryFilter").value;
-    const items = state.officeItems.filter((i) => (!cat || i.category_key === cat) && (state.permissions.officeRole || i.status === "office_info_published"));
+    const items = filteredOfficeItems().filter((i) => (!cat || i.category_key === cat) && (state.permissions.officeRole || i.status === "office_info_published"));
     $("officeList").innerHTML = items.length ? items.map((item) => {
-      const rev = currentOfficeRevision(item), scope = [item.terminal_name || "Port-wide", item.berth_name].filter(Boolean).join(" / ");
+      const rev = currentOfficeRevision(item), directoryFacility = state.facilities.find((f) => f.port_facility_id === item.port_facility_id), scope = [facilityName(directoryFacility) || item.terminal_name || "Port-wide", item.berth_name].filter(Boolean).join(" / ");
       const actions = [];
       if (state.permissions.canManageOfficeInfo && item.status === "office_info_draft") { actions.push(button("Edit Draft", "btn2", "Edit this unpublished office information Draft.", "edit-office"), button("Publish", "btn", "Publish the current revision to authorised Company users.", "publish-office"), button("Delete Draft", "pci-danger", "Permanently delete this unpublished office information Draft after confirmation.", "delete-office")); }
       if (state.permissions.canManageOfficeInfo && item.status === "office_info_published") { actions.push(button("Revise", "btn2", "Create a new controlled revision while preserving the published version history.", "revise-office"), button("Withdraw", "pci-danger", "Withdraw this published information with a required reason; retain its audit history.", "withdraw-office")); }
@@ -686,9 +822,11 @@
 
   function officeFormHtml(item, revision, isRevision) {
     const categories = Object.entries(OFFICE_LABELS).map(([k, l]) => `<option value="${k}"${item?.category_key === k ? " selected" : ""}>${esc(l)}</option>`).join("");
+    const selectedId = item?.port_facility_id || state.selectedFacilityId || "";
+    const terminalOptions = '<option value="">Port-wide (no terminal)</option>' + visibleFacilities().map((f) => `<option value="${attr(f.port_facility_id)}"${f.port_facility_id === selectedId ? " selected" : ""}>${esc(facilityName(f))}${f.company_id ? " — Company entry" : ""}</option>`).join("");
     return `<form id="pciOfficeForm" class="pci-form"><section class="pci-form-section"><h3>${isRevision ? "New controlled revision" : "Information scope"}</h3><div class="pci-form-grid">
       ${inputField({ id: "pciOfficeCategory", label: "Category", required: true, options: categories })}
-      ${inputField({ id: "pciOfficeTerminal", label: "Terminal (blank for port-wide)", value: item?.terminal_name || "" })}
+      ${inputField({ id: "pciOfficeTerminal", label: "Terminal (optional)", options: terminalOptions })}
       ${inputField({ id: "pciOfficeBerth", label: "Berth (requires terminal)", value: item?.berth_name || "" })}
       ${inputField({ id: "pciOfficeTitle", label: "Title", value: revision?.title || "", required: true, wide: true })}
       ${inputField({ id: "pciOfficeNarrative", label: "Information / incident / regulation", type: "textarea", value: revision?.narrative || "", required: true, wide: true, rows: 6 })}
@@ -721,10 +859,14 @@
   async function saveOfficeEditor(item, revision, isRevision, publish) {
     await task(publish ? "Publishing office information…" : "Saving office Draft…", async () => {
       validateOfficeForm(); let savedItem = item;
+      const facilityId = clean($("pciOfficeTerminal").value) || null;
+      const facility = facilityId ? state.facilities.find((f) => f.port_facility_id === facilityId) : null;
+      if (facilityId && !facility) throw new Error("Select a valid terminal from the controlled list.");
+      const terminalName = facility ? facilityName(facility) : "";
       if (!savedItem) {
-        const { data, error } = await state.sb.from("pci_port_information_items").insert({ company_id: state.permissions.companyId, port_id: state.selectedPortId, profile_id: null, terminal_name: clean($("pciOfficeTerminal").value), berth_name: clean($("pciOfficeBerth").value), category_key: $("pciOfficeCategory").value, status: "office_info_draft", created_by: state.permissions.userId }).select("*").single(); dbError(error); savedItem = data;
+        const { data, error } = await state.sb.from("pci_port_information_items").insert({ company_id: state.permissions.companyId, port_id: state.selectedPortId, profile_id: null, port_facility_id: facilityId, terminal_name: terminalName, berth_name: clean($("pciOfficeBerth").value), category_key: $("pciOfficeCategory").value, status: "office_info_draft", created_by: state.permissions.userId }).select("*").single(); dbError(error); savedItem = data;
       } else if (!isRevision && savedItem.status === "office_info_draft") {
-        const { data, error } = await state.sb.from("pci_port_information_items").update({ terminal_name: clean($("pciOfficeTerminal").value), berth_name: clean($("pciOfficeBerth").value), category_key: $("pciOfficeCategory").value }).eq("id", savedItem.id).select("*").single(); dbError(error); savedItem = data;
+        const { data, error } = await state.sb.from("pci_port_information_items").update({ port_facility_id: facilityId, terminal_name: terminalName, berth_name: clean($("pciOfficeBerth").value), category_key: $("pciOfficeCategory").value }).eq("id", savedItem.id).select("*").single(); dbError(error); savedItem = data;
       }
       const existingRows = state.officeRevisions.filter((r) => r.information_item_id === savedItem.id), nextNumber = existingRows.reduce((m, r) => Math.max(m, r.revision_number), 0) + 1;
       const revPayload = { company_id: savedItem.company_id, information_item_id: savedItem.id, revision_number: revision?.id ? revision.revision_number : nextNumber, title: clean($("pciOfficeTitle").value), narrative: clean($("pciOfficeNarrative").value), reference_text: nullable("pciOfficeReference"), reference_url: nullable("pciOfficeUrl"), effective_from: nullable("pciOfficeFrom"), effective_to: nullable("pciOfficeTo"), master_guidance: nullable("pciOfficeMasterGuidance"), superintendent_guidance: nullable("pciOfficeSupGuidance"), created_by: state.permissions.userId };
@@ -766,9 +908,11 @@
 
   function bindStaticEvents() {
     document.querySelectorAll(".pci-tab").forEach((b) => b.onclick = () => switchTab(b.dataset.tab));
-    $("portSearch").oninput = () => renderPortOptions($("portSearch").value);
+    $("countrySelect").onchange = () => selectCountry($("countrySelect").value);
     $("portSelect").onchange = () => selectPort($("portSelect").value);
-    $("reloadBtn").onclick = async () => task("Reloading…", async () => { await loadPorts(); if (state.selectedPortId) await loadSelectedPort(); showMessage("ok", "Port Call Intelligence was reloaded."); });
+    $("terminalSelect").onchange = () => selectTerminal($("terminalSelect").value);
+    $("addTerminalBtn").onclick = openAddTerminal; $("editTerminalBtn").onclick = openEditTerminal;
+    $("reloadBtn").onclick = async () => task("Reloading…", async () => { await loadPorts(); if (state.selectedPortId) { await loadFacilities(state.selectedPortId); await loadSelectedPort(); } showMessage("ok", "Port Call Intelligence was reloaded."); });
     $("newCallBtn").onclick = () => openCallEditor(); $("newOfficeInfoBtn").onclick = () => openOfficeEditor();
     $("callStatusFilter").onchange = renderCalls; $("callSearch").oninput = renderCalls; $("officeCategoryFilter").onchange = renderOfficeInfo;
     $("closeDrawerBtn").onclick = closeDrawer; $("pciDrawerBackdrop").onclick = closeDrawer;
@@ -783,6 +927,8 @@
     if (!state.permissions.canView) throw new Error("Your current Rights Matrix permissions do not allow Port Call Intelligence viewing.");
     await task("Loading Port Call Intelligence…", async () => { await Promise.all([loadDefinitions(), loadPorts()]); });
     $("newCallBtn").hidden = !state.permissions.canCreateCall; $("newOfficeInfoBtn").hidden = !state.permissions.canManageOfficeInfo;
+    updateTerminalActions();
+    if (state.permissions.platform && !state.permissions.companyContextReady) showMessage("warn", "Platform view is read-only until you select a Company context from the dashboard. Company office information and Company terminal changes are disabled.");
     if (!state.ports.length) showMessage("warn", "No ports are available to this Company and user.");
   }
 
