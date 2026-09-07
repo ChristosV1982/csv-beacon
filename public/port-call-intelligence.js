@@ -1,8 +1,8 @@
-// C.S.V. BEACON — Port Call Intelligence application interface v3.
+// C.S.V. BEACON — Port Call Intelligence application interface v4.
 (() => {
   "use strict";
 
-  const BUILD = "PCI-UI-2026-09-04-V03";
+  const BUILD = "PCI-UI-2026-09-07-V04";
   const BUCKET = "port-call-intelligence-private";
   const MAX_FILE = 5 * 1024 * 1024;
   const MAX_CALL = 100 * 1024 * 1024;
@@ -20,7 +20,9 @@
     sb: null, bundle: null, permissions: null, countries: [], ports: [], facilities: [], vessels: [], selectedCountryCode: "",
     selectedPortId: "", selectedFacilityId: "", activeTab: "profile",
     profiles: [], calls: [], officeItems: [], officeRevisions: [], profileValues: [], proposals: [],
-    fields: [], options: [], selectedCallId: "", callDetails: new Map(), busy: 0
+    fields: [], options: [], selectedCallId: "", callDetails: new Map(), busy: 0,
+    directorySearchResults: [], reportRows: [], reportCount: 0, reportPage: 0,
+    reportPageSize: 25, reportRequest: 0
   };
 
   const $ = (id) => document.getElementById(id);
@@ -35,6 +37,7 @@
   const selectedFacility = () => state.facilities.find((f) => f.port_facility_id === state.selectedFacilityId) || null;
   const facilityName = (facility) => clean(facility?.facility_name || facility?.berth_or_terminal_name);
   const fieldById = (id) => state.fields.find((f) => f.id === id) || null;
+  const findCall = (id) => state.calls.find((c) => c.id === id) || state.reportRows.find((c) => c.id === id) || null;
 
   function showMessage(kind, message) {
     const ok = $("okBox"), warn = $("warnBox");
@@ -81,7 +84,7 @@
   async function dispatchAction(action, node) {
     const id = node.dataset.id || "";
     if (action === "open-call") return openCall(id);
-    if (action === "edit-call") return openCallEditor(state.calls.find((c) => c.id === id));
+    if (action === "edit-call") return openCallEditor(findCall(id));
     if (action === "delete-call") return confirmDeleteCall(id);
     if (action === "submit-call") return submitCall(id);
     if (action === "retract-call") return retractCall(id);
@@ -196,6 +199,66 @@
 
   function renderCountryOptions() {
     $("countrySelect").innerHTML = '<option value="">Select a country…</option>' + state.countries.map((country) => `<option value="${attr(country.country_code)}"${country.country_code === state.selectedCountryCode ? " selected" : ""}>${esc(country.country_name || country.country_code)} (${esc(country.country_code)})</option>`).join("");
+    const reportCountry = $("callCountryFilter");
+    if (reportCountry) {
+      const selected = reportCountry.value;
+      reportCountry.innerHTML = '<option value="">All countries</option>' + state.countries.map((country) => `<option value="${attr(country.country_code)}">${esc(country.country_name || country.country_code)} (${esc(country.country_code)})</option>`).join("");
+      reportCountry.value = selected;
+    }
+  }
+
+  function renderDirectorySearchResults() {
+    const panel = $("directorySearchResults");
+    const rows = state.directorySearchResults;
+    panel.hidden = false;
+    panel.innerHTML = `<div class="pci-search-results-head"><strong>${rows.length} matching ${rows.length === 1 ? "entry" : "entries"}</strong><button id="clearDirectorySearchBtn" class="btn2" type="button">Close Results</button></div>
+      <div class="pci-search-results-list">${rows.length ? rows.map((row, index) => `<button type="button" class="pci-search-result" data-search-result="${index}">
+        <strong>${esc(row.terminal_name || row.port_name)}</strong>
+        <span>${esc([row.terminal_name ? row.port_name : "", row.country_name].filter(Boolean).join(" • "))}</span>
+        <code>${esc(row.unlocode || "No UN/LOCODE")}</code>
+      </button>`).join("") : '<div class="pci-empty">No authorised directory entries matched this search.</div>'}</div>`;
+    $("clearDirectorySearchBtn").onclick = () => { panel.hidden = true; state.directorySearchResults = []; };
+    panel.querySelectorAll("[data-search-result]").forEach((node) => {
+      node.onclick = () => chooseDirectorySearchResult(rows[Number(node.dataset.searchResult)]);
+    });
+  }
+
+  async function runDirectorySearch(kind) {
+    const unlocode = kind === "unlocode" ? clean($("unlocodeSearch").value) : "";
+    const terminal = kind === "terminal" ? clean($("terminalSearch").value) : "";
+    if (kind === "unlocode" && unlocode.replace(/[^a-z0-9]/gi, "").length < 2) return showMessage("warn", "Enter at least two UN/LOCODE characters.");
+    if (kind === "terminal" && terminal.length < 3) return showMessage("warn", "Enter at least three terminal-name characters.");
+    await task(kind === "unlocode" ? "Searching by UN/LOCODE…" : "Searching terminal directory…", async () => {
+      const { data, error } = await state.sb.rpc("pci_search_port_directory", {
+        p_unlocode: unlocode || null,
+        p_terminal_name: terminal || null,
+        p_limit: 25
+      });
+      dbError(error, "The controlled directory search failed.");
+      state.directorySearchResults = data || [];
+      renderDirectorySearchResults();
+    });
+  }
+
+  async function chooseDirectorySearchResult(row) {
+    if (!row) return;
+    await task("Opening the selected directory entry…", async () => {
+      state.selectedCountryCode = row.country_code || "";
+      state.selectedPortId = "";
+      state.selectedFacilityId = "";
+      await loadPortsForCountry(state.selectedCountryCode);
+      state.selectedPortId = row.port_id;
+      renderCountryOptions();
+      renderPortOptions();
+      await loadFacilities(row.port_id);
+      state.selectedFacilityId = row.port_facility_id && state.facilities.some((f) => f.port_facility_id === row.port_facility_id) ? row.port_facility_id : "";
+      renderTerminalOptions();
+      $("directorySearchResults").hidden = true;
+      const p = selectedPort(), f = selectedFacility();
+      $("portMeta").textContent = [p?.port_name, p?.country_name, p?.unlocode, f ? facilityName(f) : "All terminals / port-wide"].filter(Boolean).join(" • ");
+      await Promise.all([loadSelectedPort(), loadCallRegister(true)]);
+      showMessage("ok", `${row.terminal_name || row.port_name} was selected from the controlled directory.`);
+    });
   }
 
   function renderPortOptions() {
@@ -238,27 +301,115 @@
     renderTerminalOptions();
   }
 
+  function reportFilterValue(id) {
+    return clean($(id)?.value).replaceAll("%", "").replaceAll("*", "").replaceAll("_", " ");
+  }
+
+  function reportContextLabel() {
+    const p = selectedPort(), f = selectedFacility();
+    if (f) return `${facilityName(f)} • ${p?.port_name || "Selected port"}`;
+    if (p) return `${p.port_name} • all terminals`;
+    if (state.selectedCountryCode) {
+      const country = state.countries.find((row) => row.country_code === state.selectedCountryCode);
+      return `${country?.country_name || state.selectedCountryCode} • all ports`;
+    }
+    return "Company-wide register";
+  }
+
+  async function loadCallRegister(resetPage = false) {
+    if (resetPage) state.reportPage = 0;
+    const requestId = ++state.reportRequest;
+    if (!state.permissions?.companyContextReady) {
+      state.reportRows = [];
+      state.reportCount = 0;
+      renderCalls();
+      return;
+    }
+
+    let query = state.sb.from("pci_v_call_report_register").select("*", { count: "exact" });
+    if (state.selectedPortId) query = query.eq("port_id", state.selectedPortId);
+    else if (state.selectedCountryCode) query = query.eq("country_code_snapshot", state.selectedCountryCode);
+    if (state.selectedFacilityId) query = query.eq("port_facility_id", state.selectedFacilityId);
+
+    const status = $("callStatusFilter").value;
+    const origin = $("callOriginFilter").value;
+    const country = $("callCountryFilter").value;
+    const reference = reportFilterValue("callReferenceFilter");
+    const vessel = reportFilterValue("callVesselFilter");
+    const unlocode = reportFilterValue("callUnlocodeFilter").replace(/[^a-z0-9]/gi, "");
+    const port = reportFilterValue("callPortFilter");
+    const terminal = reportFilterValue("callTerminalFilter");
+    const berth = reportFilterValue("callBerthFilter");
+    const cargo = reportFilterValue("callCargoFilter");
+    const dateFrom = $("callDateFrom").value;
+    const dateTo = $("callDateTo").value;
+
+    if (status) query = query.eq("status", status);
+    if (origin) query = query.eq("report_origin", origin);
+    if (country) query = query.eq("country_code_snapshot", country);
+    if (reference) query = query.ilike("call_reference", `%${reference}%`);
+    if (vessel) query = query.ilike("vessel_name_snapshot", `%${vessel}%`);
+    if (unlocode) query = query.ilike("unlocode_snapshot", `%${unlocode}%`);
+    if (port) query = query.ilike("port_name_snapshot", `%${port}%`);
+    if (terminal) query = query.ilike("terminal_name_snapshot", `%${terminal}%`);
+    if (berth) query = query.ilike("berth_name_snapshot", `%${berth}%`);
+    if (cargo) query = query.ilike("cargo_operation_type", `%${cargo}%`);
+    if (dateFrom) query = query.gte("call_sort_at", `${dateFrom}T00:00:00.000Z`);
+    if (dateTo) {
+      const nextDay = new Date(`${dateTo}T00:00:00.000Z`);
+      nextDay.setUTCDate(nextDay.getUTCDate() + 1);
+      query = query.lt("call_sort_at", nextDay.toISOString());
+    }
+
+    const from = state.reportPage * state.reportPageSize;
+    const to = from + state.reportPageSize - 1;
+    const { data, error, count } = await query
+      .order("call_sort_at", { ascending: false })
+      .order("id", { ascending: false })
+      .range(from, to);
+    dbError(error, "Could not load the call report register.");
+    if (requestId !== state.reportRequest) return;
+    state.reportRows = data || [];
+    state.reportCount = count || 0;
+    const lastPage = Math.max(0, Math.ceil(state.reportCount / state.reportPageSize) - 1);
+    if (state.reportPage > lastPage) {
+      state.reportPage = lastPage;
+      return loadCallRegister(false);
+    }
+    renderCalls();
+    updateCounts();
+  }
+
+  async function refreshCallData(resetPage = false) {
+    if (state.selectedPortId) await loadSelectedPort();
+    else state.calls = [];
+    await loadCallRegister(resetPage);
+  }
+
   async function selectCountry(countryCode) {
     state.selectedCountryCode = countryCode || "";
-    state.selectedPortId = ""; state.selectedFacilityId = ""; state.facilities = [];
+    state.selectedPortId = ""; state.selectedFacilityId = ""; state.selectedCallId = ""; state.facilities = [];
     state.ports = []; renderPortOptions(); renderTerminalOptions(); clearPortPanels();
     $("portMeta").textContent = state.selectedCountryCode ? "Select a port." : "Select a country, then a port.";
     if (state.selectedCountryCode) await task("Loading ports for the selected country…", () => loadPortsForCountry(state.selectedCountryCode));
+    await task("Updating the call report register…", () => loadCallRegister(true));
   }
 
   async function selectPort(portId) {
     state.selectedPortId = portId || ""; state.selectedFacilityId = ""; state.selectedCallId = ""; state.callDetails.clear();
     const p = selectedPort();
     $("portMeta").textContent = p ? [p.port_name, p.country_name, p.unlocode].filter(Boolean).join(" • ") : "Select a port to view its Company information.";
-    if (!p) { state.facilities = []; renderTerminalOptions(); clearPortPanels(); return; }
-    await task("Loading port and terminal information…", async () => { await loadFacilities(portId); await loadSelectedPort(); });
+    if (!p) { state.facilities = []; renderTerminalOptions(); clearPortPanels(); await task("Updating the call report register…", () => loadCallRegister(true)); return; }
+    await task("Loading port and terminal information…", async () => { await loadFacilities(portId); await Promise.all([loadSelectedPort(), loadCallRegister(true)]); });
   }
 
-  function selectTerminal(facilityId) {
+  async function selectTerminal(facilityId) {
     state.selectedFacilityId = facilityId || "";
-    updateTerminalActions(); renderProfile(); renderCalls(); renderOfficeInfo(); updateCounts();
+    state.selectedCallId = "";
+    updateTerminalActions(); renderProfile(); renderOfficeInfo(); updateCounts();
     const p = selectedPort(), f = selectedFacility();
     $("portMeta").textContent = [p?.port_name, p?.country_name, p?.unlocode, f ? facilityName(f) : "All terminals / port-wide"].filter(Boolean).join(" • ");
+    await task("Updating the call report register…", () => loadCallRegister(true));
   }
 
   function openAddTerminal() {
@@ -274,7 +425,7 @@
         dbError(error, "Could not add the terminal.");
         const saved = Array.isArray(data) ? data[0] : data;
         closeDrawer(); await loadFacilities(state.selectedPortId);
-        state.selectedFacilityId = saved?.port_facility_id || ""; renderTerminalOptions(); selectTerminal(state.selectedFacilityId);
+        state.selectedFacilityId = saved?.port_facility_id || ""; renderTerminalOptions(); await selectTerminal(state.selectedFacilityId);
         showMessage("ok", `${name} is now available in the shared Company terminal list.`);
       });
     };
@@ -291,7 +442,7 @@
       await task("Correcting terminal name…", async () => {
         const { error } = await state.sb.rpc("pci_manage_company_terminal", { p_company_id: state.permissions.companyId, p_port_facility_id: facility.port_facility_id, p_terminal_name: name, p_is_active: true });
         dbError(error, "Could not correct the terminal name.");
-        closeDrawer(); await loadFacilities(state.selectedPortId); state.selectedFacilityId = facility.port_facility_id; renderTerminalOptions(); selectTerminal(state.selectedFacilityId);
+        closeDrawer(); await loadFacilities(state.selectedPortId); state.selectedFacilityId = facility.port_facility_id; renderTerminalOptions(); await selectTerminal(state.selectedFacilityId);
         showMessage("ok", "The terminal name was corrected. Historical call reports were not changed.");
       });
     };
@@ -300,7 +451,7 @@
       await task("Deactivating terminal…", async () => {
         const { error } = await state.sb.rpc("pci_manage_company_terminal", { p_company_id: state.permissions.companyId, p_port_facility_id: facility.port_facility_id, p_terminal_name: facilityName(facility), p_is_active: false });
         dbError(error, "Could not deactivate the terminal.");
-        closeDrawer(); state.selectedFacilityId = ""; await loadFacilities(state.selectedPortId); selectTerminal("");
+        closeDrawer(); state.selectedFacilityId = ""; await loadFacilities(state.selectedPortId); await selectTerminal("");
         showMessage("ok", "The terminal was deactivated. Historical reports remain unchanged.");
       });
     };
@@ -309,16 +460,15 @@
   function clearPortPanels() {
     state.profiles = []; state.calls = []; state.officeItems = []; state.officeRevisions = []; state.profileValues = []; state.proposals = [];
     $("profileContent").innerHTML = '<div class="pci-empty">Select a port.</div>';
-    $("callList").innerHTML = '<div class="pci-empty">Select a port.</div>';
     $("callDetail").innerHTML = '<div class="pci-empty">Select a call report to read it.</div>';
-    $("officeList").innerHTML = '<div class="pci-empty">Select a port.</div>'; updateCounts();
+    $("officeList").innerHTML = '<div class="pci-empty">Select a port.</div>'; renderCalls(); updateCounts();
   }
 
   async function loadSelectedPort() {
     const portId = state.selectedPortId;
     if (!state.permissions.companyContextReady) {
       state.profiles = []; state.calls = []; state.officeItems = []; state.officeRevisions = []; state.profileValues = []; state.proposals = [];
-      renderProfile(); renderCalls(); renderOfficeInfo(); updateCounts();
+      renderProfile(); renderOfficeInfo(); updateCounts();
       return;
     }
     const [profilesR, callsR, officeR] = await Promise.all([
@@ -336,7 +486,7 @@
     ]);
     [valuesR, proposalsR, revisionsR].forEach((r) => dbError(r.error));
     state.profileValues = valuesR.data || []; state.proposals = proposalsR.data || []; state.officeRevisions = revisionsR.data || [];
-    renderProfile(); renderCalls(); renderOfficeInfo(); updateCounts();
+    renderProfile(); renderOfficeInfo(); updateCounts();
     $("newCallBtn").hidden = !state.permissions.canCreateCall;
     $("newOfficeInfoBtn").hidden = !state.permissions.canManageOfficeInfo;
   }
@@ -344,7 +494,7 @@
   function updateCounts() {
     const profileIds = new Set(filteredProfiles().map((p) => p.id));
     $("profileCount").textContent = String(state.profileValues.filter((v) => profileIds.has(v.profile_id)).length);
-    $("callCount").textContent = String(filteredCalls().length);
+    $("callCount").textContent = String(state.reportCount);
     $("officeCount").textContent = String(filteredOfficeItems().filter((x) => x.status !== "office_info_withdrawn" || state.permissions?.officeRole).length);
   }
 
@@ -400,14 +550,24 @@
   }
 
   function filteredCalls() {
-    const status = $("callStatusFilter").value, term = clean($("callSearch").value).toLowerCase();
-    const profileIds = new Set(filteredProfiles().map((p) => p.id));
-    return state.calls.filter((c) => (!state.selectedFacilityId || profileIds.has(c.profile_id)) && (!status || c.status === status) && (!term || [c.call_reference, c.vessel_name_snapshot, c.terminal_name_snapshot, c.berth_name_snapshot].some((v) => String(v || "").toLowerCase().includes(term))));
+    return state.reportRows;
   }
 
   function renderCalls() {
     const calls = filteredCalls();
-    $("callList").innerHTML = calls.length ? calls.map((c) => `<button type="button" class="pci-list-item${c.id === state.selectedCallId ? " is-selected" : ""}" data-action="open-call" data-id="${attr(c.id)}" data-pci-tip="Open this vessel call as a separate report."><div class="pci-list-title"><span>${esc(c.vessel_name_snapshot)}</span>${statusPill(c.status)}</div><div class="pci-list-sub">${esc(c.call_reference)} • ${esc(c.terminal_name_snapshot)} / ${esc(c.berth_name_snapshot)}</div><div class="pci-list-sub">${c.report_origin === "office" ? "Office-entered • " : ""}All Lines Fast: ${esc(c.all_lines_fast_utc ? isoDate(c.all_lines_fast_utc) : "not entered")}</div></button>`).join("") : '<div class="pci-empty">No visible call reports match these filters.</div>';
+    $("callRegisterContext").textContent = reportContextLabel();
+    $("callRegisterResult").textContent = `${state.reportCount} visible ${state.reportCount === 1 ? "report" : "reports"}`;
+    $("callList").innerHTML = calls.length ? calls.map((c) => `<button type="button" class="pci-list-item${c.id === state.selectedCallId ? " is-selected" : ""}" data-action="open-call" data-id="${attr(c.id)}" data-pci-tip="Open this call as a separate permanent report.">
+      <div class="pci-list-title"><span>${esc(c.vessel_name_snapshot)}</span>${statusPill(c.status)}</div>
+      <div class="pci-list-sub"><strong>${esc(c.call_reference)}</strong> • ${esc(c.country_name_snapshot || c.country_code_snapshot || "Country not recorded")} • ${esc(c.unlocode_snapshot || "No UN/LOCODE")}</div>
+      <div class="pci-list-sub pci-call-location">${esc(c.port_name_snapshot)} • ${esc(c.terminal_name_snapshot)} / ${esc(c.berth_name_snapshot)}</div>
+      <div class="pci-list-sub"><span class="pci-call-origin">${c.report_origin === "office" ? "Office-entered" : "Vessel Master"}</span> • ${esc(c.cargo_operation_type || "Cargo operation not entered")}</div>
+      <div class="pci-list-sub">Call date: ${esc(c.all_lines_fast_utc ? isoDate(c.all_lines_fast_utc) : "not entered")} • Updated: ${esc(isoDate(c.updated_at))}</div>
+    </button>`).join("") : '<div class="pci-empty">No visible call reports match the current Company, location and filter settings.</div>';
+    const totalPages = Math.max(1, Math.ceil(state.reportCount / state.reportPageSize));
+    $("callPageSummary").textContent = `Page ${state.reportPage + 1} of ${totalPages}`;
+    $("callPrevPageBtn").disabled = state.reportPage === 0;
+    $("callNextPageBtn").disabled = state.reportPage + 1 >= totalPages;
     bindActionRoot($("callList"));
   }
 
@@ -431,7 +591,7 @@
     state.selectedCallId = callId; renderCalls();
     $("callDetail").innerHTML = '<div class="pci-empty">Loading call report…</div>';
     await task("Loading call report…", async () => {
-      const call = state.calls.find((c) => c.id === callId); if (!call) return;
+      const call = findCall(callId); if (!call) return;
       const detail = await loadCallDetails(callId); renderCallDetail(call, detail);
     });
   }
@@ -691,7 +851,7 @@
       }
       await saveCallValues(call); await saveRepeatRows(call); await saveSectionConfirmations(call); await saveHazards(call);
       closeDrawer(); showMessage("ok", `${call.call_reference} was saved as a Draft.`);
-      state.callDetails.delete(call.id); await loadSelectedPort(); switchTab("calls"); await openCall(call.id);
+      state.callDetails.delete(call.id); await refreshCallData(true); switchTab("calls"); await openCall(call.id);
     });
   }
 
@@ -763,18 +923,18 @@
   }
 
   async function downloadAttachment(id) {
-    const call = state.calls.find((c) => c.id === state.selectedCallId), detail = call ? await loadCallDetails(call.id) : null, a = detail?.attachments.find((x) => x.id === id); if (!a) return;
+    const call = findCall(state.selectedCallId), detail = call ? await loadCallDetails(call.id) : null, a = detail?.attachments.find((x) => x.id === id); if (!a) return;
     await task("Preparing secure download…", async () => { const { data, error } = await state.sb.storage.from(BUCKET).createSignedUrl(a.object_path, 60); dbError(error); window.location.href = data.signedUrl; });
   }
 
   async function confirmDeleteAttachment(id) {
-    const call = state.calls.find((c) => c.id === state.selectedCallId), detail = call ? await loadCallDetails(call.id) : null, a = detail?.attachments.find((x) => x.id === id); if (!a) return;
+    const call = findCall(state.selectedCallId), detail = call ? await loadCallDetails(call.id) : null, a = detail?.attachments.find((x) => x.id === id); if (!a) return;
     if (!await confirmAction({ title: "Delete Draft attachment?", message: `${a.original_file_name} will be permanently removed from private Storage and this Draft.`, label: "Delete Attachment" })) return;
     await task("Deleting attachment…", async () => { const { error: storageError } = await state.sb.storage.from(BUCKET).remove([a.object_path]); dbError(storageError); const { error } = await state.sb.from("pci_call_attachments").delete().eq("id", id); dbError(error); state.callDetails.delete(call.id); closeDrawer(); showMessage("ok", "The Draft attachment was deleted."); await openCall(call.id); });
   }
 
   async function submitCall(id) {
-    const call = state.calls.find((c) => c.id === id), detail = await loadCallDetails(id, true); if (!call) return;
+    const call = findCall(id), detail = await loadCallDetails(id, true); if (!call) return;
     const missing = majorSections().filter(([key]) => !detail.sections.some((s) => s.section_key === key));
     if (missing.length) return showMessage("warn", `Submission is blocked: ${missing.length} section${missing.length === 1 ? " has" : "s have"} not been confirmed. Edit the Draft and complete the Section completion area.`);
     if (!call.master_completion_confirmed) return showMessage("warn", `Submission is blocked until the ${call.report_origin === "office" ? "Office" : "Master"} completion confirmation is selected.`);
@@ -790,7 +950,7 @@
   async function changeCallStatus(id, status, success = "Call status updated.", extra = {}) {
     await task("Updating report status…", async () => {
       const { error } = await state.sb.from("pci_port_calls").update({ status, ...extra }).eq("id", id); dbError(error);
-      state.callDetails.delete(id); await loadSelectedPort(); showMessage("ok", success); await openCall(id);
+      state.callDetails.delete(id); await refreshCallData(false); showMessage("ok", success); await openCall(id);
     });
   }
 
@@ -805,19 +965,19 @@
   }
 
   async function confirmDeleteCall(id) {
-    const call = state.calls.find((c) => c.id === id), detail = call ? await loadCallDetails(id, true) : null; if (!call) return;
+    const call = findCall(id), detail = call ? await loadCallDetails(id, true) : null; if (!call) return;
     if (!await confirmAction({ title: "Delete Draft report?", message: `${call.call_reference} and all of its Draft notes and attachments will be permanently deleted. This cannot be undone.`, label: "Delete Draft" })) return;
     await task("Deleting Draft report…", async () => {
       const paths = (detail?.attachments || []).map((a) => a.object_path);
       if (paths.length) { const { error } = await state.sb.storage.from(BUCKET).remove(paths); dbError(error, "Draft attachments could not be removed, so the report was not deleted."); const { error: rowsError } = await state.sb.from("pci_call_attachments").delete().eq("call_id", id); dbError(rowsError); }
       const { error } = await state.sb.from("pci_port_calls").delete().eq("id", id); dbError(error);
-      state.selectedCallId = ""; state.callDetails.delete(id); $("callDetail").innerHTML = '<div class="pci-empty">Select a call report to read it.</div>'; await loadSelectedPort(); showMessage("ok", "The Draft report and its Draft attachments were deleted.");
+      state.selectedCallId = ""; state.callDetails.delete(id); $("callDetail").innerHTML = '<div class="pci-empty">Select a call report to read it.</div>'; await refreshCallData(false); showMessage("ok", "The Draft report and its Draft attachments were deleted.");
     });
   }
 
   function openAmendmentRequest(id) {
     openDrawer("Controlled amendment", "Request an amendment", `<form class="pci-form"><section class="pci-form-section"><h3>Reason</h3><div class="pci-form-grid">${inputField({ id: "pciAmendmentReason", label: "Reason for amendment", type: "textarea", required: true, wide: true, help: "The finalised report will remain unchanged. The office must review and apply any controlled correction." })}</div></section></form>`, `<button id="cancelAmendmentBtn" class="btn2" type="button">Cancel</button><button id="submitAmendmentBtn" class="btn" type="button" data-pci-tip="Send this controlled amendment request to the office without changing the finalised report.">Submit Request</button>`);
-    $("cancelAmendmentBtn").onclick = closeDrawer; $("submitAmendmentBtn").onclick = async () => { const reason = clean($("pciAmendmentReason").value); if (!reason) return $("pciAmendmentReason").classList.add("pci-form-error"); await task("Submitting amendment request…", async () => { const call = state.calls.find((c) => c.id === id); let r = await state.sb.from("pci_call_amendments").insert({ company_id: call.company_id, call_id: id, request_origin: state.permissions.officeRole ? "office" : "master", reason, status: "amendment_draft", requested_by: state.permissions.userId }).select("*").single(); dbError(r.error); if (!state.permissions.officeRole) { r = await state.sb.from("pci_call_amendments").update({ status: "amendment_submitted" }).eq("id", r.data.id); dbError(r.error); } closeDrawer(); state.callDetails.delete(id); showMessage("ok", state.permissions.officeRole ? "The controlled office amendment Draft was created." : "The controlled amendment request was submitted."); await openCall(id); }); };
+    $("cancelAmendmentBtn").onclick = closeDrawer; $("submitAmendmentBtn").onclick = async () => { const reason = clean($("pciAmendmentReason").value); if (!reason) return $("pciAmendmentReason").classList.add("pci-form-error"); await task("Submitting amendment request…", async () => { const call = findCall(id); let r = await state.sb.from("pci_call_amendments").insert({ company_id: call.company_id, call_id: id, request_origin: state.permissions.officeRole ? "office" : "master", reason, status: "amendment_draft", requested_by: state.permissions.userId }).select("*").single(); dbError(r.error); if (!state.permissions.officeRole) { r = await state.sb.from("pci_call_amendments").update({ status: "amendment_submitted" }).eq("id", r.data.id); dbError(r.error); } closeDrawer(); state.callDetails.delete(id); showMessage("ok", state.permissions.officeRole ? "The controlled office amendment Draft was created." : "The controlled amendment request was submitted."); await openCall(id); }); };
   }
 
   function openProposalDecision(id) {
@@ -942,6 +1102,8 @@
     $("countrySelect").onchange = () => selectCountry($("countrySelect").value);
     $("portSelect").onchange = () => selectPort($("portSelect").value);
     $("terminalSelect").onchange = () => selectTerminal($("terminalSelect").value);
+    $("unlocodeSearchForm").onsubmit = (event) => { event.preventDefault(); runDirectorySearch("unlocode"); };
+    $("terminalSearchForm").onsubmit = (event) => { event.preventDefault(); runDirectorySearch("terminal"); };
     $("addTerminalBtn").onclick = openAddTerminal; $("editTerminalBtn").onclick = openEditTerminal;
     $("reloadBtn").onclick = async () => task("Reloading…", async () => {
       const countryCode = state.selectedCountryCode, portId = state.selectedPortId;
@@ -952,10 +1114,21 @@
       if (portId && state.ports.some((port) => port.port_id === portId)) {
         state.selectedPortId = portId; await loadFacilities(portId); await loadSelectedPort();
       }
+      await loadCallRegister(false);
       showMessage("ok", "Port Call Intelligence was reloaded.");
     });
     $("newCallBtn").onclick = () => openCallEditor(); $("newOfficeInfoBtn").onclick = () => openOfficeEditor();
-    $("callStatusFilter").onchange = renderCalls; $("callSearch").oninput = renderCalls; $("officeCategoryFilter").onchange = renderOfficeInfo;
+    $("applyCallFiltersBtn").onclick = async () => {
+      if ($("callDateFrom").value && $("callDateTo").value && $("callDateFrom").value > $("callDateTo").value) return showMessage("warn", "Call date from cannot be later than call date to.");
+      await task("Applying call report filters…", () => loadCallRegister(true));
+    };
+    $("clearCallFiltersBtn").onclick = async () => {
+      ["callDateFrom", "callDateTo", "callReferenceFilter", "callVesselFilter", "callCountryFilter", "callUnlocodeFilter", "callPortFilter", "callTerminalFilter", "callBerthFilter", "callCargoFilter", "callStatusFilter", "callOriginFilter"].forEach((id) => { $(id).value = ""; });
+      await task("Clearing call report filters…", () => loadCallRegister(true));
+    };
+    $("callPrevPageBtn").onclick = async () => { if (state.reportPage === 0) return; state.reportPage -= 1; await task("Loading previous reports…", () => loadCallRegister(false)); };
+    $("callNextPageBtn").onclick = async () => { if ((state.reportPage + 1) * state.reportPageSize >= state.reportCount) return; state.reportPage += 1; await task("Loading more reports…", () => loadCallRegister(false)); };
+    $("officeCategoryFilter").onchange = renderOfficeInfo;
     $("closeDrawerBtn").onclick = closeDrawer; $("pciDrawerBackdrop").onclick = closeDrawer;
     document.addEventListener("keydown", (event) => { if (event.key === "Escape" && !$("confirmDialog").hidden) $("confirmCancelBtn").click(); else if (event.key === "Escape" && !$("pciDrawer").hidden) closeDrawer(); });
   }
@@ -966,7 +1139,10 @@
     state.bundle = bundle; state.sb = window.AUTH.ensureSupabase(); window.AUTH.fillUserBadge(bundle);
     await window.AUTH.setupAuthButtons(); state.permissions = await window.PCI_PERMISSIONS.load(bundle);
     if (!state.permissions.canView) throw new Error("Your current Rights Matrix permissions do not allow Port Call Intelligence viewing.");
-    await task("Loading Port Call Intelligence…", async () => { await Promise.all([loadDefinitions(), loadCountries(), loadCompanyVessels()]); });
+    await task("Loading Port Call Intelligence…", async () => {
+      await Promise.all([loadDefinitions(), loadCountries(), loadCompanyVessels()]);
+      await loadCallRegister(true);
+    });
     $("newCallBtn").hidden = !state.permissions.canCreateCall; $("newOfficeInfoBtn").hidden = !state.permissions.canManageOfficeInfo;
     updateTerminalActions();
     if (state.permissions.platform && !state.permissions.companyContextReady) showMessage("warn", "Platform view is read-only until you select a Company context from the dashboard. Company office information and Company terminal changes are disabled.");

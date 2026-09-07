@@ -6,7 +6,7 @@
   <title>C.S.V. BEACON – Port Call Intelligence</title>
   <link rel="stylesheet" href="./csv-beacon-theme.css?v=20260428_3" />
   <link rel="stylesheet" href="./style.css?v=20260428_3" />
-  <link rel="stylesheet" href="./port-call-intelligence.css?v=20260904_3" />
+  <link rel="stylesheet" href="./port-call-intelligence.css?v=20260907_4" />
   <link rel="stylesheet" href="./csvb-mobile-polish.css?v=20260528_1" />
   <link rel="stylesheet" href="./csvb-mobile-fixes-20260528-2.css?v=20260528_2" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -50,6 +50,23 @@
 
     <section class="pci-port-picker" aria-label="Port and terminal selection">
       <div class="pci-port-picker-title">Find a port or terminal</div>
+      <div class="pci-directory-search">
+        <form id="unlocodeSearchForm" class="pci-search-box">
+          <label for="unlocodeSearch">Search by UN/LOCODE</label>
+          <div class="pci-search-control">
+            <input id="unlocodeSearch" type="search" autocomplete="off" maxlength="12" placeholder="Example: SGSIN" />
+            <button id="unlocodeSearchBtn" class="btn2" type="submit" data-pci-tip="Find an authorised port by its complete or starting UN/LOCODE.">Search UN/LOCODE</button>
+          </div>
+        </form>
+        <form id="terminalSearchForm" class="pci-search-box">
+          <label for="terminalSearch">Search by terminal name</label>
+          <div class="pci-search-control">
+            <input id="terminalSearch" type="search" autocomplete="off" maxlength="120" placeholder="Enter at least 3 characters" />
+            <button id="terminalSearchBtn" class="btn2" type="submit" data-pci-tip="Find authorised terminals whose names contain this text.">Search Terminal</button>
+          </div>
+        </form>
+      </div>
+      <div id="directorySearchResults" class="pci-search-results" hidden></div>
       <div class="pci-port-row">
         <div class="pci-picker-field">
           <label for="countrySelect">1. Country</label>
@@ -92,16 +109,41 @@
 
     <section id="callsPanel" class="pci-panel" data-panel="calls" hidden>
       <div class="pci-panel-head">
-        <div><h2>Vessel Call Reports</h2><p>Each vessel call remains a separate permanent report. Use the filters to compare experience report by report.</p></div>
-        <div class="pci-inline-filters">
-          <select id="callStatusFilter" aria-label="Filter call reports by status">
-            <option value="">All visible statuses</option><option value="finalised">Finalised</option><option value="draft">Draft</option><option value="submitted">Submitted</option><option value="under_review">Under review</option>
-          </select>
-          <input id="callSearch" type="search" placeholder="Vessel, terminal, berth or reference…" />
+        <div><h2>Company Call Report Register</h2><p>View and filter every call report available to your role. Office users can see all Company statuses; other users remain restricted by the existing Rights Matrix and database policies.</p></div>
+      </div>
+      <div class="pci-register-toolbar">
+        <div class="pci-register-context">
+          <strong id="callRegisterContext">Company-wide register</strong>
+          <span id="callRegisterResult">0 visible reports</span>
+        </div>
+        <div class="pci-register-filters">
+          <div><label for="callDateFrom">Call date from</label><input id="callDateFrom" type="date" /></div>
+          <div><label for="callDateTo">Call date to</label><input id="callDateTo" type="date" /></div>
+          <div><label for="callReferenceFilter">Call reference</label><input id="callReferenceFilter" type="search" placeholder="Call reference" /></div>
+          <div><label for="callVesselFilter">Vessel</label><input id="callVesselFilter" type="search" placeholder="Vessel name" /></div>
+          <div><label for="callCountryFilter">Country</label><select id="callCountryFilter"><option value="">All countries</option></select></div>
+          <div><label for="callUnlocodeFilter">UN/LOCODE</label><input id="callUnlocodeFilter" type="search" placeholder="Example: SGSIN" /></div>
+          <div><label for="callPortFilter">Port</label><input id="callPortFilter" type="search" placeholder="Port name" /></div>
+          <div><label for="callTerminalFilter">Terminal</label><input id="callTerminalFilter" type="search" placeholder="Terminal name" /></div>
+          <div><label for="callBerthFilter">Berth</label><input id="callBerthFilter" type="search" placeholder="Berth name" /></div>
+          <div><label for="callCargoFilter">Cargo operation</label><input id="callCargoFilter" type="search" placeholder="Cargo operation" /></div>
+          <div><label for="callStatusFilter">Status</label><select id="callStatusFilter"><option value="">All visible statuses</option><option value="finalised">Finalised</option><option value="draft">Draft</option><option value="submitted">Submitted</option><option value="under_review">Under review</option></select></div>
+          <div><label for="callOriginFilter">Report origin</label><select id="callOriginFilter"><option value="">All origins</option><option value="vessel_master">Vessel Master</option><option value="office">Office-entered</option></select></div>
+        </div>
+        <div class="pci-register-actions">
+          <button id="applyCallFiltersBtn" class="btn" type="button">Apply Filters</button>
+          <button id="clearCallFiltersBtn" class="btn2" type="button">Clear Filters</button>
         </div>
       </div>
       <div class="pci-master-detail">
-        <div id="callList" class="pci-list"><div class="pci-empty">Select a port.</div></div>
+        <div>
+          <div id="callList" class="pci-list"><div class="pci-empty">Loading visible call reports…</div></div>
+          <div class="pci-pagination">
+            <button id="callPrevPageBtn" class="btn2" type="button">Previous</button>
+            <span id="callPageSummary">Page 1</span>
+            <button id="callNextPageBtn" class="btn2" type="button">Next</button>
+          </div>
+        </div>
         <article id="callDetail" class="pci-detail"><div class="pci-empty">Select a call report to read it.</div></article>
       </div>
     </section>
@@ -131,8 +173,8 @@
   <div id="pciTooltip" class="pci-tooltip" role="tooltip" hidden></div>
   <div id="pciBusy" class="pci-busy" hidden><div class="pci-spinner"></div><span>Working…</span></div>
 
-  <script src="./port-call-intelligence-permissions-v1.js?v=20260904_3"></script>
-  <script src="./port-call-intelligence.js?v=20260904_3"></script>
+  <script src="./port-call-intelligence-permissions-v1.js?v=20260907_4"></script>
+  <script src="./port-call-intelligence.js?v=20260907_4"></script>
   <script src="./csvb-build-badge.js?v=20260528_01"></script>
 </body>
 </html>
