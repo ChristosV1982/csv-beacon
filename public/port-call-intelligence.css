@@ -282,3 +282,52 @@ html[data-csvb-page="port-call-intelligence.html"] .pci-summary-cell {
     padding: 10px;
   }
 }
+
+/* Call report form usability v1. */
+.pci-form-field { min-width: 0; }
+.pci-form-grid > .is-wide,
+.pci-form-field.is-wide { grid-column: 1 / -1; }
+.pci-choice-group legend { color: #3c5966; font-size: .83rem; font-weight: 800; }
+.pci-form-pair { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(220px, .65fr); gap: 12px; }
+.pci-form-triple { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.pci-inline-control { display: grid; grid-template-columns: minmax(0, 1fr) minmax(118px, .45fr); gap: 7px; }
+.pci-status-number .pci-inline-control { grid-template-columns: minmax(145px, .8fr) minmax(0, 1fr); }
+.pci-choice-group { margin: 0; padding: 0; border: 0; }
+.pci-choice-group legend { margin-bottom: 7px; }
+.pci-choice-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }
+.pci-choice { display: flex; align-items: center; gap: 7px; min-height: 36px; padding: 7px 9px; border: 1px solid #c9dce6; border-radius: 8px; background: #f8fbfd; color: var(--pci-ink); font-size: .82rem; }
+.pci-choice input { width: auto !important; min-height: 0 !important; margin: 0; accent-color: var(--pci-teal); }
+.pci-choice:has(input:checked) { border-color: var(--pci-teal); background: #eaf8fa; color: var(--pci-navy); }
+.pci-legacy-note { padding: 6px 8px; border-left: 3px solid #d69c22; background: #fffaf0; color: #6f560d; font-size: .74rem; }
+.pci-coordinate-control { display: grid; grid-template-columns: minmax(80px, .8fr) minmax(105px, 1fr) minmax(92px, .7fr); gap: 7px; }
+.pci-coordinate-control label,
+.pci-manifold-control label { display: flex; flex-direction: column; gap: 4px; }
+.pci-coordinate-control label span,
+.pci-manifold-control label > span:first-child { color: var(--pci-muted); font-size: .69rem; font-weight: 700; }
+.pci-manifold-control { display: grid; grid-template-columns: minmax(110px, .7fr) minmax(130px, .75fr) minmax(230px, 1.55fr); gap: 8px; }
+.pci-size-pair { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 6px; }
+.pci-size-pair b { text-align: center; color: var(--pci-muted); }
+.pci-tug-editor { margin: 0; overflow: hidden; border: 1px solid #c9dce6; border-radius: 9px; background: #f9fcfd; }
+.pci-repeat-subhead { display: flex; justify-content: space-between; gap: 10px; padding: 9px 11px; background: #e7f2f6; color: var(--pci-navy); font-size: .82rem; }
+.pci-repeat-subhead span { color: var(--pci-muted); font-size: .75rem; }
+.pci-tug-row { margin: 9px; padding: 10px; background: #fff; }
+.pci-tug-row-title { margin-bottom: 7px; color: var(--pci-navy); font-size: .82rem; font-weight: 850; }
+.pci-tug-grid { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(130px, .8fr) minmax(130px, .8fr); gap: 9px; }
+.pci-tug-grid .pci-form-field { grid-column: auto; }
+.pci-tug-grid .pci-help { display: none; }
+
+@media (max-width: 900px) {
+  .pci-form-pair,
+  .pci-form-triple,
+  .pci-manifold-control,
+  .pci-tug-grid { grid-template-columns: 1fr; }
+  .pci-choice-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 560px) {
+  .pci-choice-grid,
+  .pci-coordinate-control,
+  .pci-inline-control,
+  .pci-status-number .pci-inline-control { grid-template-columns: 1fr; }
+  .pci-repeat-subhead { flex-direction: column; }
+}

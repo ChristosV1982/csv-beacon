@@ -1,8 +1,8 @@
-// C.S.V. BEACON — Port Call Intelligence application interface v4.
+// C.S.V. BEACON — Port Call Intelligence application interface v6.
 (() => {
   "use strict";
 
-  const BUILD = "PCI-UI-2026-09-07-V04";
+  const BUILD = "PCI-UI-2026-09-08-V06";
   const BUCKET = "port-call-intelligence-private";
   const MAX_FILE = 5 * 1024 * 1024;
   const MAX_CALL = 100 * 1024 * 1024;
@@ -15,6 +15,19 @@
     ["mooring", "Mooring"], ["cargo", "Cargo"], ["security", "Security"],
     ["environmental", "Environmental"], ["other", "Other"]
   ];
+  const CARGO_OPERATIONS = ["Loading", "Discharging", "Tank Cleaning", "COW", "Bunkering", "Ballasting", "Purging", "Gas freeing", "Cargo heating"];
+  const BERTH_TYPES = ["Standard Tanker Berth", "Non Standard Tanker Berth", "SBM Berth", "Mooring in tandem", "Conventional buoy mooring", "Multi-buoy mooring", "Mediterranean mooring berth", "Ship to Ship"];
+  const HIDDEN_CALL_FIELDS = new Set([
+    "mooring_fenders__tug_configuration_positioning",
+    "cargo_transfer__number_of_shore_loading_arms_connected"
+  ]);
+  const HIDDEN_REPEAT_GROUPS = new Set(["loading_arms"]);
+  const UNIT_CHOICES = {
+    navigation_channel__distance_through_channel: ["NM", "km", "m"],
+    berthing_limits__minimum_visibility_for_berthing: ["NM", "m"],
+    cargo_transfer__maximum_permitted_discharge_pressure: ["bar", "kg·cm⁻²", "other"],
+    cargo_transfer__distance_to_shore_tanks: ["m", "km"]
+  };
 
   const state = {
     sb: null, bundle: null, permissions: null, countries: [], ports: [], facilities: [], vessels: [], selectedCountryCode: "",
@@ -648,12 +661,14 @@
   }
 
   function coreCallDetail(call) {
+    const statusReading = (value, status, unit = "m") => status === "not_applicable" ? "Not applicable" : status === "not_known" ? "Not known" : value == null ? "—" : `${value} ${unit}`;
     const rows = [
       ["Port entry", `${localDate(call.port_entry_local)} (UTC ${formatOffset(call.port_entry_utc_offset_minutes)})`],
-      ["Arrival draught F / A", `${call.arrival_draught_forward ?? "—"} / ${call.arrival_draught_aft ?? "—"} m`],
-      ["Controlling depth", call.controlling_depth == null ? "—" : `${call.controlling_depth} m`],
-      ["Tide height at entry", call.tide_height_at_entry == null ? "—" : `${call.tide_height_at_entry} m`],
-      ["UKC method / result", `${call.ukc_method || "—"} / ${call.ukc_result ?? "—"} m`], ["UKC notes", call.ukc_notes || "—"]
+      ["Arrival draught F / M / A", `${call.arrival_draught_forward ?? "—"} / ${call.arrival_draught_midships ?? "—"} / ${call.arrival_draught_aft ?? "—"} m`],
+      ["Channel Controlling depth", statusReading(call.controlling_depth, call.controlling_depth_status)],
+      ["Tide height at Port Entry", statusReading(call.tide_height_at_entry, call.tide_height_at_entry_status)],
+      ["Tide height at Port Exit", statusReading(call.tide_height_at_exit, call.tide_height_at_exit_status)],
+      ["UKC method", call.ukc_method || "—"], ["Actual UKC at shallowest depth", call.ukc_result == null ? "—" : `${call.ukc_result} m`], ["UKC notes", call.ukc_notes || "—"]
     ];
     return `<section class="pci-section"><h3>Core call information</h3>${rows.map(([k, v]) => `<div class="pci-field-row"><div class="pci-field-label">${esc(k)}</div><div class="pci-field-value">${esc(v)}</div></div>`).join("")}</section>`;
   }
@@ -676,6 +691,49 @@
     return String(value);
   }
 
+  function listValue(value) {
+    if (Array.isArray(value)) return value.map(String);
+    return clean(value).split(/\s*[,;]\s*/).filter(Boolean);
+  }
+
+  function decimalToDdm(value, axis) {
+    const number = Number(value);
+    if (!Number.isFinite(number)) return { degrees: "", minutes: "", hemisphere: axis === "lat" ? "N" : "E" };
+    const absolute = Math.abs(number), degrees = Math.floor(absolute), minutes = Number(((absolute - degrees) * 60).toFixed(3));
+    return { degrees, minutes, hemisphere: axis === "lat" ? (number < 0 ? "S" : "N") : (number < 0 ? "W" : "E") };
+  }
+
+  function checkboxGroupHtml({ id, label, values, selected, required = false, help = "", fieldId = "", kind = "multi" }) {
+    const chosen = new Set(listValue(selected));
+    const legacy = [...chosen].filter((value) => !values.includes(value)).join(", ");
+    return `<fieldset id="${attr(id)}" class="pci-form-field is-wide pci-choice-group"${fieldId ? ` data-pci-composite-field-id="${attr(fieldId)}" data-pci-kind="${attr(kind)}" data-legacy-value="${attr(legacy)}"` : ""}><legend>${esc(label)}${required ? ' <span class="pci-required">*</span>' : ""}</legend><div class="pci-choice-grid">${values.map((value) => `<label class="pci-choice"><input type="checkbox" value="${attr(value)}"${chosen.has(value) ? " checked" : ""} /> <span>${esc(value)}</span></label>`).join("")}</div>${legacy ? `<div class="pci-legacy-note">Existing value retained until a new choice is selected: ${esc(legacy)}</div>` : ""}${help ? `<div class="pci-help">${esc(help)}</div>` : ""}</fieldset>`;
+  }
+
+  function statusNumberField({ id, label, value, status, help = "" }) {
+    const inferred = status || (value !== null && value !== undefined ? "reported" : "");
+    return `<div class="pci-form-field pci-status-number" data-status-number><label for="${attr(id)}Status">${esc(label)}</label><div class="pci-inline-control"><select id="${attr(id)}Status" data-status-select><option value="">Select…</option><option value="reported"${inferred === "reported" ? " selected" : ""}>Reported value</option><option value="not_applicable"${inferred === "not_applicable" ? " selected" : ""}>Not applicable</option><option value="not_known"${inferred === "not_known" ? " selected" : ""}>Not known</option></select><input id="${attr(id)}" type="number" step="any" value="${attr(value ?? "")}" placeholder="m"${inferred !== "reported" ? " disabled" : ""} /></div>${help ? `<div class="pci-help">${esc(help)}</div>` : ""}</div>`;
+  }
+
+  function coordinateInput(f, current, id) {
+    const axis = f.field_key.endsWith("latitude") ? "lat" : "lon", ddm = decimalToDdm(current?.value_jsonb, axis), max = axis === "lat" ? 90 : 180;
+    const hemispheres = axis === "lat" ? ["N", "S"] : ["E", "W"];
+    return `<div class="pci-form-field pci-coordinate-field" data-pci-composite-field-id="${attr(f.id)}" data-pci-kind="coordinate" data-axis="${axis}" data-field-label="${attr(f.field_label)}"><label>${esc(f.field_label)}</label><div class="pci-coordinate-control"><label><span>Degrees</span><input id="${attr(id)}" data-coordinate-degrees type="number" min="0" max="${max}" step="1" inputmode="numeric" value="${attr(ddm.degrees)}" placeholder="${axis === "lat" ? "00" : "000"}" /></label><label><span>Minutes</span><input data-coordinate-minutes type="number" min="0" max="59.999" step="0.001" inputmode="decimal" value="${attr(ddm.minutes)}" placeholder="00.0" /></label><label><span>Hemisphere</span><select data-coordinate-hemisphere>${hemispheres.map((h) => `<option value="${h}"${h === ddm.hemisphere ? " selected" : ""}>${h}</option>`).join("")}</select></label></div><div class="pci-help">Enter degrees and decimal minutes; saved internally as decimal degrees. ${esc(f.condition_notes || "")}</div></div>`;
+  }
+
+  function manifoldInput(f, current, id) {
+    const value = current?.value_jsonb && typeof current.value_jsonb === "object" ? current.value_jsonb : {};
+    const legacy = typeof current?.value_jsonb === "string" ? current.value_jsonb : "";
+    const sizes = Array.from({ length: 21 }, (_, i) => String(i + 6).padStart(2, "0"));
+    const options = (selected) => '<option value="">Select…</option>' + sizes.map((v) => `<option value="${v}"${String(selected || "") === v ? " selected" : ""}>${v}''</option>`).join("");
+    return `<div class="pci-form-field is-wide pci-structured-field" data-pci-composite-field-id="${attr(f.id)}" data-pci-kind="manifold" data-field-label="${attr(f.field_label)}" data-legacy-value="${attr(legacy)}"><label>${esc(f.field_label)}</label><div class="pci-manifold-control"><label><span>Side</span><select data-manifold-side><option value="">Select…</option><option value="Port"${value.side === "Port" ? " selected" : ""}>Port</option><option value="Starboard"${value.side === "Starboard" ? " selected" : ""}>Starboard</option></select></label><label><span>Number connected</span><select data-manifold-count><option value="">Select…</option>${[1,2,3,4].map((n) => `<option value="${n}"${Number(value.count) === n ? " selected" : ""}>${n}</option>`).join("")}</select></label><label><span>Connection size</span><span class="pci-size-pair"><select data-manifold-size-a>${options(value.size_a)}</select><b>×</b><select data-manifold-size-b>${options(value.size_b)}</select></span></label></div>${legacy ? `<div class="pci-legacy-note">Existing value retained until the structured connection is completed: ${esc(legacy)}</div>` : ""}<div class="pci-help">Port or starboard • 1–4 connections • flange size in inches (06'' to 26'').</div></div>`;
+  }
+
+  function rateInput(f, current) {
+    const legacy = typeof current?.value_jsonb === "number" ? current.value_jsonb : "";
+    const value = current?.value_jsonb && typeof current.value_jsonb === "object" ? current.value_jsonb : {};
+    return `<div class="pci-form-field pci-structured-field" data-pci-composite-field-id="${attr(f.id)}" data-pci-kind="rate" data-field-label="${attr(f.field_label)}" data-legacy-rate="${attr(legacy)}"><label>${esc(f.field_label)}</label><div class="pci-inline-control"><select data-rate-operation><option value="">Loading / discharging…</option><option value="Loading"${value.operation === "Loading" ? " selected" : ""}>Loading</option><option value="Discharging"${value.operation === "Discharging" ? " selected" : ""}>Discharging</option></select><input data-rate-value type="number" step="any" min="0" value="${attr(value.rate ?? legacy)}" placeholder="m³/h" /></div>${legacy !== "" ? '<div class="pci-legacy-note">Existing numeric rate retained until Loading or Discharging is selected.</div>' : ""}<div class="pci-help">m³/h • Historical call value.</div></div>`;
+  }
+
   function inputField({ id, label, type = "text", value = "", required = false, wide = false, help = "", step = "any", options = null, rows = 3 }) {
     const labelHtml = `${esc(label)}${required ? ' <span class="pci-required">*</span>' : ""}`;
     let control;
@@ -689,17 +747,35 @@
   function dynamicInput(f, current, prefix = "pciField") {
     const id = `${prefix}_${f.id}`, value = current?.value_jsonb ?? "", required = f.requirement_rule === "core";
     const optionRows = state.options.filter((o) => o.field_definition_id === f.id);
+    if (/latitude$|longitude$/.test(f.field_key)) return coordinateInput(f, current, id);
+    if (f.field_key === "port_berth_identification__type_of_berth") return checkboxGroupHtml({ id, label: f.field_label, values: BERTH_TYPES, selected: value, fieldId: f.id, help: f.condition_notes });
+    if (f.field_key === "cargo_transfer__manifold_connection") return manifoldInput(f, current, id);
+    if (["cargo_transfer__maximum_loading_discharging_rate", "cargo_transfer__maximum_loading_discharging_rate_achieved"].includes(f.field_key)) return rateInput(f, current);
     let control;
     if (optionRows.length) {
-      control = `<select id="${attr(id)}" data-pci-field-id="${attr(f.id)}" data-value-type="${attr(f.value_type)}"><option value="">Select…</option>${optionRows.map((o) => `<option value="${attr(o.option_key)}"${String(value) === String(o.option_key) ? " selected" : ""}>${esc(o.option_label)}</option>`).join("")}</select>`;
+      control = `<select id="${attr(id)}" data-pci-field-id="${attr(f.id)}" data-value-type="${attr(f.value_type)}"><option value="">Select…</option>${optionRows.map((o) => `<option value="${attr(o.option_key)}"${String(value) === String(o.option_key) || clean(value).toLowerCase() === clean(o.option_label).toLowerCase() ? " selected" : ""}>${esc(o.option_label)}</option>`).join("")}</select>`;
     } else if (f.value_type === "boolean") {
       control = `<select id="${attr(id)}" data-pci-field-id="${attr(f.id)}" data-value-type="boolean"><option value="">Select…</option><option value="true"${value === true ? " selected" : ""}>Yes</option><option value="false"${value === false ? " selected" : ""}>No</option></select>`;
     } else {
       const type = f.value_type === "number" ? "number" : f.value_type === "date" ? "date" : f.value_type === "time" ? "time" : f.value_type === "local_datetime" ? "datetime-local" : "text";
-      const long = type === "text" && /narrative|remarks|description|details|comment|lessons|precautions|explain|specify|text area/i.test(`${f.control_type} ${f.field_label}`);
-      control = long ? `<textarea id="${attr(id)}" rows="3" data-pci-field-id="${attr(f.id)}" data-value-type="${attr(f.value_type)}">${esc(formValue(value))}</textarea>` : `<input id="${attr(id)}" type="${type}"${type === "number" ? ' step="any"' : ""} value="${attr(formValue(value))}" data-pci-field-id="${attr(f.id)}" data-value-type="${attr(f.value_type)}" />`;
+      const long = type === "text" && /long text|narrative|remarks|description|details|comment|lessons|precautions|explain|specify|text area|information|procedures|requirements/i.test(`${f.control_type} ${f.field_label}`);
+      if (f.field_key === "mooring_fenders__number_of_tugs_used") control = `<select id="${attr(id)}" data-pci-field-id="${attr(f.id)}" data-value-type="number" data-tug-count><option value="">Select…</option>${Array.from({ length: 8 }, (_, n) => `<option value="${n}"${String(value) !== "" && Number(value) === n ? " selected" : ""}>${n}</option>`).join("")}</select>`;
+      else control = long ? `<textarea id="${attr(id)}" rows="4" data-pci-field-id="${attr(f.id)}" data-value-type="${attr(f.value_type)}">${esc(formValue(value))}</textarea>` : `<input id="${attr(id)}" type="${type}"${type === "number" ? ' step="any"' : ""} value="${attr(formValue(value))}" data-pci-field-id="${attr(f.id)}" data-value-type="${attr(f.value_type)}" />`;
     }
-    return `<div class="pci-form-field${/narrative|remarks|description|details|comment|lessons|precautions/i.test(`${f.control_type} ${f.field_label}`) ? " is-wide" : ""}"><label for="${attr(id)}">${esc(f.field_label)}${required ? ' <span class="pci-required">*</span>' : ""}</label>${control}<div class="pci-help">${esc([f.unit_format, f.condition_notes].filter(Boolean).join(" • "))}</div></div>`;
+    if (UNIT_CHOICES[f.field_key] && f.value_type === "number") control = `<div class="pci-inline-control">${control}<select data-pci-unit-for="${attr(f.id)}" aria-label="Unit"><option value="">Select unit…</option>${UNIT_CHOICES[f.field_key].map((unit) => `<option value="${attr(unit)}"${current?.unit_key === unit ? " selected" : ""}>${esc(unit)}</option>`).join("")}</select></div>`;
+    const conditional = f.field_key === "port_berth_identification__ship_to_ship_other_vessel_name" ? ' data-sts-vessel-field hidden' : "";
+    const wide = ["port_berth_identification__anchorage_waiting_position", "port_berth_identification__ship_to_ship_other_vessel_name"].includes(f.field_key) || /long text|narrative|remarks|description|details|comment|lessons|precautions|information|procedures|requirements/i.test(`${f.control_type} ${f.field_label}`);
+    return `<div class="pci-form-field${wide ? " is-wide" : ""}"${conditional}><label for="${attr(id)}">${esc(f.field_label)}${required ? ' <span class="pci-required">*</span>' : ""}</label>${control}<div class="pci-help">${esc([f.unit_format, f.condition_notes].filter(Boolean).join(" • "))}</div></div>`;
+  }
+
+  function editorSortOrder(field) {
+    const overrides = {
+      port_berth_identification__ship_to_ship_other_vessel_name: 21.1,
+      port_berth_identification__anchorage_waiting_latitude: 24.1,
+      port_berth_identification__anchorage_waiting_longitude: 24.2,
+      cargo_transfer__maximum_loading_discharging_rate_achieved: 105.1
+    };
+    return overrides[field.field_key] ?? field.sort_order;
   }
 
   async function openCallEditor(call = null) {
@@ -709,7 +785,7 @@
     if (!call && officeAuthored && !state.vessels.length) return showMessage("warn", "No active Company vessel is available for this office-entered call report.");
     const detail = call ? await task("Opening Draft…", () => loadCallDetails(call.id, true)) : { values: [], repeatRows: [], repeatValues: [], sections: [], hazards: [], attachments: [] };
     const valueMap = new Map(detail.values.map((v) => [v.field_definition_id, v]));
-    const fields = state.fields.filter((f) => f.storage_target === "call_value");
+    const fields = state.fields.filter((f) => f.storage_target === "call_value" && !HIDDEN_CALL_FIELDS.has(f.field_key)).sort((a, b) => editorSortOrder(a) - editorSortOrder(b));
     const sections = new Map(); fields.forEach((f) => { if (!sections.has(f.section_label)) sections.set(f.section_label, []); sections.get(f.section_label).push(f); });
     const callProfile = call ? state.profiles.find((p) => p.id === call.profile_id) : null;
     const selectedTerminalId = callProfile?.port_facility_id || state.selectedFacilityId || "";
@@ -720,45 +796,57 @@
     const core = `<section class="pci-form-section"><h3>Core call details</h3><div class="pci-form-grid">
       ${vesselField}
       ${inputField({ id: "pciTerminal", label: "Terminal", required: true, options: terminalOptions, help: "If the terminal is missing, close this panel and use Add Terminal beside the main terminal selector." })}
-      ${inputField({ id: "pciBerth", label: "Berth", value: call?.berth_name_snapshot || "", required: true })}
-      ${inputField({ id: "pciALF", label: "Arrival — All Lines Fast (local)", type: "datetime-local", value: call?.all_lines_fast_local || "", required: true })}
-      ${inputField({ id: "pciALFOffset", label: "All Lines Fast UTC offset", required: true, options: offsetOptions(call?.all_lines_fast_utc_offset_minutes) })}
-      ${inputField({ id: "pciALC", label: "Departure — All Lines Clear (local)", type: "datetime-local", value: call?.all_lines_clear_local || "", required: true })}
-      ${inputField({ id: "pciALCOffset", label: "All Lines Clear UTC offset", required: true, options: offsetOptions(call?.all_lines_clear_utc_offset_minutes) })}
-      ${inputField({ id: "pciEntry", label: "Port entry time used for UKC (local)", type: "datetime-local", value: call?.port_entry_local || "", required: true })}
-      ${inputField({ id: "pciEntryOffset", label: "Port entry UTC offset", required: true, options: offsetOptions(call?.port_entry_utc_offset_minutes) })}
-      ${inputField({ id: "pciDraftF", label: "Arrival draught forward (m)", type: "number", value: call?.arrival_draught_forward ?? "", required: true })}
-      ${inputField({ id: "pciDraftA", label: "Arrival draught aft (m)", type: "number", value: call?.arrival_draught_aft ?? "", required: true })}
-      ${inputField({ id: "pciDepth", label: "Controlling depth (m)", type: "number", value: call?.controlling_depth ?? "" })}
-      ${inputField({ id: "pciTide", label: "Tide height at entry (m)", type: "number", value: call?.tide_height_at_entry ?? "" })}
+      ${inputField({ id: "pciBerth", label: "Berth (Berth Name)", value: call?.berth_name_snapshot || "", required: true })}
+      <div class="pci-form-pair is-wide">${inputField({ id: "pciALF", label: "Arrival — All Lines Fast (local)", type: "datetime-local", value: call?.all_lines_fast_local || "", required: true })}${inputField({ id: "pciALFOffset", label: "All Lines Fast UTC offset", required: true, options: offsetOptions(call?.all_lines_fast_utc_offset_minutes) })}</div>
+      <div class="pci-form-pair is-wide">${inputField({ id: "pciALC", label: "Departure — All Lines Clear (local)", type: "datetime-local", value: call?.all_lines_clear_local || "", required: true })}${inputField({ id: "pciALCOffset", label: "All Lines Clear UTC offset", required: true, options: offsetOptions(call?.all_lines_clear_utc_offset_minutes) })}</div>
+      <div class="pci-form-pair is-wide">${inputField({ id: "pciEntry", label: "Port entry time used for UKC (local)", type: "datetime-local", value: call?.port_entry_local || "", required: true })}${inputField({ id: "pciEntryOffset", label: "Port entry UTC offset", required: true, options: offsetOptions(call?.port_entry_utc_offset_minutes) })}</div>
+      <div class="pci-form-triple is-wide">${inputField({ id: "pciDraftF", label: "Arrival draught forward (m)", type: "number", value: call?.arrival_draught_forward ?? "", required: true })}${inputField({ id: "pciDraftM", label: "Arrival draught midships (m)", type: "number", value: call?.arrival_draught_midships ?? "" })}${inputField({ id: "pciDraftA", label: "Arrival draught aft (m)", type: "number", value: call?.arrival_draught_aft ?? "", required: true })}</div>
+      ${statusNumberField({ id: "pciDepth", label: "Channel Controlling depth (m)", value: call?.controlling_depth, status: call?.controlling_depth_status })}
+      ${statusNumberField({ id: "pciTide", label: "Tide height at Port Entry (m)", value: call?.tide_height_at_entry, status: call?.tide_height_at_entry_status })}
+      ${statusNumberField({ id: "pciTideExit", label: "Tide height at Port Exit (m)", value: call?.tide_height_at_exit, status: call?.tide_height_at_exit_status })}
       ${inputField({ id: "pciUkcMethod", label: "UKC method", value: call?.ukc_method || "" })}
-      ${inputField({ id: "pciUkcResult", label: "UKC result (m)", type: "number", value: call?.ukc_result ?? "" })}
-      ${inputField({ id: "pciUkcNotes", label: "UKC notes", type: "textarea", value: call?.ukc_notes || "", wide: true })}
-      ${inputField({ id: "pciCargo", label: "Cargo-operation type", value: call?.cargo_operation_type || "", required: true })}
+      ${inputField({ id: "pciUkcResult", label: "Actual UKC at shallowest depth (m)", type: "number", value: call?.ukc_result ?? "" })}
+      ${inputField({ id: "pciUkcNotes", label: "UKC notes", type: "textarea", value: call?.ukc_notes || "", wide: true, rows: 4, help: "Free text." })}
+      ${checkboxGroupHtml({ id: "pciCargo", label: "Cargo-operation type", values: CARGO_OPERATIONS, selected: call?.cargo_operation_type || "", required: true, help: "Select every operation that applied during this call." })}
       ${inputField({ id: "pciMasterConfirm", label: officeAuthored ? "Office completion confirmation" : "Master completion confirmation", type: "checkbox", value: call?.master_completion_confirmed === true, wide: true, help: officeAuthored ? "I confirm that the Office has entered this report on behalf of the selected vessel and reviewed it for completeness." : "I confirm that this report reflects the vessel's actual call experience and has been reviewed for completeness." })}
     </div></section>`;
-    const dynamic = [...sections.entries()].map(([label, list]) => `<section class="pci-form-section"><h3>${esc(label)}</h3><div class="pci-form-grid">${list.map((f) => dynamicInput(f, valueMap.get(f.id))).join("")}</div></section>`).join("");
-    const repeats = renderRepeatEditor(detail);
+    const dynamic = [...sections.entries()].map(([label, list]) => `<section class="pci-form-section"><h3>${esc(label)}</h3><div class="pci-form-grid">${list.map((f) => `${dynamicInput(f, valueMap.get(f.id))}${f.field_key === "mooring_fenders__number_of_tugs_used" ? renderRepeatGroup(detail, "tugs") : ""}`).join("")}</div></section>`).join("");
+    const repeats = renderRepeatEditor(detail, new Set(["tugs", ...HIDDEN_REPEAT_GROUPS]));
     const confirmations = renderSectionConfirmationEditor(detail);
     const hazards = renderHazardEditor(detail);
     const attachments = call ? renderAttachmentEditor(call, detail) : '<section class="pci-form-section"><h3>Attachments</h3><div class="pci-repeat-note">Save the Draft first, then reopen it to upload attachments securely.</div></section>';
     openDrawer(officeAuthored ? "Office-entered vessel call report" : "Vessel call report", call ? `Edit ${call.call_reference}` : `New Draft — ${selectedPort()?.port_name || "Port"}`, `<form id="pciCallForm" class="pci-form" novalidate>${core}${dynamic}${repeats}${confirmations}${hazards}${attachments}</form>`, `<button id="cancelCallBtn" class="btn2" type="button" data-pci-tip="Close without saving unsaved changes.">Cancel</button><button id="saveCallBtn" class="btn" type="button" data-pci-tip="Save all entered information as a Draft. You can continue later.">Save Draft</button>`);
     $("cancelCallBtn").onclick = closeDrawer; $("saveCallBtn").onclick = () => saveCallEditor(call);
-    installRepeatAndHazardControls(); if (call) installUploadControl(call, detail);
+    installCallEditorControls(); installRepeatAndHazardControls(); if (call) installUploadControl(call, detail);
   }
 
-  function renderRepeatEditor(detail) {
+  function renderRepeatEditor(detail, excluded = new Set()) {
     const repeatFields = state.fields.filter((f) => f.storage_target === "repeat_value" && f.repeating_group_key);
-    const groups = [...new Set(repeatFields.map((f) => f.repeating_group_key))];
+    const groups = [...new Set(repeatFields.map((f) => f.repeating_group_key))].filter((group) => !excluded.has(group));
     if (!groups.length) return "";
-    return groups.map((group) => {
-      const defs = repeatFields.filter((f) => f.repeating_group_key === group), rows = detail.repeatRows.filter((r) => r.group_key === group);
-      return `<section class="pci-form-section pci-repeat-group" data-repeat-group="${attr(group)}"><h3>${esc(defs[0]?.section_label || group.replaceAll("_", " "))} — repeating entries</h3><div class="pci-repeat-rows">${rows.map((r) => repeatRowHtml(group, defs, r, detail.repeatValues.filter((v) => v.repeat_row_id === r.id))).join("")}</div><div class="pci-form-grid"><button type="button" class="btn2 pci-add-repeat" data-pci-tip="Add another entry to this repeating section.">+ Add entry</button></div></section>`;
-    }).join("");
+    return groups.map((group) => renderRepeatGroup(detail, group)).join("");
   }
 
-  function repeatRowHtml(group, defs, row = null, values = []) {
+  function renderRepeatGroup(detail, group) {
+    const defs = state.fields.filter((f) => f.storage_target === "repeat_value" && f.repeating_group_key === group);
+    if (!defs.length) return "";
+    const rows = detail.repeatRows.filter((r) => r.group_key === group);
+    if (group === "tugs") {
+      const countDefinition = state.fields.find((f) => f.field_key === "mooring_fenders__number_of_tugs_used");
+      const savedCount = Number(detail.values.find((v) => v.field_definition_id === countDefinition?.id)?.value_jsonb);
+      const count = Math.min(7, Math.max(rows.length, Number.isFinite(savedCount) ? savedCount : 0));
+      const rowHtml = Array.from({ length: count }, (_, index) => {
+        const row = rows[index] || null;
+        return repeatRowHtml(group, defs, row, row ? detail.repeatValues.filter((v) => v.repeat_row_id === row.id) : [], index + 1);
+      }).join("");
+      return `<div class="pci-tug-editor pci-repeat-group is-wide" data-repeat-group="tugs"><div class="pci-repeat-subhead"><strong>Tugs used — individual details</strong><span>Name, action and vessel position for each tug.</span></div><div class="pci-repeat-rows">${rowHtml}</div><div class="pci-repeat-note pci-tug-empty"${count ? " hidden" : ""}>Select the number of tugs used (maximum 7) to open the corresponding detail rows.</div></div>`;
+    }
+    return `<section class="pci-form-section pci-repeat-group" data-repeat-group="${attr(group)}"><h3>${esc(defs[0]?.section_label || group.replaceAll("_", " "))} — repeating entries</h3><div class="pci-repeat-rows">${rows.map((r) => repeatRowHtml(group, defs, r, detail.repeatValues.filter((v) => v.repeat_row_id === r.id))).join("")}</div><div class="pci-form-grid"><button type="button" class="btn2 pci-add-repeat" data-pci-tip="Add another entry to this repeating section.">+ Add entry</button></div></section>`;
+  }
+
+  function repeatRowHtml(group, defs, row = null, values = [], rowNumber = 0) {
     const map = new Map(values.map((v) => [v.field_definition_id, v]));
+    if (group === "tugs") return `<div class="pci-hazard-edit pci-repeat-row pci-tug-row" data-original-row-id="${attr(row?.id || "")}"><div class="pci-tug-row-title">Tug ${rowNumber || 1}</div><input type="hidden" data-repeat-row-label="1" value="Tug ${rowNumber || 1}" /><div class="pci-tug-grid">${defs.sort((a, b) => a.sort_order - b.sort_order).map((f) => dynamicInput(f, map.get(f.id), `repeat_${group}_${rowNumber || 1}`)).join("")}</div></div>`;
     return `<div class="pci-hazard-edit pci-repeat-row" data-original-row-id="${attr(row?.id || "")}"><div class="pci-form-grid">${inputField({ id: `rowLabel_${crypto.randomUUID()}`, label: "Entry label (optional)", value: row?.row_label || "", wide: true }).replace("<input", '<input data-repeat-row-label="1"')}${defs.map((f) => dynamicInput(f, map.get(f.id), `repeat_${group}`)).join("")}<div class="pci-form-field is-wide"><button type="button" class="pci-danger pci-remove-repeat" data-pci-tip="Delete this unsaved repeating entry from the Draft when you save.">Delete Entry</button></div></div></div>`;
   }
 
@@ -793,17 +881,61 @@
     $("pciDrawer").querySelectorAll(".pci-remove-hazard").forEach((b) => b.onclick = () => b.closest(".pci-hazard-edit").remove());
   }
 
+  function installCallEditorControls() {
+    $("pciDrawer").querySelectorAll("[data-status-number]").forEach((wrapper) => {
+      const select = wrapper.querySelector("[data-status-select]"), input = wrapper.querySelector('input[type="number"]');
+      select.onchange = () => { input.disabled = select.value !== "reported"; if (input.disabled) input.value = ""; };
+    });
+    for (const unitSelect of $("pciCallForm").querySelectorAll("[data-pci-unit-for]")) {
+      const valueControl = $("pciCallForm").querySelector(`[data-pci-field-id="${unitSelect.dataset.pciUnitFor}"]`);
+      const bad = typedValue(valueControl) !== null && !clean(unitSelect.value);
+      unitSelect.classList.toggle("pci-form-error", bad); if (bad && !first) first = unitSelect;
+    }
+    const berthGroup = $("pciDrawer").querySelector('[data-pci-kind="multi"]');
+    const stsField = $("pciDrawer").querySelector("[data-sts-vessel-field]");
+    const refreshSts = () => {
+      const active = [...(berthGroup?.querySelectorAll('input[type="checkbox"]') || [])].some((box) => box.checked && box.value === "Ship to Ship");
+      if (stsField) { stsField.hidden = !active; if (!active) stsField.querySelector("input").value = ""; }
+    };
+    berthGroup?.querySelectorAll('input[type="checkbox"]').forEach((box) => box.addEventListener("change", refreshSts));
+    refreshSts();
+    const tugCount = $("pciDrawer").querySelector("[data-tug-count]");
+    if (tugCount) tugCount.onchange = () => syncTugRows(Number(tugCount.value || 0));
+  }
+
+  function syncTugRows(count) {
+    const group = $("pciDrawer").querySelector('[data-repeat-group="tugs"]');
+    if (!group) return;
+    const rows = group.querySelector(".pci-repeat-rows"), defs = state.fields.filter((f) => f.storage_target === "repeat_value" && f.repeating_group_key === "tugs");
+    const target = Math.max(0, Math.min(7, count));
+    while (rows.children.length > target) rows.lastElementChild.remove();
+    while (rows.children.length < target) rows.insertAdjacentHTML("beforeend", repeatRowHtml("tugs", defs, null, [], rows.children.length + 1));
+    [...rows.children].forEach((row, index) => { row.querySelector(".pci-tug-row-title").textContent = `Tug ${index + 1}`; row.querySelector("[data-repeat-row-label]").value = `Tug ${index + 1}`; });
+    group.querySelector(".pci-tug-empty").hidden = target > 0;
+  }
+
   function nullable(id) { const v = clean($(id)?.value); return v === "" ? null : v; }
   function nullableNumber(id) { const v = nullable(id); return v === null ? null : Number(v); }
+  function checkedValues(id) { return [...($(id)?.querySelectorAll('input[type="checkbox"]:checked') || [])].map((box) => box.value); }
+  function statusValue(id) { return clean($(`${id}Status`)?.value) || null; }
+  function statusNumber(id) { return statusValue(id) === "reported" ? nullableNumber(id) : null; }
 
   function validateCallForm() {
-    const required = ["pciTerminal", "pciBerth", "pciALF", "pciALFOffset", "pciALC", "pciALCOffset", "pciEntry", "pciEntryOffset", "pciDraftF", "pciDraftA", "pciCargo"];
+    const required = ["pciTerminal", "pciBerth", "pciALF", "pciALFOffset", "pciALC", "pciALCOffset", "pciEntry", "pciEntryOffset", "pciDraftF", "pciDraftA"];
     if ($("pciVessel")) required.unshift("pciVessel");
     let first = null;
     required.forEach((id) => { const el = $(id), bad = !clean(el?.value); el?.classList.toggle("pci-form-error", bad); if (bad && !first) first = el; });
     if (nullable("pciALF") && nullable("pciALC")) {
       const bad = new Date(nullable("pciALC")) < new Date(nullable("pciALF")); $("pciALC").classList.toggle("pci-form-error", bad); if (bad && !first) first = $("pciALC");
     }
+    const cargo = $("pciCargo"), cargoBad = checkedValues("pciCargo").length === 0;
+    cargo?.classList.toggle("pci-form-error", cargoBad); if (cargoBad && !first) first = cargo;
+    $("pciDrawer").querySelectorAll("[data-status-number]").forEach((wrapper) => {
+      const select = wrapper.querySelector("[data-status-select]"), input = wrapper.querySelector('input[type="number"]');
+      const bad = select.value === "reported" && clean(input.value) === "";
+      input.classList.toggle("pci-form-error", bad); if (bad && !first) first = input;
+    });
+    for (const composite of $("pciCallForm").querySelectorAll("[data-pci-composite-field-id]")) compositeValue(composite);
     if (first) { first.scrollIntoView({ behavior: "smooth", block: "center" }); first.focus(); throw new Error("Complete the highlighted core fields before saving the Draft."); }
   }
 
@@ -823,9 +955,12 @@
       status: "draft", all_lines_fast_local: nullable("pciALF"), all_lines_fast_utc_offset_minutes: nullableNumber("pciALFOffset"),
       all_lines_clear_local: nullable("pciALC"), all_lines_clear_utc_offset_minutes: nullableNumber("pciALCOffset"),
       port_entry_local: nullable("pciEntry"), port_entry_utc_offset_minutes: nullableNumber("pciEntryOffset"),
-      arrival_draught_forward: nullableNumber("pciDraftF"), arrival_draught_aft: nullableNumber("pciDraftA"),
-      controlling_depth: nullableNumber("pciDepth"), tide_height_at_entry: nullableNumber("pciTide"), ukc_method: nullable("pciUkcMethod"),
-      ukc_result: nullableNumber("pciUkcResult"), ukc_notes: nullable("pciUkcNotes"), cargo_operation_type: nullable("pciCargo"),
+      arrival_draught_forward: nullableNumber("pciDraftF"), arrival_draught_midships: nullableNumber("pciDraftM"), arrival_draught_aft: nullableNumber("pciDraftA"),
+      controlling_depth: statusNumber("pciDepth"), controlling_depth_status: statusValue("pciDepth"),
+      tide_height_at_entry: statusNumber("pciTide"), tide_height_at_entry_status: statusValue("pciTide"),
+      tide_height_at_exit: statusNumber("pciTideExit"), tide_height_at_exit_status: statusValue("pciTideExit"),
+      ukc_method: nullable("pciUkcMethod"), ukc_result: nullableNumber("pciUkcResult"), ukc_notes: nullable("pciUkcNotes"),
+      cargo_operation_type: checkedValues("pciCargo").join(", "),
       master_completion_confirmed: $("pciMasterConfirm").checked === true
     };
   }
@@ -835,6 +970,39 @@
     if (el.dataset.valueType === "number") return Number(raw);
     if (el.dataset.valueType === "boolean") return raw === "true";
     return raw;
+  }
+
+  function compositeValue(wrapper) {
+    const kind = wrapper.dataset.pciKind;
+    if (kind === "multi") {
+      const value = [...wrapper.querySelectorAll('input[type="checkbox"]:checked')].map((box) => box.value);
+      const legacy = clean(wrapper.dataset.legacyValue);
+      return { value: value.length ? value : (legacy || null), display: value.length ? value.join(", ") : legacy, unit: null };
+    }
+    if (kind === "coordinate") {
+      const degreesText = clean(wrapper.querySelector("[data-coordinate-degrees]").value), minutesText = clean(wrapper.querySelector("[data-coordinate-minutes]").value);
+      if (!degreesText && !minutesText) return { value: null, display: "", unit: null };
+      if (!degreesText || !minutesText) throw new Error(`${wrapper.dataset.fieldLabel}: enter both degrees and minutes.`);
+      const degrees = Number(degreesText), minutes = Number(minutesText), axis = wrapper.dataset.axis, max = axis === "lat" ? 90 : 180;
+      if (!Number.isFinite(degrees) || !Number.isFinite(minutes) || !Number.isInteger(degrees) || degrees < 0 || degrees > max || minutes < 0 || minutes >= 60 || (degrees === max && minutes !== 0)) throw new Error(`${wrapper.dataset.fieldLabel}: enter a valid ${axis === "lat" ? "latitude" : "longitude"}.`);
+      const hemisphere = wrapper.querySelector("[data-coordinate-hemisphere]").value, sign = ["S", "W"].includes(hemisphere) ? -1 : 1;
+      return { value: Number((sign * (degrees + minutes / 60)).toFixed(6)), display: `${degrees}° ${minutes.toFixed(3)}' ${hemisphere}`, unit: null };
+    }
+    if (kind === "manifold") {
+      const side = clean(wrapper.querySelector("[data-manifold-side]").value), count = clean(wrapper.querySelector("[data-manifold-count]").value), sizeA = clean(wrapper.querySelector("[data-manifold-size-a]").value), sizeB = clean(wrapper.querySelector("[data-manifold-size-b]").value);
+      if (![side, count, sizeA, sizeB].some(Boolean)) { const legacy = clean(wrapper.dataset.legacyValue); return { value: legacy || null, display: legacy, unit: null }; }
+      if (![side, count, sizeA, sizeB].every(Boolean)) throw new Error("Manifold connection: complete side, number connected and both connection sizes.");
+      return { value: { side, count: Number(count), size_a: sizeA, size_b: sizeB }, display: `${side} • ${count} connection(s) • ${sizeA}'' × ${sizeB}''`, unit: null };
+    }
+    if (kind === "rate") {
+      const operation = clean(wrapper.querySelector("[data-rate-operation]").value), rate = clean(wrapper.querySelector("[data-rate-value]").value);
+      if (!operation && !rate) return { value: null, display: "", unit: null };
+      if (!operation && rate && clean(wrapper.dataset.legacyRate) === rate) return { value: Number(rate), display: rate, unit: "m³/h" };
+      if (!operation || !rate) throw new Error(`${wrapper.dataset.fieldLabel}: select Loading or Discharging and enter the rate.`);
+      if (!Number.isFinite(Number(rate)) || Number(rate) < 0) throw new Error(`${wrapper.dataset.fieldLabel}: enter a valid non-negative rate.`);
+      return { value: { operation, rate: Number(rate) }, display: `${operation} • ${rate}`, unit: "m³/h" };
+    }
+    return { value: null, display: "", unit: null };
   }
 
   async function saveCallEditor(existingCall) {
@@ -857,25 +1025,27 @@
 
   async function saveCallValues(call) {
     const controls = [...$("pciCallForm").querySelectorAll("[data-pci-field-id]")].filter((el) => !el.closest(".pci-repeat-row"));
-    const filled = controls.map((el) => ({ el, value: typedValue(el) })).filter((x) => x.value !== null);
-    const records = filled.map(({ el, value }) => ({ company_id: call.company_id, call_id: call.id, field_definition_id: el.dataset.pciFieldId, value_jsonb: value, display_value: String(value), unit_key: null, created_by: state.permissions.userId }));
+    const normal = controls.map((el) => ({ id: el.dataset.pciFieldId, value: typedValue(el), display: clean(el.selectedOptions?.[0]?.textContent || el.value), unit: clean($("pciCallForm").querySelector(`[data-pci-unit-for="${el.dataset.pciFieldId}"]`)?.value) || null }));
+    const composites = [...$("pciCallForm").querySelectorAll("[data-pci-composite-field-id]")].filter((el) => !el.closest(".pci-repeat-row")).map((el) => ({ id: el.dataset.pciCompositeFieldId, ...compositeValue(el) }));
+    const all = [...normal, ...composites], filled = all.filter((x) => x.value !== null);
+    const records = filled.map(({ id, value, display, unit }) => ({ company_id: call.company_id, call_id: call.id, field_definition_id: id, value_jsonb: value, display_value: display || String(value), unit_key: unit, created_by: state.permissions.userId }));
     if (records.length) { const { error } = await state.sb.from("pci_call_values").upsert(records, { onConflict: "call_id,field_definition_id" }); dbError(error); }
-    const emptyIds = controls.filter((el) => typedValue(el) === null).map((el) => el.dataset.pciFieldId);
+    const emptyIds = all.filter((x) => x.value === null).map((x) => x.id);
     if (emptyIds.length) { const { error } = await state.sb.from("pci_call_values").delete().eq("call_id", call.id).in("field_definition_id", emptyIds); dbError(error); }
   }
 
   async function saveRepeatRows(call) {
-    const { error: deleteError } = await state.sb.from("pci_call_repeat_rows").delete().eq("call_id", call.id); dbError(deleteError);
     for (const group of $("pciCallForm").querySelectorAll("[data-repeat-group]")) {
+      const { error: deleteError } = await state.sb.from("pci_call_repeat_rows").delete().eq("call_id", call.id).eq("group_key", group.dataset.repeatGroup); dbError(deleteError);
       let rowNo = 0;
       for (const row of group.querySelectorAll(".pci-repeat-row")) {
-        const entries = [...row.querySelectorAll("[data-pci-field-id]")].map((el) => ({ el, value: typedValue(el) })).filter((x) => x.value !== null);
+        const entries = [...row.querySelectorAll("[data-pci-field-id]")].map((el) => ({ el, value: typedValue(el), display: clean(el.selectedOptions?.[0]?.textContent || el.value) })).filter((x) => x.value !== null);
         const label = clean(row.querySelector("[data-repeat-row-label]")?.value);
         if (!entries.length && !label) continue;
         rowNo += 1;
         const { data: savedRow, error } = await state.sb.from("pci_call_repeat_rows").insert({ company_id: call.company_id, call_id: call.id, group_key: group.dataset.repeatGroup, row_number: rowNo, row_label: label || null, created_by: state.permissions.userId }).select("*").single(); dbError(error);
         if (entries.length) {
-          const records = entries.map(({ el, value }) => ({ company_id: call.company_id, call_id: call.id, repeat_row_id: savedRow.id, field_definition_id: el.dataset.pciFieldId, value_jsonb: value, display_value: String(value), unit_key: null, created_by: state.permissions.userId }));
+          const records = entries.map(({ el, value, display }) => ({ company_id: call.company_id, call_id: call.id, repeat_row_id: savedRow.id, field_definition_id: el.dataset.pciFieldId, value_jsonb: value, display_value: display || String(value), unit_key: null, created_by: state.permissions.userId }));
           const { error: valuesError } = await state.sb.from("pci_call_repeat_values").insert(records); dbError(valuesError);
         }
       }
