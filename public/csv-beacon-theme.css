@@ -349,7 +349,7 @@ a.btn:hover,
 a.btn.btn-outline,
 .tab{
   background: var(--btn-secondary-bg) !important;
-  color: var(--brand-navy) !important;
+  color: var(--btn-secondary-text) !important;
   border:1px solid var(--btn-secondary-border) !important;
 }
 
@@ -463,4 +463,3 @@ tr:hover td{
   border-color:#BFE8CC !important;
   color:#0D4F2A !important;
 }
-

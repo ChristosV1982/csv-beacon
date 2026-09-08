@@ -23,3 +23,262 @@
 @media(max-width:1100px){.pci-port-row{grid-template-columns:1fr 1fr}.pci-terminal-actions{align-items:flex-end}.pci-register-filters{grid-template-columns:repeat(3,minmax(150px,1fr))}}
 @media(max-width:900px){.pci-hero,.pci-panel-head{flex-direction:column}.pci-hero-actions{justify-content:flex-start}.pci-port-row,.pci-master-detail,.pci-directory-search{grid-template-columns:1fr}.pci-list{border-right:0;border-bottom:1px solid var(--pci-line);padding-right:0;padding-bottom:10px;max-height:430px}.pci-inline-filters{width:100%;min-width:0}.pci-form-grid{grid-template-columns:1fr}.pci-section-confirm{grid-template-columns:1fr}.pci-field-row{grid-template-columns:1fr;gap:3px}.pci-register-filters{grid-template-columns:repeat(2,minmax(140px,1fr))}}
 @media(max-width:560px){.pci-panel{padding:14px;border-radius:0 0 13px 13px}.pci-hero{padding:20px}.pci-port-picker{padding:13px}.pci-inline-filters{flex-direction:column}.pci-hero-actions>*{flex:1}.pci-detail-head{flex-direction:column}.pci-actions{justify-content:flex-start}.pci-office-list,.pci-card-grid,.pci-register-filters{grid-template-columns:1fr}.pci-search-control,.pci-search-result{grid-template-columns:1fr}.pci-register-actions{justify-content:stretch}.pci-register-actions>*{flex:1}}
+
+/* Application-shell visual alignment v1.
+   Keeps PCI behaviour intact while matching the compact C.S.V. BEACON UI. */
+html[data-csvb-page="port-call-intelligence.html"] {
+  --pci-navy: var(--brand-navy, #062a5e);
+  --pci-blue: #0b4f7a;
+  --pci-teal: var(--brand-teal, #0097a7);
+  --pci-ink: var(--text-main, #17324d);
+  --pci-muted: var(--text-muted, #5e6f86);
+  --pci-line: var(--border-soft, #d6e4f5);
+  --pci-soft: #f4f8fc;
+  --pci-shadow: 0 8px 20px rgba(3, 27, 63, .05);
+}
+
+html[data-csvb-page="port-call-intelligence.html"] body {
+  background: var(--bg-main, #f4f8fc);
+}
+
+html[data-csvb-page="port-call-intelligence.html"] .pci-page {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 6px 10px 42px;
+}
+
+html[data-csvb-page="port-call-intelligence.html"] .pci-hero {
+  align-items: center;
+  margin: 4px 0 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--pci-line);
+  border-radius: 12px;
+  background: #fff;
+  color: var(--pci-ink);
+  box-shadow: var(--pci-shadow);
+}
+
+html[data-csvb-page="port-call-intelligence.html"] .pci-hero h1 {
+  margin: 1px 0 3px;
+  color: var(--pci-navy);
+  font-size: 1.2rem;
+  line-height: 1.15;
+}
+
+html[data-csvb-page="port-call-intelligence.html"] .pci-hero p {
+  max-width: none;
+  color: var(--pci-muted);
+  font-size: .86rem;
+  line-height: 1.3;
+}
+
+html[data-csvb-page="port-call-intelligence.html"] .pci-kicker {
+  color: var(--pci-teal);
+  font-size: .68rem;
+  letter-spacing: .075em;
+  opacity: 1;
+}
+
+html[data-csvb-page="port-call-intelligence.html"] .pci-hero-actions {
+  gap: 7px;
+}
+
+html[data-csvb-page="port-call-intelligence.html"] .pci-page .btn,
+html[data-csvb-page="port-call-intelligence.html"] .pci-drawer .btn,
+html[data-csvb-page="port-call-intelligence.html"] .pci-confirm .btn {
+  border: 1px solid var(--pci-navy) !important;
+  border-radius: 8px !important;
+  background: var(--pci-navy) !important;
+  color: #fff !important;
+  padding: 7px 10px !important;
+  font-size: .86rem !important;
+  font-weight: 700 !important;
+  line-height: 1.15 !important;
+  box-shadow: none !important;
+}
+
+html[data-csvb-page="port-call-intelligence.html"] .pci-page .btn2,
+html[data-csvb-page="port-call-intelligence.html"] .pci-drawer .btn2,
+html[data-csvb-page="port-call-intelligence.html"] .pci-confirm .btn2 {
+  border: 1px solid var(--btn-secondary-border, #b8dce8) !important;
+  border-radius: 8px !important;
+  background: var(--btn-secondary-bg, #eaf6fa) !important;
+  color: var(--btn-secondary-text, #062a5e) !important;
+  padding: 7px 10px !important;
+  font-size: .86rem !important;
+  font-weight: 650 !important;
+  line-height: 1.15 !important;
+  box-shadow: none !important;
+}
+
+html[data-csvb-page="port-call-intelligence.html"] .pci-page .btn:hover,
+html[data-csvb-page="port-call-intelligence.html"] .pci-drawer .btn:hover,
+html[data-csvb-page="port-call-intelligence.html"] .pci-confirm .btn:hover {
+  background: var(--brand-navy-dark, #031b3f) !important;
+  border-color: var(--brand-navy-dark, #031b3f) !important;
+}
+
+html[data-csvb-page="port-call-intelligence.html"] .pci-page .btn2:hover,
+html[data-csvb-page="port-call-intelligence.html"] .pci-drawer .btn2:hover,
+html[data-csvb-page="port-call-intelligence.html"] .pci-confirm .btn2:hover {
+  background: var(--btn-secondary-bg-hover, #ddf7fa) !important;
+}
+
+html[data-csvb-page="port-call-intelligence.html"] .pci-page button:disabled,
+html[data-csvb-page="port-call-intelligence.html"] .pci-drawer button:disabled,
+html[data-csvb-page="port-call-intelligence.html"] .pci-confirm button:disabled {
+  opacity: .62;
+  cursor: not-allowed;
+}
+
+html[data-csvb-page="port-call-intelligence.html"] .pci-port-picker,
+html[data-csvb-page="port-call-intelligence.html"] .pci-panel {
+  border-color: var(--pci-line);
+  border-radius: 12px;
+  box-shadow: var(--pci-shadow);
+}
+
+html[data-csvb-page="port-call-intelligence.html"] .pci-port-picker {
+  padding: 10px 12px;
+}
+
+html[data-csvb-page="port-call-intelligence.html"] .pci-port-picker-title {
+  margin-bottom: 7px;
+  color: var(--pci-muted);
+  font-size: .73rem;
+  letter-spacing: .045em;
+}
+
+html[data-csvb-page="port-call-intelligence.html"] .pci-directory-search {
+  gap: 10px;
+  margin-bottom: 9px;
+  padding-bottom: 9px;
+}
+
+html[data-csvb-page="port-call-intelligence.html"] .pci-port-row {
+  gap: 8px;
+}
+
+html[data-csvb-page="port-call-intelligence.html"] .pci-search-control {
+  gap: 6px;
+}
+
+html[data-csvb-page="port-call-intelligence.html"] .pci-port-row input,
+html[data-csvb-page="port-call-intelligence.html"] .pci-port-row select,
+html[data-csvb-page="port-call-intelligence.html"] .pci-inline-filters input,
+html[data-csvb-page="port-call-intelligence.html"] .pci-inline-filters select,
+html[data-csvb-page="port-call-intelligence.html"] .pci-panel select,
+html[data-csvb-page="port-call-intelligence.html"] .pci-form input,
+html[data-csvb-page="port-call-intelligence.html"] .pci-form select,
+html[data-csvb-page="port-call-intelligence.html"] .pci-form textarea,
+html[data-csvb-page="port-call-intelligence.html"] .pci-search-control input,
+html[data-csvb-page="port-call-intelligence.html"] .pci-register-filters input,
+html[data-csvb-page="port-call-intelligence.html"] .pci-register-filters select {
+  border-color: #b8d8ea;
+  border-radius: 8px;
+  padding: 8px 10px;
+  min-height: 36px;
+  color: var(--pci-ink);
+}
+
+html[data-csvb-page="port-call-intelligence.html"] .pci-tabs {
+  gap: 6px;
+  margin-top: 8px;
+}
+
+html[data-csvb-page="port-call-intelligence.html"] .pci-tab {
+  border-color: var(--pci-line);
+  border-radius: 10px 10px 0 0;
+  padding: 8px 12px;
+  background: #eaf3fb;
+  color: #31516c;
+  font-size: .88rem;
+  box-shadow: none;
+}
+
+html[data-csvb-page="port-call-intelligence.html"] .pci-tab.is-active {
+  background: #fff;
+  color: var(--pci-navy);
+}
+
+html[data-csvb-page="port-call-intelligence.html"] .pci-count {
+  min-width: 20px;
+  height: 20px;
+  background: #d9edf3;
+}
+
+html[data-csvb-page="port-call-intelligence.html"] .pci-panel {
+  min-height: 360px;
+  padding: 12px;
+  border-radius: 0 12px 12px 12px;
+}
+
+html[data-csvb-page="port-call-intelligence.html"] .pci-panel-head {
+  margin-bottom: 10px;
+  padding-bottom: 9px;
+}
+
+html[data-csvb-page="port-call-intelligence.html"] .pci-panel-head h2 {
+  margin-bottom: 3px;
+  font-size: 1.08rem;
+}
+
+html[data-csvb-page="port-call-intelligence.html"] .pci-panel-head p {
+  font-size: .86rem;
+  line-height: 1.35;
+}
+
+html[data-csvb-page="port-call-intelligence.html"] .pci-register-toolbar,
+html[data-csvb-page="port-call-intelligence.html"] .pci-form-section,
+html[data-csvb-page="port-call-intelligence.html"] .pci-info-card,
+html[data-csvb-page="port-call-intelligence.html"] .pci-list-item,
+html[data-csvb-page="port-call-intelligence.html"] .pci-office-card,
+html[data-csvb-page="port-call-intelligence.html"] .pci-search-results {
+  border-radius: 9px;
+  box-shadow: none;
+}
+
+html[data-csvb-page="port-call-intelligence.html"] .pci-register-toolbar {
+  padding: 10px;
+  margin-bottom: 10px;
+  background: #f4f8fc;
+}
+
+html[data-csvb-page="port-call-intelligence.html"] .pci-register-filters {
+  gap: 7px;
+}
+
+html[data-csvb-page="port-call-intelligence.html"] .pci-register-actions {
+  margin-top: 8px;
+}
+
+html[data-csvb-page="port-call-intelligence.html"] .pci-empty {
+  padding: 24px 14px;
+  border-radius: 9px;
+  background: #f8fbfe;
+}
+
+html[data-csvb-page="port-call-intelligence.html"] .pci-summary-cell {
+  border: 1px solid var(--pci-line);
+  border-radius: 8px;
+  background: #f4f8fc;
+}
+
+@media (max-width: 900px) {
+  html[data-csvb-page="port-call-intelligence.html"] .pci-hero {
+    align-items: flex-start;
+  }
+}
+
+@media (max-width: 560px) {
+  html[data-csvb-page="port-call-intelligence.html"] .pci-page {
+    padding: 5px 7px 34px;
+  }
+
+  html[data-csvb-page="port-call-intelligence.html"] .pci-hero,
+  html[data-csvb-page="port-call-intelligence.html"] .pci-port-picker,
+  html[data-csvb-page="port-call-intelligence.html"] .pci-panel {
+    padding: 10px;
+  }
+}
