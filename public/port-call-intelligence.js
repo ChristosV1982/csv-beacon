@@ -2,7 +2,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "PCI-UI-2026-09-09-V08";
+  const BUILD = "PCI-UI-2026-09-09-V08R1";
   const BUCKET = "port-call-intelligence-private";
   const MAX_FILE = 5 * 1024 * 1024;
   const MAX_CALL = 100 * 1024 * 1024;
@@ -794,7 +794,7 @@
       cargo_transfer__maximum_loading_discharging_rate_achieved: 105.1
     };
     if (field.field_key === "access_to_ship__gangway_source_other") {
-      const source = state.definitions.find((candidate) => candidate.field_key === "access_to_ship__gangway_source");
+      const source = state.fields.find((candidate) => candidate.field_key === "access_to_ship__gangway_source");
       return Number(source?.sort_order || field.sort_order) + 0.1;
     }
     return overrides[field.field_key] ?? field.sort_order;
