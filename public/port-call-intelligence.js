@@ -1,8 +1,8 @@
-// C.S.V. BEACON — Port Call Intelligence application interface v7 R3.
+// C.S.V. BEACON — Port Call Intelligence application interface v8.
 (() => {
   "use strict";
 
-  const BUILD = "PCI-UI-2026-09-09-V07R3";
+  const BUILD = "PCI-UI-2026-09-09-V08";
   const BUCKET = "port-call-intelligence-private";
   const MAX_FILE = 5 * 1024 * 1024;
   const MAX_CALL = 100 * 1024 * 1024;
@@ -33,7 +33,7 @@
     sb: null, bundle: null, permissions: null, countries: [], ports: [], facilities: [], vessels: [], selectedCountryCode: "",
     selectedPortId: "", selectedFacilityId: "", activeTab: "profile",
     profiles: [], calls: [], officeItems: [], officeRevisions: [], profileValues: [], proposals: [],
-    fields: [], options: [], selectedCallId: "", callDetails: new Map(), busy: 0,
+    fields: [], options: [], cargoGradeMemory: [], approvedBerths: [], selectedCallId: "", callDetails: new Map(), busy: 0,
     directorySearchResults: [], reportRows: [], reportCount: 0, reportPage: 0,
     reportPageSize: 25, reportRequest: 0
   };
@@ -210,6 +210,18 @@
     state.vessels = data || [];
   }
 
+  async function loadApprovedMemory() {
+    state.cargoGradeMemory = []; state.approvedBerths = [];
+    if (!state.permissions.companyContextReady) return;
+    const cargo = await state.sb.rpc("pci_list_approved_cargo_grades", { p_company_id: state.permissions.companyId });
+    dbError(cargo.error, "Could not load approved cargo-grade suggestions.");
+    state.cargoGradeMemory = (cargo.data || []).map((row) => row.cargo_grade_name);
+    if (!state.selectedPortId) return;
+    const berths = await state.sb.rpc("pci_list_approved_berths", { p_company_id: state.permissions.companyId, p_port_id: state.selectedPortId });
+    dbError(berths.error, "Could not load approved berth suggestions.");
+    state.approvedBerths = berths.data || [];
+  }
+
   function renderCountryOptions() {
     $("countrySelect").innerHTML = '<option value="">Select a country…</option>' + state.countries.map((country) => `<option value="${attr(country.country_code)}"${country.country_code === state.selectedCountryCode ? " selected" : ""}>${esc(country.country_name || country.country_code)} (${esc(country.country_code)})</option>`).join("");
     const reportCountry = $("callCountryFilter");
@@ -269,7 +281,7 @@
       $("directorySearchResults").hidden = true;
       const p = selectedPort(), f = selectedFacility();
       $("portMeta").textContent = [p?.port_name, p?.country_name, p?.unlocode, f ? facilityName(f) : "All terminals / port-wide"].filter(Boolean).join(" • ");
-      await Promise.all([loadSelectedPort(), loadCallRegister(true)]);
+      await Promise.all([loadSelectedPort(), loadCallRegister(true), loadApprovedMemory()]);
       showMessage("ok", `${row.terminal_name || row.port_name} was selected from the controlled directory.`);
     });
   }
@@ -394,7 +406,7 @@
   }
 
   async function refreshCallData(resetPage = false) {
-    if (state.selectedPortId) await loadSelectedPort();
+    if (state.selectedPortId) await Promise.all([loadSelectedPort(), loadApprovedMemory()]);
     else state.calls = [];
     await loadCallRegister(resetPage);
   }
@@ -413,7 +425,7 @@
     const p = selectedPort();
     $("portMeta").textContent = p ? [p.port_name, p.country_name, p.unlocode].filter(Boolean).join(" • ") : "Select a port to view its Company information.";
     if (!p) { state.facilities = []; renderTerminalOptions(); clearPortPanels(); await task("Updating the call report register…", () => loadCallRegister(true)); return; }
-    await task("Loading port and terminal information…", async () => { await loadFacilities(portId); await Promise.all([loadSelectedPort(), loadCallRegister(true)]); });
+    await task("Loading port and terminal information…", async () => { await loadFacilities(portId); await Promise.all([loadSelectedPort(), loadCallRegister(true), loadApprovedMemory()]); });
   }
 
   async function selectTerminal(facilityId) {
@@ -714,16 +726,16 @@
     return `<div class="pci-form-field pci-status-number" data-status-number><label for="${attr(id)}Status">${esc(label)}</label><div class="pci-inline-control"><select id="${attr(id)}Status" data-status-select><option value="">Select…</option><option value="reported"${inferred === "reported" ? " selected" : ""}>Reported value</option><option value="not_applicable"${inferred === "not_applicable" ? " selected" : ""}>Not applicable</option><option value="not_known"${inferred === "not_known" ? " selected" : ""}>Not known</option></select><input id="${attr(id)}" type="number" step="any" value="${attr(value ?? "")}" placeholder="m"${inferred !== "reported" ? " disabled" : ""} /></div>${help ? `<div class="pci-help">${esc(help)}</div>` : ""}</div>`;
   }
 
-  function coordinateInput(f, current, id) {
+  function coordinateInput(f, current, id, labelOverride = "") {
     const axis = f.field_key.endsWith("latitude") ? "lat" : "lon", ddm = decimalToDdm(current?.value_jsonb, axis), max = axis === "lat" ? 90 : 180;
     const hemispheres = axis === "lat" ? ["N", "S"] : ["E", "W"];
-    return `<div class="pci-form-field pci-coordinate-field" data-pci-composite-field-id="${attr(f.id)}" data-pci-kind="coordinate" data-axis="${axis}" data-field-label="${attr(f.field_label)}"><label>${esc(f.field_label)}</label><div class="pci-coordinate-control"><label><span>Degrees</span><input id="${attr(id)}" data-coordinate-degrees type="number" min="0" max="${max}" step="1" inputmode="numeric" value="${attr(ddm.degrees)}" placeholder="${axis === "lat" ? "00" : "000"}" /></label><label><span>Minutes</span><input data-coordinate-minutes type="number" min="0" max="59.999" step="0.001" inputmode="decimal" value="${attr(ddm.minutes)}" placeholder="00.0" /></label><label><span>Hemisphere</span><select data-coordinate-hemisphere>${hemispheres.map((h) => `<option value="${h}"${h === ddm.hemisphere ? " selected" : ""}>${h}</option>`).join("")}</select></label></div><div class="pci-help">Enter degrees and decimal minutes; saved internally as decimal degrees. ${esc(f.condition_notes || "")}</div></div>`;
+    return `<div class="pci-form-field pci-coordinate-field" data-pci-composite-field-id="${attr(f.id)}" data-pci-kind="coordinate" data-axis="${axis}" data-field-label="${attr(f.field_label)}"><label>${esc(labelOverride || f.field_label)}</label><div class="pci-coordinate-control"><label><span>Degrees</span><input id="${attr(id)}" data-coordinate-degrees type="number" min="0" max="${max}" step="1" inputmode="numeric" value="${attr(ddm.degrees)}" placeholder="${axis === "lat" ? "00" : "000"}" /></label><label><span>Minutes</span><input data-coordinate-minutes type="number" min="0" max="59.999" step="0.001" inputmode="decimal" value="${attr(ddm.minutes)}" placeholder="00.0" /></label><label><span>Hemisphere</span><select data-coordinate-hemisphere>${hemispheres.map((h) => `<option value="${h}"${h === ddm.hemisphere ? " selected" : ""}>${h}</option>`).join("")}</select></label></div><div class="pci-help">Enter degrees and decimal minutes; saved internally as decimal degrees. ${esc(f.condition_notes || "")}</div></div>`;
   }
 
   function manifoldInput(f, current, id) {
     const value = current?.value_jsonb && typeof current.value_jsonb === "object" ? current.value_jsonb : {};
     const legacy = typeof current?.value_jsonb === "string" ? current.value_jsonb : "";
-    const sizes = Array.from({ length: 21 }, (_, i) => String(i + 6).padStart(2, "0"));
+    const sizes = Array.from({ length: 11 }, (_, i) => String(6 + i * 2).padStart(2, "0"));
     const options = (selected) => '<option value="">Select…</option>' + sizes.map((v) => `<option value="${v}"${String(selected || "") === v ? " selected" : ""}>${v}''</option>`).join("");
     return `<div class="pci-form-field is-wide pci-structured-field" data-pci-composite-field-id="${attr(f.id)}" data-pci-kind="manifold" data-field-label="${attr(f.field_label)}" data-legacy-value="${attr(legacy)}"><label>${esc(f.field_label)}</label><div class="pci-manifold-control"><label><span>Side</span><select data-manifold-side><option value="">Select…</option><option value="Port"${value.side === "Port" ? " selected" : ""}>Port</option><option value="Starboard"${value.side === "Starboard" ? " selected" : ""}>Starboard</option></select></label><label><span>Number connected</span><select data-manifold-count><option value="">Select…</option>${[1,2,3,4].map((n) => `<option value="${n}"${Number(value.count) === n ? " selected" : ""}>${n}</option>`).join("")}</select></label><label><span>Connection size</span><span class="pci-size-pair"><select data-manifold-size-a>${options(value.size_a)}</select><b>×</b><select data-manifold-size-b>${options(value.size_b)}</select></span></label></div>${legacy ? `<div class="pci-legacy-note">Existing value retained until the structured connection is completed: ${esc(legacy)}</div>` : ""}<div class="pci-help">Port or starboard • 1–4 connections • flange size in inches (06'' to 26'').</div></div>`;
   }
@@ -755,6 +767,8 @@
     let control;
     if (f.field_key === "cargo_transfer__loading_discharging_sequence_of_grades") {
       control = `<select id="${attr(id)}" data-pci-field-id="${attr(f.id)}" data-value-type="number" data-cargo-sequence data-saved-value="${attr(formValue(value))}"><option value="">Select sequence…</option></select>`;
+    } else if (f.field_key === "cargo_transfer__cargo_type_grade") {
+      control = `<input id="${attr(id)}" type="text" list="pciCargoGradeMemory" value="${attr(formValue(value))}" data-pci-field-id="${attr(f.id)}" data-value-type="text" autocomplete="off" />`;
     } else if (optionRows.length) {
       control = `<select id="${attr(id)}" data-pci-field-id="${attr(f.id)}" data-value-type="${attr(f.value_type)}"><option value="">Select…</option>${optionRows.map((o) => `<option value="${attr(o.option_key)}"${String(value) === String(o.option_key) || clean(value).toLowerCase() === clean(o.option_label).toLowerCase() ? " selected" : ""}>${esc(o.option_label)}</option>`).join("")}</select>`;
     } else if (f.value_type === "boolean") {
@@ -766,7 +780,7 @@
       else control = long ? `<textarea id="${attr(id)}" rows="4" data-pci-field-id="${attr(f.id)}" data-value-type="${attr(f.value_type)}">${esc(formValue(value))}</textarea>` : `<input id="${attr(id)}" type="${type}"${type === "number" ? ' step="any"' : ""} value="${attr(formValue(value))}" data-pci-field-id="${attr(f.id)}" data-value-type="${attr(f.value_type)}" />`;
     }
     if (UNIT_CHOICES[f.field_key] && f.value_type === "number") control = `<div class="pci-inline-control">${control}<select data-pci-unit-for="${attr(f.id)}" aria-label="Unit"><option value="">Select unit…</option>${UNIT_CHOICES[f.field_key].map((unit) => `<option value="${attr(unit)}"${current?.unit_key === unit ? " selected" : ""}>${esc(unit)}</option>`).join("")}</select></div>`;
-    const conditional = f.field_key === "port_berth_identification__ship_to_ship_other_vessel_name" ? ' data-sts-vessel-field hidden' : "";
+    const conditional = f.field_key === "port_berth_identification__ship_to_ship_other_vessel_name" ? ' data-sts-vessel-field hidden' : f.field_key === "access_to_ship__gangway_source_other" ? ' data-gangway-other-field hidden' : "";
     const wide = ["port_berth_identification__anchorage_waiting_position", "port_berth_identification__ship_to_ship_other_vessel_name"].includes(f.field_key) || /long text|narrative|remarks|description|details|comment|lessons|precautions|information|procedures|requirements/i.test(`${f.control_type} ${f.field_label}`);
     const cargoHook = f.field_key === "cargo_transfer__cargo_measurement_basis" ? " data-cargo-measurement-basis-field" : f.field_key === "cargo_transfer__cargo_api" ? " data-cargo-measurement-value-field" : f.field_key === "cargo_transfer__loading_discharging_sequence_of_grades" ? " data-cargo-sequence-field" : "";
     return `<div class="pci-form-field${wide ? " is-wide" : ""}"${conditional}${cargoHook}><label for="${attr(id)}">${esc(f.field_label)}${required ? ' <span class="pci-required">*</span>' : ""}</label>${control}<div class="pci-help">${esc([f.unit_format, f.condition_notes].filter(Boolean).join(" • "))}</div></div>`;
@@ -779,7 +793,29 @@
       port_berth_identification__anchorage_waiting_longitude: 24.2,
       cargo_transfer__maximum_loading_discharging_rate_achieved: 105.1
     };
+    if (field.field_key === "access_to_ship__gangway_source_other") {
+      const source = state.definitions.find((candidate) => candidate.field_key === "access_to_ship__gangway_source");
+      return Number(source?.sort_order || field.sort_order) + 0.1;
+    }
     return overrides[field.field_key] ?? field.sort_order;
+  }
+
+  function renderDynamicSectionFields(list, valueMap) {
+    const output = [], used = new Set();
+    for (const field of list) {
+      if (used.has(field.id)) continue;
+      if (field.field_key.endsWith("_latitude")) {
+        const base = field.field_key.slice(0, -9), longitude = list.find((candidate) => candidate.field_key === `${base}_longitude`);
+        if (longitude) {
+          used.add(field.id); used.add(longitude.id);
+          const title = field.field_label.replace(/ latitude$/i, " latitude & longitude");
+          output.push(`<fieldset class="pci-coordinate-pair is-wide"><legend>${esc(title)}</legend><div class="pci-coordinate-pair-grid">${coordinateInput(field, valueMap.get(field.id), `pciField_${field.id}`, "Latitude")}${coordinateInput(longitude, valueMap.get(longitude.id), `pciField_${longitude.id}`, "Longitude")}</div></fieldset>`);
+          continue;
+        }
+      }
+      used.add(field.id); output.push(`${dynamicInput(field, valueMap.get(field.id))}${field.field_key === "mooring_fenders__number_of_tugs_used" ? "__TUGS__" : ""}`);
+    }
+    return output.join("");
   }
 
   async function openCallEditor(call = null) {
@@ -797,13 +833,14 @@
     const selectedVesselId = call?.vessel_id || "";
     const vesselOptions = '<option value="">Select the vessel that made the call…</option>' + state.vessels.map((vessel) => `<option value="${attr(vessel.vessel_id)}"${vessel.vessel_id === selectedVesselId ? " selected" : ""}>${esc(vessel.vessel_name)}${vessel.imo_number ? ` — IMO ${esc(vessel.imo_number)}` : ""}</option>`).join("");
     const vesselField = officeAuthored ? `<div class="pci-form-field"><label for="pciVessel">Vessel <span class="pci-required">*</span></label><select id="pciVessel" required${call ? " disabled" : ""}>${vesselOptions}</select><div class="pci-help">The office is entering this report on behalf of the selected Company vessel. This association cannot be changed after the Draft is created.</div></div>` : "";
-    const core = `<section class="pci-form-section"><h3>Core call details</h3><div class="pci-form-grid">
+    const berthNames = state.approvedBerths.filter((row) => !selectedTerminalId || row.port_facility_id === selectedTerminalId).map((row) => row.berth_name);
+    const sharedOffset = call?.all_lines_fast_utc_offset_minutes ?? call?.all_lines_clear_utc_offset_minutes ?? call?.port_entry_utc_offset_minutes;
+    const core = `<datalist id="pciCargoGradeMemory">${state.cargoGradeMemory.map((name) => `<option value="${attr(name)}"></option>`).join("")}</datalist><datalist id="pciBerthMemory">${berthNames.map((name) => `<option value="${attr(name)}"></option>`).join("")}</datalist><section class="pci-form-section"><h3>Core call details</h3><div class="pci-form-grid">
       ${vesselField}
       ${inputField({ id: "pciTerminal", label: "Terminal", required: true, options: terminalOptions, help: "If the terminal is missing, close this panel and use Add Terminal beside the main terminal selector." })}
-      ${inputField({ id: "pciBerth", label: "Berth (Berth Name)", value: call?.berth_name_snapshot || "", required: true })}
-      <div class="pci-form-pair is-wide">${inputField({ id: "pciALF", label: "Arrival — All Lines Fast (local)", type: "datetime-local", value: call?.all_lines_fast_local || "", required: true })}${inputField({ id: "pciALFOffset", label: "All Lines Fast UTC offset", required: true, options: offsetOptions(call?.all_lines_fast_utc_offset_minutes) })}</div>
-      <div class="pci-form-pair is-wide">${inputField({ id: "pciALC", label: "Departure — All Lines Clear (local)", type: "datetime-local", value: call?.all_lines_clear_local || "", required: true })}${inputField({ id: "pciALCOffset", label: "All Lines Clear UTC offset", required: true, options: offsetOptions(call?.all_lines_clear_utc_offset_minutes) })}</div>
-      <div class="pci-form-pair is-wide">${inputField({ id: "pciEntry", label: "Port entry time used for UKC (local)", type: "datetime-local", value: call?.port_entry_local || "", required: true })}${inputField({ id: "pciEntryOffset", label: "Port entry UTC offset", required: true, options: offsetOptions(call?.port_entry_utc_offset_minutes) })}</div>
+      <div class="pci-form-field"><label for="pciBerth">Berth (Berth Name) <span class="pci-required">*</span></label><input id="pciBerth" type="text" list="pciBerthMemory" value="${attr(call?.berth_name_snapshot || "")}" required autocomplete="off" /><div class="pci-help">Approved berth names for the selected terminal are suggested; a new name may be entered.</div></div>
+      ${inputField({ id: "pciUtcOffset", label: "Port-call UTC offset", required: true, options: offsetOptions(sharedOffset), help: "Applied to All Lines Fast, All Lines Clear and port entry time." })}
+      <div class="pci-form-triple is-wide">${inputField({ id: "pciALF", label: "Arrival — All Lines Fast (local)", type: "datetime-local", value: call?.all_lines_fast_local || "", required: true })}${inputField({ id: "pciALC", label: "Departure — All Lines Clear (local)", type: "datetime-local", value: call?.all_lines_clear_local || "", required: true })}${inputField({ id: "pciEntry", label: "Port entry time used for UKC (local)", type: "datetime-local", value: call?.port_entry_local || "", required: true })}</div>
       <div class="pci-form-triple is-wide">${inputField({ id: "pciDraftF", label: "Arrival draught forward (m)", type: "number", value: call?.arrival_draught_forward ?? "", required: true })}${inputField({ id: "pciDraftM", label: "Arrival draught midships (m)", type: "number", value: call?.arrival_draught_midships ?? "" })}${inputField({ id: "pciDraftA", label: "Arrival draught aft (m)", type: "number", value: call?.arrival_draught_aft ?? "", required: true })}</div>
       ${statusNumberField({ id: "pciDepth", label: "Channel Controlling depth (m)", value: call?.controlling_depth, status: call?.controlling_depth_status })}
       ${statusNumberField({ id: "pciTide", label: "Tide height at Port Entry (m)", value: call?.tide_height_at_entry, status: call?.tide_height_at_entry_status })}
@@ -812,9 +849,8 @@
       ${inputField({ id: "pciUkcResult", label: "Actual UKC at shallowest depth (m)", type: "number", value: call?.ukc_result ?? "" })}
       ${inputField({ id: "pciUkcNotes", label: "UKC notes", type: "textarea", value: call?.ukc_notes || "", wide: true, rows: 4, help: "Free text." })}
       ${checkboxGroupHtml({ id: "pciCargo", label: "Cargo-operation type", values: CARGO_OPERATIONS, selected: call?.cargo_operation_type || "", required: true, help: "Select every operation that applied during this call." })}
-      ${inputField({ id: "pciMasterConfirm", label: officeAuthored ? "Office completion confirmation" : "Master completion confirmation", type: "checkbox", value: call?.master_completion_confirmed === true, wide: true, help: officeAuthored ? "I confirm that the Office has entered this report on behalf of the selected vessel and reviewed it for completeness." : "I confirm that this report reflects the vessel's actual call experience and has been reviewed for completeness." })}
     </div></section>`;
-    const dynamic = [...sections.entries()].map(([label, list]) => `<section class="pci-form-section"><h3>${esc(label)}</h3><div class="pci-form-grid">${list.map((f) => `${dynamicInput(f, valueMap.get(f.id))}${f.field_key === "mooring_fenders__number_of_tugs_used" ? renderRepeatGroup(detail, "tugs") : ""}`).join("")}</div></section>`).join("");
+    const dynamic = [...sections.entries()].map(([label, list]) => `<section class="pci-form-section"><h3>${esc(label)}</h3><div class="pci-form-grid">${renderDynamicSectionFields(list, valueMap).replace("__TUGS__", renderRepeatGroup(detail, "tugs"))}</div></section>`).join("");
     const repeats = renderRepeatEditor(detail, new Set(["tugs", ...HIDDEN_REPEAT_GROUPS]));
     const confirmations = renderSectionConfirmationEditor(detail);
     const hazards = renderHazardEditor(detail);
@@ -930,11 +966,6 @@
       const select = wrapper.querySelector("[data-status-select]"), input = wrapper.querySelector('input[type="number"]');
       select.onchange = () => { input.disabled = select.value !== "reported"; if (input.disabled) input.value = ""; };
     });
-    for (const unitSelect of $("pciCallForm").querySelectorAll("[data-pci-unit-for]")) {
-      const valueControl = $("pciCallForm").querySelector(`[data-pci-field-id="${unitSelect.dataset.pciUnitFor}"]`);
-      const bad = typedValue(valueControl) !== null && !clean(unitSelect.value);
-      unitSelect.classList.toggle("pci-form-error", bad); if (bad && !first) first = unitSelect;
-    }
     const berthGroup = $("pciDrawer").querySelector('[data-pci-kind="multi"]');
     const stsField = $("pciDrawer").querySelector("[data-sts-vessel-field]");
     const refreshSts = () => {
@@ -943,6 +974,18 @@
     };
     berthGroup?.querySelectorAll('input[type="checkbox"]').forEach((box) => box.addEventListener("change", refreshSts));
     refreshSts();
+    const gangwaySource = [...$("pciCallForm").querySelectorAll("[data-pci-field-id]")].find((control) => state.fields.find((field) => field.id === control.dataset.pciFieldId)?.field_key === "access_to_ship__gangway_source");
+    const gangwayOther = $("pciDrawer").querySelector("[data-gangway-other-field]");
+    const refreshGangwayOther = () => {
+      const active = gangwaySource?.value === "other";
+      if (gangwayOther) { gangwayOther.hidden = !active; if (!active) { const control = gangwayOther.querySelector("input,textarea"); if (control) control.value = ""; } }
+    };
+    if (gangwaySource) gangwaySource.onchange = refreshGangwayOther;
+    refreshGangwayOther();
+    const terminal = $("pciTerminal"), berthMemory = $("pciBerthMemory");
+    if (terminal && berthMemory) terminal.addEventListener("change", () => {
+      berthMemory.innerHTML = state.approvedBerths.filter((row) => !terminal.value || row.port_facility_id === terminal.value).map((row) => `<option value="${attr(row.berth_name)}"></option>`).join("");
+    });
     const tugCount = $("pciDrawer").querySelector("[data-tug-count]");
     if (tugCount) tugCount.onchange = () => syncTugRows(Number(tugCount.value || 0));
     installRateOperationSync();
@@ -991,7 +1034,7 @@
 
   function validateCallForm() {
     syncAchievedRateOperation();
-    const required = ["pciTerminal", "pciBerth", "pciALF", "pciALFOffset", "pciALC", "pciALCOffset", "pciEntry", "pciEntryOffset", "pciDraftF", "pciDraftA"];
+    const required = ["pciTerminal", "pciBerth", "pciUtcOffset", "pciALF", "pciALC", "pciEntry", "pciDraftF", "pciDraftA"];
     if ($("pciVessel")) required.unshift("pciVessel");
     let first = null;
     required.forEach((id) => { const el = $(id), bad = !clean(el?.value); el?.classList.toggle("pci-form-error", bad); if (bad && !first) first = el; });
@@ -1000,6 +1043,16 @@
     }
     const cargo = $("pciCargo"), cargoBad = checkedValues("pciCargo").length === 0;
     cargo?.classList.toggle("pci-form-error", cargoBad); if (cargoBad && !first) first = cargo;
+    const gangwayOther = $("pciDrawer").querySelector("[data-gangway-other-field]");
+    if (gangwayOther && !gangwayOther.hidden) {
+      const input = gangwayOther.querySelector("input, textarea, select"), bad = !clean(input?.value);
+      input?.classList.toggle("pci-form-error", bad); if (bad && !first) first = input;
+    }
+    for (const unitSelect of $("pciCallForm").querySelectorAll("[data-pci-unit-for]")) {
+      const valueControl = $("pciCallForm").querySelector(`[data-pci-field-id="${unitSelect.dataset.pciUnitFor}"]`);
+      const bad = typedValue(valueControl) !== null && !clean(unitSelect.value);
+      unitSelect.classList.toggle("pci-form-error", bad); if (bad && !first) first = unitSelect;
+    }
     $("pciDrawer").querySelectorAll("[data-status-number]").forEach((wrapper) => {
       const select = wrapper.querySelector("[data-status-select]"), input = wrapper.querySelector('input[type="number"]');
       const bad = select.value === "reported" && clean(input.value) === "";
@@ -1030,16 +1083,16 @@
     const vesselId = existingCall?.vessel_id || (state.permissions.canCreateOfficeCall ? nullable("pciVessel") : state.permissions.vesselId);
     const payload = {
       company_id: state.permissions.companyId, vessel_id: vesselId, port_id: state.selectedPortId, profile_id: profile.id,
-      status: "draft", all_lines_fast_local: nullable("pciALF"), all_lines_fast_utc_offset_minutes: nullableNumber("pciALFOffset"),
-      all_lines_clear_local: nullable("pciALC"), all_lines_clear_utc_offset_minutes: nullableNumber("pciALCOffset"),
-      port_entry_local: nullable("pciEntry"), port_entry_utc_offset_minutes: nullableNumber("pciEntryOffset"),
+      status: "draft", all_lines_fast_local: nullable("pciALF"), all_lines_fast_utc_offset_minutes: nullableNumber("pciUtcOffset"),
+      all_lines_clear_local: nullable("pciALC"), all_lines_clear_utc_offset_minutes: nullableNumber("pciUtcOffset"),
+      port_entry_local: nullable("pciEntry"), port_entry_utc_offset_minutes: nullableNumber("pciUtcOffset"),
       arrival_draught_forward: nullableNumber("pciDraftF"), arrival_draught_midships: nullableNumber("pciDraftM"), arrival_draught_aft: nullableNumber("pciDraftA"),
       controlling_depth: statusNumber("pciDepth"), controlling_depth_status: statusValue("pciDepth"),
       tide_height_at_entry: statusNumber("pciTide"), tide_height_at_entry_status: statusValue("pciTide"),
       tide_height_at_exit: statusNumber("pciTideExit"), tide_height_at_exit_status: statusValue("pciTideExit"),
       ukc_method: nullable("pciUkcMethod"), ukc_result: nullableNumber("pciUkcResult"), ukc_notes: nullable("pciUkcNotes"),
       cargo_operation_type: checkedValues("pciCargo").join(", "),
-      master_completion_confirmed: $("pciMasterConfirm").checked === true
+      master_completion_confirmed: existingCall?.master_completion_confirmed === true
     };
     if (!existingCall) {
       payload.report_origin = state.permissions.canCreateOfficeCall ? "office" : "vessel_master";
@@ -1193,9 +1246,8 @@
     const call = findCall(id), detail = await loadCallDetails(id, true); if (!call) return;
     const missing = majorSections().filter(([key]) => !detail.sections.some((s) => s.section_key === key));
     if (missing.length) return showMessage("warn", `Submission is blocked: ${missing.length} section${missing.length === 1 ? " has" : "s have"} not been confirmed. Edit the Draft and complete the Section completion area.`);
-    if (!call.master_completion_confirmed) return showMessage("warn", `Submission is blocked until the ${call.report_origin === "office" ? "Office" : "Master"} completion confirmation is selected.`);
-    if (!await confirmAction({ title: "Submit vessel-call report?", message: call.report_origin === "office" ? "This office-entered report will move to Submitted and can then enter the controlled office review workflow." : "The office will receive this report for review. You can return it to Draft only until office review begins.", label: "Submit Report", danger: false })) return;
-    await changeCallStatus(id, "submitted", "Report submitted to the office.");
+    if (!await confirmAction({ title: "Submit vessel-call report?", message: call.report_origin === "office" ? "I confirm that the Office-entered report has been reviewed for completeness. It will move to Submitted." : "I confirm that this report reflects the vessel's actual call experience and has been reviewed for completeness.", label: "Confirm and Submit", danger: false })) return;
+    await changeCallStatus(id, "submitted", "Report submitted to the office.", { master_completion_confirmed: true });
   }
 
   async function retractCall(id) {
@@ -1396,7 +1448,7 @@
     await window.AUTH.setupAuthButtons(); state.permissions = await window.PCI_PERMISSIONS.load(bundle);
     if (!state.permissions.canView) throw new Error("Your current Rights Matrix permissions do not allow Port Call Intelligence viewing.");
     await task("Loading Port Call Intelligence…", async () => {
-      await Promise.all([loadDefinitions(), loadCountries(), loadCompanyVessels()]);
+      await Promise.all([loadDefinitions(), loadCountries(), loadCompanyVessels(), loadApprovedMemory()]);
       await loadCallRegister(true);
     });
     $("newCallBtn").hidden = !state.permissions.canCreateCall; $("newOfficeInfoBtn").hidden = !state.permissions.canManageOfficeInfo;

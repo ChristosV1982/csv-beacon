@@ -338,3 +338,35 @@ html[data-csvb-page="port-call-intelligence.html"] .pci-summary-cell {
 [data-cargo-sequence-field][hidden]{
   display:none !important;
 }
+
+/* V8 compact call-entry layout. */
+html[data-csvb-page="port-call-intelligence.html"] .pci-page{padding-top:6px}
+html[data-csvb-page="port-call-intelligence.html"] .pci-hero{padding:9px 12px;margin-bottom:7px}
+html[data-csvb-page="port-call-intelligence.html"] .pci-port-picker{padding:10px 12px}
+html[data-csvb-page="port-call-intelligence.html"] .pci-tabs{margin-top:7px}
+html[data-csvb-page="port-call-intelligence.html"] .pci-panel{padding:9px;min-height:320px}
+.pci-drawer-head{padding:12px 16px!important}
+.pci-drawer-body{padding:10px 14px 72px!important}
+.pci-drawer-actions{padding:8px 14px!important}
+.pci-form{gap:9px!important}
+.pci-form-section{margin-bottom:9px!important}
+.pci-form-section>h3{padding:8px 10px!important;font-size:.9rem!important}
+.pci-form-section>.pci-form-grid{padding:9px 10px!important}
+.pci-form-grid{gap:8px 10px!important}
+.pci-form-field>label,.pci-choice-group legend{margin-bottom:3px!important;font-size:.77rem!important}
+.pci-form input,.pci-form select,.pci-form textarea{padding:7px 9px!important;min-height:34px!important}
+.pci-form textarea{min-height:70px}
+.pci-help{margin-top:3px!important;font-size:.68rem!important;line-height:1.25!important}
+.pci-choice-grid{gap:5px}
+.pci-choice{min-height:32px;padding:5px 7px}
+.pci-form-pair,.pci-form-triple{gap:8px}
+.pci-coordinate-pair{grid-column:1/-1;margin:0;padding:8px 9px 7px;border:1px solid #c9dce6;border-radius:8px;background:#f8fbfd;min-width:0}
+.pci-coordinate-pair>legend{padding:0 5px;color:var(--pci-navy);font-size:.8rem;font-weight:850}
+.pci-coordinate-pair-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.pci-coordinate-pair .pci-coordinate-field>label{font-size:.73rem}
+.pci-coordinate-pair .pci-coordinate-field .pci-help{display:none}
+.pci-coordinate-control{grid-template-columns:minmax(62px,.7fr) minmax(82px,1fr) minmax(70px,.65fr);gap:5px}
+.pci-hazard-edit,.pci-tug-row{padding:8px!important;margin:7px!important}
+.pci-repeat-subhead{padding:7px 9px}
+.pci-section-confirm{padding:5px 0!important;gap:7px!important}
+@media(max-width:760px){.pci-coordinate-pair-grid,.pci-form-triple{grid-template-columns:1fr}.pci-coordinate-pair{padding:7px}}
