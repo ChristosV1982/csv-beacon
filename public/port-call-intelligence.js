@@ -1,8 +1,8 @@
-// C.S.V. BEACON — Port Call Intelligence application interface v7 R2.
+// C.S.V. BEACON — Port Call Intelligence application interface v7 R3.
 (() => {
   "use strict";
 
-  const BUILD = "PCI-UI-2026-09-09-V07R2";
+  const BUILD = "PCI-UI-2026-09-09-V07R3";
   const BUCKET = "port-call-intelligence-private";
   const MAX_FILE = 5 * 1024 * 1024;
   const MAX_CALL = 100 * 1024 * 1024;
@@ -1098,7 +1098,10 @@
       if (existingCall) {
         const { data, error } = await state.sb.from("pci_port_calls").update(callHeaderPayload(profile, existingCall)).eq("id", existingCall.id).select("*").single(); dbError(error); call = data;
       } else {
-        const { data, error } = await state.sb.from("pci_port_calls").insert(callHeaderPayload(profile)).select("*").single(); dbError(error); call = data;
+        const newCallId = crypto.randomUUID();
+        const payload = { ...callHeaderPayload(profile), id: newCallId };
+        const { error: insertError } = await state.sb.from("pci_port_calls").insert(payload); dbError(insertError);
+        const { data, error: selectError } = await state.sb.from("pci_port_calls").select("*").eq("id", newCallId).single(); dbError(selectError); call = data;
       }
       await saveCallValues(call); await saveRepeatRows(call); await saveSectionConfirmations(call); await saveHazards(call);
       closeDrawer(); showMessage("ok", `${call.call_reference} was saved as a Draft.`);
