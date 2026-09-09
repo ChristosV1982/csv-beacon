@@ -1,8 +1,8 @@
-// C.S.V. BEACON — Port Call Intelligence application interface v7.
+// C.S.V. BEACON — Port Call Intelligence application interface v7 R2.
 (() => {
   "use strict";
 
-  const BUILD = "PCI-UI-2026-09-09-V07";
+  const BUILD = "PCI-UI-2026-09-09-V07R2";
   const BUCKET = "port-call-intelligence-private";
   const MAX_FILE = 5 * 1024 * 1024;
   const MAX_CALL = 100 * 1024 * 1024;
@@ -731,7 +731,8 @@
   function rateInput(f, current) {
     const legacy = typeof current?.value_jsonb === "number" ? current.value_jsonb : "";
     const value = current?.value_jsonb && typeof current.value_jsonb === "object" ? current.value_jsonb : {};
-    return `<div class="pci-form-field pci-structured-field" data-pci-composite-field-id="${attr(f.id)}" data-pci-kind="rate" data-field-label="${attr(f.field_label)}" data-legacy-rate="${attr(legacy)}"><label>${esc(f.field_label)}</label><div class="pci-inline-control"><select data-rate-operation><option value="">Loading / discharging…</option><option value="Loading"${value.operation === "Loading" ? " selected" : ""}>Loading</option><option value="Discharging"${value.operation === "Discharging" ? " selected" : ""}>Discharging</option></select><input data-rate-value type="number" step="any" min="0" value="${attr(value.rate ?? legacy)}" placeholder="m³/h" /></div>${legacy !== "" ? '<div class="pci-legacy-note">Existing numeric rate retained until Loading or Discharging is selected.</div>' : ""}<div class="pci-help">m³/h • Historical call value.</div></div>`;
+    const role = f.field_key === "cargo_transfer__maximum_loading_discharging_rate_achieved" ? "achieved" : "requested";
+    return `<div class="pci-form-field pci-structured-field" data-pci-composite-field-id="${attr(f.id)}" data-pci-kind="rate" data-rate-role="${role}" data-field-label="${attr(f.field_label)}" data-legacy-rate="${attr(legacy)}"><label>${esc(f.field_label)}</label><div class="pci-inline-control"><select data-rate-operation><option value="">Loading / discharging…</option><option value="Loading"${value.operation === "Loading" ? " selected" : ""}>Loading</option><option value="Discharging"${value.operation === "Discharging" ? " selected" : ""}>Discharging</option></select><input data-rate-value type="number" step="any" min="0" value="${attr(value.rate ?? legacy)}" placeholder="m³/h" /></div>${legacy !== "" ? '<div class="pci-legacy-note">Existing numeric rate retained until Loading or Discharging is selected.</div>' : ""}<div class="pci-help">m³/h • Historical call value.</div></div>`;
   }
 
   function inputField({ id, label, type = "text", value = "", required = false, wide = false, help = "", step = "any", options = null, rows = 3 }) {
@@ -944,6 +945,31 @@
     refreshSts();
     const tugCount = $("pciDrawer").querySelector("[data-tug-count]");
     if (tugCount) tugCount.onchange = () => syncTugRows(Number(tugCount.value || 0));
+    installRateOperationSync();
+  }
+
+  function installRateOperationSync() {
+    const requested = $("pciDrawer").querySelector('[data-rate-role="requested"]');
+    const achieved = $("pciDrawer").querySelector('[data-rate-role="achieved"]');
+    if (!requested || !achieved) return;
+    const requestedOperation = requested.querySelector("[data-rate-operation]");
+    const achievedOperation = achieved.querySelector("[data-rate-operation]");
+    const achievedRate = achieved.querySelector("[data-rate-value]");
+    const inherit = syncAchievedRateOperation;
+    requestedOperation.addEventListener("change", inherit);
+    achievedRate.addEventListener("input", inherit);
+    inherit();
+  }
+
+  function syncAchievedRateOperation() {
+    const requested = $("pciDrawer").querySelector('[data-rate-role="requested"]');
+    const achieved = $("pciDrawer").querySelector('[data-rate-role="achieved"]');
+    const requestedOperation = requested?.querySelector("[data-rate-operation]");
+    const achievedOperation = achieved?.querySelector("[data-rate-operation]");
+    const achievedRate = achieved?.querySelector("[data-rate-value]");
+    if (clean(achievedRate?.value) && !clean(achievedOperation?.value) && clean(requestedOperation?.value)) {
+      achievedOperation.value = requestedOperation.value;
+    }
   }
 
   function syncTugRows(count) {
@@ -964,6 +990,7 @@
   function statusNumber(id) { return statusValue(id) === "reported" ? nullableNumber(id) : null; }
 
   function validateCallForm() {
+    syncAchievedRateOperation();
     const required = ["pciTerminal", "pciBerth", "pciALF", "pciALFOffset", "pciALC", "pciALCOffset", "pciEntry", "pciEntryOffset", "pciDraftF", "pciDraftA"];
     if ($("pciVessel")) required.unshift("pciVessel");
     let first = null;
@@ -1001,7 +1028,7 @@
 
   function callHeaderPayload(profile, existingCall = null) {
     const vesselId = existingCall?.vessel_id || (state.permissions.canCreateOfficeCall ? nullable("pciVessel") : state.permissions.vesselId);
-    return {
+    const payload = {
       company_id: state.permissions.companyId, vessel_id: vesselId, port_id: state.selectedPortId, profile_id: profile.id,
       status: "draft", all_lines_fast_local: nullable("pciALF"), all_lines_fast_utc_offset_minutes: nullableNumber("pciALFOffset"),
       all_lines_clear_local: nullable("pciALC"), all_lines_clear_utc_offset_minutes: nullableNumber("pciALCOffset"),
@@ -1014,6 +1041,11 @@
       cargo_operation_type: checkedValues("pciCargo").join(", "),
       master_completion_confirmed: $("pciMasterConfirm").checked === true
     };
+    if (!existingCall) {
+      payload.report_origin = state.permissions.canCreateOfficeCall ? "office" : "vessel_master";
+      payload.created_by = state.permissions.userId;
+    }
+    return payload;
   }
 
   function typedValue(el) {
