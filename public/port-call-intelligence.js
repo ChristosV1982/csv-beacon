@@ -1,8 +1,8 @@
-// C.S.V. BEACON — Port Call Intelligence application interface v6.
+// C.S.V. BEACON — Port Call Intelligence application interface v7.
 (() => {
   "use strict";
 
-  const BUILD = "PCI-UI-2026-09-08-V06";
+  const BUILD = "PCI-UI-2026-09-09-V07";
   const BUCKET = "port-call-intelligence-private";
   const MAX_FILE = 5 * 1024 * 1024;
   const MAX_CALL = 100 * 1024 * 1024;
@@ -752,7 +752,9 @@
     if (f.field_key === "cargo_transfer__manifold_connection") return manifoldInput(f, current, id);
     if (["cargo_transfer__maximum_loading_discharging_rate", "cargo_transfer__maximum_loading_discharging_rate_achieved"].includes(f.field_key)) return rateInput(f, current);
     let control;
-    if (optionRows.length) {
+    if (f.field_key === "cargo_transfer__loading_discharging_sequence_of_grades") {
+      control = `<select id="${attr(id)}" data-pci-field-id="${attr(f.id)}" data-value-type="number" data-cargo-sequence data-saved-value="${attr(formValue(value))}"><option value="">Select sequence…</option></select>`;
+    } else if (optionRows.length) {
       control = `<select id="${attr(id)}" data-pci-field-id="${attr(f.id)}" data-value-type="${attr(f.value_type)}"><option value="">Select…</option>${optionRows.map((o) => `<option value="${attr(o.option_key)}"${String(value) === String(o.option_key) || clean(value).toLowerCase() === clean(o.option_label).toLowerCase() ? " selected" : ""}>${esc(o.option_label)}</option>`).join("")}</select>`;
     } else if (f.value_type === "boolean") {
       control = `<select id="${attr(id)}" data-pci-field-id="${attr(f.id)}" data-value-type="boolean"><option value="">Select…</option><option value="true"${value === true ? " selected" : ""}>Yes</option><option value="false"${value === false ? " selected" : ""}>No</option></select>`;
@@ -765,7 +767,8 @@
     if (UNIT_CHOICES[f.field_key] && f.value_type === "number") control = `<div class="pci-inline-control">${control}<select data-pci-unit-for="${attr(f.id)}" aria-label="Unit"><option value="">Select unit…</option>${UNIT_CHOICES[f.field_key].map((unit) => `<option value="${attr(unit)}"${current?.unit_key === unit ? " selected" : ""}>${esc(unit)}</option>`).join("")}</select></div>`;
     const conditional = f.field_key === "port_berth_identification__ship_to_ship_other_vessel_name" ? ' data-sts-vessel-field hidden' : "";
     const wide = ["port_berth_identification__anchorage_waiting_position", "port_berth_identification__ship_to_ship_other_vessel_name"].includes(f.field_key) || /long text|narrative|remarks|description|details|comment|lessons|precautions|information|procedures|requirements/i.test(`${f.control_type} ${f.field_label}`);
-    return `<div class="pci-form-field${wide ? " is-wide" : ""}"${conditional}><label for="${attr(id)}">${esc(f.field_label)}${required ? ' <span class="pci-required">*</span>' : ""}</label>${control}<div class="pci-help">${esc([f.unit_format, f.condition_notes].filter(Boolean).join(" • "))}</div></div>`;
+    const cargoHook = f.field_key === "cargo_transfer__cargo_measurement_basis" ? " data-cargo-measurement-basis-field" : f.field_key === "cargo_transfer__cargo_api" ? " data-cargo-measurement-value-field" : f.field_key === "cargo_transfer__loading_discharging_sequence_of_grades" ? " data-cargo-sequence-field" : "";
+    return `<div class="pci-form-field${wide ? " is-wide" : ""}"${conditional}${cargoHook}><label for="${attr(id)}">${esc(f.field_label)}${required ? ' <span class="pci-required">*</span>' : ""}</label>${control}<div class="pci-help">${esc([f.unit_format, f.condition_notes].filter(Boolean).join(" • "))}</div></div>`;
   }
 
   function editorSortOrder(field) {
@@ -847,6 +850,19 @@
   function repeatRowHtml(group, defs, row = null, values = [], rowNumber = 0) {
     const map = new Map(values.map((v) => [v.field_definition_id, v]));
     if (group === "tugs") return `<div class="pci-hazard-edit pci-repeat-row pci-tug-row" data-original-row-id="${attr(row?.id || "")}"><div class="pci-tug-row-title">Tug ${rowNumber || 1}</div><input type="hidden" data-repeat-row-label="1" value="Tug ${rowNumber || 1}" /><div class="pci-tug-grid">${defs.sort((a, b) => a.sort_order - b.sort_order).map((f) => dynamicInput(f, map.get(f.id), `repeat_${group}_${rowNumber || 1}`)).join("")}</div></div>`;
+    if (group === "cargo_grades") {
+      const cargoOrder = new Map([
+        ["cargo_transfer__cargo_type", 1],
+        ["cargo_transfer__cargo_type_grade", 2],
+        ["cargo_transfer__shore_cargo_nomination_quantity", 3],
+        ["cargo_transfer__cargo_measurement_basis", 4],
+        ["cargo_transfer__cargo_api", 5],
+        ["cargo_transfer__loading_temperature", 6],
+        ["cargo_transfer__loading_discharging_sequence_of_grades", 7]
+      ]);
+      const ordered = [...defs].sort((a, b) => (cargoOrder.get(a.field_key) ?? a.sort_order) - (cargoOrder.get(b.field_key) ?? b.sort_order));
+      return `<div class="pci-hazard-edit pci-repeat-row pci-cargo-grade-row" data-original-row-id="${attr(row?.id || "")}"><div class="pci-tug-row-title">Cargo grade</div><input type="hidden" data-repeat-row-label="1" value="${attr(row?.row_label || "Cargo grade")}" /><div class="pci-form-grid">${ordered.map((f) => dynamicInput(f, map.get(f.id), `repeat_${group}`)).join("")}<div class="pci-form-field is-wide"><button type="button" class="pci-danger pci-remove-repeat" data-pci-tip="Delete this cargo-grade entry from the Draft when you save.">Delete Cargo Grade</button></div></div></div>`;
+    }
     return `<div class="pci-hazard-edit pci-repeat-row" data-original-row-id="${attr(row?.id || "")}"><div class="pci-form-grid">${inputField({ id: `rowLabel_${crypto.randomUUID()}`, label: "Entry label (optional)", value: row?.row_label || "", wide: true }).replace("<input", '<input data-repeat-row-label="1"')}${defs.map((f) => dynamicInput(f, map.get(f.id), `repeat_${group}`)).join("")}<div class="pci-form-field is-wide"><button type="button" class="pci-danger pci-remove-repeat" data-pci-tip="Delete this unsaved repeating entry from the Draft when you save.">Delete Entry</button></div></div></div>`;
   }
 
@@ -876,9 +892,36 @@
 
   function installRepeatAndHazardControls() {
     $("pciDrawer").querySelectorAll(".pci-add-repeat").forEach((b) => b.onclick = () => { const g = b.closest("[data-repeat-group]"), key = g.dataset.repeatGroup, defs = state.fields.filter((f) => f.storage_target === "repeat_value" && f.repeating_group_key === key); g.querySelector(".pci-repeat-rows").insertAdjacentHTML("beforeend", repeatRowHtml(key, defs)); installRepeatAndHazardControls(); });
-    $("pciDrawer").querySelectorAll(".pci-remove-repeat").forEach((b) => b.onclick = () => b.closest(".pci-repeat-row").remove());
+    $("pciDrawer").querySelectorAll(".pci-remove-repeat").forEach((b) => b.onclick = () => { b.closest(".pci-repeat-row").remove(); syncCargoGradeControls(); });
     if ($("addHazardBtn")) $("addHazardBtn").onclick = () => { $("pciHazardRows").insertAdjacentHTML("beforeend", hazardRowHtml()); installRepeatAndHazardControls(); };
     $("pciDrawer").querySelectorAll(".pci-remove-hazard").forEach((b) => b.onclick = () => b.closest(".pci-hazard-edit").remove());
+    syncCargoGradeControls();
+  }
+
+  function syncCargoGradeControls() {
+    const group = $("pciDrawer")?.querySelector('[data-repeat-group="cargo_grades"]');
+    if (!group) return;
+    const rows = [...group.querySelectorAll(".pci-repeat-row")], count = rows.length;
+    rows.forEach((row, index) => {
+      row.querySelector(".pci-tug-row-title").textContent = `Cargo grade ${index + 1}`;
+      row.querySelector("[data-repeat-row-label]").value = `Cargo grade ${index + 1}`;
+      const sequenceField = row.querySelector("[data-cargo-sequence-field]"), sequence = row.querySelector("[data-cargo-sequence]");
+      if (sequenceField && sequence) {
+        const saved = clean(sequence.value || sequence.dataset.savedValue);
+        sequenceField.hidden = count <= 1;
+        sequence.innerHTML = '<option value="">Select sequence…</option>' + Array.from({ length: count }, (_, n) => `<option value="${n + 1}">${n + 1}</option>`).join("");
+        sequence.value = count > 1 && Number(saved) >= 1 && Number(saved) <= count ? saved : (count > 1 ? String(index + 1) : "");
+        sequence.dataset.savedValue = sequence.value;
+      }
+      const basis = row.querySelector("[data-cargo-measurement-basis-field] select"), valueField = row.querySelector("[data-cargo-measurement-value-field]"), valueLabel = valueField?.querySelector("label"), help = valueField?.querySelector(".pci-help");
+      const refreshMeasurement = () => {
+        const density = basis?.value === "density_15c";
+        if (valueLabel) valueLabel.textContent = density ? "Density at 15°C (kg/m³)" : "Cargo API (°API)";
+        if (help) help.textContent = density ? "Density at 15°C in kg/m³." : "API gravity in degrees API.";
+      };
+      if (basis) basis.onchange = refreshMeasurement;
+      refreshMeasurement();
+    });
   }
 
   function installCallEditorControls() {
@@ -935,6 +978,14 @@
       const bad = select.value === "reported" && clean(input.value) === "";
       input.classList.toggle("pci-form-error", bad); if (bad && !first) first = input;
     });
+    const cargoRows = [...$("pciDrawer").querySelectorAll('[data-repeat-group="cargo_grades"] .pci-repeat-row')];
+    if (cargoRows.length > 1) {
+      const sequences = cargoRows.map((row) => row.querySelector("[data-cargo-sequence]"));
+      const values = sequences.map((select) => clean(select?.value));
+      const invalid = values.some((value) => !value) || new Set(values).size !== values.length;
+      sequences.forEach((select) => select?.classList.toggle("pci-form-error", invalid));
+      if (invalid && !first) first = sequences[0];
+    }
     for (const composite of $("pciCallForm").querySelectorAll("[data-pci-composite-field-id]")) compositeValue(composite);
     if (first) { first.scrollIntoView({ behavior: "smooth", block: "center" }); first.focus(); throw new Error("Complete the highlighted core fields before saving the Draft."); }
   }

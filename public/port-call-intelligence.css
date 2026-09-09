@@ -331,3 +331,10 @@ html[data-csvb-page="port-call-intelligence.html"] .pci-summary-cell {
   .pci-status-number .pci-inline-control { grid-template-columns: 1fr; }
   .pci-repeat-subhead { flex-direction: column; }
 }
+.pci-cargo-grade-row > .pci-tug-row-title{
+  margin-bottom:12px;
+}
+
+[data-cargo-sequence-field][hidden]{
+  display:none !important;
+}
