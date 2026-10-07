@@ -1,0 +1,1 @@
+- [Omega isolation](omega-isolation.md) — approved baseline and branding constraints; keep Omega preview work separate from C.S.V. Beacon production.
