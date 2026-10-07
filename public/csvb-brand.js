@@ -3,10 +3,11 @@
  * Safe branding accessor foundation
  *
  * IMPORTANT:
- * - This helper is currently inactive unless explicitly loaded and used.
- * - It must never prevent C.S.V. BEACON from operating.
- * - If no valid branding override exists, the current C.S.V. BEACON
- *   identity is returned.
+ * - C.S.V. BEACON remains the default and hard fallback identity.
+ * - Deployment-specific branding is optional.
+ * - If an override is absent or invalid, C.S.V. BEACON must continue
+ *   operating normally.
+ * - Technical identifiers using csvb_* / CSVB_* remain unchanged.
  */
 
 (function () {
@@ -27,6 +28,8 @@
       favicon: "./favicon.ico"
     }),
 
+    colors: Object.freeze({}),
+
     pwa: Object.freeze({
       name: "C.S.V. BEACON",
       shortName: "C.S.V. BEACON"
@@ -36,16 +39,73 @@
       email: ""
     }),
 
+    deployment: Object.freeze({}),
+
     metadata: Object.freeze({
       profileType: "fallback",
       deploymentBrand: "C.S.V. Beacon"
     })
   });
 
+  const TOP_LEVEL_OVERRIDE_KEYS = Object.freeze([
+    "key",
+    "productName",
+    "productNameUpper",
+    "subtitle",
+    "assets",
+    "colors",
+    "pwa",
+    "support",
+    "deployment",
+    "metadata"
+  ]);
+
   function isPlainObject(value) {
-    return !!value &&
-      typeof value === "object" &&
-      !Array.isArray(value);
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      return false;
+    }
+
+    const proto = Object.getPrototypeOf(value);
+    return proto === Object.prototype || proto === null;
+  }
+
+  function shallowCopyPlainObject(value) {
+    if (!isPlainObject(value)) {
+      return {};
+    }
+
+    return { ...value };
+  }
+
+  function cloneBrandProfile(profile) {
+    const source = isPlainObject(profile) ? profile : HARD_FALLBACK;
+
+    return {
+      key: source.key,
+      productName: source.productName,
+      productNameUpper: source.productNameUpper,
+      subtitle: source.subtitle,
+
+      assets: shallowCopyPlainObject(source.assets),
+      colors: shallowCopyPlainObject(source.colors),
+      pwa: shallowCopyPlainObject(source.pwa),
+      support: shallowCopyPlainObject(source.support),
+      deployment: shallowCopyPlainObject(source.deployment),
+      metadata: shallowCopyPlainObject(source.metadata)
+    };
+  }
+
+  function deepFreezeBrand(profile) {
+    const copy = cloneBrandProfile(profile);
+
+    Object.freeze(copy.assets);
+    Object.freeze(copy.colors);
+    Object.freeze(copy.pwa);
+    Object.freeze(copy.support);
+    Object.freeze(copy.deployment);
+    Object.freeze(copy.metadata);
+
+    return Object.freeze(copy);
   }
 
   function getDefaultBrand() {
@@ -56,15 +116,85 @@
     return HARD_FALLBACK;
   }
 
-  function getBrand() {
+  function isValidOverride(value) {
+    if (!isPlainObject(value)) {
+      return false;
+    }
+
     /*
-     * Step 1 deliberately returns only the existing C.S.V. BEACON
-     * default/fallback profile.
-     *
-     * Deployment-specific overrides will be introduced only in a later,
-     * separately verified step.
+     * Require a non-empty brand key so random global objects cannot
+     * accidentally become deployment branding.
      */
-    return getDefaultBrand();
+    if (typeof value.key !== "string" || !value.key.trim()) {
+      return false;
+    }
+
+    return true;
+  }
+
+  function mergeNestedObject(baseValue, overrideValue) {
+    const base = shallowCopyPlainObject(baseValue);
+
+    if (!isPlainObject(overrideValue)) {
+      return base;
+    }
+
+    return {
+      ...base,
+      ...overrideValue
+    };
+  }
+
+  function mergeBrand(defaultBrand, override) {
+    const base = cloneBrandProfile(defaultBrand);
+
+    if (!isValidOverride(override)) {
+      return deepFreezeBrand(base);
+    }
+
+    for (const key of TOP_LEVEL_OVERRIDE_KEYS) {
+      if (!Object.prototype.hasOwnProperty.call(override, key)) {
+        continue;
+      }
+
+      switch (key) {
+        case "assets":
+        case "colors":
+        case "pwa":
+        case "support":
+        case "deployment":
+        case "metadata":
+          base[key] = mergeNestedObject(base[key], override[key]);
+          break;
+
+        case "key":
+        case "productName":
+        case "productNameUpper":
+        case "subtitle":
+          if (typeof override[key] === "string" && override[key].trim()) {
+            base[key] = override[key];
+          }
+          break;
+
+        default:
+          break;
+      }
+    }
+
+    return deepFreezeBrand(base);
+  }
+
+  function getBrand() {
+    const defaultBrand = getDefaultBrand();
+
+    if (!isValidOverride(window.CSVB_BRAND_OVERRIDE)) {
+      return deepFreezeBrand(defaultBrand);
+    }
+
+    return mergeBrand(
+      defaultBrand,
+      window.CSVB_BRAND_OVERRIDE
+    );
   }
 
   function get(path, fallbackValue) {
@@ -76,12 +206,13 @@
     let current = getBrand();
 
     for (const part of parts) {
-      if (!isPlainObject(current) && typeof current !== "object") {
+      if (current == null ||
+          (typeof current !== "object" &&
+           typeof current !== "function")) {
         return fallbackValue;
       }
 
-      if (current == null ||
-          !Object.prototype.hasOwnProperty.call(current, part)) {
+      if (!Object.prototype.hasOwnProperty.call(current, part)) {
         return fallbackValue;
       }
 
