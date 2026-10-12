@@ -1,0 +1,94 @@
+/* public/csvb-mobile-fixes-20260528-2.css
+   C.S.V. BEACON — targeted mobile fixes.
+   CSS only. No backend/auth/device/offline logic. */
+
+@media (max-width: 760px) {
+  /* SIRE Viewer: dropdown filter panels must expand inside the filter ribbon instead of floating behind lower content. */
+  html[data-csvb-page="q-sire-questions-viewer.html"] .filterRibbon,
+  html[data-csvb-page="q-sire-questions-viewer.html"] #filterRibbon,
+  html[data-csvb-page="q-sire-questions-viewer.html"] .facetWrapRibbon,
+  html[data-csvb-page="q-sire-questions-viewer.html"] .facetWrap {
+    overflow: visible !important;
+  }
+
+  html[data-csvb-page="q-sire-questions-viewer.html"] .facetWrapRibbon {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    align-items: start !important;
+  }
+
+  html[data-csvb-page="q-sire-questions-viewer.html"] details.facet {
+    position: relative !important;
+    display: block !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    z-index: 1 !important;
+  }
+
+  html[data-csvb-page="q-sire-questions-viewer.html"] details.facet[open] {
+    grid-column: 1 / -1 !important;
+    z-index: 50 !important;
+  }
+
+  html[data-csvb-page="q-sire-questions-viewer.html"] details.facet > summary {
+    width: 100% !important;
+    min-height: 44px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+  }
+
+  html[data-csvb-page="q-sire-questions-viewer.html"] .facetBody {
+    position: static !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    margin-top: 8px !important;
+    box-shadow: 0 10px 28px rgba(3, 27, 63, .12) !important;
+  }
+
+  html[data-csvb-page="q-sire-questions-viewer.html"] .facetOptions {
+    max-height: 260px !important;
+  }
+}
+
+@media (max-width: 520px) {
+  html[data-csvb-page="q-sire-questions-viewer.html"] .facetWrapRibbon {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* Post-Inspection Observation Detail: prevent duplicate/stray arrow boxes beside Response Tracking. */
+html[data-csvb-page="post_inspection_observation_detail.html"] .pi-card h2 + .grid-3::before,
+html[data-csvb-page="post_inspection_observation_detail.html"] .pi-card h2 + .grid-3::after,
+html[data-csvb-page="post_inspection_observation_detail.html"] .grid-3::before,
+html[data-csvb-page="post_inspection_observation_detail.html"] .grid-3::after {
+  content: none !important;
+  display: none !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .pi-card:has(#responseStatus) > button:not(.btn),
+html[data-csvb-page="post_inspection_observation_detail.html"] .pi-card:has(#responseStatus) > .toggle,
+html[data-csvb-page="post_inspection_observation_detail.html"] .pi-card:has(#responseStatus) > .toggle-btn,
+html[data-csvb-page="post_inspection_observation_detail.html"] .pi-card:has(#responseStatus) > .collapse-toggle,
+html[data-csvb-page="post_inspection_observation_detail.html"] .pi-card:has(#responseStatus) > .expander,
+html[data-csvb-page="post_inspection_observation_detail.html"] .pi-card:has(#responseStatus) > [aria-expanded] {
+  display: none !important;
+}
+
+@media (max-width: 760px) {
+  html[data-csvb-page="post_inspection_observation_detail.html"] .pi-card:has(#responseStatus) {
+    overflow: visible !important;
+  }
+
+  html[data-csvb-page="post_inspection_observation_detail.html"] .pi-card:has(#responseStatus) .grid-3 {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    gap: 10px !important;
+  }
+
+  html[data-csvb-page="post_inspection_observation_detail.html"] .pi-card:has(#responseStatus) select,
+  html[data-csvb-page="post_inspection_observation_detail.html"] .pi-card:has(#responseStatus) input {
+    width: 100% !important;
+  }
+}

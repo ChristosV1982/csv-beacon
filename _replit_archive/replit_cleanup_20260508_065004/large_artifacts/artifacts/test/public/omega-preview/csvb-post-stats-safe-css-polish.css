@@ -1,0 +1,270 @@
+/* public/csvb-post-stats-safe-css-polish.css
+   C.S.V. BEACON — MC-10D5-S1
+   Safe CSS-only polish for Post-Inspection Stats.
+
+   Rules:
+   - No JS.
+   - No hiding containers.
+   - No chart renderer changes.
+   - Condense spacing.
+   - Use screen width.
+   - Reduce excessive bold.
+   - Keep headers readable.
+*/
+
+/* ------------------------------------------------------------
+   1. Page width and density
+------------------------------------------------------------ */
+
+html[data-csvb-page="post_inspection_stats.html"] body,
+html[data-csvb-page="post_inspection_kpis.html"] body {
+  overflow-x: hidden !important;
+}
+
+html[data-csvb-page="post_inspection_stats.html"] main,
+html[data-csvb-page="post_inspection_stats.html"] .wrap,
+html[data-csvb-page="post_inspection_stats.html"] .container,
+html[data-csvb-page="post_inspection_stats.html"] .page,
+html[data-csvb-page="post_inspection_stats.html"] .content,
+html[data-csvb-page="post_inspection_kpis.html"] main,
+html[data-csvb-page="post_inspection_kpis.html"] .wrap,
+html[data-csvb-page="post_inspection_kpis.html"] .container,
+html[data-csvb-page="post_inspection_kpis.html"] .page,
+html[data-csvb-page="post_inspection_kpis.html"] .content {
+  width: 100% !important;
+  max-width: 100% !important;
+  padding-left: 8px !important;
+  padding-right: 8px !important;
+  box-sizing: border-box !important;
+}
+
+/* ------------------------------------------------------------
+   2. Fonts: reduce excessive bold, keep headers bold
+------------------------------------------------------------ */
+
+html[data-csvb-page="post_inspection_stats.html"] body,
+html[data-csvb-page="post_inspection_stats.html"] td,
+html[data-csvb-page="post_inspection_stats.html"] p,
+html[data-csvb-page="post_inspection_stats.html"] .statSub,
+html[data-csvb-page="post_inspection_stats.html"] .statL,
+html[data-csvb-page="post_inspection_stats.html"] .chartSub,
+html[data-csvb-page="post_inspection_kpis.html"] body,
+html[data-csvb-page="post_inspection_kpis.html"] td,
+html[data-csvb-page="post_inspection_kpis.html"] p {
+  font-weight: 400 !important;
+}
+
+html[data-csvb-page="post_inspection_stats.html"] h1,
+html[data-csvb-page="post_inspection_stats.html"] h2,
+html[data-csvb-page="post_inspection_stats.html"] h3,
+html[data-csvb-page="post_inspection_stats.html"] h4,
+html[data-csvb-page="post_inspection_stats.html"] th,
+html[data-csvb-page="post_inspection_stats.html"] .title,
+html[data-csvb-page="post_inspection_stats.html"] .sectionTitle,
+html[data-csvb-page="post_inspection_stats.html"] .chartTitle,
+html[data-csvb-page="post_inspection_stats.html"] .statV,
+html[data-csvb-page="post_inspection_kpis.html"] h1,
+html[data-csvb-page="post_inspection_kpis.html"] h2,
+html[data-csvb-page="post_inspection_kpis.html"] h3,
+html[data-csvb-page="post_inspection_kpis.html"] th {
+  font-weight: 700 !important;
+}
+
+/* ------------------------------------------------------------
+   3. Panels / information boxes
+------------------------------------------------------------ */
+
+html[data-csvb-page="post_inspection_stats.html"] section,
+html[data-csvb-page="post_inspection_stats.html"] .panel,
+html[data-csvb-page="post_inspection_stats.html"] .card,
+html[data-csvb-page="post_inspection_stats.html"] .box,
+html[data-csvb-page="post_inspection_stats.html"] .chartBox,
+html[data-csvb-page="post_inspection_kpis.html"] section,
+html[data-csvb-page="post_inspection_kpis.html"] .panel,
+html[data-csvb-page="post_inspection_kpis.html"] .card,
+html[data-csvb-page="post_inspection_kpis.html"] .box {
+  width: 100% !important;
+  max-width: 100% !important;
+  padding: 10px !important;
+  border-radius: 12px !important;
+  box-sizing: border-box !important;
+}
+
+/* Reduce vertical gaps between sections */
+html[data-csvb-page="post_inspection_stats.html"] section,
+html[data-csvb-page="post_inspection_stats.html"] .panel,
+html[data-csvb-page="post_inspection_stats.html"] .card {
+  margin-top: 8px !important;
+  margin-bottom: 8px !important;
+}
+
+/* ------------------------------------------------------------
+   4. Filters: compact horizontal layout
+------------------------------------------------------------ */
+
+html[data-csvb-page="post_inspection_stats.html"] .filters,
+html[data-csvb-page="post_inspection_stats.html"] .filterRow,
+html[data-csvb-page="post_inspection_stats.html"] .filterGrid,
+html[data-csvb-page="post_inspection_stats.html"] .row {
+  gap: 8px !important;
+  align-items: end !important;
+}
+
+html[data-csvb-page="post_inspection_stats.html"] .field-small {
+  min-width: 150px !important;
+  flex: 0 1 180px !important;
+}
+
+html[data-csvb-page="post_inspection_stats.html"] input,
+html[data-csvb-page="post_inspection_stats.html"] select,
+html[data-csvb-page="post_inspection_stats.html"] .filterDropBtn,
+html[data-csvb-page="post_inspection_kpis.html"] input,
+html[data-csvb-page="post_inspection_kpis.html"] select {
+  padding: 7px 9px !important;
+  min-height: 34px !important;
+  border-radius: 8px !important;
+  font-size: 0.92rem !important;
+}
+
+/* Multi-select dropdown panels: do not open by CSS; only compact when open */
+html[data-csvb-page="post_inspection_stats.html"] .filterPanel {
+  padding: 8px !important;
+  border-radius: 10px !important;
+  max-height: 320px !important;
+  overflow-y: auto !important;
+}
+
+html[data-csvb-page="post_inspection_stats.html"] .checkPanel label,
+html[data-csvb-page="post_inspection_stats.html"] .filterPanel label {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  padding: 4px 2px !important;
+  font-weight: 400 !important;
+}
+
+/* ------------------------------------------------------------
+   5. Buttons: smaller, grouped, tool-friendly
+------------------------------------------------------------ */
+
+html[data-csvb-page="post_inspection_stats.html"] button,
+html[data-csvb-page="post_inspection_stats.html"] .btn,
+html[data-csvb-page="post_inspection_stats.html"] .miniBtn,
+html[data-csvb-page="post_inspection_kpis.html"] button,
+html[data-csvb-page="post_inspection_kpis.html"] .btn {
+  padding: 6px 10px !important;
+  border-radius: 8px !important;
+  line-height: 1.15 !important;
+  font-weight: 600 !important;
+  white-space: nowrap !important;
+}
+
+html[data-csvb-page="post_inspection_stats.html"] .btn-small {
+  padding: 5px 9px !important;
+  border-radius: 8px !important;
+  font-size: 0.86rem !important;
+}
+
+/* All / None buttons inside dropdowns */
+html[data-csvb-page="post_inspection_stats.html"] .miniBtn {
+  margin-right: 5px !important;
+  margin-bottom: 5px !important;
+}
+
+/* ------------------------------------------------------------
+   6. KPI summary cards
+------------------------------------------------------------ */
+
+html[data-csvb-page="post_inspection_stats.html"] .statBox,
+html[data-csvb-page="post_inspection_stats.html"] .statCard,
+html[data-csvb-page="post_inspection_stats.html"] .kpiBox,
+html[data-csvb-page="post_inspection_kpis.html"] .kpiBox {
+  padding: 10px !important;
+  border-radius: 12px !important;
+  min-height: 0 !important;
+}
+
+html[data-csvb-page="post_inspection_stats.html"] .statV,
+html[data-csvb-page="post_inspection_kpis.html"] .val {
+  font-size: 1.4rem !important;
+  line-height: 1.1 !important;
+}
+
+html[data-csvb-page="post_inspection_stats.html"] .statL,
+html[data-csvb-page="post_inspection_stats.html"] .statSub,
+html[data-csvb-page="post_inspection_kpis.html"] .lbl {
+  line-height: 1.25 !important;
+}
+
+/* ------------------------------------------------------------
+   7. Chart boxes: use horizontal space but stay readable
+------------------------------------------------------------ */
+
+html[data-csvb-page="post_inspection_stats.html"] .chartGrid {
+  gap: 10px !important;
+  width: 100% !important;
+}
+
+html[data-csvb-page="post_inspection_stats.html"] .chartBox {
+  min-width: 0 !important;
+}
+
+html[data-csvb-page="post_inspection_stats.html"] .chartTitle {
+  margin-bottom: 2px !important;
+}
+
+html[data-csvb-page="post_inspection_stats.html"] .chartSub {
+  margin-bottom: 6px !important;
+}
+
+/* ------------------------------------------------------------
+   8. Tables: full width, no vertical wrapping
+------------------------------------------------------------ */
+
+html[data-csvb-page="post_inspection_stats.html"] table,
+html[data-csvb-page="post_inspection_kpis.html"] table {
+  width: 100% !important;
+  min-width: 860px !important;
+  table-layout: auto !important;
+  border-collapse: collapse !important;
+}
+
+html[data-csvb-page="post_inspection_stats.html"] th,
+html[data-csvb-page="post_inspection_stats.html"] td,
+html[data-csvb-page="post_inspection_kpis.html"] th,
+html[data-csvb-page="post_inspection_kpis.html"] td {
+  padding: 6px 7px !important;
+  line-height: 1.25 !important;
+  word-break: normal !important;
+  overflow-wrap: break-word !important;
+  white-space: normal !important;
+  vertical-align: top !important;
+}
+
+html[data-csvb-page="post_inspection_stats.html"] th {
+  white-space: nowrap !important;
+}
+
+/* PGNO table first column wider for full PGNO text */
+html[data-csvb-page="post_inspection_stats.html"] #pgnoTableTbody td:first-child,
+html[data-csvb-page="post_inspection_stats.html"] table:has(#pgnoTableTbody) th:first-child {
+  width: 55% !important;
+}
+
+/* Records column compact */
+html[data-csvb-page="post_inspection_stats.html"] td:last-child,
+html[data-csvb-page="post_inspection_stats.html"] th:last-child {
+  white-space: nowrap !important;
+}
+
+/* ------------------------------------------------------------
+   9. Helper hints should not waste space
+------------------------------------------------------------ */
+
+html[data-csvb-page="post_inspection_stats.html"] .filterNote,
+html[data-csvb-page="post_inspection_stats.html"] .modeNote {
+  padding: 7px 9px !important;
+  border-radius: 10px !important;
+  margin: 6px 0 !important;
+  line-height: 1.25 !important;
+}

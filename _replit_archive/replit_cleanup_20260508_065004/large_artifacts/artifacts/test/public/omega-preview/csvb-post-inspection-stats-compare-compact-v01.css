@@ -1,0 +1,95 @@
+/* public/csvb-post-inspection-stats-compare-compact-v01.css
+   C.S.V. BEACON — Post-Inspection Stats comparison chart compact sizing v01.
+   CSS only. Reduces the comparison chart from full-width to dashboard-card size.
+   No calculations, filters, drilldowns, exports, auth, Supabase, device, grant, or offline logic. */
+
+html body:has(script[src*="post_inspection_stats.js"]) #csvbStatsComparePanelV01 {
+  box-sizing: border-box !important;
+  width: calc((100% - 24px) / 3) !important;
+  max-width: 560px !important;
+  min-width: 360px !important;
+  display: inline-block !important;
+  vertical-align: top !important;
+  margin-top: 12px !important;
+  margin-right: 12px !important;
+  padding: 10px !important;
+}
+
+html body:has(script[src*="post_inspection_stats.js"]) #csvbStatsComparePanelV01 .csvb-stats-compare-v01-head {
+  margin-bottom: 8px !important;
+}
+
+html body:has(script[src*="post_inspection_stats.js"]) #csvbStatsComparePanelV01 .csvb-stats-compare-v01-title {
+  font-size: 0.94rem !important;
+}
+
+html body:has(script[src*="post_inspection_stats.js"]) #csvbStatsComparePanelV01 .csvb-stats-compare-v01-sub {
+  font-size: 0.78rem !important;
+}
+
+html body:has(script[src*="post_inspection_stats.js"]) #csvbStatsComparePanelV01 .csvb-stats-compare-v01-grid {
+  grid-template-columns: 1fr !important;
+  gap: 7px !important;
+}
+
+html body:has(script[src*="post_inspection_stats.js"]) #csvbStatsComparePanelV01 .csvb-stats-compare-v01-field label {
+  font-size: 0.78rem !important;
+  margin-bottom: 3px !important;
+}
+
+html body:has(script[src*="post_inspection_stats.js"]) #csvbStatsComparePanelV01 .csvb-stats-compare-v01-field select {
+  padding: 7px 9px !important;
+  font-size: 0.84rem !important;
+}
+
+html body:has(script[src*="post_inspection_stats.js"]) #csvbStatsComparePanelV01 .csvb-stats-compare-v01-options {
+  margin-top: 8px !important;
+  padding: 7px !important;
+  grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)) !important;
+  max-height: 86px !important;
+}
+
+html body:has(script[src*="post_inspection_stats.js"]) #csvbStatsComparePanelV01 .csvb-stats-compare-v01-check {
+  font-size: 0.78rem !important;
+}
+
+html body:has(script[src*="post_inspection_stats.js"]) #csvbStatsComparePanelV01 .csvb-stats-compare-v01-chart {
+  margin-top: 9px !important;
+  padding: 8px !important;
+}
+
+html body:has(script[src*="post_inspection_stats.js"]) #csvbStatsComparePanelV01 .csvb-stats-compare-v01-chart svg {
+  max-height: 190px !important;
+}
+
+html body:has(script[src*="post_inspection_stats.js"]) #csvbStatsComparePanelV01 .csvb-stats-compare-v01-legend {
+  font-size: 0.76rem !important;
+  gap: 8px !important;
+}
+
+html body:has(script[src*="post_inspection_stats.js"]) #csvbStatsComparePanelV01 .csvb-stats-compare-v01-note {
+  font-size: 0.75rem !important;
+  margin-top: 7px !important;
+}
+
+@media (max-width: 1280px) {
+  html body:has(script[src*="post_inspection_stats.js"]) #csvbStatsComparePanelV01 {
+    width: calc((100% - 14px) / 2) !important;
+    max-width: none !important;
+    min-width: 320px !important;
+  }
+}
+
+@media (max-width: 760px) {
+  html body:has(script[src*="post_inspection_stats.js"]) #csvbStatsComparePanelV01 {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    margin-right: 0 !important;
+    display: block !important;
+  }
+
+  html body:has(script[src*="post_inspection_stats.js"]) #csvbStatsComparePanelV01 .csvb-stats-compare-v01-chart svg {
+    max-height: 210px !important;
+  }
+}

@@ -1,0 +1,262 @@
+/* public/csvb-su-admin-density-polish.css
+   C.S.V. BEACON — SU-1 Superuser Administration density polish
+   CSS-only. Page-specific. No logic changes.
+*/
+
+body.csvb-su-admin-density-page {
+  padding: 8px !important;
+  background: #F4F8FC !important;
+  overflow-x: hidden !important;
+}
+
+/* Use full width */
+body.csvb-su-admin-density-page .wrap,
+body.csvb-su-admin-density-page main,
+body.csvb-su-admin-density-page .container {
+  width: 100% !important;
+  max-width: 100% !important;
+  padding-left: 8px !important;
+  padding-right: 8px !important;
+  box-sizing: border-box !important;
+}
+
+/* Top bars / headers */
+body.csvb-su-admin-density-page .topbar,
+body.csvb-su-admin-density-page header {
+  padding: 8px 10px !important;
+  gap: 8px !important;
+  flex-wrap: wrap !important;
+}
+
+body.csvb-su-admin-density-page .hero,
+body.csvb-su-admin-density-page .appHeader,
+body.csvb-su-admin-density-page .pageHeader {
+  padding: 10px 12px !important;
+  border-radius: 12px !important;
+  margin-bottom: 8px !important;
+}
+
+/* Cards / panels */
+body.csvb-su-admin-density-page .card {
+  padding: 10px !important;
+  border-radius: 12px !important;
+  margin-bottom: 8px !important;
+  box-shadow: 0 8px 20px rgba(3,27,63,.06) !important;
+}
+
+body.csvb-su-admin-density-page .card .card {
+  padding: 9px !important;
+  border-radius: 10px !important;
+  margin-bottom: 8px !important;
+}
+
+/* Reduce excessive bold except section headings */
+body.csvb-su-admin-density-page,
+body.csvb-su-admin-density-page td,
+body.csvb-su-admin-density-page input,
+body.csvb-su-admin-density-page select,
+body.csvb-su-admin-density-page textarea,
+body.csvb-su-admin-density-page .muted,
+body.csvb-su-admin-density-page .small {
+  font-weight: 400 !important;
+}
+
+body.csvb-su-admin-density-page h1,
+body.csvb-su-admin-density-page h2,
+body.csvb-su-admin-density-page h3,
+body.csvb-su-admin-density-page th,
+body.csvb-su-admin-density-page .title,
+body.csvb-su-admin-density-page .assignmentBoxTitle {
+  font-weight: 700 !important;
+}
+
+/* Inline-styled section titles were very heavy */
+body.csvb-su-admin-density-page [style*="font-weight:950"] {
+  font-weight: 700 !important;
+}
+
+/* Layout density */
+body.csvb-su-admin-density-page .row {
+  gap: 8px !important;
+  margin: 6px 0 !important;
+}
+
+body.csvb-su-admin-density-page .grid2,
+body.csvb-su-admin-density-page .grid3,
+body.csvb-su-admin-density-page .assignmentGrid {
+  gap: 8px !important;
+}
+
+body.csvb-su-admin-density-page .companyLayout {
+  gap: 10px !important;
+}
+
+/* Company summary */
+body.csvb-su-admin-density-page .companySummary {
+  gap: 8px !important;
+  margin-top: 8px !important;
+}
+
+body.csvb-su-admin-density-page .summaryBox {
+  padding: 8px 10px !important;
+  border-radius: 10px !important;
+}
+
+body.csvb-su-admin-density-page .summaryBox .n {
+  font-size: 1.25rem !important;
+  line-height: 1.1 !important;
+  font-weight: 700 !important;
+}
+
+body.csvb-su-admin-density-page .summaryBox .t {
+  font-size: .82rem !important;
+  font-weight: 400 !important;
+}
+
+/* Form fields */
+body.csvb-su-admin-density-page .field label,
+body.csvb-su-admin-density-page label {
+  margin-bottom: 4px !important;
+  font-weight: 600 !important;
+  font-size: .9rem !important;
+}
+
+body.csvb-su-admin-density-page input,
+body.csvb-su-admin-density-page select,
+body.csvb-su-admin-density-page textarea {
+  min-height: 34px !important;
+  padding: 6px 9px !important;
+  border-radius: 8px !important;
+  font-size: .92rem !important;
+}
+
+body.csvb-su-admin-density-page textarea {
+  min-height: 66px !important;
+}
+
+/* Buttons */
+body.csvb-su-admin-density-page button,
+body.csvb-su-admin-density-page .btn,
+body.csvb-su-admin-density-page .btn2,
+body.csvb-su-admin-density-page .btnSmall {
+  padding: 6px 10px !important;
+  border-radius: 8px !important;
+  min-height: 31px !important;
+  line-height: 1.15 !important;
+  font-weight: 600 !important;
+  white-space: nowrap !important;
+}
+
+body.csvb-su-admin-density-page .btnSmall {
+  font-size: .86rem !important;
+  padding: 5px 8px !important;
+}
+
+/* Tabs */
+body.csvb-su-admin-density-page .tab,
+body.csvb-su-admin-density-page .csvb-su-tab-iconed {
+  padding: 7px 10px !important;
+  border-radius: 9px !important;
+  gap: 6px !important;
+}
+
+body.csvb-su-admin-density-page .csvb-su-tabbar-polished {
+  padding: 5px 0 !important;
+}
+
+/* Tables */
+body.csvb-su-admin-density-page table {
+  width: 100% !important;
+  border-collapse: collapse !important;
+  table-layout: auto !important;
+  font-size: .9rem !important;
+}
+
+body.csvb-su-admin-density-page th,
+body.csvb-su-admin-density-page td {
+  padding: 6px 7px !important;
+  line-height: 1.25 !important;
+  vertical-align: top !important;
+  word-break: normal !important;
+  overflow-wrap: break-word !important;
+}
+
+body.csvb-su-admin-density-page th {
+  white-space: nowrap !important;
+}
+
+body.csvb-su-admin-density-page td button {
+  margin: 2px 3px 2px 0 !important;
+}
+
+/* Company modules */
+body.csvb-su-admin-density-page #companyModulesBody {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 5px !important;
+}
+
+body.csvb-su-admin-density-page .moduleToggle {
+  padding: 6px 8px !important;
+  border-radius: 9px !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+}
+
+body.csvb-su-admin-density-page .moduleToggle input {
+  width: 14px !important;
+  height: 14px !important;
+  min-width: 14px !important;
+  min-height: 14px !important;
+}
+
+/* Thread privacy card alignment */
+body.csvb-su-admin-density-page #csvbThreadPrivacyCard {
+  margin-top: 8px !important;
+  padding: 9px !important;
+  border-radius: 10px !important;
+  background: #F7FAFE !important;
+}
+
+body.csvb-su-admin-density-page #csvbThreadPrivacyCard .csvb-thread-card-title {
+  font-weight: 700 !important;
+  margin-bottom: 3px !important;
+}
+
+body.csvb-su-admin-density-page #csvbThreadPrivacyCard .csvb-thread-help {
+  font-size: .84rem !important;
+  line-height: 1.25 !important;
+  margin-bottom: 7px !important;
+}
+
+body.csvb-su-admin-density-page #csvbThreadPrivacyCard .csvb-thread-row {
+  gap: 7px !important;
+}
+
+/* Assignment boxes */
+body.csvb-su-admin-density-page .assignmentBox {
+  padding: 9px !important;
+  border-radius: 10px !important;
+}
+
+body.csvb-su-admin-density-page .assignmentHelp {
+  font-size: .84rem !important;
+  line-height: 1.25 !important;
+  margin: 4px 0 8px !important;
+}
+
+/* Debug area less intrusive */
+body.csvb-su-admin-density-page .debugBox {
+  max-height: 220px !important;
+  font-size: .82rem !important;
+}
+
+/* Small screen fallback */
+@media (max-width: 1100px) {
+  body.csvb-su-admin-density-page .companyLayout,
+  body.csvb-su-admin-density-page .grid2,
+  body.csvb-su-admin-density-page .assignmentGrid {
+    grid-template-columns: 1fr !important;
+  }
+}

@@ -1,0 +1,2261 @@
+/*
+  CSV BEACON Design System V01
+  Step 8C-1 pilot.
+
+  Scope:
+  - Only pages that explicitly opt in with html[data-csvb-ds="v01"].
+  - First approved pilot: registered_device.html.
+  - Light theme only for this step.
+  - No application logic.
+  - No dark mode.
+*/
+
+html[data-csvb-ds="v01"]{
+  --csvb-ds-bg: #f4f8fc;
+  --csvb-ds-surface: #ffffff;
+  --csvb-ds-surface-soft: #f7fafe;
+  --csvb-ds-border: #d6e4f5;
+  --csvb-ds-border-strong: #b8d8ea;
+
+  --csvb-ds-navy: #062a5e;
+  --csvb-ds-navy-dark: #031b3f;
+  --csvb-ds-text: #17324d;
+  --csvb-ds-muted: #5e6f86;
+  --csvb-ds-teal: #0097a7;
+  --csvb-ds-teal-soft: #e8f8fa;
+
+  --csvb-ds-ok: #087334;
+  --csvb-ds-warn: #8a5a00;
+  --csvb-ds-err: #9b1c1c;
+
+  --csvb-ds-font: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  --csvb-ds-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  --csvb-ds-page-max: 1420px;
+  --csvb-ds-page-pad: 12px;
+  --csvb-ds-gap: 10px;
+
+  --csvb-ds-radius-sm: 8px;
+  --csvb-ds-radius: 10px;
+  --csvb-ds-radius-lg: 12px;
+  --csvb-ds-radius-xl: 16px;
+
+  --csvb-ds-shadow: 0 8px 22px rgba(3, 27, 63, .07);
+  --csvb-ds-shadow-topbar: 0 8px 22px rgba(3, 27, 63, .16);
+}
+
+html[data-csvb-ds="v01"],
+html[data-csvb-ds="v01"] body{
+  background: var(--csvb-ds-bg) !important;
+  color: var(--csvb-ds-text) !important;
+  font-family: var(--csvb-ds-font) !important;
+  font-size: 14px !important;
+}
+
+html[data-csvb-ds="v01"] .topbar{
+  background: linear-gradient(90deg, var(--csvb-ds-navy-dark), var(--csvb-ds-navy)) !important;
+  color: #ffffff !important;
+  padding: 10px 14px !important;
+  min-height: 56px !important;
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  gap: var(--csvb-ds-gap) !important;
+  flex-wrap: wrap !important;
+  box-shadow: var(--csvb-ds-shadow-topbar) !important;
+}
+
+html[data-csvb-ds="v01"] .brand{
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  font-weight: 700 !important;
+  letter-spacing: .01em !important;
+}
+
+html[data-csvb-ds="v01"] .brand img{
+  width: 34px !important;
+  height: 34px !important;
+  object-fit: contain !important;
+}
+
+html[data-csvb-ds="v01"] .sub{
+  font-size: .78rem !important;
+  color: rgba(255,255,255,.78) !important;
+  font-weight: 500 !important;
+  margin-top: 2px !important;
+}
+
+html[data-csvb-ds="v01"] .row{
+  display: flex !important;
+  gap: 8px !important;
+  align-items: center !important;
+  flex-wrap: wrap !important;
+}
+
+html[data-csvb-ds="v01"] .wrap{
+  width: min(var(--csvb-ds-page-max), calc(100vw - 24px)) !important;
+  margin: 0 auto !important;
+  padding: var(--csvb-ds-page-pad) !important;
+}
+
+html[data-csvb-ds="v01"] .pageTitle,
+html[data-csvb-ds="v01"] .card,
+html[data-csvb-ds="v01"] .panel{
+  background: var(--csvb-ds-surface) !important;
+  color: var(--csvb-ds-text) !important;
+  border: 1px solid var(--csvb-ds-border) !important;
+  border-radius: var(--csvb-ds-radius-lg) !important;
+  box-shadow: var(--csvb-ds-shadow) !important;
+}
+
+html[data-csvb-ds="v01"] .pageTitle{
+  padding: 12px 14px !important;
+  margin-bottom: 12px !important;
+}
+
+html[data-csvb-ds="v01"] .pageTitle h1{
+  margin: 0 !important;
+  color: var(--csvb-ds-navy) !important;
+  font-size: 1.22rem !important;
+  font-weight: 700 !important;
+}
+
+html[data-csvb-ds="v01"] .pageTitle p{
+  margin: 5px 0 0 !important;
+  color: var(--csvb-ds-muted) !important;
+  font-size: .9rem !important;
+  font-weight: 500 !important;
+  line-height: 1.4 !important;
+}
+
+html[data-csvb-ds="v01"] .btn,
+html[data-csvb-ds="v01"] .btn2,
+html[data-csvb-ds="v01"] button,
+html[data-csvb-ds="v01"] a.btn,
+html[data-csvb-ds="v01"] a.btn2{
+  border-radius: var(--csvb-ds-radius) !important;
+  padding: 7px 10px !important;
+  font-size: .88rem !important;
+  font-weight: 600 !important;
+  line-height: 1.2 !important;
+  cursor: pointer !important;
+  text-decoration: none !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 6px !important;
+  border: 1px solid var(--csvb-ds-border-strong) !important;
+  background: var(--csvb-ds-teal-soft) !important;
+  color: var(--csvb-ds-navy) !important;
+}
+
+html[data-csvb-ds="v01"] .btn,
+html[data-csvb-ds="v01"] button.btn{
+  background: var(--csvb-ds-navy) !important;
+  color: #ffffff !important;
+  border-color: var(--csvb-ds-navy) !important;
+}
+
+html[data-csvb-ds="v01"] .btn2,
+html[data-csvb-ds="v01"] button.btn2,
+html[data-csvb-ds="v01"] a.btn2{
+  background: var(--csvb-ds-teal-soft) !important;
+  color: var(--csvb-ds-navy) !important;
+  border-color: var(--csvb-ds-border-strong) !important;
+}
+
+html[data-csvb-ds="v01"] .topbar .btn,
+html[data-csvb-ds="v01"] .topbar .btn2,
+html[data-csvb-ds="v01"] .topbar button,
+html[data-csvb-ds="v01"] .topbar a{
+  min-height: 32px !important;
+}
+
+html[data-csvb-ds="v01"] input,
+html[data-csvb-ds="v01"] select,
+html[data-csvb-ds="v01"] textarea{
+  border: 1px solid var(--csvb-ds-border-strong) !important;
+  border-radius: var(--csvb-ds-radius-sm) !important;
+  background: #ffffff !important;
+  color: var(--csvb-ds-text) !important;
+  padding: 7px 8px !important;
+  font-size: .9rem !important;
+  font-weight: 500 !important;
+  font-family: var(--csvb-ds-font) !important;
+}
+
+html[data-csvb-ds="v01"] table{
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--csvb-ds-surface) !important;
+}
+
+html[data-csvb-ds="v01"] th,
+html[data-csvb-ds="v01"] td{
+  border-bottom: 1px solid #e6eef7 !important;
+  padding: 8px 7px !important;
+  text-align: left !important;
+  vertical-align: middle !important;
+  font-size: .84rem !important;
+}
+
+html[data-csvb-ds="v01"] th{
+  color: var(--csvb-ds-navy) !important;
+  background: var(--csvb-ds-surface-soft) !important;
+  font-weight: 700 !important;
+}
+
+html[data-csvb-ds="v01"] td{
+  color: var(--csvb-ds-text) !important;
+  font-weight: 500 !important;
+}
+
+/* registered_device.html pilot: generated compact component */
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] #csvbRegisteredDeviceCompactRoot{
+  border: 1px solid var(--csvb-ds-border) !important;
+  border-radius: var(--csvb-ds-radius-lg) !important;
+  background: var(--csvb-ds-surface) !important;
+  box-shadow: var(--csvb-ds-shadow) !important;
+  padding: 12px !important;
+  margin-bottom: 12px !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] #csvbRegisteredDeviceCompactRoot .csvb-registered-device-title{
+  color: var(--csvb-ds-navy) !important;
+  font-size: 1rem !important;
+  font-weight: 700 !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] #csvbRegisteredDeviceCompactRoot .csvb-registered-device-note{
+  color: var(--csvb-ds-muted) !important;
+  font-size: .82rem !important;
+  font-weight: 500 !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] #csvbRegisteredDeviceCompactRoot button{
+  border-radius: var(--csvb-ds-radius-sm) !important;
+  padding: 7px 10px !important;
+  font-weight: 600 !important;
+  background: var(--csvb-ds-teal-soft) !important;
+  color: var(--csvb-ds-navy) !important;
+  border: 1px solid var(--csvb-ds-border-strong) !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] #csvbRegisteredDeviceCompactRoot button.primary{
+  background: var(--csvb-ds-navy) !important;
+  color: #ffffff !important;
+  border-color: var(--csvb-ds-navy) !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] #csvbRegisteredDeviceCompactRoot input,
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] #csvbRegisteredDeviceCompactRoot select{
+  font-weight: 500 !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] #csvbRegisteredDeviceCompactRoot .csvb-registered-device-table-wrap{
+  border: 1px solid var(--csvb-ds-border) !important;
+  border-radius: var(--csvb-ds-radius-lg) !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] #csvbRegisteredDeviceCompactRoot th{
+  color: var(--csvb-ds-navy) !important;
+  background: var(--csvb-ds-surface-soft) !important;
+  font-weight: 700 !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] #csvbRegisteredDeviceCompactRoot td{
+  color: var(--csvb-ds-text) !important;
+  font-weight: 500 !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] #csvbRegisteredDeviceCompactRoot .csvb-device-status-pill{
+  font-weight: 700 !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] #csvbRegisteredDeviceCompactRoot .csvb-device-id{
+  font-family: var(--csvb-ds-mono) !important;
+  font-weight: 500 !important;
+}
+
+@media (max-width: 850px){
+  html[data-csvb-ds="v01"] .wrap{
+    width: calc(100vw - 16px) !important;
+    padding: 8px !important;
+  }
+
+  html[data-csvb-ds="v01"] .topbar{
+    padding: 9px 10px !important;
+  }
+
+  html[data-csvb-ds="v01"] .btn,
+  html[data-csvb-ds="v01"] .btn2,
+  html[data-csvb-ds="v01"] button,
+  html[data-csvb-ds="v01"] input,
+  html[data-csvb-ds="v01"] select{
+    min-height: 40px !important;
+  }
+}
+
+/*
+  STEP8C-2 — registered_device.html visual refinement after user review.
+
+  Approved direction:
+  - lighter topbar
+  - less bold controls
+  - smaller button buffer
+  - same-size topbar buttons
+  - quieter / semi-transparent buttons
+*/
+
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"]{
+  --csvb-ds-topbar-a: #0b4f7a;
+  --csvb-ds-topbar-b: #126c93;
+  --csvb-ds-topbar-border: rgba(255,255,255,.18);
+  --csvb-ds-topbar-btn-bg: rgba(255,255,255,.14);
+  --csvb-ds-topbar-btn-bg-hover: rgba(255,255,255,.22);
+  --csvb-ds-topbar-btn-border: rgba(255,255,255,.28);
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] .topbar{
+  background: linear-gradient(90deg, var(--csvb-ds-topbar-a), var(--csvb-ds-topbar-b)) !important;
+  min-height: 48px !important;
+  padding: 7px 12px !important;
+  border-bottom: 1px solid var(--csvb-ds-topbar-border) !important;
+  box-shadow: 0 4px 14px rgba(3, 27, 63, .12) !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] .brand{
+  font-weight: 600 !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] .brand img{
+  width: 30px !important;
+  height: 30px !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] .sub{
+  font-size: .74rem !important;
+  font-weight: 400 !important;
+  opacity: .86 !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] #userBadge{
+  font-weight: 600 !important;
+  opacity: .92 !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] .topbar .btn,
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] .topbar .btn2,
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] .topbar button,
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] .topbar a.btn,
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] .topbar a.btn2{
+  width: 92px !important;
+  min-width: 92px !important;
+  max-width: 92px !important;
+  min-height: 30px !important;
+  padding: 5px 7px !important;
+  border-radius: 8px !important;
+  font-size: .78rem !important;
+  font-weight: 500 !important;
+  line-height: 1.1 !important;
+  background: var(--csvb-ds-topbar-btn-bg) !important;
+  color: #ffffff !important;
+  border: 1px solid var(--csvb-ds-topbar-btn-border) !important;
+  box-shadow: none !important;
+  white-space: nowrap !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] .topbar .btn:hover,
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] .topbar .btn2:hover,
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] .topbar button:hover,
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] .topbar a.btn:hover,
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] .topbar a.btn2:hover{
+  background: var(--csvb-ds-topbar-btn-bg-hover) !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] .pageTitle h1{
+  font-weight: 650 !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] #csvbRegisteredDeviceCompactRoot .csvb-registered-device-title{
+  font-weight: 650 !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] #csvbRegisteredDeviceCompactRoot button{
+  min-height: 32px !important;
+  padding: 6px 9px !important;
+  border-radius: 8px !important;
+  font-size: .84rem !important;
+  font-weight: 500 !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] #csvbRegisteredDeviceCompactRoot button.primary{
+  background: #0b4f7a !important;
+  border-color: #0b4f7a !important;
+  font-weight: 550 !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] #csvbRegisteredDeviceCompactRoot input,
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] #csvbRegisteredDeviceCompactRoot select{
+  min-height: 32px !important;
+  padding: 6px 8px !important;
+  font-size: .84rem !important;
+  font-weight: 500 !important;
+}
+
+/*
+  STEP8C-3 — registered_device.html topbar/button correction after user review.
+
+  Corrections:
+  - remove duplicate global pseudo-logo from the topbar
+  - keep the real logo visible by placing it on a light translucent tile
+  - standardize topbar buttons to the same box size
+  - restore readable 13px button text
+  - reduce padding/buffer
+  - keep button styling quiet/semi-transparent
+*/
+
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] .topbar::before,
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] header.topbar::before{
+  content: none !important;
+  display: none !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] .topbar{
+  min-height: 46px !important;
+  padding: 6px 10px !important;
+  background: linear-gradient(90deg, #0a6a88, #1580a2) !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] .brand{
+  gap: 8px !important;
+  font-weight: 600 !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] .brand img{
+  width: 30px !important;
+  height: 30px !important;
+  padding: 3px !important;
+  border-radius: 8px !important;
+  background: rgba(255,255,255,.82) !important;
+  border: 1px solid rgba(255,255,255,.55) !important;
+  box-shadow: 0 1px 4px rgba(3,27,63,.16) !important;
+  box-sizing: border-box !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] .brand > div > div:first-child{
+  font-size: .94rem !important;
+  font-weight: 650 !important;
+  line-height: 1.1 !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] .sub{
+  font-size: .72rem !important;
+  font-weight: 400 !important;
+  line-height: 1.15 !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] .topbar .row{
+  gap: 6px !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] #userBadge{
+  font-size: .9rem !important;
+  font-weight: 600 !important;
+  margin-right: 4px !important;
+}
+
+/* Equal compact topbar buttons. */
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] .topbar a.btn,
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] .topbar a.btn2,
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] .topbar button.btn,
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] .topbar button.btn2,
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] .topbar #logoutBtn,
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] .topbar #switchUserBtn{
+  box-sizing: border-box !important;
+  width: 88px !important;
+  min-width: 88px !important;
+  max-width: 88px !important;
+  height: 30px !important;
+  min-height: 30px !important;
+  padding: 0 6px !important;
+  border-radius: 8px !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  line-height: 30px !important;
+  text-align: center !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background: rgba(255,255,255,.14) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255,255,255,.32) !important;
+  box-shadow: none !important;
+  white-space: nowrap !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] .topbar a.btn:hover,
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] .topbar a.btn2:hover,
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] .topbar button.btn:hover,
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] .topbar button.btn2:hover,
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] .topbar #logoutBtn:hover,
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] .topbar #switchUserBtn:hover{
+  background: rgba(255,255,255,.24) !important;
+  border-color: rgba(255,255,255,.46) !important;
+}
+
+/*
+  STEP8C-4 — registered_device.html full-width layout and uniform device controls.
+
+  Corrections:
+  - use available screen width
+  - equal control height
+  - readable but not bold control fonts
+  - Check / Request buttons use the same quiet visual style
+  - no excessive buffer inside controls
+*/
+
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"]{
+  --csvb-ds-page-max: none;
+  --csvb-ds-page-pad: 8px;
+  --csvb-ds-control-h: 34px;
+  --csvb-ds-control-font: 13px;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] .wrap{
+  width: calc(100vw - 16px) !important;
+  max-width: none !important;
+  margin: 0 auto !important;
+  padding: 8px !important;
+  box-sizing: border-box !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] .pageTitle,
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] #csvbRegisteredDeviceCompactRoot{
+  width: 100% !important;
+  max-width: none !important;
+  box-sizing: border-box !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] #csvbRegisteredDeviceCompactRoot{
+  padding: 10px !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] #csvbRegisteredDeviceCompactRoot .csvb-registered-device-toolbar{
+  align-items: center !important;
+  gap: 8px !important;
+  margin-bottom: 9px !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] #csvbRegisteredDeviceCompactRoot .csvb-registered-device-controls{
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 6px !important;
+  flex-wrap: nowrap !important;
+  min-width: 0 !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] #csvbRegisteredDeviceCompactStatus{
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  white-space: nowrap !important;
+  margin-right: 2px !important;
+}
+
+/* One height/font standard for generated device controls. */
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] #csvbRegisteredDeviceCompactRoot input,
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] #csvbRegisteredDeviceCompactRoot select,
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] #csvbRegisteredDeviceCompactRoot button{
+  box-sizing: border-box !important;
+  height: var(--csvb-ds-control-h) !important;
+  min-height: var(--csvb-ds-control-h) !important;
+  max-height: var(--csvb-ds-control-h) !important;
+  padding: 0 9px !important;
+  border-radius: 8px !important;
+  font-size: var(--csvb-ds-control-font) !important;
+  font-weight: 500 !important;
+  line-height: var(--csvb-ds-control-h) !important;
+  font-family: var(--csvb-ds-font) !important;
+  box-shadow: none !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] #csvbRegisteredDeviceCompactRoot input{
+  width: 170px !important;
+  min-width: 170px !important;
+  max-width: 170px !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] #csvbRegisteredDeviceCompactRoot select{
+  width: 150px !important;
+  min-width: 150px !important;
+  max-width: 150px !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] #csvbRegisteredDeviceCompactRoot button,
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] #csvbRegisteredDeviceCompactRoot button.primary{
+  width: 76px !important;
+  min-width: 76px !important;
+  max-width: 76px !important;
+  background: rgba(11, 106, 136, .10) !important;
+  color: #064762 !important;
+  border: 1px solid rgba(11, 106, 136, .38) !important;
+  font-weight: 500 !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] #csvbRegisteredDeviceCompactRoot button:hover,
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] #csvbRegisteredDeviceCompactRoot button.primary:hover{
+  background: rgba(11, 106, 136, .18) !important;
+  border-color: rgba(11, 106, 136, .52) !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] #csvbRegisteredDeviceCompactRoot .csvb-registered-device-title{
+  font-size: 1rem !important;
+  font-weight: 650 !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] #csvbRegisteredDeviceCompactRoot .csvb-registered-device-note{
+  font-size: .82rem !important;
+  font-weight: 450 !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] #csvbRegisteredDeviceCompactRoot th{
+  font-weight: 650 !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] #csvbRegisteredDeviceCompactRoot td{
+  font-weight: 450 !important;
+}
+
+/* Keep controls usable on narrow screens without affecting desktop. */
+@media (max-width: 900px){
+  html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] #csvbRegisteredDeviceCompactRoot .csvb-registered-device-controls{
+    flex-wrap: wrap !important;
+    justify-content: flex-start !important;
+  }
+
+  html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] #csvbRegisteredDeviceCompactRoot input,
+  html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] #csvbRegisteredDeviceCompactRoot select{
+    width: 100% !important;
+    max-width: none !important;
+    min-width: 0 !important;
+  }
+}
+
+/*
+  STEP8C-5 — final button standard refinement.
+
+  Approved direction:
+  - buttons readable but not bold
+  - reduced internal buffer
+  - same-size topbar buttons
+  - danger/delete actions: red text/border, not heavy red block
+*/
+
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] .topbar a.btn,
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] .topbar a.btn2,
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] .topbar button.btn,
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] .topbar button.btn2,
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] .topbar #logoutBtn,
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] .topbar #switchUserBtn{
+  width: 84px !important;
+  min-width: 84px !important;
+  max-width: 84px !important;
+  height: 28px !important;
+  min-height: 28px !important;
+  padding: 0 5px !important;
+  line-height: 28px !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] #csvbRegisteredDeviceCompactRoot button,
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] #csvbRegisteredDeviceCompactRoot button.primary{
+  height: 32px !important;
+  min-height: 32px !important;
+  max-height: 32px !important;
+  padding: 0 7px !important;
+  line-height: 32px !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+}
+
+/* Universal danger/delete style for pages opted into design system v01. */
+html[data-csvb-ds="v01"] .btn-danger,
+html[data-csvb-ds="v01"] .btn.danger,
+html[data-csvb-ds="v01"] .btn2.danger,
+html[data-csvb-ds="v01"] button.danger,
+html[data-csvb-ds="v01"] button[data-danger="true"],
+html[data-csvb-ds="v01"] a.danger{
+  background: rgba(155, 28, 28, .06) !important;
+  color: #9b1c1c !important;
+  border: 1px solid rgba(155, 28, 28, .38) !important;
+  font-weight: 500 !important;
+}
+
+html[data-csvb-ds="v01"] .btn-danger:hover,
+html[data-csvb-ds="v01"] .btn.danger:hover,
+html[data-csvb-ds="v01"] .btn2.danger:hover,
+html[data-csvb-ds="v01"] button.danger:hover,
+html[data-csvb-ds="v01"] button[data-danger="true"]:hover,
+html[data-csvb-ds="v01"] a.danger:hover{
+  background: rgba(155, 28, 28, .12) !important;
+  border-color: rgba(155, 28, 28, .55) !important;
+  color: #8b1d1d !important;
+}
+
+/*
+  STEP8C-5 — final button standard refinement.
+
+  Approved direction:
+  - buttons readable but not bold
+  - reduced internal buffer
+  - same-size topbar buttons
+  - danger/delete actions: red text/border, not heavy red block
+*/
+
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] .topbar a.btn,
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] .topbar a.btn2,
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] .topbar button.btn,
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] .topbar button.btn2,
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] .topbar #logoutBtn,
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] .topbar #switchUserBtn{
+  width: 84px !important;
+  min-width: 84px !important;
+  max-width: 84px !important;
+  height: 28px !important;
+  min-height: 28px !important;
+  padding: 0 5px !important;
+  line-height: 28px !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] #csvbRegisteredDeviceCompactRoot button,
+html[data-csvb-ds="v01"][data-csvb-page="registered_device.html"] #csvbRegisteredDeviceCompactRoot button.primary{
+  height: 32px !important;
+  min-height: 32px !important;
+  max-height: 32px !important;
+  padding: 0 7px !important;
+  line-height: 32px !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+}
+
+/* Universal danger/delete style for pages opted into design system v01. */
+html[data-csvb-ds="v01"] .btn-danger,
+html[data-csvb-ds="v01"] .btn.danger,
+html[data-csvb-ds="v01"] .btn2.danger,
+html[data-csvb-ds="v01"] button.danger,
+html[data-csvb-ds="v01"] button[data-danger="true"],
+html[data-csvb-ds="v01"] a.danger{
+  background: rgba(155, 28, 28, .06) !important;
+  color: #9b1c1c !important;
+  border: 1px solid rgba(155, 28, 28, .38) !important;
+  font-weight: 500 !important;
+}
+
+html[data-csvb-ds="v01"] .btn-danger:hover,
+html[data-csvb-ds="v01"] .btn.danger:hover,
+html[data-csvb-ds="v01"] .btn2.danger:hover,
+html[data-csvb-ds="v01"] button.danger:hover,
+html[data-csvb-ds="v01"] button[data-danger="true"]:hover,
+html[data-csvb-ds="v01"] a.danger:hover{
+  background: rgba(155, 28, 28, .12) !important;
+  border-color: rgba(155, 28, 28, .55) !important;
+  color: #8b1d1d !important;
+}
+
+/*
+  STEP8D-2 — login.html design-system pilot.
+
+  Scope:
+  - login.html only
+  - visual styling only
+  - no login/auth/Supabase logic
+  - light-mode pilot only
+*/
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] body.csvb-login-page{
+  min-height: 100vh !important;
+  height: auto !important;
+  margin: 0 !important;
+  padding: 18px 14px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background:
+    radial-gradient(900px 520px at 22% 8%, rgba(21,128,162,.55) 0%, rgba(10,106,136,.32) 34%, rgba(3,27,63,.94) 100%) !important;
+  color: #ffffff !important;
+  font-family: var(--csvb-ds-font) !important;
+  box-sizing: border-box !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .login-shell{
+  width: min(760px, calc(100vw - 28px)) !important;
+  max-width: 760px !important;
+  max-height: none !important;
+  padding: 18px 20px 18px 20px !important;
+  border-radius: 16px !important;
+  background: rgba(12,33,58,.58) !important;
+  border: 1px solid rgba(213,222,239,.34) !important;
+  box-shadow: 0 10px 34px rgba(0,0,0,.32) !important;
+  color: #ffffff !important;
+  backdrop-filter: blur(3px) !important;
+  box-sizing: border-box !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .login-shell > div:first-child{
+  margin-bottom: 10px !important;
+  max-height: 92px !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-brand-logo-full{
+  max-width: 260px !important;
+  max-height: 88px !important;
+  width: auto !important;
+  display: block !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .title{
+  margin: 0 0 8px 0 !important;
+  color: #ffffff !important;
+  font-size: 1.32rem !important;
+  font-weight: 650 !important;
+  letter-spacing: .015em !important;
+  text-align: center !important;
+  text-shadow: 0 2px 8px rgba(0,0,0,.24) !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .subtitle{
+  margin: 0 0 14px 0 !important;
+  color: rgba(255,255,255,.88) !important;
+  font-size: .94rem !important;
+  line-height: 1.32 !important;
+  text-align: center !important;
+  font-weight: 450 !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .subtitle b{
+  font-weight: 600 !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .build{
+  margin-top: 5px !important;
+  font-size: .8rem !important;
+  opacity: .82 !important;
+  font-weight: 450 !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .card{
+  background: #ffffff !important;
+  border: 1px solid var(--csvb-ds-border) !important;
+  border-radius: 12px !important;
+  padding: 14px !important;
+  box-shadow: 0 4px 18px rgba(18,44,87,.14) !important;
+  color: var(--csvb-ds-text) !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] label{
+  display: block !important;
+  margin: 10px 0 5px 0 !important;
+  font-weight: 550 !important;
+  color: var(--csvb-ds-navy) !important;
+  font-size: 13px !important;
+  line-height: 1.2 !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] input{
+  width: 100% !important;
+  box-sizing: border-box !important;
+  height: 36px !important;
+  min-height: 36px !important;
+  padding: 0 9px !important;
+  border-radius: 8px !important;
+  border: 1px solid var(--csvb-ds-border-strong) !important;
+  outline: none !important;
+  font-size: 14px !important;
+  font-weight: 450 !important;
+  line-height: 36px !important;
+  font-family: var(--csvb-ds-font) !important;
+  background: #ffffff !important;
+  color: var(--csvb-ds-text) !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] input:focus{
+  border-color: var(--csvb-ds-teal) !important;
+  box-shadow: 0 0 0 3px rgba(0,151,167,.14) !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .actions{
+  display: flex !important;
+  gap: 8px !important;
+  flex-wrap: wrap !important;
+  align-items: center !important;
+  margin-top: 13px !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .btn-primary,
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .btn-muted,
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .btn-outline{
+  box-sizing: border-box !important;
+  height: 32px !important;
+  min-height: 32px !important;
+  padding: 0 10px !important;
+  border-radius: 8px !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  line-height: 32px !important;
+  cursor: pointer !important;
+  text-decoration: none !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-shadow: none !important;
+  white-space: nowrap !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .btn-primary{
+  min-width: 84px !important;
+  background: rgba(11,106,136,.14) !important;
+  color: #064762 !important;
+  border: 1px solid rgba(11,106,136,.42) !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .btn-muted,
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .btn-outline{
+  min-width: 104px !important;
+  background: rgba(11,106,136,.07) !important;
+  color: #064762 !important;
+  border: 1px solid rgba(11,106,136,.32) !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .btn-primary:hover,
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .btn-muted:hover,
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .btn-outline:hover{
+  background: rgba(11,106,136,.17) !important;
+  border-color: rgba(11,106,136,.52) !important;
+  filter: none !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .error{
+  margin-top: 11px !important;
+  padding: 8px 10px !important;
+  border-radius: 8px !important;
+  border: 1px solid rgba(155,28,28,.32) !important;
+  background: rgba(155,28,28,.06) !important;
+  color: var(--csvb-ds-err) !important;
+  font-weight: 500 !important;
+  font-size: 13px !important;
+  line-height: 1.32 !important;
+  white-space: pre-wrap !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .hint{
+  margin-top: 11px !important;
+  color: var(--csvb-ds-muted) !important;
+  font-size: 13px !important;
+  line-height: 1.34 !important;
+  font-weight: 450 !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .hint b{
+  font-weight: 600 !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .mono{
+  font-family: var(--csvb-ds-mono) !important;
+  font-size: 13px !important;
+  color: #35507b !important;
+  font-weight: 450 !important;
+}
+
+@media (max-width: 700px){
+  html[data-csvb-ds="v01"][data-csvb-page="login.html"] body.csvb-login-page{
+    padding: 10px 8px !important;
+    align-items: flex-start !important;
+  }
+
+  html[data-csvb-ds="v01"][data-csvb-page="login.html"] .login-shell{
+    width: calc(100vw - 16px) !important;
+    padding: 14px !important;
+  }
+
+  html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-brand-logo-full{
+    max-width: 220px !important;
+  }
+
+  html[data-csvb-ds="v01"][data-csvb-page="login.html"] .actions{
+    align-items: stretch !important;
+  }
+
+  html[data-csvb-ds="v01"][data-csvb-page="login.html"] .btn-primary,
+  html[data-csvb-ds="v01"][data-csvb-page="login.html"] .btn-muted,
+  html[data-csvb-ds="v01"][data-csvb-page="login.html"] .btn-outline{
+    flex: 1 1 120px !important;
+  }
+}
+
+/*
+  STEP8D-3 — login.html refinement after browser review.
+
+  Corrections:
+  - reduce heavy logo block
+  - slightly wider / better-proportioned panel
+  - tighter vertical rhythm
+  - standard quiet buttons
+  - visual only; no auth/login logic
+*/
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] body.csvb-login-page{
+  padding: 14px 12px !important;
+  background:
+    radial-gradient(780px 460px at 18% 5%, rgba(174,219,229,.78) 0%, rgba(21,128,162,.40) 33%, rgba(5,48,78,.94) 72%, rgba(3,27,63,.98) 100%) !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .login-shell{
+  width: min(860px, calc(100vw - 32px)) !important;
+  max-width: 860px !important;
+  padding: 16px 18px 16px 18px !important;
+  border-radius: 14px !important;
+  background: rgba(12,33,58,.50) !important;
+  border: 1px solid rgba(213,222,239,.30) !important;
+  box-shadow: 0 8px 28px rgba(0,0,0,.28) !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .login-shell > div:first-child{
+  margin-bottom: 6px !important;
+  max-height: 72px !important;
+}
+
+/*
+  The source logo image has a white rectangular field.
+  Use multiply blending to reduce the hard white box while keeping the mark visible.
+*/
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-brand-logo-full{
+  max-width: 230px !important;
+  max-height: 70px !important;
+  mix-blend-mode: multiply !important;
+  opacity: .92 !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .title{
+  margin: 0 0 5px 0 !important;
+  font-size: 1.24rem !important;
+  font-weight: 600 !important;
+  letter-spacing: .01em !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .subtitle{
+  margin: 0 0 11px 0 !important;
+  font-size: .9rem !important;
+  line-height: 1.28 !important;
+  font-weight: 430 !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .build{
+  margin-top: 4px !important;
+  font-size: .76rem !important;
+  font-weight: 430 !important;
+  opacity: .78 !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .card{
+  padding: 13px 14px !important;
+  border-radius: 12px !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] label{
+  margin: 9px 0 4px 0 !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] input{
+  height: 34px !important;
+  min-height: 34px !important;
+  line-height: 34px !important;
+  padding: 0 8px !important;
+  font-size: 14px !important;
+  font-weight: 430 !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .actions{
+  gap: 7px !important;
+  margin-top: 11px !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .btn-primary,
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .btn-muted,
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .btn-outline{
+  height: 30px !important;
+  min-height: 30px !important;
+  line-height: 30px !important;
+  padding: 0 9px !important;
+  border-radius: 8px !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .btn-primary{
+  min-width: 78px !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .btn-muted{
+  min-width: 78px !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .btn-outline{
+  min-width: 112px !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .hint{
+  margin-top: 10px !important;
+  font-size: 13px !important;
+  line-height: 1.3 !important;
+  font-weight: 430 !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .mono{
+  font-size: 13px !important;
+  font-weight: 430 !important;
+}
+
+@media (max-width: 700px){
+  html[data-csvb-ds="v01"][data-csvb-page="login.html"] .login-shell{
+    width: calc(100vw - 16px) !important;
+    padding: 13px !important;
+  }
+
+  html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-brand-logo-full{
+    max-width: 210px !important;
+    max-height: 66px !important;
+  }
+}
+
+/*
+  STEP8D-4 — login logo background integration.
+
+  User-approved intent:
+  - larger / bolder logo presence
+  - logo should be incorporated into the overall background
+  - no separate badge-like feeling
+  - all other login visuals remain as already approved
+  - visual only; no login/auth logic
+*/
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .login-shell{
+  position: relative !important;
+  overflow: hidden !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .login-shell > div:first-child{
+  position: relative !important;
+  min-height: 150px !important;
+  padding-top: 18px !important;
+  padding-bottom: 10px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+}
+
+/* Turn the existing logo into a large integrated background mark */
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-brand-logo-full{
+  position: absolute !important;
+  left: 50% !important;
+  top: 4px !important;
+  transform: translateX(-50%) !important;
+  width: min(430px, 72%) !important;
+  max-width: 430px !important;
+  max-height: none !important;
+  height: auto !important;
+  opacity: 0.14 !important;
+  mix-blend-mode: screen !important;
+  filter: contrast(1.05) brightness(1.08) saturate(0.92) !important;
+  pointer-events: none !important;
+  z-index: 0 !important;
+}
+
+/* Keep text above the integrated logo */
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .title,
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .subtitle,
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .build{
+  position: relative !important;
+  z-index: 1 !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .title{
+  margin-top: 0 !important;
+}
+
+@media (max-width: 700px){
+  html[data-csvb-ds="v01"][data-csvb-page="login.html"] .login-shell > div:first-child{
+    min-height: 132px !important;
+    padding-top: 14px !important;
+  }
+
+  html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-brand-logo-full{
+    width: min(340px, 80%) !important;
+    max-width: 340px !important;
+    top: 6px !important;
+    opacity: 0.16 !important;
+  }
+}
+
+/*
+  STEP8D-5 — login transparent logo asset.
+
+  Correction:
+  - replace white-background logo with generated transparent-background logo
+  - make logo larger and bolder
+  - remove separate badge/background feeling
+  - keep the rest of the approved login layout unchanged
+  - visual only; no login/auth logic
+*/
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .login-shell > div:first-child{
+  min-height: auto !important;
+  max-height: none !important;
+  padding-top: 2px !important;
+  padding-bottom: 6px !important;
+  margin-bottom: 4px !important;
+  display: block !important;
+  text-align: center !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-brand-logo-full{
+  position: static !important;
+  left: auto !important;
+  top: auto !important;
+  transform: none !important;
+  width: min(380px, 74%) !important;
+  max-width: 380px !important;
+  max-height: 120px !important;
+  height: auto !important;
+  display: block !important;
+  margin: 0 auto 4px auto !important;
+  opacity: 1 !important;
+  mix-blend-mode: normal !important;
+  filter: drop-shadow(0 4px 12px rgba(0,0,0,.22)) contrast(1.04) saturate(1.04) !important;
+  pointer-events: auto !important;
+  z-index: auto !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .title{
+  margin-top: 0 !important;
+}
+
+@media (max-width: 700px){
+  html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-brand-logo-full{
+    width: min(300px, 82%) !important;
+    max-width: 300px !important;
+    max-height: 100px !important;
+  }
+}
+
+/*
+  STEP8D-6 — login transparent logo visibility refinement.
+
+  Correction:
+  - keep transparent logo asset
+  - remove hard white badge/rectangle
+  - improve contrast with a soft integrated light field
+  - make the logo larger and clearer
+  - visual only; no login/auth logic
+*/
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .login-shell{
+  background:
+    linear-gradient(180deg, rgba(186,224,232,.13) 0%, rgba(12,33,58,.50) 34%, rgba(12,33,58,.50) 100%) !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .login-shell > div:first-child{
+  position: relative !important;
+  overflow: visible !important;
+  min-height: auto !important;
+  max-height: none !important;
+  padding: 10px 0 8px 0 !important;
+  margin-bottom: 4px !important;
+  display: block !important;
+  text-align: center !important;
+  isolation: isolate !important;
+}
+
+/* Soft glow behind logo: not a separate badge, only an integrated contrast field. */
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .login-shell > div:first-child::before{
+  content: "" !important;
+  position: absolute !important;
+  left: 50% !important;
+  top: 50% !important;
+  width: min(560px, 86%) !important;
+  height: 145px !important;
+  transform: translate(-50%, -52%) !important;
+  background:
+    radial-gradient(ellipse at center,
+      rgba(211,244,249,.38) 0%,
+      rgba(174,224,233,.24) 34%,
+      rgba(174,224,233,.10) 56%,
+      rgba(174,224,233,0) 76%) !important;
+  border: 0 !important;
+  border-radius: 999px !important;
+  filter: blur(.2px) !important;
+  z-index: -1 !important;
+  pointer-events: none !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-brand-logo-full{
+  position: static !important;
+  width: min(500px, 78%) !important;
+  max-width: 500px !important;
+  max-height: 150px !important;
+  height: auto !important;
+  display: block !important;
+  margin: 0 auto 4px auto !important;
+  opacity: 1 !important;
+  mix-blend-mode: normal !important;
+  filter:
+    drop-shadow(0 2px 5px rgba(255,255,255,.25))
+    drop-shadow(0 7px 16px rgba(0,0,0,.36))
+    brightness(1.12)
+    contrast(1.16)
+    saturate(1.10) !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  z-index: 1 !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .title{
+  margin-top: 0 !important;
+  text-shadow: 0 2px 8px rgba(0,0,0,.34) !important;
+}
+
+@media (max-width: 700px){
+  html[data-csvb-ds="v01"][data-csvb-page="login.html"] .login-shell > div:first-child::before{
+    width: min(410px, 90%) !important;
+    height: 118px !important;
+  }
+
+  html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-brand-logo-full{
+    width: min(340px, 84%) !important;
+    max-width: 340px !important;
+    max-height: 112px !important;
+  }
+}
+
+/*
+  STEP8D-7 — login logo refinement
+  Approved corrections:
+  - reduce white/over-bright effect between letters
+  - make the integrated light field a bit stronger
+  - visual only
+*/
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .login-shell > div:first-child::before{
+  width: min(620px, 90%) !important;
+  height: 165px !important;
+  transform: translate(-50%, -52%) !important;
+  background:
+    radial-gradient(
+      ellipse at center,
+      rgba(214,244,249,.52) 0%,
+      rgba(186,231,240,.34) 30%,
+      rgba(154,214,226,.18) 52%,
+      rgba(154,214,226,.06) 68%,
+      rgba(154,214,226,0) 82%
+    ) !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-brand-logo-full{
+  width: min(520px, 80%) !important;
+  max-width: 520px !important;
+  max-height: 156px !important;
+
+  /*
+    Reduce the white "splitting" / over-glow effect in the letters,
+    while keeping the logo visible on the dark background.
+  */
+  filter:
+    drop-shadow(0 1px 2px rgba(255,255,255,.10))
+    drop-shadow(0 4px 10px rgba(0,0,0,.30))
+    brightness(1.04)
+    contrast(1.08)
+    saturate(1.06) !important;
+}
+
+@media (max-width: 700px){
+  html[data-csvb-ds="v01"][data-csvb-page="login.html"] .login-shell > div:first-child::before{
+    width: min(440px, 92%) !important;
+    height: 126px !important;
+  }
+
+  html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-brand-logo-full{
+    width: min(360px, 86%) !important;
+    max-width: 360px !important;
+    max-height: 116px !important;
+  }
+}
+
+/*
+  STEP8D-7 — login logo refinement
+  Approved corrections:
+  - reduce white/over-bright effect between letters
+  - make the integrated light field a bit stronger
+  - visual only
+*/
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .login-shell > div:first-child::before{
+  width: min(620px, 90%) !important;
+  height: 165px !important;
+  transform: translate(-50%, -52%) !important;
+  background:
+    radial-gradient(
+      ellipse at center,
+      rgba(214,244,249,.52) 0%,
+      rgba(186,231,240,.34) 30%,
+      rgba(154,214,226,.18) 52%,
+      rgba(154,214,226,.06) 68%,
+      rgba(154,214,226,0) 82%
+    ) !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-brand-logo-full{
+  width: min(520px, 80%) !important;
+  max-width: 520px !important;
+  max-height: 156px !important;
+
+  /*
+    Reduce the white "splitting" / over-glow effect in the letters,
+    while keeping the logo visible on the dark background.
+  */
+  filter:
+    drop-shadow(0 1px 2px rgba(255,255,255,.10))
+    drop-shadow(0 4px 10px rgba(0,0,0,.30))
+    brightness(1.04)
+    contrast(1.08)
+    saturate(1.06) !important;
+}
+
+@media (max-width: 700px){
+  html[data-csvb-ds="v01"][data-csvb-page="login.html"] .login-shell > div:first-child::before{
+    width: min(440px, 92%) !important;
+    height: 126px !important;
+  }
+
+  html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-brand-logo-full{
+    width: min(360px, 86%) !important;
+    max-width: 360px !important;
+    max-height: 116px !important;
+  }
+}
+
+/*
+  STEP8D-8 — login-optimized transparent logo.
+
+  Correction:
+  - use login-specific transparent logo with reduced white glare
+  - built-in subtitle colour improved in asset
+  - keep soft integrated light field
+  - visual only; no login/auth logic
+*/
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .login-shell > div:first-child::before{
+  width: min(640px, 92%) !important;
+  height: 168px !important;
+  background:
+    radial-gradient(
+      ellipse at center,
+      rgba(218,248,252,.58) 0%,
+      rgba(186,233,241,.40) 30%,
+      rgba(132,205,222,.22) 54%,
+      rgba(132,205,222,.08) 70%,
+      rgba(132,205,222,0) 84%
+    ) !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-brand-logo-full{
+  width: min(520px, 80%) !important;
+  max-width: 520px !important;
+  max-height: 156px !important;
+  filter:
+    drop-shadow(0 4px 11px rgba(0,0,0,.28))
+    contrast(1.06)
+    saturate(1.04)
+    brightness(1.02) !important;
+}
+
+/*
+  STEP8D-9 — approved login logo asset.
+
+  Final login-logo direction:
+  - use login-only approved transparent logo asset
+  - all C.S.V. BEACON letters are consistent dark navy
+  - Marine Assurance & Compliance Platform is normal white
+  - no hard white rectangle
+  - soft integrated light field remains
+  - visual only; no login/auth logic
+*/
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .login-shell > div:first-child{
+  position: relative !important;
+  overflow: visible !important;
+  min-height: auto !important;
+  max-height: none !important;
+  padding: 10px 0 8px 0 !important;
+  margin-bottom: 4px !important;
+  display: block !important;
+  text-align: center !important;
+  isolation: isolate !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .login-shell > div:first-child::before{
+  content: "" !important;
+  position: absolute !important;
+  left: 50% !important;
+  top: 50% !important;
+  width: min(640px, 92%) !important;
+  height: 168px !important;
+  transform: translate(-50%, -52%) !important;
+  background:
+    radial-gradient(
+      ellipse at center,
+      rgba(218,248,252,.58) 0%,
+      rgba(186,233,241,.40) 30%,
+      rgba(132,205,222,.22) 54%,
+      rgba(132,205,222,.08) 70%,
+      rgba(132,205,222,0) 84%
+    ) !important;
+  border-radius: 999px !important;
+  z-index: -1 !important;
+  pointer-events: none !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-brand-logo-full{
+  position: static !important;
+  left: auto !important;
+  top: auto !important;
+  transform: none !important;
+  width: min(520px, 80%) !important;
+  max-width: 520px !important;
+  max-height: 156px !important;
+  height: auto !important;
+  display: block !important;
+  margin: 0 auto 4px auto !important;
+  opacity: 1 !important;
+  mix-blend-mode: normal !important;
+  filter: drop-shadow(0 4px 11px rgba(0,0,0,.28)) !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  z-index: 1 !important;
+}
+
+@media (max-width: 700px){
+  html[data-csvb-ds="v01"][data-csvb-page="login.html"] .login-shell > div:first-child::before{
+    width: min(440px, 92%) !important;
+    height: 126px !important;
+  }
+
+  html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-brand-logo-full{
+    width: min(360px, 86%) !important;
+    max-width: 360px !important;
+    max-height: 116px !important;
+  }
+}
+
+/*
+  STEP8D-10 — login brand rebuilt with icon image + real text.
+
+  Correction:
+  - stop using raster text for C.S.V. BEACON
+  - use icon-only transparent image
+  - render C.S.V. BEACON as real browser text so all letters match
+  - render Marine Assurance & Compliance Platform as normal white text
+  - visual only; no login/auth logic
+*/
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-login-brand-hero{
+  position: relative !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 18px !important;
+  min-height: 154px !important;
+  padding: 10px 0 8px 0 !important;
+  margin: 0 auto 4px auto !important;
+  text-align: left !important;
+  isolation: isolate !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-login-brand-hero::before{
+  content: "" !important;
+  position: absolute !important;
+  left: 50% !important;
+  top: 50% !important;
+  width: min(650px, 92%) !important;
+  height: 168px !important;
+  transform: translate(-50%, -52%) !important;
+  background:
+    radial-gradient(
+      ellipse at center,
+      rgba(218,248,252,.58) 0%,
+      rgba(186,233,241,.40) 30%,
+      rgba(132,205,222,.22) 54%,
+      rgba(132,205,222,.08) 70%,
+      rgba(132,205,222,0) 84%
+    ) !important;
+  border-radius: 999px !important;
+  z-index: -1 !important;
+  pointer-events: none !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-login-brand-icon{
+  width: 136px !important;
+  max-width: 136px !important;
+  height: auto !important;
+  display: block !important;
+  filter: drop-shadow(0 4px 10px rgba(0,0,0,.28)) !important;
+  flex: 0 0 auto !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-login-brand-copy{
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  min-width: 0 !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-login-brand-main{
+  color: #00184e !important;
+  font-family: var(--csvb-ds-font) !important;
+  font-size: clamp(2rem, 4.2vw, 3.55rem) !important;
+  line-height: .98 !important;
+  font-weight: 800 !important;
+  letter-spacing: .055em !important;
+  white-space: nowrap !important;
+  text-shadow: 0 2px 7px rgba(255,255,255,.16), 0 4px 12px rgba(0,0,0,.18) !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-login-brand-subline{
+  margin-top: 10px !important;
+  color: #ffffff !important;
+  font-family: var(--csvb-ds-font) !important;
+  font-size: clamp(.95rem, 1.45vw, 1.25rem) !important;
+  line-height: 1.15 !important;
+  font-weight: 600 !important;
+  letter-spacing: .012em !important;
+  white-space: nowrap !important;
+  text-shadow: 0 2px 8px rgba(0,0,0,.36) !important;
+}
+
+/* Prevent old experimental full-logo rules from affecting the new brand block. */
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-login-brand-hero .csvb-brand-logo-full{
+  display: none !important;
+}
+
+@media (max-width: 700px){
+  html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-login-brand-hero{
+    flex-direction: column !important;
+    gap: 8px !important;
+    min-height: auto !important;
+    padding: 8px 0 10px 0 !important;
+    text-align: center !important;
+  }
+
+  html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-login-brand-icon{
+    width: 118px !important;
+    max-width: 118px !important;
+  }
+
+  html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-login-brand-main{
+    font-size: 2rem !important;
+    white-space: normal !important;
+    text-align: center !important;
+  }
+
+  html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-login-brand-subline{
+    font-size: .95rem !important;
+    white-space: normal !important;
+    text-align: center !important;
+  }
+}
+
+/*
+  STEP8D-11 — login brand text centering and font refinement.
+
+  Corrections:
+  - reduce heavy/bold appearance of C.S.V. BEACON
+  - center the text group over the soft light glow
+  - keep real browser text so all BEACON letters match
+  - keep subtitle normal white
+  - visual only; no login/auth logic
+*/
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-login-brand-hero{
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 16px !important;
+  width: min(650px, 92%) !important;
+  min-height: 150px !important;
+  margin: 0 auto 6px auto !important;
+  padding: 8px 0 8px 0 !important;
+  text-align: center !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-login-brand-hero::before{
+  left: 50% !important;
+  top: 50% !important;
+  width: min(660px, 100%) !important;
+  height: 160px !important;
+  transform: translate(-50%, -50%) !important;
+  background:
+    radial-gradient(
+      ellipse at center,
+      rgba(218,248,252,.62) 0%,
+      rgba(186,233,241,.43) 28%,
+      rgba(132,205,222,.24) 54%,
+      rgba(132,205,222,.09) 72%,
+      rgba(132,205,222,0) 86%
+    ) !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-login-brand-icon{
+  width: 126px !important;
+  max-width: 126px !important;
+  margin: 0 !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-login-brand-copy{
+  align-items: flex-start !important;
+  justify-content: center !important;
+  text-align: left !important;
+  transform: translateY(-1px) !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-login-brand-main{
+  color: #00184e !important;
+  font-size: clamp(1.85rem, 3.55vw, 3.05rem) !important;
+  line-height: 1.02 !important;
+  font-weight: 650 !important;
+  letter-spacing: .06em !important;
+  text-shadow:
+    0 1px 3px rgba(255,255,255,.16),
+    0 3px 9px rgba(0,0,0,.18) !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-login-brand-subline{
+  margin-top: 7px !important;
+  color: #ffffff !important;
+  font-size: clamp(.9rem, 1.25vw, 1.08rem) !important;
+  line-height: 1.15 !important;
+  font-weight: 500 !important;
+  letter-spacing: .01em !important;
+  text-shadow: 0 2px 8px rgba(0,0,0,.36) !important;
+}
+
+@media (max-width: 700px){
+  html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-login-brand-hero{
+    flex-direction: column !important;
+    gap: 8px !important;
+    width: 100% !important;
+    min-height: auto !important;
+    text-align: center !important;
+  }
+
+  html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-login-brand-copy{
+    align-items: center !important;
+    text-align: center !important;
+    transform: none !important;
+  }
+
+  html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-login-brand-main{
+    font-size: 1.85rem !important;
+    font-weight: 650 !important;
+    white-space: normal !important;
+  }
+
+  html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-login-brand-subline{
+    font-size: .92rem !important;
+    white-space: normal !important;
+  }
+}
+
+/*
+  STEP8D-12 — login brand horizontal alignment.
+
+  Correction:
+  - keep lighthouse/icon and text at the same visual level
+  - prevent medium-width browser windows from stacking the text below the icon
+  - preserve the approved font weight
+  - keep subtitle white
+  - visual only; no login/auth logic
+*/
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-login-brand-hero{
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 18px !important;
+  width: min(700px, 94%) !important;
+  min-height: 142px !important;
+  margin: 0 auto 6px auto !important;
+  padding: 8px 0 8px 0 !important;
+  text-align: left !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-login-brand-hero::before{
+  width: min(690px, 100%) !important;
+  height: 154px !important;
+  transform: translate(-50%, -50%) !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-login-brand-icon{
+  width: 132px !important;
+  max-width: 132px !important;
+  flex: 0 0 132px !important;
+  margin: 0 !important;
+  align-self: center !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-login-brand-copy{
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  justify-content: center !important;
+  text-align: left !important;
+  transform: translateY(2px) !important;
+  min-width: 0 !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-login-brand-main{
+  font-size: clamp(1.95rem, 3.3vw, 3rem) !important;
+  font-weight: 650 !important;
+  line-height: 1 !important;
+  letter-spacing: .055em !important;
+  white-space: nowrap !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-login-brand-subline{
+  margin-top: 7px !important;
+  color: #ffffff !important;
+  font-size: clamp(.9rem, 1.18vw, 1.05rem) !important;
+  font-weight: 500 !important;
+  white-space: nowrap !important;
+}
+
+/*
+  Override the previous <=700px column rule.
+  Keep row layout also on medium-width browser windows.
+*/
+@media (max-width: 700px){
+  html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-login-brand-hero{
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 12px !important;
+    width: 100% !important;
+    min-height: 120px !important;
+    text-align: left !important;
+  }
+
+  html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-login-brand-icon{
+    width: 92px !important;
+    max-width: 92px !important;
+    flex: 0 0 92px !important;
+  }
+
+  html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-login-brand-copy{
+    align-items: flex-start !important;
+    text-align: left !important;
+    transform: translateY(1px) !important;
+  }
+
+  html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-login-brand-main{
+    font-size: 1.72rem !important;
+    font-weight: 650 !important;
+    white-space: nowrap !important;
+  }
+
+  html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-login-brand-subline{
+    font-size: .82rem !important;
+    white-space: nowrap !important;
+  }
+}
+
+/*
+  Only very narrow phone screens may stack.
+*/
+@media (max-width: 480px){
+  html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-login-brand-hero{
+    flex-direction: column !important;
+    gap: 8px !important;
+    text-align: center !important;
+  }
+
+  html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-login-brand-copy{
+    align-items: center !important;
+    text-align: center !important;
+  }
+
+  html[data-csvb-ds="v01"][data-csvb-page="login.html"] .csvb-login-brand-subline{
+    white-space: normal !important;
+  }
+}
+
+/*
+  STEP8D-13 — final login brand grid override.
+
+  Correction:
+  - force lighthouse and text to remain side-by-side
+  - override all earlier flex / stacked logo rules
+  - keep C.S.V. BEACON as real text
+  - keep subtitle white
+  - visual only; no login/auth logic
+*/
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] body.csvb-login-page .login-shell .csvb-login-brand-hero{
+  display: grid !important;
+  grid-template-columns: 150px minmax(0, 1fr) !important;
+  grid-template-rows: auto !important;
+  column-gap: 18px !important;
+  row-gap: 0 !important;
+  align-items: center !important;
+  justify-items: start !important;
+  justify-content: center !important;
+  width: min(720px, 94%) !important;
+  min-height: 142px !important;
+  max-height: none !important;
+  margin: 0 auto 8px auto !important;
+  padding: 8px 0 8px 0 !important;
+  text-align: left !important;
+  overflow: visible !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] body.csvb-login-page .login-shell .csvb-login-brand-hero::before{
+  content: "" !important;
+  position: absolute !important;
+  left: 50% !important;
+  top: 50% !important;
+  width: min(560px, 82%) !important;
+  height: 128px !important;
+  transform: translate(-50%, -50%) !important;
+  background:
+    radial-gradient(
+      ellipse at center,
+      rgba(218,248,252,.62) 0%,
+      rgba(186,233,241,.43) 28%,
+      rgba(132,205,222,.24) 54%,
+      rgba(132,205,222,.09) 72%,
+      rgba(132,205,222,0) 86%
+    ) !important;
+  border-radius: 999px !important;
+  z-index: -1 !important;
+  pointer-events: none !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] body.csvb-login-page .login-shell .csvb-login-brand-icon{
+  grid-column: 1 !important;
+  grid-row: 1 !important;
+  width: 150px !important;
+  max-width: 150px !important;
+  height: auto !important;
+  display: block !important;
+  align-self: center !important;
+  justify-self: end !important;
+  margin: 0 !important;
+  flex: none !important;
+  transform: none !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] body.csvb-login-page .login-shell .csvb-login-brand-copy{
+  grid-column: 2 !important;
+  grid-row: 1 !important;
+  display: block !important;
+  align-self: center !important;
+  justify-self: start !important;
+  text-align: left !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  transform: none !important;
+  min-width: 0 !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] body.csvb-login-page .login-shell .csvb-login-brand-main{
+  display: block !important;
+  color: #00184e !important;
+  font-size: clamp(2.05rem, 3.6vw, 3.05rem) !important;
+  line-height: 1 !important;
+  font-weight: 650 !important;
+  letter-spacing: .055em !important;
+  white-space: nowrap !important;
+  text-align: left !important;
+  margin: 0 !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] body.csvb-login-page .login-shell .csvb-login-brand-subline{
+  display: block !important;
+  margin: 8px 0 0 0 !important;
+  color: #ffffff !important;
+  font-size: clamp(.9rem, 1.18vw, 1.05rem) !important;
+  line-height: 1.15 !important;
+  font-weight: 500 !important;
+  letter-spacing: .01em !important;
+  white-space: nowrap !important;
+  text-align: left !important;
+}
+
+@media (max-width: 700px){
+  html[data-csvb-ds="v01"][data-csvb-page="login.html"] body.csvb-login-page .login-shell .csvb-login-brand-hero{
+    grid-template-columns: 112px minmax(0, 1fr) !important;
+    column-gap: 12px !important;
+    width: 100% !important;
+    min-height: 112px !important;
+  }
+
+  html[data-csvb-ds="v01"][data-csvb-page="login.html"] body.csvb-login-page .login-shell .csvb-login-brand-icon{
+    width: 112px !important;
+    max-width: 112px !important;
+  }
+
+  html[data-csvb-ds="v01"][data-csvb-page="login.html"] body.csvb-login-page .login-shell .csvb-login-brand-main{
+    font-size: 1.82rem !important;
+    white-space: nowrap !important;
+  }
+
+  html[data-csvb-ds="v01"][data-csvb-page="login.html"] body.csvb-login-page .login-shell .csvb-login-brand-subline{
+    font-size: .82rem !important;
+    white-space: nowrap !important;
+  }
+}
+
+/* Only narrow phones may stack. */
+@media (max-width: 440px){
+  html[data-csvb-ds="v01"][data-csvb-page="login.html"] body.csvb-login-page .login-shell .csvb-login-brand-hero{
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 8px !important;
+    text-align: center !important;
+  }
+
+  html[data-csvb-ds="v01"][data-csvb-page="login.html"] body.csvb-login-page .login-shell .csvb-login-brand-icon{
+    width: 110px !important;
+    max-width: 110px !important;
+    justify-self: center !important;
+  }
+
+  html[data-csvb-ds="v01"][data-csvb-page="login.html"] body.csvb-login-page .login-shell .csvb-login-brand-copy,
+  html[data-csvb-ds="v01"][data-csvb-page="login.html"] body.csvb-login-page .login-shell .csvb-login-brand-main,
+  html[data-csvb-ds="v01"][data-csvb-page="login.html"] body.csvb-login-page .login-shell .csvb-login-brand-subline{
+    text-align: center !important;
+    white-space: normal !important;
+  }
+}
+
+/*
+  STEP8D-13 — final login brand grid override.
+
+  Correction:
+  - force lighthouse and text to remain side-by-side
+  - override all earlier flex / stacked logo rules
+  - keep C.S.V. BEACON as real text
+  - keep subtitle white
+  - visual only; no login/auth logic
+*/
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] body.csvb-login-page .login-shell .csvb-login-brand-hero{
+  display: grid !important;
+  grid-template-columns: 150px minmax(0, 1fr) !important;
+  grid-template-rows: auto !important;
+  column-gap: 18px !important;
+  row-gap: 0 !important;
+  align-items: center !important;
+  justify-items: start !important;
+  justify-content: center !important;
+  width: min(720px, 94%) !important;
+  min-height: 142px !important;
+  max-height: none !important;
+  margin: 0 auto 8px auto !important;
+  padding: 8px 0 8px 0 !important;
+  text-align: left !important;
+  overflow: visible !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] body.csvb-login-page .login-shell .csvb-login-brand-hero::before{
+  content: "" !important;
+  position: absolute !important;
+  left: 50% !important;
+  top: 50% !important;
+  width: min(700px, 100%) !important;
+  height: 158px !important;
+  transform: translate(-50%, -50%) !important;
+  background:
+    radial-gradient(
+      ellipse at center,
+      rgba(218,248,252,.62) 0%,
+      rgba(186,233,241,.43) 28%,
+      rgba(132,205,222,.24) 54%,
+      rgba(132,205,222,.09) 72%,
+      rgba(132,205,222,0) 86%
+    ) !important;
+  border-radius: 999px !important;
+  z-index: -1 !important;
+  pointer-events: none !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] body.csvb-login-page .login-shell .csvb-login-brand-icon{
+  grid-column: 1 !important;
+  grid-row: 1 !important;
+  width: 150px !important;
+  max-width: 150px !important;
+  height: auto !important;
+  display: block !important;
+  align-self: center !important;
+  justify-self: end !important;
+  margin: 0 !important;
+  flex: none !important;
+  transform: none !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] body.csvb-login-page .login-shell .csvb-login-brand-copy{
+  grid-column: 2 !important;
+  grid-row: 1 !important;
+  display: block !important;
+  align-self: center !important;
+  justify-self: start !important;
+  text-align: left !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  transform: none !important;
+  min-width: 0 !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] body.csvb-login-page .login-shell .csvb-login-brand-main{
+  display: block !important;
+  color: #00184e !important;
+  font-size: clamp(2.05rem, 3.6vw, 3.05rem) !important;
+  line-height: 1 !important;
+  font-weight: 650 !important;
+  letter-spacing: .055em !important;
+  white-space: nowrap !important;
+  text-align: left !important;
+  margin: 0 !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] body.csvb-login-page .login-shell .csvb-login-brand-subline{
+  display: block !important;
+  margin: 8px 0 0 0 !important;
+  color: #ffffff !important;
+  font-size: clamp(.9rem, 1.18vw, 1.05rem) !important;
+  line-height: 1.15 !important;
+  font-weight: 500 !important;
+  letter-spacing: .01em !important;
+  white-space: nowrap !important;
+  text-align: left !important;
+}
+
+@media (max-width: 700px){
+  html[data-csvb-ds="v01"][data-csvb-page="login.html"] body.csvb-login-page .login-shell .csvb-login-brand-hero{
+    grid-template-columns: 112px minmax(0, 1fr) !important;
+    column-gap: 12px !important;
+    width: 100% !important;
+    min-height: 112px !important;
+  }
+
+  html[data-csvb-ds="v01"][data-csvb-page="login.html"] body.csvb-login-page .login-shell .csvb-login-brand-icon{
+    width: 112px !important;
+    max-width: 112px !important;
+  }
+
+  html[data-csvb-ds="v01"][data-csvb-page="login.html"] body.csvb-login-page .login-shell .csvb-login-brand-main{
+    font-size: 1.82rem !important;
+    white-space: nowrap !important;
+  }
+
+  html[data-csvb-ds="v01"][data-csvb-page="login.html"] body.csvb-login-page .login-shell .csvb-login-brand-subline{
+    font-size: .82rem !important;
+    white-space: nowrap !important;
+  }
+}
+
+/* Only narrow phones may stack. */
+@media (max-width: 440px){
+  html[data-csvb-ds="v01"][data-csvb-page="login.html"] body.csvb-login-page .login-shell .csvb-login-brand-hero{
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 8px !important;
+    text-align: center !important;
+  }
+
+  html[data-csvb-ds="v01"][data-csvb-page="login.html"] body.csvb-login-page .login-shell .csvb-login-brand-icon{
+    width: 110px !important;
+    max-width: 110px !important;
+    justify-self: center !important;
+  }
+
+  html[data-csvb-ds="v01"][data-csvb-page="login.html"] body.csvb-login-page .login-shell .csvb-login-brand-copy,
+  html[data-csvb-ds="v01"][data-csvb-page="login.html"] body.csvb-login-page .login-shell .csvb-login-brand-main,
+  html[data-csvb-ds="v01"][data-csvb-page="login.html"] body.csvb-login-page .login-shell .csvb-login-brand-subline{
+    text-align: center !important;
+    white-space: normal !important;
+  }
+}
+
+/*
+  STEP8D-15 — center login glow to actual logo group.
+
+  Correction:
+  - previous glow was centered in a wide container, not behind the logo group
+  - make brand hero content-width
+  - reduce glow size
+  - keep lighthouse/text layout unchanged
+  - visual only; no login/auth logic
+*/
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] body.csvb-login-page .login-shell .csvb-login-brand-hero{
+  width: fit-content !important;
+  max-width: 92% !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+  grid-template-columns: 150px auto !important;
+  column-gap: 18px !important;
+  justify-content: center !important;
+  justify-items: start !important;
+}
+
+html[data-csvb-ds="v01"][data-csvb-page="login.html"] body.csvb-login-page .login-shell .csvb-login-brand-hero::before{
+  left: 50% !important;
+  top: 50% !important;
+  width: min(520px, 106%) !important;
+  height: 124px !important;
+  transform: translate(-50%, -50%) !important;
+  background:
+    radial-gradient(
+      ellipse at center,
+      rgba(218,248,252,.56) 0%,
+      rgba(186,233,241,.36) 30%,
+      rgba(132,205,222,.17) 56%,
+      rgba(132,205,222,.05) 72%,
+      rgba(132,205,222,0) 86%
+    ) !important;
+}
+
+@media (max-width: 700px){
+  html[data-csvb-ds="v01"][data-csvb-page="login.html"] body.csvb-login-page .login-shell .csvb-login-brand-hero{
+    width: fit-content !important;
+    max-width: 96% !important;
+    grid-template-columns: 112px auto !important;
+    column-gap: 12px !important;
+  }
+
+  html[data-csvb-ds="v01"][data-csvb-page="login.html"] body.csvb-login-page .login-shell .csvb-login-brand-hero::before{
+    width: min(400px, 108%) !important;
+    height: 102px !important;
+  }
+}

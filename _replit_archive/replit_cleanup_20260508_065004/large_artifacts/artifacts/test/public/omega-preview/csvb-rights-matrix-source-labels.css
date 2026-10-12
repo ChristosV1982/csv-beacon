@@ -1,0 +1,62 @@
+/* public/csvb-rights-matrix-source-labels.css
+   RM-2B — static Rights Matrix guide.
+   CSS-only. No JavaScript. No permission logic changes.
+*/
+
+#rmScopeGuide {
+  border: 1px solid #D6E4F5;
+  background: #F7FAFE;
+  border-radius: 10px;
+  padding: 8px 9px;
+  margin-top: 8px;
+}
+
+#rmScopeGuide .rm-guide-title {
+  color: #062A5E;
+  font-weight: 700;
+  margin-bottom: 5px;
+}
+
+#rmScopeGuide .rm-guide-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+#rmScopeGuide .rm-guide-pill {
+  display: inline-flex;
+  border: 1px solid #D6E4F5;
+  background: #fff;
+  border-radius: 999px;
+  padding: 4px 8px;
+  font-size: .84rem;
+  color: #163457;
+  white-space: nowrap;
+}
+
+#rmScopeGuide .off {
+  color: #5E6F86;
+  background: #F4F8FC;
+}
+
+#rmScopeGuide .vessel {
+  color: #062A5E;
+  background: #E9F7FB;
+  border-color: #AEE3F1;
+}
+
+#rmScopeGuide .company {
+  color: #087334;
+  background: #EAF9EF;
+  border-color: #B8E7C8;
+}
+
+#rmScopeGuide .platform {
+  color: #8A5A00;
+  background: #FFF6E0;
+  border-color: #F6D58F;
+}
+
+.rmCellSel {
+  font-weight: 500 !important;
+}

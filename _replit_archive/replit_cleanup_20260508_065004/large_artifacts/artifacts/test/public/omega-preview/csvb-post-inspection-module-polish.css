@@ -1,0 +1,2662 @@
+/* public/csvb-post-inspection-module-polish.css
+   C.S.V. BEACON — Post-Inspection module topbar standard
+   Matches SIRE 2.0 Questions Viewer header pattern.
+   CSS-only. No data / backend logic.
+*/
+
+html[data-csvb-page="post_inspection.html"],
+html[data-csvb-page="post_inspection_detail.html"],
+html[data-csvb-page="post_inspection_observation_detail.html"] {
+  --csvb-pi-bg: #f4f8fc;
+  --csvb-pi-card: #ffffff;
+  --csvb-pi-border: #d6e4f5;
+  --csvb-pi-text: #17324d;
+  --csvb-pi-muted: #5e6f86;
+  --csvb-pi-navy: #062a5e;
+  --csvb-pi-navy-dark: #031b3f;
+  --csvb-pi-teal: #0097a7;
+  --csvb-pi-shadow: 0 8px 22px rgba(3, 27, 63, .08);
+  --csvb-pi-radius: 12px;
+  --csvb-pi-radius-sm: 8px;
+}
+
+html[data-csvb-page="post_inspection.html"] body,
+html[data-csvb-page="post_inspection_detail.html"] body,
+html[data-csvb-page="post_inspection_observation_detail.html"] body {
+  background: var(--csvb-pi-bg) !important;
+  color: var(--csvb-pi-text) !important;
+  font-family: Arial, Helvetica, sans-serif !important;
+  margin: 0 !important;
+  overflow-x: hidden !important;
+}
+
+/* Viewer-style topbar */
+html[data-csvb-page="post_inspection.html"] .topbar.csvb-pi-topbar,
+html[data-csvb-page="post_inspection_detail.html"] .topbar.csvb-pi-topbar,
+html[data-csvb-page="post_inspection_observation_detail.html"] .topbar.csvb-pi-topbar {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 12px !important;
+  min-height: 58px !important;
+  padding: 8px 14px !important;
+  background: linear-gradient(90deg, var(--csvb-pi-navy-dark), var(--csvb-pi-navy)) !important;
+  color: #ffffff !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: 0 8px 24px rgba(3, 27, 63, .16) !important;
+}
+
+/* keep global theme logo visible and correctly sized */
+html[data-csvb-page="post_inspection.html"] .topbar.csvb-pi-topbar::before,
+html[data-csvb-page="post_inspection_detail.html"] .topbar.csvb-pi-topbar::before,
+html[data-csvb-page="post_inspection_observation_detail.html"] .topbar.csvb-pi-topbar::before {
+  width: 42px !important;
+  height: 42px !important;
+  min-width: 42px !important;
+  background: url("./assets/csv-beacon-icon.png") center center / contain no-repeat !important;
+  display: block !important;
+  flex: 0 0 auto !important;
+  content: "" !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .topbar-left,
+html[data-csvb-page="post_inspection_detail.html"] .topbar-left,
+html[data-csvb-page="post_inspection_observation_detail.html"] .topbar-left {
+  flex: 1 1 auto !important;
+  min-width: 260px !important;
+  text-align: center !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .topbar-left .brand,
+html[data-csvb-page="post_inspection_detail.html"] .topbar-left .brand,
+html[data-csvb-page="post_inspection_observation_detail.html"] .topbar-left .brand {
+  color: #ffffff !important;
+  font-size: 1.05rem !important;
+  font-weight: 850 !important;
+  line-height: 1.1 !important;
+  letter-spacing: .01em !important;
+  margin: 0 !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .csvb-pi-mode-line,
+html[data-csvb-page="post_inspection_detail.html"] .csvb-pi-mode-line,
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-pi-mode-line {
+  color: #bfeff4 !important;
+  font-size: .78rem !important;
+  font-weight: 600 !important;
+  line-height: 1.15 !important;
+  margin-top: 3px !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .topbar-right.csvb-pi-actions,
+html[data-csvb-page="post_inspection_detail.html"] .topbar-right.csvb-pi-actions,
+html[data-csvb-page="post_inspection_observation_detail.html"] .topbar-right.csvb-pi-actions {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 7px !important;
+  flex: 0 1 auto !important;
+  flex-wrap: wrap !important;
+}
+
+/* Topbar controls */
+html[data-csvb-page="post_inspection.html"] .topbar .btn,
+html[data-csvb-page="post_inspection_detail.html"] .topbar .btn,
+html[data-csvb-page="post_inspection_observation_detail.html"] .topbar .btn {
+  min-height: 30px !important;
+  padding: 6px 10px !important;
+  border-radius: 8px !important;
+  font-size: .84rem !important;
+  font-weight: 750 !important;
+  line-height: 1.1 !important;
+  white-space: nowrap !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .topbar .btn.primary,
+html[data-csvb-page="post_inspection_detail.html"] .topbar .btn.primary,
+html[data-csvb-page="post_inspection_observation_detail.html"] .topbar .btn.primary {
+  background: var(--csvb-pi-teal) !important;
+  color: #ffffff !important;
+  border: 1px solid var(--csvb-pi-teal) !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .topbar .btn.light,
+html[data-csvb-page="post_inspection_detail.html"] .topbar .btn.light,
+html[data-csvb-page="post_inspection_observation_detail.html"] .topbar .btn.light {
+  background: rgba(255,255,255,.12) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255,255,255,.32) !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .topbar .pill,
+html[data-csvb-page="post_inspection_detail.html"] .topbar .pi-pill,
+html[data-csvb-page="post_inspection_observation_detail.html"] .topbar .pi-pill,
+html[data-csvb-page="post_inspection.html"] .topbar #userBadge,
+html[data-csvb-page="post_inspection_detail.html"] .topbar #userBadge,
+html[data-csvb-page="post_inspection_observation_detail.html"] .topbar #userBadge {
+  padding: 5px 9px !important;
+  border-radius: 999px !important;
+  font-size: .78rem !important;
+  font-weight: 650 !important;
+  line-height: 1.1 !important;
+  background: rgba(255,255,255,.10) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255,255,255,.22) !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .csvb-pi-themeCtl,
+html[data-csvb-page="post_inspection_detail.html"] .csvb-pi-themeCtl,
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-pi-themeCtl {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  margin: 0 4px 0 0 !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .csvb-pi-themeCtl .themeCtl-label,
+html[data-csvb-page="post_inspection_detail.html"] .csvb-pi-themeCtl .themeCtl-label,
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-pi-themeCtl .themeCtl-label {
+  color: #b8c9d9 !important;
+  font-size: .78rem !important;
+  font-weight: 700 !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .csvb-pi-themeCtl select,
+html[data-csvb-page="post_inspection_detail.html"] .csvb-pi-themeCtl select,
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-pi-themeCtl select {
+  background: rgba(255,255,255,.12) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255,255,255,.32) !important;
+  border-radius: 8px !important;
+  min-height: 30px !important;
+  padding: 5px 26px 5px 9px !important;
+}
+
+/* Page shell below topbar */
+html[data-csvb-page="post_inspection.html"] .wrap,
+html[data-csvb-page="post_inspection_detail.html"] .pi-wrap,
+html[data-csvb-page="post_inspection_observation_detail.html"] .pi-wrap {
+  width: 100% !important;
+  max-width: 100% !important;
+  margin: 0 auto !important;
+  padding: 8px !important;
+}
+
+/* If old shell still wraps header, remove extra top padding */
+html[data-csvb-page="post_inspection.html"] .wrap > .topbar:first-child,
+html[data-csvb-page="post_inspection_detail.html"] .pi-wrap > .topbar:first-child,
+html[data-csvb-page="post_inspection_observation_detail.html"] .pi-wrap > .topbar:first-child {
+  margin: -8px -8px 8px -8px !important;
+}
+
+/* Cards */
+html[data-csvb-page="post_inspection.html"] .card,
+html[data-csvb-page="post_inspection_detail.html"] .pi-card,
+html[data-csvb-page="post_inspection_observation_detail.html"] .pi-card {
+  background: var(--csvb-pi-card) !important;
+  border: 1px solid var(--csvb-pi-border) !important;
+  border-radius: 12px !important;
+  padding: 10px !important;
+  margin-top: 8px !important;
+  margin-bottom: 8px !important;
+  box-shadow: var(--csvb-pi-shadow) !important;
+  overflow: hidden !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .card h2,
+html[data-csvb-page="post_inspection_detail.html"] .pi-card h2,
+html[data-csvb-page="post_inspection_observation_detail.html"] .pi-card h2 {
+  color: var(--csvb-pi-navy) !important;
+  font-size: 1.05rem !important;
+  line-height: 1.15 !important;
+  font-weight: 800 !important;
+  margin: 0 0 8px !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .muted,
+html[data-csvb-page="post_inspection_detail.html"] .muted,
+html[data-csvb-page="post_inspection_observation_detail.html"] .muted {
+  color: var(--csvb-pi-muted) !important;
+  font-size: .88rem !important;
+  font-weight: 500 !important;
+  line-height: 1.25 !important;
+}
+
+/* Forms */
+html[data-csvb-page="post_inspection_detail.html"] .pi-field label,
+html[data-csvb-page="post_inspection_observation_detail.html"] .pi-field label {
+  color: var(--csvb-pi-navy) !important;
+  font-size: .86rem !important;
+  font-weight: 750 !important;
+  margin: 0 0 4px !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] input,
+html[data-csvb-page="post_inspection_detail.html"] select,
+html[data-csvb-page="post_inspection_detail.html"] textarea,
+html[data-csvb-page="post_inspection_observation_detail.html"] input,
+html[data-csvb-page="post_inspection_observation_detail.html"] select,
+html[data-csvb-page="post_inspection_observation_detail.html"] textarea {
+  border: 1px solid #b8dce8 !important;
+  border-radius: 8px !important;
+  background: #ffffff !important;
+  color: var(--csvb-pi-text) !important;
+  font-size: .92rem !important;
+  line-height: 1.35 !important;
+  padding: 7px 9px !important;
+  min-height: 34px !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] textarea,
+html[data-csvb-page="post_inspection_observation_detail.html"] textarea {
+  min-height: 82px !important;
+  resize: vertical !important;
+}
+
+/* Tables */
+html[data-csvb-page="post_inspection.html"] .tbl-wrap,
+html[data-csvb-page="post_inspection_detail.html"] .tbl-wrap {
+  width: 100% !important;
+  max-width: 100% !important;
+  border-radius: 10px !important;
+  border: 1px solid var(--csvb-pi-border) !important;
+  overflow: auto !important;
+}
+
+html[data-csvb-page="post_inspection.html"] table,
+html[data-csvb-page="post_inspection_detail.html"] table {
+  width: 100% !important;
+  border-collapse: collapse !important;
+  table-layout: auto !important;
+}
+
+html[data-csvb-page="post_inspection.html"] th,
+html[data-csvb-page="post_inspection.html"] td,
+html[data-csvb-page="post_inspection_detail.html"] th,
+html[data-csvb-page="post_inspection_detail.html"] td {
+  padding: 6px 7px !important;
+  line-height: 1.25 !important;
+  vertical-align: top !important;
+  border-bottom: 1px solid #edf3fb !important;
+}
+
+html[data-csvb-page="post_inspection.html"] th,
+html[data-csvb-page="post_inspection_detail.html"] th {
+  background: #eef6fc !important;
+  color: var(--csvb-pi-navy) !important;
+  font-weight: 800 !important;
+  white-space: nowrap !important;
+}
+
+html[data-csvb-page="post_inspection.html"] td,
+html[data-csvb-page="post_inspection_detail.html"] td {
+  color: var(--csvb-pi-text) !important;
+  font-weight: 450 !important;
+}
+
+html[data-csvb-page="post_inspection.html"] tbody tr:hover td,
+html[data-csvb-page="post_inspection_detail.html"] tbody tr:hover td {
+  background: #f7fbfe !important;
+}
+
+/* Observation / PGNO */
+html[data-csvb-page="post_inspection_detail.html"] .obs-badge,
+html[data-csvb-page="post_inspection_observation_detail.html"] .obs-badge {
+  font-size: .78rem !important;
+  font-weight: 750 !important;
+  padding: 5px 9px !important;
+  border-radius: 999px !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .grid-2,
+html[data-csvb-page="post_inspection_observation_detail.html"] .grid-3 {
+  gap: 10px !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] #socField,
+html[data-csvb-page="post_inspection_observation_detail.html"] #nocField {
+  min-height: 64px !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] #questionFullField {
+  min-height: 72px !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] #supportingCommentField {
+  min-height: 86px !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .response-block,
+html[data-csvb-page="post_inspection_observation_detail.html"] .pgno-list {
+  border: 1px solid var(--csvb-pi-border) !important;
+  border-radius: 12px !important;
+  background: #fbfdff !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .response-block {
+  padding: 10px !important;
+  margin-top: 10px !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .pgno-list {
+  padding: 6px !important;
+  max-height: 320px !important;
+}
+
+@media (max-width: 1100px) {
+  html[data-csvb-page="post_inspection.html"] .topbar.csvb-pi-topbar,
+  html[data-csvb-page="post_inspection_detail.html"] .topbar.csvb-pi-topbar,
+  html[data-csvb-page="post_inspection_observation_detail.html"] .topbar.csvb-pi-topbar {
+    align-items: flex-start !important;
+    flex-wrap: wrap !important;
+  }
+
+  html[data-csvb-page="post_inspection.html"] .topbar-left,
+  html[data-csvb-page="post_inspection_detail.html"] .topbar-left,
+  html[data-csvb-page="post_inspection_observation_detail.html"] .topbar-left {
+    text-align: left !important;
+  }
+}
+
+/* Single-inspection KPI popup */
+html[data-csvb-page="post_inspection_detail.html"] #statsDialog.csvb-kpi-dialog {
+  width: min(1280px, calc(100vw - 32px)) !important;
+  max-width: min(1280px, calc(100vw - 32px)) !important;
+  border: 0 !important;
+  border-radius: 14px !important;
+  padding: 0 !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] #statsDialog::backdrop {
+  background: rgba(3, 27, 63, .35) !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-kpi-dlg {
+  padding: 14px !important;
+  max-height: calc(100vh - 42px) !important;
+  overflow: auto !important;
+  background: #ffffff !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-kpi-head {
+  display: flex !important;
+  justify-content: space-between !important;
+  gap: 12px !important;
+  align-items: flex-start !important;
+  margin-bottom: 10px !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-kpi-head h3 {
+  margin: 0 0 3px !important;
+  color: #062a5e !important;
+  font-size: 1.18rem !important;
+  font-weight: 850 !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-kpi-note,
+html[data-csvb-page="post_inspection_detail.html"] .csvb-kpi-hidden-analytics-note {
+  color: #5e6f86 !important;
+  font-size: .86rem !important;
+  font-weight: 500 !important;
+  line-height: 1.25 !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-kpi-summary-grid {
+  display: grid !important;
+  grid-template-columns: repeat(5, minmax(130px, 1fr)) !important;
+  gap: 10px !important;
+  margin-bottom: 12px !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-kpi-section {
+  border: 1px solid #d6e4f5 !important;
+  border-radius: 12px !important;
+  padding: 10px !important;
+  margin-top: 10px !important;
+  background: #f8fbff !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-kpi-section h4 {
+  margin: 0 0 8px !important;
+  color: #062a5e !important;
+  font-size: .98rem !important;
+  font-weight: 850 !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-kpi-grid-3 {
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(220px, 1fr)) !important;
+  gap: 10px !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-kpi-dlg label {
+  display: block !important;
+  color: #062a5e !important;
+  font-size: .84rem !important;
+  font-weight: 750 !important;
+  margin: 0 0 4px !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-kpi-dlg input,
+html[data-csvb-page="post_inspection_detail.html"] .csvb-kpi-dlg textarea {
+  width: 100% !important;
+  border: 1px solid #b8dce8 !important;
+  border-radius: 8px !important;
+  background: #ffffff !important;
+  color: #17324d !important;
+  padding: 7px 9px !important;
+  font-size: .9rem !important;
+  line-height: 1.3 !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-kpi-dlg textarea {
+  min-height: 96px !important;
+  resize: vertical !important;
+  font-family: Arial, Helvetica, sans-serif !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-kpi-hidden-analytics-note {
+  margin-top: 10px !important;
+  padding: 8px 10px !important;
+  border-left: 3px solid #0097a7 !important;
+  background: #eefaff !important;
+  border-radius: 8px !important;
+}
+
+@media (max-width: 1000px) {
+  html[data-csvb-page="post_inspection_detail.html"] .csvb-kpi-summary-grid,
+  html[data-csvb-page="post_inspection_detail.html"] .csvb-kpi-grid-3 {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* v20260520_8 — Single-inspection KPI popup */
+html[data-csvb-page="post_inspection_detail.html"] #statsDialog.csvb-kpi-dialog {
+  width: min(1280px, calc(100vw - 32px)) !important;
+  max-width: min(1280px, calc(100vw - 32px)) !important;
+  border: 0 !important;
+  border-radius: 14px !important;
+  padding: 0 !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] #statsDialog::backdrop {
+  background: rgba(3, 27, 63, .35) !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-kpi-dlg {
+  padding: 14px !important;
+  max-height: calc(100vh - 42px) !important;
+  overflow: auto !important;
+  background: #ffffff !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-kpi-head h3 {
+  margin: 0 0 3px !important;
+  color: #062a5e !important;
+  font-size: 1.18rem !important;
+  font-weight: 850 !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-kpi-note,
+html[data-csvb-page="post_inspection_detail.html"] .csvb-kpi-hidden-analytics-note {
+  color: #5e6f86 !important;
+  font-size: .86rem !important;
+  font-weight: 500 !important;
+  line-height: 1.25 !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-kpi-summary-grid {
+  display: grid !important;
+  grid-template-columns: repeat(5, minmax(130px, 1fr)) !important;
+  gap: 10px !important;
+  margin: 10px 0 12px !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-kpi-section {
+  border: 1px solid #d6e4f5 !important;
+  border-radius: 12px !important;
+  padding: 10px !important;
+  margin-top: 10px !important;
+  background: #f8fbff !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-kpi-section h4 {
+  margin: 0 0 8px !important;
+  color: #062a5e !important;
+  font-size: .98rem !important;
+  font-weight: 850 !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-kpi-grid-3 {
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(220px, 1fr)) !important;
+  gap: 10px !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-kpi-dlg label {
+  display: block !important;
+  color: #062a5e !important;
+  font-size: .84rem !important;
+  font-weight: 750 !important;
+  margin: 0 0 4px !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-kpi-dlg input,
+html[data-csvb-page="post_inspection_detail.html"] .csvb-kpi-dlg textarea {
+  width: 100% !important;
+  border: 1px solid #b8dce8 !important;
+  border-radius: 8px !important;
+  background: #ffffff !important;
+  color: #17324d !important;
+  padding: 7px 9px !important;
+  font-size: .9rem !important;
+  line-height: 1.3 !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-kpi-dlg textarea {
+  min-height: 96px !important;
+  resize: vertical !important;
+  font-family: Arial, Helvetica, sans-serif !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-kpi-hidden-analytics-note {
+  margin-top: 10px !important;
+  padding: 8px 10px !important;
+  border-left: 3px solid #0097a7 !important;
+  background: #eefaff !important;
+  border-radius: 8px !important;
+}
+
+@media (max-width: 1000px) {
+  html[data-csvb-page="post_inspection_detail.html"] .csvb-kpi-summary-grid,
+  html[data-csvb-page="post_inspection_detail.html"] .csvb-kpi-grid-3 {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* Stored Inspections — per-report KPI quick view */
+html[data-csvb-page="post_inspection.html"] .stored-kpi-btn {
+  min-height: 28px !important;
+  padding: 5px 9px !important;
+  border-radius: 8px !important;
+  font-size: .82rem !important;
+  font-weight: 750 !important;
+}
+
+html[data-csvb-page="post_inspection.html"] #storedKpiDialog.csvb-kpi-dialog {
+  width: min(1280px, calc(100vw - 32px)) !important;
+  max-width: min(1280px, calc(100vw - 32px)) !important;
+  border: 0 !important;
+  border-radius: 14px !important;
+  padding: 0 !important;
+}
+
+html[data-csvb-page="post_inspection.html"] #storedKpiDialog::backdrop {
+  background: rgba(3, 27, 63, .35) !important;
+}
+
+html[data-csvb-page="post_inspection.html"] #storedKpiDialog .csvb-kpi-dlg {
+  padding: 14px !important;
+  max-height: calc(100vh - 42px) !important;
+  overflow: auto !important;
+  background: #ffffff !important;
+}
+
+html[data-csvb-page="post_inspection.html"] #storedKpiDialog .csvb-kpi-head h3 {
+  margin: 0 0 3px !important;
+  color: #062a5e !important;
+  font-size: 1.18rem !important;
+  font-weight: 850 !important;
+}
+
+html[data-csvb-page="post_inspection.html"] #storedKpiDialog .csvb-kpi-note,
+html[data-csvb-page="post_inspection.html"] #storedKpiDialog .csvb-kpi-hidden-analytics-note {
+  color: #5e6f86 !important;
+  font-size: .86rem !important;
+  font-weight: 500 !important;
+  line-height: 1.25 !important;
+}
+
+html[data-csvb-page="post_inspection.html"] #storedKpiDialog .csvb-kpi-summary-grid {
+  display: grid !important;
+  grid-template-columns: repeat(5, minmax(130px, 1fr)) !important;
+  gap: 10px !important;
+  margin: 10px 0 12px !important;
+}
+
+html[data-csvb-page="post_inspection.html"] #storedKpiDialog .csvb-kpi-section {
+  border: 1px solid #d6e4f5 !important;
+  border-radius: 12px !important;
+  padding: 10px !important;
+  margin-top: 10px !important;
+  background: #f8fbff !important;
+}
+
+html[data-csvb-page="post_inspection.html"] #storedKpiDialog .csvb-kpi-section h4 {
+  margin: 0 0 8px !important;
+  color: #062a5e !important;
+  font-size: .98rem !important;
+  font-weight: 850 !important;
+}
+
+html[data-csvb-page="post_inspection.html"] #storedKpiDialog .csvb-kpi-grid-3 {
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(220px, 1fr)) !important;
+  gap: 10px !important;
+}
+
+html[data-csvb-page="post_inspection.html"] #storedKpiDialog label {
+  display: block !important;
+  color: #062a5e !important;
+  font-size: .84rem !important;
+  font-weight: 750 !important;
+  margin: 0 0 4px !important;
+}
+
+html[data-csvb-page="post_inspection.html"] #storedKpiDialog input,
+html[data-csvb-page="post_inspection.html"] #storedKpiDialog textarea {
+  width: 100% !important;
+  border: 1px solid #b8dce8 !important;
+  border-radius: 8px !important;
+  background: #ffffff !important;
+  color: #17324d !important;
+  padding: 7px 9px !important;
+  font-size: .9rem !important;
+  line-height: 1.3 !important;
+}
+
+html[data-csvb-page="post_inspection.html"] #storedKpiDialog textarea {
+  min-height: 96px !important;
+  resize: vertical !important;
+  font-family: Arial, Helvetica, sans-serif !important;
+}
+
+html[data-csvb-page="post_inspection.html"] #storedKpiDialog .csvb-kpi-hidden-analytics-note {
+  margin-top: 10px !important;
+  padding: 8px 10px !important;
+  border-left: 3px solid #0097a7 !important;
+  background: #eefaff !important;
+  border-radius: 8px !important;
+}
+
+@media (max-width: 1000px) {
+  html[data-csvb-page="post_inspection.html"] #storedKpiDialog .csvb-kpi-summary-grid,
+  html[data-csvb-page="post_inspection.html"] #storedKpiDialog .csvb-kpi-grid-3 {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* v20260521 — Risk Evaluation display */
+html[data-csvb-page="post_inspection.html"] .csvb-risk-mini {
+  display: inline-flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-width: 92px !important;
+  min-height: 42px !important;
+  padding: 5px 8px !important;
+  border-radius: 12px !important;
+  background: linear-gradient(180deg, #eefaff, #ffffff) !important;
+  border: 1px solid #b8dce8 !important;
+  color: #062a5e !important;
+  box-shadow: 0 3px 8px rgba(3,27,63,.08) !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .csvb-risk-mini.no-risk {
+  opacity: .72 !important;
+  background: #f8fbff !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .csvb-risk-mini-label {
+  font-size: .68rem !important;
+  font-weight: 750 !important;
+  line-height: 1.05 !important;
+  max-width: 88px !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .csvb-risk-mini-value {
+  font-size: 1.08rem !important;
+  font-weight: 950 !important;
+  line-height: 1.05 !important;
+  color: #031b3f !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-card {
+  border-color: #b8dce8 !important;
+  background: linear-gradient(180deg, #ffffff, #f8fbff) !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-card-head {
+  display: flex !important;
+  align-items: flex-start !important;
+  justify-content: space-between !important;
+  gap: 12px !important;
+  margin-bottom: 10px !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-detail-grid {
+  display: grid !important;
+  grid-template-columns: 220px repeat(5, minmax(140px, 1fr)) !important;
+  gap: 10px !important;
+  align-items: stretch !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-dial {
+  min-height: 112px !important;
+  border-radius: 18px !important;
+  background: radial-gradient(circle at 50% 18%, #ffffff 0, #eefaff 45%, #dff5fa 100%) !important;
+  border: 1px solid #b8dce8 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  align-items: center !important;
+  text-align: center !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.7), 0 6px 16px rgba(3,27,63,.08) !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-dial-label {
+  color: #5e6f86 !important;
+  font-size: .78rem !important;
+  font-weight: 800 !important;
+  line-height: 1.1 !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-dial-value {
+  color: #031b3f !important;
+  font-size: 2.05rem !important;
+  font-weight: 950 !important;
+  line-height: 1 !important;
+  margin: 6px 0 4px !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-dial-sub {
+  color: #0097a7 !important;
+  font-size: .8rem !important;
+  font-weight: 850 !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-metric {
+  border: 1px solid #d6e4f5 !important;
+  border-radius: 12px !important;
+  background: #ffffff !important;
+  padding: 10px !important;
+  min-height: 72px !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-metric label {
+  display: block !important;
+  color: #5e6f86 !important;
+  font-size: .78rem !important;
+  font-weight: 750 !important;
+  line-height: 1.15 !important;
+  margin: 0 0 8px !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-metric div {
+  color: #062a5e !important;
+  font-size: 1.08rem !important;
+  font-weight: 900 !important;
+}
+
+@media (max-width: 1200px) {
+  html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-detail-grid {
+    grid-template-columns: 1fr 1fr !important;
+  }
+}
+
+@media (max-width: 760px) {
+  html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-detail-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* v20260521_2 — Observation risk score display */
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-detail-grid-compact {
+  grid-template-columns: 220px repeat(2, minmax(180px, 1fr)) !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-score-pill {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-width: 54px !important;
+  padding: 5px 9px !important;
+  border-radius: 999px !important;
+  border: 1px solid #b8dce8 !important;
+  background: #eefaff !important;
+  color: #031b3f !important;
+  font-weight: 950 !important;
+  font-size: .86rem !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-score-na,
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-score-missing {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-width: 54px !important;
+  padding: 5px 9px !important;
+  border-radius: 999px !important;
+  border: 1px solid #d6e4f5 !important;
+  background: #f8fbff !important;
+  color: #5e6f86 !important;
+  font-weight: 850 !important;
+  font-size: .82rem !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-observation-risk-grid {
+  display: grid !important;
+  grid-template-columns: 220px repeat(5, minmax(140px, 1fr)) !important;
+  gap: 10px !important;
+  margin-top: 10px !important;
+}
+
+@media (max-width: 1200px) {
+  html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-observation-risk-grid {
+    grid-template-columns: 1fr 1fr !important;
+  }
+}
+
+@media (max-width: 760px) {
+  html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-detail-grid-compact,
+  html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-observation-risk-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* v20260521_3 — Compact Risk Evaluation inside Inspection Header */
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-inline-card {
+  border: 1px solid #b8dce8 !important;
+  border-radius: 12px !important;
+  background: linear-gradient(180deg, #ffffff, #eefaff) !important;
+  padding: 8px 10px !important;
+  align-self: stretch !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-inline-head {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: flex-start !important;
+  gap: 8px !important;
+  margin-bottom: 6px !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-inline-title {
+  color: #062a5e !important;
+  font-size: .92rem !important;
+  font-weight: 900 !important;
+  line-height: 1.1 !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-inline-profile {
+  color: #5e6f86 !important;
+  font-size: .72rem !important;
+  font-weight: 700 !important;
+  line-height: 1.15 !important;
+  margin-top: 2px !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-refresh-btn {
+  min-height: 26px !important;
+  padding: 4px 8px !important;
+  font-size: .76rem !important;
+  white-space: nowrap !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-inline-body {
+  display: grid !important;
+  grid-template-columns: 110px 1fr !important;
+  gap: 8px !important;
+  align-items: stretch !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-inline-score {
+  border: 1px solid #b8dce8 !important;
+  border-radius: 10px !important;
+  background: #f8fdff !important;
+  padding: 6px !important;
+  text-align: center !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-inline-score-label {
+  display: block !important;
+  color: #5e6f86 !important;
+  font-size: .62rem !important;
+  font-weight: 800 !important;
+  line-height: 1.05 !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-inline-score-value {
+  display: block !important;
+  color: #031b3f !important;
+  font-size: 1.35rem !important;
+  font-weight: 950 !important;
+  line-height: 1 !important;
+  margin: 3px 0 !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-inline-score-profile {
+  display: block !important;
+  color: #0097a7 !important;
+  font-size: .65rem !important;
+  font-weight: 850 !important;
+  line-height: 1.05 !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-inline-metrics {
+  display: grid !important;
+  grid-template-columns: 1fr 1fr !important;
+  gap: 6px !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-inline-metrics > div {
+  border: 1px solid #d6e4f5 !important;
+  border-radius: 10px !important;
+  background: #ffffff !important;
+  padding: 6px 8px !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-inline-metrics label {
+  display: block !important;
+  color: #5e6f86 !important;
+  font-size: .66rem !important;
+  font-weight: 750 !important;
+  margin: 0 0 4px !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-inline-metrics strong {
+  color: #062a5e !important;
+  font-size: .96rem !important;
+  font-weight: 900 !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-score-pill {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-width: 54px !important;
+  padding: 5px 9px !important;
+  border-radius: 999px !important;
+  border: 1px solid #b8dce8 !important;
+  background: #eefaff !important;
+  color: #031b3f !important;
+  font-weight: 950 !important;
+  font-size: .86rem !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-score-na,
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-score-missing {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-width: 54px !important;
+  padding: 5px 9px !important;
+  border-radius: 999px !important;
+  border: 1px solid #d6e4f5 !important;
+  background: #f8fbff !important;
+  color: #5e6f86 !important;
+  font-weight: 850 !important;
+  font-size: .82rem !important;
+}
+
+/* v20260521_4 — Compact readable Risk Evaluation in Inspection Header */
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-inline-card {
+  border: 1px solid #b8dce8 !important;
+  border-radius: 12px !important;
+  background: linear-gradient(180deg, #ffffff, #eefaff) !important;
+  padding: 10px 12px !important;
+  align-self: stretch !important;
+  min-height: 104px !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-inline-head {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: flex-start !important;
+  gap: 10px !important;
+  margin-bottom: 8px !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-inline-title {
+  color: #062a5e !important;
+  font-size: 1.04rem !important;
+  font-weight: 950 !important;
+  line-height: 1.1 !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-inline-profile {
+  color: #5e6f86 !important;
+  font-size: .78rem !important;
+  font-weight: 750 !important;
+  line-height: 1.15 !important;
+  margin-top: 3px !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-refresh-btn {
+  min-height: 28px !important;
+  padding: 5px 9px !important;
+  font-size: .78rem !important;
+  white-space: nowrap !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-inline-body {
+  display: grid !important;
+  grid-template-columns: 132px 1fr !important;
+  gap: 10px !important;
+  align-items: stretch !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-inline-score {
+  border: 1px solid #b8dce8 !important;
+  border-radius: 10px !important;
+  background: #f8fdff !important;
+  padding: 8px !important;
+  text-align: center !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-inline-score-label {
+  display: block !important;
+  color: #5e6f86 !important;
+  font-size: .70rem !important;
+  font-weight: 850 !important;
+  line-height: 1.05 !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-inline-score-value {
+  display: block !important;
+  color: #031b3f !important;
+  font-size: 1.75rem !important;
+  font-weight: 950 !important;
+  line-height: 1 !important;
+  margin: 5px 0 4px !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-inline-score-profile {
+  display: block !important;
+  color: #0097a7 !important;
+  font-size: .72rem !important;
+  font-weight: 900 !important;
+  line-height: 1.05 !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-inline-metrics {
+  display: grid !important;
+  grid-template-columns: 1fr 1fr !important;
+  gap: 8px !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-inline-metrics > div {
+  border: 1px solid #d6e4f5 !important;
+  border-radius: 10px !important;
+  background: #ffffff !important;
+  padding: 8px 10px !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-inline-metrics label {
+  display: block !important;
+  color: #5e6f86 !important;
+  font-size: .74rem !important;
+  font-weight: 800 !important;
+  margin: 0 0 5px !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-inline-metrics strong {
+  color: #062a5e !important;
+  font-size: 1.12rem !important;
+  font-weight: 950 !important;
+}
+
+/* Keep Risk Score badges clean */
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-score-pill {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-width: 54px !important;
+  padding: 5px 9px !important;
+  border-radius: 999px !important;
+  border: 1px solid #b8dce8 !important;
+  background: #eefaff !important;
+  color: #031b3f !important;
+  font-weight: 950 !important;
+  font-size: .86rem !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-score-na,
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-score-missing {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-width: 54px !important;
+  padding: 5px 9px !important;
+  border-radius: 999px !important;
+  border: 1px solid #d6e4f5 !important;
+  background: #f8fbff !important;
+  color: #5e6f86 !important;
+  font-weight: 850 !important;
+  font-size: .82rem !important;
+}
+
+/* v20260521_5 — Future-ready Risk Evaluation row */
+html[data-csvb-page="post_inspection_detail.html"] .csvb-inspector-risk-row {
+  display: grid !important;
+  grid-template-columns: minmax(420px, .85fr) minmax(620px, 1.25fr) !important;
+  gap: 12px !important;
+  grid-column: 1 / -1 !important;
+  align-items: stretch !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-inspector-stack {
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  gap: 9px !important;
+  align-content: start !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-inline-card {
+  border: 1px solid #b8dce8 !important;
+  border-radius: 12px !important;
+  background: linear-gradient(180deg, #ffffff, #eefaff) !important;
+  padding: 10px 12px !important;
+  align-self: stretch !important;
+  min-height: 118px !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-inline-head {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: flex-start !important;
+  gap: 10px !important;
+  margin-bottom: 8px !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-inline-title {
+  color: #062a5e !important;
+  font-size: 1.08rem !important;
+  font-weight: 950 !important;
+  line-height: 1.1 !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-inline-profile {
+  color: #5e6f86 !important;
+  font-size: .78rem !important;
+  font-weight: 750 !important;
+  line-height: 1.15 !important;
+  margin-top: 3px !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-refresh-btn {
+  min-height: 28px !important;
+  padding: 5px 9px !important;
+  font-size: .78rem !important;
+  white-space: nowrap !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-inline-body {
+  display: grid !important;
+  grid-template-columns: minmax(136px, 220px) minmax(260px, 1fr) !important;
+  gap: 10px !important;
+  align-items: stretch !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-profile-strip {
+  display: flex !important;
+  gap: 8px !important;
+  overflow-x: auto !important;
+  min-width: 0 !important;
+  padding-bottom: 2px !important;
+}
+
+/* This tile is the first profile tile. Later, oil-major profiles can be added horizontally here. */
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-inline-score {
+  flex: 0 0 136px !important;
+  border: 1px solid #b8dce8 !important;
+  border-radius: 10px !important;
+  background: #f8fdff !important;
+  padding: 8px !important;
+  text-align: center !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-inline-score-label {
+  display: block !important;
+  color: #5e6f86 !important;
+  font-size: .72rem !important;
+  font-weight: 850 !important;
+  line-height: 1.05 !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-inline-score-value {
+  display: block !important;
+  color: #031b3f !important;
+  font-size: 1.85rem !important;
+  font-weight: 950 !important;
+  line-height: 1 !important;
+  margin: 5px 0 4px !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-inline-score-profile {
+  display: block !important;
+  color: #0097a7 !important;
+  font-size: .74rem !important;
+  font-weight: 900 !important;
+  line-height: 1.05 !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-inline-metrics {
+  display: grid !important;
+  grid-template-columns: 1fr 1fr !important;
+  gap: 8px !important;
+  min-width: 0 !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-inline-metrics > div {
+  border: 1px solid #d6e4f5 !important;
+  border-radius: 10px !important;
+  background: #ffffff !important;
+  padding: 8px 10px !important;
+  min-width: 0 !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-inline-metrics label {
+  display: block !important;
+  color: #5e6f86 !important;
+  font-size: .76rem !important;
+  font-weight: 800 !important;
+  margin: 0 0 5px !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-inline-metrics strong {
+  color: #062a5e !important;
+  font-size: 1.18rem !important;
+  font-weight: 950 !important;
+}
+
+@media (max-width: 1200px) {
+  html[data-csvb-page="post_inspection_detail.html"] .csvb-inspector-risk-row,
+  html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-inline-body {
+    grid-template-columns: 1fr !important;
+  }
+
+  html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-inline-metrics {
+    grid-template-columns: 1fr 1fr !important;
+  }
+}
+
+@media (max-width: 760px) {
+  html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-inline-metrics {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* v20260521_6 — Company average Risk/Inspection and relative colour coding */
+html[data-csvb-page="post_inspection.html"] .csvb-risk-average-panel {
+  background: #ffffff !important;
+  border: 1px solid #d6e4f5 !important;
+  border-radius: 12px !important;
+  padding: 10px !important;
+  margin: 8px 0 !important;
+  box-shadow: 0 6px 18px rgba(3,27,63,.06) !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .csvb-risk-average-title {
+  color: #062a5e !important;
+  font-size: .98rem !important;
+  font-weight: 950 !important;
+  margin-bottom: 8px !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .csvb-risk-average-grid {
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(160px, 1fr)) !important;
+  gap: 8px !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .csvb-risk-average-box {
+  border: 1px solid #d6e4f5 !important;
+  border-radius: 10px !important;
+  background: #f8fbff !important;
+  padding: 8px 10px !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .csvb-risk-average-box span {
+  display: block !important;
+  color: #5e6f86 !important;
+  font-size: .76rem !important;
+  font-weight: 800 !important;
+  margin-bottom: 3px !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .csvb-risk-average-box strong {
+  display: block !important;
+  color: #031b3f !important;
+  font-size: 1.25rem !important;
+  font-weight: 950 !important;
+  line-height: 1.05 !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .csvb-risk-average-box em {
+  display: block !important;
+  color: #5e6f86 !important;
+  font-size: .72rem !important;
+  font-style: normal !important;
+  font-weight: 700 !important;
+  margin-top: 4px !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .csvb-risk-mini {
+  transition: background-color .15s ease, border-color .15s ease !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .csvb-risk-mini-ratio {
+  display: block !important;
+  font-size: .66rem !important;
+  font-weight: 800 !important;
+  line-height: 1.05 !important;
+  color: #5e6f86 !important;
+  margin-top: 2px !important;
+}
+
+@media (max-width: 1200px) {
+  html[data-csvb-page="post_inspection.html"] .csvb-risk-average-grid {
+    grid-template-columns: repeat(2, minmax(160px, 1fr)) !important;
+  }
+}
+
+@media (max-width: 760px) {
+  html[data-csvb-page="post_inspection.html"] .csvb-risk-average-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* v20260521_7 — Make risk mini boxes use calculated colour variables */
+html[data-csvb-page="post_inspection.html"] .csvb-risk-mini {
+  background: var(--csvb-risk-bg, #eefaff) !important;
+  border-color: var(--csvb-risk-border, #b8dce8) !important;
+  color: var(--csvb-risk-text, #031b3f) !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .csvb-risk-mini-value {
+  color: var(--csvb-risk-text, #031b3f) !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .csvb-risk-mini-ratio {
+  color: var(--csvb-risk-text, #031b3f) !important;
+  opacity: .78 !important;
+}
+
+/* v20260521_8 — Largely A.E. risk switch + editable risk profile tables */
+html[data-csvb-page="post_inspection.html"] .csvb-risk-average-grid-5 {
+  grid-template-columns: repeat(5, minmax(160px, 1fr)) !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .csvb-risk-switch {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  color: #062a5e !important;
+  font-weight: 900 !important;
+  cursor: pointer !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .csvb-risk-switch input {
+  width: auto !important;
+  transform: scale(1.18) !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .csvb-risk-lae-switch-box {
+  background: #fffdf2 !important;
+  border-color: #f2d571 !important;
+}
+
+.riskGroupRow td {
+  background: #eaf7fb !important;
+  color: #062a5e !important;
+  font-weight: 950 !important;
+  font-size: .95rem !important;
+}
+
+/* v20260521_10 — Risk Rating visible profile selector */
+.profile-row-head {
+  display: flex !important;
+  align-items: flex-start !important;
+  justify-content: space-between !important;
+  gap: 8px !important;
+}
+
+.risk-visible-toggle {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  margin: 0 !important;
+  font-size: .82rem !important;
+  font-weight: 900 !important;
+  color: #062a5e !important;
+  cursor: pointer !important;
+}
+
+.risk-visible-toggle input {
+  width: auto !important;
+  transform: scale(1.1) !important;
+}
+
+.profile-visible-row {
+  display: grid !important;
+  grid-template-columns: 88px 70px 1fr !important;
+  gap: 6px !important;
+  align-items: center !important;
+  margin-top: 8px !important;
+}
+
+.profile-visible-row label {
+  margin: 0 !important;
+  font-size: .76rem !important;
+}
+
+.profile-visible-row input {
+  padding: 6px 7px !important;
+  text-align: center !important;
+}
+
+/* v20260521_11 — Refresh all risk snapshots button */
+html[data-csvb-page="post_inspection.html"] .csvb-refresh-all-risk-btn {
+  margin-top: 6px !important;
+  width: 100% !important;
+  min-height: 28px !important;
+  padding: 5px 8px !important;
+  font-size: .78rem !important;
+  font-weight: 900 !important;
+  border-radius: 8px !important;
+}
+
+/* v20260521_12 — Separate Largely A.E. display switch and Bulk Risk Refresh */
+html[data-csvb-page="post_inspection.html"] .csvb-risk-average-grid-6 {
+  grid-template-columns: repeat(6, minmax(150px, 1fr)) !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .csvb-risk-bulk-refresh-box {
+  background: #f2f8ff !important;
+  border-color: #8fc4e8 !important;
+}
+
+@media (max-width: 1400px) {
+  html[data-csvb-page="post_inspection.html"] .csvb-risk-average-grid-6 {
+    grid-template-columns: repeat(3, minmax(150px, 1fr)) !important;
+  }
+}
+
+@media (max-width: 760px) {
+  html[data-csvb-page="post_inspection.html"] .csvb-risk-average-grid-6 {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* v20260521_13 — Force visible multiple risk profile tiles */
+html[data-csvb-page="post_inspection.html"] .csvb-risk-mini-stack {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 5px !important;
+  justify-content: center !important;
+  align-items: center !important;
+  max-width: 220px !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .csvb-risk-mini-stack .csvb-risk-mini {
+  min-width: 78px !important;
+}
+
+/* v20260521_14 — Risk profile dropdown checkbox selector */
+html[data-csvb-page="post_inspection.html"] .csvb-risk-profile-select-box {
+  background: #f8fbff !important;
+  border-color: #8fc4e8 !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .csvb-risk-profile-dropdown {
+  position: relative !important;
+  margin-top: 4px !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .csvb-risk-profile-drop-btn {
+  width: 100% !important;
+  border: 1px solid #b8dce8 !important;
+  background: #ffffff !important;
+  color: #062a5e !important;
+  border-radius: 8px !important;
+  padding: 6px 8px !important;
+  font-size: .74rem !important;
+  font-weight: 850 !important;
+  text-align: left !important;
+  cursor: pointer !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .csvb-risk-profile-drop-panel {
+  display: none !important;
+  position: absolute !important;
+  z-index: 1000 !important;
+  top: calc(100% + 4px) !important;
+  left: 0 !important;
+  min-width: 230px !important;
+  max-width: 320px !important;
+  background: #ffffff !important;
+  border: 1px solid #b8dce8 !important;
+  border-radius: 10px !important;
+  box-shadow: 0 14px 36px rgba(3,27,63,.18) !important;
+  padding: 8px !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .csvb-risk-profile-dropdown.open .csvb-risk-profile-drop-panel {
+  display: block !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .csvb-risk-profile-option {
+  display: flex !important;
+  align-items: center !important;
+  gap: 7px !important;
+  margin: 4px 0 !important;
+  color: #062a5e !important;
+  font-size: .78rem !important;
+  font-weight: 850 !important;
+  cursor: pointer !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .csvb-risk-profile-option input {
+  width: auto !important;
+}
+
+/* v20260521_15 — Selected risk profile tiles on detail pages */
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-profile-strip {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 8px !important;
+  overflow: visible !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-observation-risk-profile-list {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 8px !important;
+  margin-top: 10px !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-observation-risk-profile-tile {
+  min-width: 115px !important;
+  border: 1px solid #b8dce8 !important;
+  border-radius: 10px !important;
+  background: #eefaff !important;
+  padding: 8px !important;
+  text-align: center !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-observation-risk-profile-name {
+  color: #062a5e !important;
+  font-size: .78rem !important;
+  font-weight: 900 !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-observation-risk-profile-score {
+  color: #031b3f !important;
+  font-size: 1.3rem !important;
+  font-weight: 950 !important;
+  line-height: 1 !important;
+  margin: 5px 0 !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-observation-risk-profile-sub {
+  color: #5e6f86 !important;
+  font-size: .72rem !important;
+  font-weight: 800 !important;
+}
+
+
+/* v20260521_20 — compact selected profile risk final repair */
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-inline-metrics {
+  display: none !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-profile-strip {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 8px !important;
+  width: 100% !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-inline-score-compact {
+  flex: 0 0 126px !important;
+  min-height: 78px !important;
+  padding: 7px !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-inline-mini {
+  display: block !important;
+  color: #5e6f86 !important;
+  font-size: .64rem !important;
+  font-weight: 800 !important;
+  margin-top: 4px !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-score-stack {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 4px !important;
+  justify-content: center !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-score-stack .csvb-risk-score-pill {
+  display: inline-grid !important;
+  grid-template-columns: 1fr !important;
+  min-width: 58px !important;
+  padding: 3px 6px !important;
+  font-size: .72rem !important;
+  line-height: 1.05 !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-score-profile-name {
+  font-size: .62rem !important;
+  font-weight: 900 !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-score-profile-value {
+  font-size: .86rem !important;
+  font-weight: 950 !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-observation-risk-profile-list {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 8px !important;
+  margin-top: 10px !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-observation-risk-profile-tile {
+  min-width: 105px !important;
+  border: 1px solid #b8dce8 !important;
+  border-radius: 10px !important;
+  background: #eefaff !important;
+  padding: 7px !important;
+  text-align: center !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-observation-risk-profile-name {
+  color: #062a5e !important;
+  font-size: .76rem !important;
+  font-weight: 900 !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-observation-risk-profile-score {
+  color: #031b3f !important;
+  font-size: 1.25rem !important;
+  font-weight: 950 !important;
+  line-height: 1 !important;
+  margin: 4px 0 !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-observation-risk-profile-sub {
+  color: #5e6f86 !important;
+  font-size: .70rem !important;
+  font-weight: 800 !important;
+}
+
+
+/* v20260521_21 — compact Post-Inspection Entry risk panel */
+html[data-csvb-page="post_inspection.html"] .csvb-risk-average-panel {
+  padding: 8px 10px !important;
+  margin: 6px 0 8px !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .csvb-risk-average-title {
+  margin-bottom: 6px !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .csvb-risk-average-grid-operational {
+  display: flex !important;
+  flex-wrap: nowrap !important;
+  align-items: stretch !important;
+  justify-content: flex-start !important;
+  gap: 8px !important;
+  overflow-x: auto !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .csvb-risk-average-grid-operational .csvb-risk-average-box {
+  flex: 0 0 168px !important;
+  max-width: 168px !important;
+  min-height: 96px !important;
+  padding: 8px 9px !important;
+  box-sizing: border-box !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .csvb-profile-average-box strong {
+  font-size: 1.32rem !important;
+  line-height: 1 !important;
+  margin: 3px 0 5px !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .csvb-profile-average-lines {
+  color: #5e6f86 !important;
+  font-size: .70rem !important;
+  font-weight: 800 !important;
+  line-height: 1.18 !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .csvb-profile-average-lines div {
+  white-space: nowrap !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .csvb-risk-profile-select-box {
+  flex-basis: 184px !important;
+  max-width: 184px !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .csvb-risk-lae-switch-box {
+  flex-basis: 170px !important;
+  max-width: 170px !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .csvb-risk-bulk-refresh-box {
+  flex-basis: 170px !important;
+  max-width: 170px !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .csvb-risk-profile-drop-btn {
+  padding: 5px 7px !important;
+  font-size: .70rem !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .csvb-risk-switch {
+  gap: 6px !important;
+  font-size: .84rem !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .csvb-risk-switch b {
+  font-size: .84rem !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .csvb-risk-average-box em {
+  font-size: .66rem !important;
+  line-height: 1.18 !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .csvb-refresh-all-risk-btn {
+  min-height: 26px !important;
+  padding: 4px 7px !important;
+  font-size: .72rem !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .csvb-risk-mini-ratio {
+  display: none !important;
+}
+
+/* v20260521_22 — Post-Inspection Entry compact risk ribbon layout fix */
+html[data-csvb-page="post_inspection.html"] .csvb-risk-average-panel {
+  flex: 1 0 100% !important;
+  width: calc(100% - 20px) !important;
+  max-width: none !important;
+  overflow: visible !important;
+  position: relative !important;
+  z-index: 50 !important;
+  padding: 8px 10px !important;
+  margin: 6px 0 10px !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .csvb-risk-average-title {
+  margin: 0 0 6px !important;
+  line-height: 1.1 !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .csvb-risk-average-grid-operational {
+  display: grid !important;
+  grid-template-columns: repeat(6, minmax(130px, 1fr)) !important;
+  gap: 8px !important;
+  overflow: visible !important;
+  align-items: stretch !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .csvb-risk-average-grid-operational .csvb-risk-average-box {
+  width: auto !important;
+  max-width: none !important;
+  min-width: 0 !important;
+  min-height: 92px !important;
+  padding: 8px 9px !important;
+  box-sizing: border-box !important;
+  overflow: visible !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .csvb-profile-average-box strong {
+  font-size: 1.28rem !important;
+  line-height: 1 !important;
+  margin: 3px 0 4px !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .csvb-profile-average-lines {
+  color: #5e6f86 !important;
+  font-size: .68rem !important;
+  font-weight: 800 !important;
+  line-height: 1.14 !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .csvb-profile-average-lines div {
+  white-space: nowrap !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .csvb-risk-profile-select-box,
+html[data-csvb-page="post_inspection.html"] .csvb-risk-lae-switch-box,
+html[data-csvb-page="post_inspection.html"] .csvb-risk-bulk-refresh-box {
+  overflow: visible !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .csvb-risk-profile-select-box em,
+html[data-csvb-page="post_inspection.html"] .csvb-risk-lae-switch-box em,
+html[data-csvb-page="post_inspection.html"] .csvb-risk-bulk-refresh-box em {
+  font-size: .65rem !important;
+  line-height: 1.12 !important;
+  margin-top: 4px !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .csvb-risk-profile-dropdown {
+  position: relative !important;
+  z-index: 5000 !important;
+  overflow: visible !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .csvb-risk-profile-drop-btn {
+  padding: 5px 7px !important;
+  font-size: .70rem !important;
+  line-height: 1.1 !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .csvb-risk-profile-drop-panel {
+  z-index: 99999 !important;
+  min-width: 260px !important;
+  max-width: 360px !important;
+  top: calc(100% + 5px) !important;
+  left: 0 !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .csvb-risk-switch {
+  gap: 6px !important;
+  font-size: .82rem !important;
+  line-height: 1.1 !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .csvb-risk-switch b {
+  font-size: .82rem !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .csvb-refresh-all-risk-btn {
+  min-height: 26px !important;
+  padding: 4px 7px !important;
+  font-size: .72rem !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .csvb-risk-mini-ratio {
+  display: none !important;
+}
+
+@media (max-width: 1500px) {
+  html[data-csvb-page="post_inspection.html"] .csvb-risk-average-grid-operational {
+    grid-template-columns: repeat(3, minmax(150px, 1fr)) !important;
+  }
+}
+
+@media (max-width: 820px) {
+  html[data-csvb-page="post_inspection.html"] .csvb-risk-average-grid-operational {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+
+/* v20260521_23 — Post-Inspection Detail compact risk-only layout */
+html[data-csvb-page="post_inspection_detail.html"] #riskEvaluationCard {
+  min-height: 0 !important;
+  padding: 8px 10px !important;
+  overflow: visible !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-inline-body {
+  display: block !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-inline-metrics {
+  display: none !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-profile-strip {
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  align-items: stretch !important;
+  justify-content: flex-start !important;
+  gap: 8px !important;
+  width: 100% !important;
+  max-width: 460px !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-inline-score-compact {
+  flex: 0 0 126px !important;
+  width: 126px !important;
+  min-height: 70px !important;
+  padding: 7px 8px !important;
+  box-sizing: border-box !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-inline-score-label {
+  font-size: .66rem !important;
+  line-height: 1.05 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-inline-score-value {
+  font-size: 1.45rem !important;
+  margin: 4px 0 0 !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-inline-mini {
+  display: none !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-score-stack {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 3px !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-score-stack .csvb-risk-score-pill {
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  align-items: center !important;
+  justify-items: center !important;
+  width: 76px !important;
+  min-width: 76px !important;
+  max-width: 76px !important;
+  min-height: 32px !important;
+  padding: 3px 5px !important;
+  line-height: 1.05 !important;
+  border-radius: 999px !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-score-profile-name {
+  display: block !important;
+  font-size: .58rem !important;
+  font-weight: 900 !important;
+  line-height: 1 !important;
+  max-width: 66px !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-score-profile-value {
+  display: block !important;
+  font-size: .90rem !important;
+  font-weight: 950 !important;
+  line-height: 1 !important;
+}
+
+
+/* v20260521_24 — Post-Inspection Detail risk score pills coloured by observation type */
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-score-pill-neg {
+  background: #ffe9e9 !important;
+  border-color: #ffb5b5 !important;
+  color: #8b1d1d !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-score-pill-neg .csvb-risk-score-profile-name,
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-score-pill-neg .csvb-risk-score-profile-value {
+  color: #8b1d1d !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-score-pill-lae {
+  background: #eaf4ff !important;
+  border-color: #b8d7f5 !important;
+  color: #164e7a !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-score-pill-lae .csvb-risk-score-profile-name,
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-score-pill-lae .csvb-risk-score-profile-value {
+  color: #164e7a !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-score-pill-pos {
+  background: #e9fff0 !important;
+  border-color: #b8f0c9 !important;
+  color: #0d4f2a !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-score-pill-pos .csvb-risk-score-profile-name,
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-score-pill-pos .csvb-risk-score-profile-value {
+  color: #0d4f2a !important;
+}
+
+html[data-csvb-page="post_inspection_detail.html"] .csvb-risk-score-pill-neutral {
+  background: #f8fbff !important;
+  border-color: #d6e4f5 !important;
+  color: #5e6f86 !important;
+}
+
+
+/* v20260521_25 — Observation Detail compact selected-profile risk tiles */
+html[data-csvb-page="post_inspection_observation_detail.html"] #observationRiskCard {
+  padding: 8px 10px !important;
+  overflow: visible !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] #observationRiskCard h2 {
+  margin: 0 0 3px !important;
+  font-size: 1.02rem !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] #observationRiskProfileLine {
+  font-size: .74rem !important;
+  line-height: 1.15 !important;
+  margin-bottom: 6px !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-observation-risk-grid {
+  display: none !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-observation-risk-profile-list {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 8px !important;
+  margin-top: 6px !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-observation-risk-profile-tile {
+  flex: 0 0 116px !important;
+  width: 116px !important;
+  min-height: 72px !important;
+  border: 1px solid #b8dce8 !important;
+  border-radius: 10px !important;
+  background: #eefaff !important;
+  padding: 7px !important;
+  text-align: center !important;
+  box-sizing: border-box !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-observation-risk-profile-name {
+  color: #062a5e !important;
+  font-size: .68rem !important;
+  font-weight: 900 !important;
+  line-height: 1.05 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-observation-risk-profile-score {
+  color: #031b3f !important;
+  font-size: 1.34rem !important;
+  font-weight: 950 !important;
+  line-height: 1 !important;
+  margin: 5px 0 3px !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-observation-risk-profile-sub {
+  color: #5e6f86 !important;
+  font-size: .62rem !important;
+  font-weight: 850 !important;
+  line-height: 1.05 !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-observation-risk-profile-tile-neg {
+  background: #ffe9e9 !important;
+  border-color: #ffb5b5 !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-observation-risk-profile-tile-neg * {
+  color: #8b1d1d !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-observation-risk-profile-tile-lae {
+  background: #eaf4ff !important;
+  border-color: #b8d7f5 !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-observation-risk-profile-tile-lae * {
+  color: #164e7a !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-observation-risk-profile-tile-pos {
+  background: #e9fff0 !important;
+  border-color: #b8f0c9 !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-observation-risk-profile-tile-pos * {
+  color: #0d4f2a !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-observation-factor-strip-wrap {
+  margin-top: 7px !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-observation-factor-strip {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 6px !important;
+  color: #5e6f86 !important;
+  font-size: .68rem !important;
+  font-weight: 800 !important;
+  line-height: 1.15 !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-observation-factor-strip span {
+  border: 1px solid #d6e4f5 !important;
+  background: #f8fbff !important;
+  border-radius: 999px !important;
+  padding: 3px 7px !important;
+  white-space: nowrap !important;
+}
+
+
+/* v20260521_26 — Observation Detail row-based risk evaluation + collapsible response tracking */
+html[data-csvb-page="post_inspection_observation_detail.html"] #observationRiskCard {
+  padding: 8px 10px !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] #observationRiskCard h2 {
+  margin: 0 0 2px !important;
+  font-size: 1.02rem !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] #observationRiskProfileLine {
+  margin: 0 0 6px !important;
+  font-size: .74rem !important;
+  line-height: 1.15 !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-observation-risk-action-bar {
+  display: flex !important;
+  justify-content: flex-end !important;
+  margin-bottom: 4px !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-observation-risk-mini-refresh {
+  width: 28px !important;
+  height: 28px !important;
+  min-width: 28px !important;
+  padding: 0 !important;
+  border-radius: 8px !important;
+  border: 1px solid #b7d7e8 !important;
+  background: #eef8ff !important;
+  color: #0b376d !important;
+  font-size: 1rem !important;
+  font-weight: 900 !important;
+  cursor: pointer !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-observation-risk-mini-refresh:hover {
+  background: #dff1ff !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-observation-risk-grid {
+  display: none !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-obs-risk-empty {
+  font-size: .86rem !important;
+  color: #5e6f86 !important;
+  padding: 4px 0 !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-obs-risk-table-wrap {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 4px !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-obs-risk-table-head,
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-obs-risk-table-row {
+  display: grid !important;
+  grid-template-columns: 1.5fr 1fr 1fr 1fr 1fr 1fr 1fr !important;
+  gap: 6px !important;
+  align-items: center !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-obs-risk-table-head {
+  font-size: .72rem !important;
+  font-weight: 900 !important;
+  color: #5d6e86 !important;
+  padding: 2px 4px !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-obs-risk-table-row {
+  border: 1px solid #d8e8f5 !important;
+  border-radius: 10px !important;
+  padding: 6px 8px !important;
+  font-size: .82rem !important;
+  font-weight: 800 !important;
+  color: #062a5e !important;
+  background: #f8fbff !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-obs-risk-profile-name {
+  font-weight: 900 !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-obs-risk-row-neg {
+  background: #ffeaea !important;
+  border-color: #f5bbbb !important;
+  color: #8b1d1d !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-obs-risk-row-lae {
+  background: #ebf5ff !important;
+  border-color: #bedbf8 !important;
+  color: #1a517f !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-obs-risk-row-pos {
+  background: #ecfff2 !important;
+  border-color: #bce9c8 !important;
+  color: #145331 !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-obs-risk-row-neutral {
+  background: #f8fbff !important;
+  border-color: #d8e8f5 !important;
+  color: #062a5e !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-collapsible-header {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 10px !important;
+  margin-bottom: 6px !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-collapsible-title > * {
+  margin: 0 !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-mini-toggle-btn {
+  width: 30px !important;
+  height: 30px !important;
+  min-width: 30px !important;
+  padding: 0 !important;
+  border-radius: 8px !important;
+  border: 1px solid #b7d7e8 !important;
+  background: #eef8ff !important;
+  color: #0b376d !important;
+  font-weight: 900 !important;
+  cursor: pointer !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-mini-toggle-btn:hover {
+  background: #dff1ff !important;
+}
+
+
+/* v20260521_27 — Force Observation Detail risk rows and collapsed response tracking */
+html[data-csvb-page="post_inspection_observation_detail.html"] #observationRiskCard {
+  padding: 8px 10px !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] #observationRiskCard h2 {
+  margin: 0 0 2px !important;
+  font-size: 1.02rem !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] #observationRiskProfileLine {
+  margin: 0 0 6px !important;
+  font-size: .74rem !important;
+  line-height: 1.15 !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-observation-risk-action-bar {
+  display: flex !important;
+  justify-content: flex-end !important;
+  margin-bottom: 4px !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-observation-risk-mini-refresh {
+  width: 28px !important;
+  height: 28px !important;
+  min-width: 28px !important;
+  padding: 0 !important;
+  border-radius: 8px !important;
+  border: 1px solid #b7d7e8 !important;
+  background: #eef8ff !important;
+  color: #0b376d !important;
+  font-size: 1rem !important;
+  font-weight: 900 !important;
+  cursor: pointer !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-observation-risk-grid {
+  display: none !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-obs-risk-table-wrap {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 4px !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-obs-risk-table-head,
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-obs-risk-table-row {
+  display: grid !important;
+  grid-template-columns: 1.5fr 1fr 1fr 1fr 1fr 1fr 1fr !important;
+  gap: 6px !important;
+  align-items: center !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-obs-risk-table-head {
+  font-size: .72rem !important;
+  font-weight: 900 !important;
+  color: #5d6e86 !important;
+  padding: 2px 4px !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-obs-risk-table-row {
+  border: 1px solid #d8e8f5 !important;
+  border-radius: 10px !important;
+  padding: 6px 8px !important;
+  font-size: .82rem !important;
+  font-weight: 800 !important;
+  color: #062a5e !important;
+  background: #f8fbff !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-obs-risk-profile-name {
+  font-weight: 900 !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-obs-risk-row-neg {
+  background: #ffeaea !important;
+  border-color: #f5bbbb !important;
+  color: #8b1d1d !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-obs-risk-row-lae {
+  background: #ebf5ff !important;
+  border-color: #bedbf8 !important;
+  color: #1a517f !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-obs-risk-row-pos {
+  background: #ecfff2 !important;
+  border-color: #bce9c8 !important;
+  color: #145331 !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-response-collapse-header {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 10px !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-response-collapse-header h2 {
+  margin: 0 !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-mini-toggle-btn {
+  width: 30px !important;
+  height: 30px !important;
+  min-width: 30px !important;
+  padding: 0 !important;
+  border-radius: 8px !important;
+  border: 1px solid #b7d7e8 !important;
+  background: #eef8ff !important;
+  color: #0b376d !important;
+  font-weight: 900 !important;
+  cursor: pointer !important;
+}
+
+
+/* v20260521_28 — Force final Observation Detail risk rows and collapsed Response Tracking */
+html[data-csvb-page="post_inspection_observation_detail.html"] #observationRiskCard {
+  padding: 8px 10px !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] #observationRiskCard h2 {
+  margin: 0 0 2px !important;
+  font-size: 1.02rem !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] #observationRiskProfileLine {
+  margin: 0 0 6px !important;
+  font-size: .74rem !important;
+  line-height: 1.15 !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-observation-risk-action-bar {
+  display: flex !important;
+  justify-content: flex-end !important;
+  margin-bottom: 4px !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-observation-risk-mini-refresh {
+  width: 28px !important;
+  height: 28px !important;
+  min-width: 28px !important;
+  padding: 0 !important;
+  border-radius: 8px !important;
+  border: 1px solid #b7d7e8 !important;
+  background: #eef8ff !important;
+  color: #0b376d !important;
+  font-size: 1rem !important;
+  font-weight: 900 !important;
+  cursor: pointer !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-observation-risk-grid {
+  display: none !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-obs-risk-empty {
+  font-size: .86rem !important;
+  color: #5e6f86 !important;
+  padding: 4px 0 !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-obs-risk-table-wrap {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 4px !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-obs-risk-table-head,
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-obs-risk-table-row {
+  display: grid !important;
+  grid-template-columns: 1.5fr 1fr 1fr 1fr 1fr 1fr 1fr !important;
+  gap: 6px !important;
+  align-items: center !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-obs-risk-table-head {
+  font-size: .72rem !important;
+  font-weight: 900 !important;
+  color: #5d6e86 !important;
+  padding: 2px 4px !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-obs-risk-table-row {
+  border: 1px solid #d8e8f5 !important;
+  border-radius: 10px !important;
+  padding: 6px 8px !important;
+  font-size: .82rem !important;
+  font-weight: 800 !important;
+  color: #062a5e !important;
+  background: #f8fbff !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-obs-risk-profile-name {
+  font-weight: 900 !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-obs-risk-row-neg {
+  background: #ffeaea !important;
+  border-color: #f5bbbb !important;
+  color: #8b1d1d !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-obs-risk-row-lae {
+  background: #ebf5ff !important;
+  border-color: #bedbf8 !important;
+  color: #1a517f !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-obs-risk-row-pos {
+  background: #ecfff2 !important;
+  border-color: #bce9c8 !important;
+  color: #145331 !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-response-collapse-header {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 10px !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-response-collapse-header h2 {
+  margin: 0 !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-mini-toggle-btn {
+  width: 30px !important;
+  height: 30px !important;
+  min-width: 30px !important;
+  padding: 0 !important;
+  border-radius: 8px !important;
+  border: 1px solid #b7d7e8 !important;
+  background: #eef8ff !important;
+  color: #0b376d !important;
+  font-weight: 900 !important;
+  cursor: pointer !important;
+}
+
+
+/* v20260522_1 — Editable independent Largely A.E. percentage */
+html[data-csvb-page="post_inspection.html"] .csvb-lae-percent-row {
+  display: grid !important;
+  grid-template-columns: 1fr auto !important;
+  gap: 5px !important;
+  align-items: center !important;
+  margin-top: 5px !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .csvb-lae-percent-row input {
+  min-height: 26px !important;
+  padding: 4px 6px !important;
+  text-align: center !important;
+  font-size: .78rem !important;
+  font-weight: 900 !important;
+  border-radius: 7px !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .csvb-lae-percent-row span {
+  font-size: .80rem !important;
+  font-weight: 900 !important;
+  color: #062a5e !important;
+}
+
+
+/* v20260522_4 — clean manual SOC/NOC/Observation Text editing */
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-manual-editable {
+  background: #fffdf4 !important;
+  border-color: #e9c46a !important;
+  box-shadow: 0 0 0 2px rgba(233,196,106,.16) !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-noc-manual-box {
+  display: grid !important;
+  grid-template-columns: auto 1fr !important;
+  gap: 6px 8px !important;
+  align-items: center !important;
+  margin-top: 6px !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-noc-manual-toggle {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  margin: 0 !important;
+  font-size: .74rem !important;
+  font-weight: 900 !important;
+  color: #062a5e !important;
+  white-space: nowrap !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-noc-manual-toggle input {
+  width: auto !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-noc-manual-select {
+  min-height: 28px !important;
+  padding: 4px 7px !important;
+  font-size: .76rem !important;
+  font-weight: 800 !important;
+  border-radius: 8px !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-noc-manual-help {
+  grid-column: 1 / -1 !important;
+  color: #5e6f86 !important;
+  font-size: .68rem !important;
+  font-weight: 750 !important;
+  line-height: 1.15 !important;
+}
+
+
+/* v20260522_5 — manual observation save and risk refresh */
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-manual-obs-save-refresh-btn {
+  grid-column: 1 / -1 !important;
+  justify-self: start !important;
+  min-height: 28px !important;
+  padding: 5px 10px !important;
+  border-radius: 8px !important;
+  border: 1px solid #8fc4e8 !important;
+  background: #eefaff !important;
+  color: #062a5e !important;
+  font-size: .76rem !important;
+  font-weight: 900 !important;
+  cursor: pointer !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-manual-obs-save-refresh-btn:hover {
+  background: #dff4ff !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-manual-obs-save-refresh-btn:disabled {
+  opacity: .65 !important;
+  cursor: wait !important;
+}
+
+
+/* v20260522_6 — visible manual save refresh button */
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-manual-obs-save-refresh-row {
+  display: flex !important;
+  justify-content: flex-start !important;
+  align-items: center !important;
+  margin-top: 8px !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-manual-obs-save-refresh-btn {
+  min-height: 30px !important;
+  padding: 5px 12px !important;
+  border-radius: 8px !important;
+  border: 1px solid #8fc4e8 !important;
+  background: #eefaff !important;
+  color: #062a5e !important;
+  font-size: .78rem !important;
+  font-weight: 950 !important;
+  cursor: pointer !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-manual-obs-save-refresh-btn:hover {
+  background: #dff4ff !important;
+}
+
+html[data-csvb-page="post_inspection_observation_detail.html"] .csvb-manual-obs-save-refresh-btn:disabled {
+  opacity: .65 !important;
+  cursor: wait !important;
+}

@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en" data-csvb-page="port-call-intelligence.html">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>C.S.V. BEACON – Port Call Intelligence</title>
+  <link rel="stylesheet" href="./csv-beacon-theme.css?v=20260907_contrast_1" />
+  <link rel="stylesheet" href="./style.css?v=20260428_3" />
+  <link rel="stylesheet" href="./port-call-intelligence.css?v=20260909_compact_2" />
+  <link rel="stylesheet" href="./csvb-mobile-polish.css?v=20260528_1" />
+  <link rel="stylesheet" href="./csvb-mobile-fixes-20260528-2.css?v=20260528_2" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="./auth.js"></script>
+  <script src="./csvb-module-guard.js?v=20260904_pci_1"></script>
+</head>
+<body>
+  <div class="topbar">
+    <div class="csvb-brand">
+      <img class="csvb-brand-logo" src="./assets/csv-beacon-icon.png" alt="C.S.V. BEACON logo" />
+      <div class="csvb-brand-text">
+        <div class="csvb-brand-title">C.S.V. BEACON</div>
+        <div class="csvb-brand-subtitle">Marine Assurance &amp; Compliance Platform</div>
+      </div>
+    </div>
+    <div class="topbar-actions">
+      <div id="userBadge" class="user-badge"></div>
+      <button class="btn2" id="loginBtn" type="button" style="display:none;">Login</button>
+      <button class="btn2" id="switchUserBtn" type="button">Switch User</button>
+      <button class="btn" id="logoutBtn" type="button" style="display:none;">Logout</button>
+      <button class="btn2" type="button" data-pci-tip="Return to the main C.S.V. BEACON dashboard." onclick="location.href='./q-dashboard.html'">Dashboard</button>
+    </div>
+  </div>
+
+  <main class="wrap pci-page">
+    <div id="warnBox" class="warn" role="alert" style="display:none;"></div>
+    <div id="okBox" class="ok" role="status" style="display:none;"></div>
+
+    <section class="pci-hero">
+      <div>
+        <div class="pci-kicker">Marine Applications &amp; Vessel Interaction</div>
+        <h1>Port Call Intelligence</h1>
+        <p>Company port knowledge, permanent vessel-call experience and controlled office guidance.</p>
+      </div>
+      <div class="pci-hero-actions">
+        <button id="reloadBtn" class="btn2" type="button" data-pci-tip="Reload ports and the selected port's latest information.">↻ Reload</button>
+        <button id="newCallBtn" class="btn" type="button" hidden data-pci-tip="Create a new Draft port-call report. Office users select the Company vessel that made the call.">+ New Call Report</button>
+        <button id="newOfficeInfoBtn" class="btn" type="button" hidden data-pci-tip="Add a controlled Company regulation, incident, operational note or guidance item for this port.">+ Office Information</button>
+      </div>
+    </section>
+
+    <section class="pci-port-picker" aria-label="Port and terminal selection">
+      <div class="pci-port-picker-title">Find a port or terminal</div>
+      <div class="pci-directory-search">
+        <form id="unlocodeSearchForm" class="pci-search-box">
+          <label for="unlocodeSearch">Search by UN/LOCODE</label>
+          <div class="pci-search-control">
+            <input id="unlocodeSearch" type="search" autocomplete="off" maxlength="12" placeholder="Example: SGSIN" />
+            <button id="unlocodeSearchBtn" class="btn2" type="submit" data-pci-tip="Find an authorised port by its complete or starting UN/LOCODE.">Search UN/LOCODE</button>
+          </div>
+        </form>
+        <form id="terminalSearchForm" class="pci-search-box">
+          <label for="terminalSearch">Search by terminal name</label>
+          <div class="pci-search-control">
+            <input id="terminalSearch" type="search" autocomplete="off" maxlength="120" placeholder="Enter at least 3 characters" />
+            <button id="terminalSearchBtn" class="btn2" type="submit" data-pci-tip="Find authorised terminals whose names contain this text.">Search Terminal</button>
+          </div>
+        </form>
+      </div>
+      <div id="directorySearchResults" class="pci-search-results" hidden></div>
+      <div class="pci-port-row">
+        <div class="pci-picker-field">
+          <label for="countrySelect">1. Country</label>
+          <select id="countrySelect" aria-label="Country"><option value="">Loading countries…</option></select>
+        </div>
+        <div class="pci-picker-field">
+          <label for="portSelect">2. Port</label>
+          <select id="portSelect" aria-label="Port" disabled><option value="">Select a country first…</option></select>
+        </div>
+        <div class="pci-picker-field">
+          <label for="terminalSelect">3. Terminal (if applicable)</label>
+          <select id="terminalSelect" aria-label="Terminal" disabled><option value="">Select a port first…</option></select>
+        </div>
+        <div class="pci-terminal-actions">
+          <button id="addTerminalBtn" class="btn2" type="button" hidden data-pci-tip="Add a missing terminal to this Company's shared terminal list for the selected port.">+ Add Terminal</button>
+          <button id="editTerminalBtn" class="btn2" type="button" hidden data-pci-tip="Correct the selected Company-added terminal name or deactivate the entry.">Edit Terminal</button>
+        </div>
+      </div>
+      <div id="portMeta" class="pci-meta">Select a port to view its Company information.</div>
+    </section>
+
+    <nav class="pci-tabs" aria-label="Port information views">
+      <button class="pci-tab is-active" type="button" data-tab="profile" data-pci-tip="View approved consolidated information and pending conflicts for this port.">Consolidated Profile <span id="profileCount" class="pci-count">0</span></button>
+      <button class="pci-tab" type="button" data-tab="calls" data-pci-tip="View each vessel call as a separate dated report.">Call Reports <span id="callCount" class="pci-count">0</span></button>
+      <button class="pci-tab" type="button" data-tab="office" data-pci-tip="View Company regulations, incidents, notes and guidance for this port.">Office Information <span id="officeCount" class="pci-count">0</span></button>
+    </nav>
+
+    <section id="profilePanel" class="pci-panel" data-panel="profile">
+      <div class="pci-panel-head">
+        <div><h2>Consolidated Port / Terminal / Berth Profile</h2><p>Only office-approved information is presented as the current Company profile.</p></div>
+      </div>
+      <div id="conflictBanner" class="pci-conflict" hidden></div>
+      <div id="profileScope" class="pci-scope-filter"></div>
+      <div id="profileContent" class="pci-card-grid"><div class="pci-empty">Select a port.</div></div>
+      <section id="proposalPanel" class="pci-subpanel" hidden>
+        <h3>Profile differences awaiting office review</h3>
+        <div id="proposalList"></div>
+      </section>
+    </section>
+
+    <section id="callsPanel" class="pci-panel" data-panel="calls" hidden>
+      <div class="pci-panel-head">
+        <div><h2>Company Call Report Register</h2><p>View and filter every call report available to your role. Office users can see all Company statuses; other users remain restricted by the existing Rights Matrix and database policies.</p></div>
+      </div>
+      <div class="pci-register-toolbar">
+        <div class="pci-register-context">
+          <strong id="callRegisterContext">Company-wide register</strong>
+          <span id="callRegisterResult">0 visible reports</span>
+        </div>
+        <div class="pci-register-filters">
+          <div><label for="callDateFrom">Call date from</label><input id="callDateFrom" type="date" /></div>
+          <div><label for="callDateTo">Call date to</label><input id="callDateTo" type="date" /></div>
+          <div><label for="callReferenceFilter">Call reference</label><input id="callReferenceFilter" type="search" placeholder="Call reference" /></div>
+          <div><label for="callVesselFilter">Vessel</label><input id="callVesselFilter" type="search" placeholder="Vessel name" /></div>
+          <div><label for="callCountryFilter">Country</label><select id="callCountryFilter"><option value="">All countries</option></select></div>
+          <div><label for="callUnlocodeFilter">UN/LOCODE</label><input id="callUnlocodeFilter" type="search" placeholder="Example: SGSIN" /></div>
+          <div><label for="callPortFilter">Port</label><input id="callPortFilter" type="search" placeholder="Port name" /></div>
+          <div><label for="callTerminalFilter">Terminal</label><input id="callTerminalFilter" type="search" placeholder="Terminal name" /></div>
+          <div><label for="callBerthFilter">Berth</label><input id="callBerthFilter" type="search" placeholder="Berth name" /></div>
+          <div><label for="callCargoFilter">Cargo operation</label><input id="callCargoFilter" type="search" placeholder="Cargo operation" /></div>
+          <div><label for="callStatusFilter">Status</label><select id="callStatusFilter"><option value="">All visible statuses</option><option value="finalised">Finalised</option><option value="draft">Draft</option><option value="submitted">Submitted</option><option value="under_review">Under review</option></select></div>
+          <div><label for="callOriginFilter">Report origin</label><select id="callOriginFilter"><option value="">All origins</option><option value="vessel_master">Vessel Master</option><option value="office">Office-entered</option></select></div>
+        </div>
+        <div class="pci-register-actions">
+          <button id="applyCallFiltersBtn" class="btn" type="button">Apply Filters</button>
+          <button id="clearCallFiltersBtn" class="btn2" type="button">Clear Filters</button>
+        </div>
+      </div>
+      <div class="pci-master-detail">
+        <div>
+          <div id="callList" class="pci-list"><div class="pci-empty">Loading visible call reports…</div></div>
+          <div class="pci-pagination">
+            <button id="callPrevPageBtn" class="btn2" type="button">Previous</button>
+            <span id="callPageSummary">Page 1</span>
+            <button id="callNextPageBtn" class="btn2" type="button">Next</button>
+          </div>
+        </div>
+        <article id="callDetail" class="pci-detail"><div class="pci-empty">Select a call report to read it.</div></article>
+      </div>
+    </section>
+
+    <section id="officePanel" class="pci-panel" data-panel="office" hidden>
+      <div class="pci-panel-head">
+        <div><h2>Office Information</h2><p>Port-wide or terminal/berth-specific regulations, incidents, operational notes and guidance.</p></div>
+        <select id="officeCategoryFilter" aria-label="Filter office information by category"><option value="">All categories</option><option value="regulation">Regulations</option><option value="incident">Incidents</option><option value="operational_note">Operational notes</option><option value="master_guidance">Master guidance</option><option value="superintendent_note">Superintendent notes</option><option value="other">Other</option></select>
+      </div>
+      <div id="officeList" class="pci-office-list"><div class="pci-empty">Select a port.</div></div>
+    </section>
+  </main>
+
+  <div id="pciDrawerBackdrop" class="pci-backdrop" hidden></div>
+  <aside id="pciDrawer" class="pci-drawer" aria-modal="true" role="dialog" aria-labelledby="drawerTitle" hidden>
+    <div class="pci-drawer-head"><div><div class="pci-kicker" id="drawerKicker"></div><h2 id="drawerTitle"></h2></div><button id="closeDrawerBtn" class="pci-icon-btn" type="button" aria-label="Close" data-pci-tip="Close this panel without changing saved information.">×</button></div>
+    <div id="drawerBody" class="pci-drawer-body"></div>
+    <div id="drawerActions" class="pci-drawer-actions"></div>
+  </aside>
+
+  <div id="confirmBackdrop" class="pci-backdrop pci-confirm-backdrop" hidden></div>
+  <section id="confirmDialog" class="pci-confirm" role="alertdialog" aria-modal="true" aria-labelledby="confirmTitle" hidden>
+    <h2 id="confirmTitle">Confirm action</h2><p id="confirmMessage"></p>
+    <div class="pci-confirm-actions"><button id="confirmCancelBtn" class="btn2" type="button">Cancel</button><button id="confirmActionBtn" class="pci-danger" type="button">Delete</button></div>
+  </section>
+
+  <div id="pciTooltip" class="pci-tooltip" role="tooltip" hidden></div>
+  <div id="pciBusy" class="pci-busy" hidden><div class="pci-spinner"></div><span>Working…</span></div>
+
+  <script src="./port-call-intelligence-permissions-v1.js?v=20260907_4"></script>
+  <script src="./port-call-intelligence.js?v=20260909_compact_2"></script>
+  <script src="./csvb-build-badge.js?v=20260528_01"></script>
+</body>
+</html>

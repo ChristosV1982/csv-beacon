@@ -1,0 +1,65 @@
+/* Isolated Omega Beacon dashboard preview — approved package 01.00.00003. */
+:root {
+  --brand-navy: #001840;
+  --brand-navy-dark: #000D24;
+  --brand-teal: #F86000;
+  --brand-teal-soft: #FFF0E8;
+  --brand-gold: #F86000;
+
+  --link: #F86000;
+  --btn-primary-bg: #F86000;
+  --btn-primary-text: #FFFFFF;
+  --btn-primary-bg-hover: #D95100;
+  --btn-secondary-bg: #FFFFFF;
+  --btn-secondary-text: #001840;
+  --btn-secondary-border: #CCD7E6;
+  --btn-secondary-bg-hover: #FFF0E8;
+  --focus: rgba(248, 96, 0, 0.35);
+}
+
+html[data-theme="dark"] {
+  --link: #F86000;
+  --btn-primary-bg: #F86000;
+  --btn-primary-text: #FFFFFF;
+  --btn-primary-bg-hover: #D95100;
+  --btn-secondary-bg: #0B2447;
+  --btn-secondary-text: #EAF3FB;
+  --btn-secondary-border: #20466F;
+  --btn-secondary-bg-hover: #12345E;
+  --focus: rgba(248, 96, 0, 0.42);
+}
+
+.topbar,
+header.topbar {
+  background: linear-gradient(90deg, #000D24, #001840) !important;
+  padding: 8px 16px !important;
+}
+
+.csvb-brand {
+  gap: 8px;
+}
+
+.csvb-brand-logo.omega-brand-logo {
+  display: block;
+  width: 210px;
+  height: 38px;
+  object-fit: contain;
+}
+
+.csvb-company-view-label {
+  color: #FFFFFF;
+}
+
+.csvb-company-view-select {
+  color: #001840;
+}
+
+.btn {
+  background: #F86000;
+  border-color: #F86000;
+}
+
+.btn:hover {
+  background: #D95100;
+  border-color: #D95100;
+}

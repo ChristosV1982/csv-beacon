@@ -1,0 +1,65 @@
+/* C.S.V. BEACON — MC-10B Global Help Tooltips */
+
+.csvb-help-tooltip {
+  position: fixed;
+  z-index: 999999;
+  max-width: 340px;
+  padding: 9px 11px;
+  border-radius: 10px;
+  background: #062A5E;
+  color: #ffffff;
+  border: 1px solid rgba(255,255,255,.18);
+  box-shadow: 0 10px 24px rgba(0,0,0,.22);
+  font-size: 0.86rem;
+  line-height: 1.35;
+  font-weight: 500;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity .12s ease, transform .12s ease;
+}
+
+.csvb-help-tooltip.show {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.csvb-help-tooltip::after {
+  content: "";
+  position: absolute;
+  top: -6px;
+  left: 18px;
+  width: 10px;
+  height: 10px;
+  background: #062A5E;
+  transform: rotate(45deg);
+  border-left: 1px solid rgba(255,255,255,.18);
+  border-top: 1px solid rgba(255,255,255,.18);
+}
+
+[data-csvb-help] {
+  cursor: help;
+}
+
+button[data-csvb-help],
+a[data-csvb-help],
+.btn[data-csvb-help],
+.btn2[data-csvb-help] {
+  cursor: pointer;
+}
+
+.csvb-help-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 17px;
+  height: 17px;
+  margin-left: 5px;
+  border-radius: 999px;
+  border: 1px solid #AEE3F1;
+  background: #E9F7FB;
+  color: #062A5E;
+  font-size: 0.72rem;
+  font-weight: 700;
+  vertical-align: middle;
+}

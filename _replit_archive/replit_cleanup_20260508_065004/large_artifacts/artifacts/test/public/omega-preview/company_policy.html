@@ -1,0 +1,1067 @@
+<!-- public/company_policy.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>C.S.V. BEACON – Company Policy</title>
+
+  <link rel="stylesheet" href="./csv-beacon-theme.css?v=20260428_3" />
+  <link rel="stylesheet" href="./style.css?v=20260428_3" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="./auth.js"></script>
+  <script src="./csvb-module-guard.js?v=20260522_dashboard_button_guard"></script>
+
+  <style>
+    body {
+      margin: 0;
+      font-family: var(--font-sans, "Segoe UI", Arial, sans-serif);
+      background: var(--bg-main, #f4f7fb);
+      color: var(--text-main, #10233f);
+      font-weight: 400;
+    }
+
+    .topbar {
+      background: linear-gradient(90deg, var(--brand-navy-dark, #061d3d), var(--brand-navy, #1a4170));
+      color: #fff;
+      padding: 12px 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      box-shadow: 0 8px 24px rgba(3,27,63,.16);
+    }
+
+    .row {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .wrap {
+      width: 100%;
+      max-width: none;
+      margin: 0;
+      padding: 10px;
+      box-sizing: border-box;
+    }
+
+    .btn,
+    .btn2,
+    .btnDanger {
+      border-radius: 10px;
+      padding: 8px 12px;
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-block;
+      white-space: nowrap;
+      line-height: 1.2;
+      font-size: 0.9rem;
+    }
+
+    .btn {
+      background: var(--brand-navy, #1a4170);
+      color: #fff;
+      border: 1px solid var(--brand-navy, #1a4170);
+    }
+
+    .btn2 {
+      background: var(--btn-secondary-bg, #eaf1fb);
+      color: var(--brand-navy, #1a4170);
+      border: 1px solid var(--btn-secondary-border, #c9d7eb);
+    }
+
+    .btnDanger {
+      background: #b02a2a;
+      color: #fff;
+      border: 1px solid #b02a2a;
+    }
+
+    .btn:disabled,
+    .btn2:disabled,
+    .btnDanger:disabled {
+      opacity: .55;
+      cursor: not-allowed;
+    }
+
+    .page-head {
+      background: #fff;
+      border: 1px solid var(--border-soft, #dbe6f6);
+      border-radius: 14px;
+      padding: 10px 12px;
+      box-shadow: 0 10px 30px rgba(3,27,63,0.06);
+      margin-bottom: 10px;
+    }
+
+    .page-title {
+      margin: 0;
+      color: var(--brand-navy, #1a4170);
+      font-size: 1.28rem;
+      font-weight: 700;
+      letter-spacing: .01em;
+    }
+
+    .page-subtitle {
+      margin-top: 4px;
+      color: var(--text-muted, #4d6283);
+      font-weight: 400;
+      line-height: 1.3;
+      font-size: 0.92rem;
+    }
+
+    .tabs,
+    .content-tabs {
+      display: flex;
+      gap: 7px;
+      flex-wrap: wrap;
+      margin-top: 9px;
+    }
+
+    .tab-btn,
+    .content-tab-btn {
+      border-radius: 999px;
+      padding: 7px 11px;
+      border: 1px solid #cbd8ea;
+      background: #f7fbff;
+      color: #1a4170;
+      font-weight: 500;
+      cursor: pointer;
+      font-size: 0.88rem;
+    }
+
+    .tab-btn.active,
+    .content-tab-btn.active {
+      background: #1a4170;
+      color: #fff;
+      border-color: #1a4170;
+      font-weight: 600;
+    }
+
+    .layout {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      width: 100%;
+      overflow-x: auto;
+    }
+
+    .panel {
+      background: #fff;
+      border: 1px solid var(--border-soft, #dbe6f6);
+      border-radius: 14px;
+      padding: 10px;
+      box-shadow: 0 10px 30px rgba(3,27,63,0.06);
+      min-width: 0;
+      box-sizing: border-box;
+    }
+
+    .chapter-panel {
+      flex: 0 0 auto;
+      width: max-content;
+      max-width: none;
+    }
+
+    .viewer-panel {
+      flex: 1 1 500px;
+      min-width: 500px;
+      max-width: none;
+    }
+
+    .panel-title {
+      color: #1a4170;
+      font-weight: 700;
+      font-size: 0.98rem;
+      margin-bottom: 8px;
+    }
+
+    .chapter-list {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      max-height: calc(100vh - 220px);
+      overflow: auto;
+      padding-right: 4px;
+      padding-bottom: 4px;
+      width: max-content;
+    }
+
+    .chapter-btn {
+      border: 1px solid #dbe6f6;
+      background: #f7fbff;
+      color: #173a68;
+      border-radius: 9px;
+      padding: 6px 8px;
+      text-align: left;
+      cursor: pointer;
+      font-weight: 700;
+      line-height: 1.2;
+      font-size: 0.8rem;
+      white-space: nowrap;
+      width: 100%;
+      min-width: max-content;
+      max-width: none;
+    }
+
+    .chapter-code {
+      font-weight: 700;
+      color: #0b2f5f;
+      margin-right: 4px;
+    }
+
+    .tree-mark {
+      display: inline-block;
+      width: 14px;
+      color: #5a6d88;
+      font-weight: 500;
+    }
+
+    .viewer-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 8px;
+      flex-wrap: wrap;
+      border-bottom: 1px solid #dbe6f6;
+      padding-bottom: 9px;
+      margin-bottom: 9px;
+    }
+
+    .viewer-title {
+      margin: 0;
+      color: #1a4170;
+      font-size: 1.02rem;
+      font-weight: 700;
+      line-height: 1.25;
+    }
+
+    .viewer-meta {
+      margin-top: 5px;
+      color: #4d6283;
+      font-weight: 400;
+      line-height: 1.3;
+      font-size: 0.9rem;
+    }
+
+    .status-pill {
+      display: inline-block;
+      padding: 4px 9px;
+      border-radius: 999px;
+      background: #fff6e0;
+      color: #8a5a00;
+      border: 1px solid #f6d58f;
+      font-weight: 500;
+      font-size: .82rem;
+      white-space: nowrap;
+    }
+
+    .content-box {
+      border: 1px dashed #b9c8df;
+      background: #f9fbfe;
+      border-radius: 12px;
+      padding: 11px;
+      color: #213a5f;
+      font-weight: 400;
+      line-height: 1.45;
+      min-height: 160px;
+      font-size: 0.92rem;
+    }
+
+    .content-box strong,
+    .content-box b {
+      font-weight: 700;
+    }
+
+    .published-content {
+      min-height: 220px;
+      overflow: auto;
+    }
+
+    .module-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 10px;
+    }
+
+    .mini-card {
+      border: 1px solid #dbe6f6;
+      border-radius: 12px;
+      background: #fff;
+      padding: 11px;
+    }
+
+    .mini-card-title {
+      color: #1a4170;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+
+    .mini-card-text {
+      color: #4d6283;
+      font-weight: 400;
+      line-height: 1.35;
+    }
+
+    .search-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 10px;
+    }
+
+    .search-input {
+      flex: 1;
+      min-width: 240px;
+      border: 1px solid #cbd8ea;
+      border-radius: 10px;
+      padding: 9px 11px;
+      font-weight: 400;
+      color: #10233f;
+    }
+
+    .result-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .result-item {
+      border: 1px solid #dbe6f6;
+      border-radius: 12px;
+      padding: 10px;
+      background: #f7fbff;
+      cursor: pointer;
+    }
+
+    .result-item:hover {
+      background: #eef6ff;
+    }
+
+    .result-title {
+      color: #1a4170;
+      font-weight: 700;
+    }
+
+    .result-text {
+      margin-top: 4px;
+      color: #4d6283;
+      font-weight: 400;
+      line-height: 1.35;
+    }
+
+    .warn {
+      display: none;
+      margin-bottom: 10px;
+      color: #8b1d1d;
+      background: #ffeaea;
+      border: 1px solid #ffc7c7;
+      padding: 9px 11px;
+      border-radius: 12px;
+      font-weight: 500;
+      white-space: pre-wrap;
+    }
+
+    .ok {
+      display: none;
+      margin-bottom: 10px;
+      color: #11612b;
+      background: #e9fff0;
+      border: 1px solid #bce9c9;
+      padding: 9px 11px;
+      border-radius: 12px;
+      font-weight: 500;
+      white-space: pre-wrap;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    .admin-layout {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 10px;
+      align-items: start;
+    }
+
+    .admin-card {
+      border: 1px solid #dbe6f6;
+      background: #fff;
+      border-radius: 12px;
+      padding: 11px;
+    }
+
+    .admin-card-title {
+      color: #1a4170;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+
+    .admin-note {
+      color: #4d6283;
+      font-weight: 400;
+      line-height: 1.35;
+      font-size: 0.9rem;
+      margin-bottom: 10px;
+    }
+
+    .admin-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      gap: 8px;
+    }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      margin-bottom: 8px;
+    }
+
+    label {
+      color: #1a4170;
+      font-weight: 600;
+      font-size: 0.9rem;
+    }
+
+    input,
+    select,
+    textarea {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 8px 10px;
+      border-radius: 10px;
+      border: 1px solid #cbd8ea;
+      background: #fff;
+      color: #10233f;
+      font-family: inherit;
+      font-size: 0.9rem;
+      font-weight: 400;
+    }
+
+    textarea {
+      min-height: 70px;
+      resize: vertical;
+    }
+
+    .checkbox-line {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: #213a5f;
+      font-weight: 400;
+      font-size: 0.9rem;
+      margin: 8px 0;
+    }
+
+    .checkbox-line input {
+      width: auto;
+    }
+
+    .admin-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+      margin-top: 8px;
+    }
+
+    .selected-box {
+      border: 1px solid #dbe6f6;
+      background: #f7fbff;
+      border-radius: 12px;
+      padding: 9px 10px;
+      color: #213a5f;
+      font-size: 0.9rem;
+      line-height: 1.35;
+      margin-bottom: 10px;
+    }
+
+    .selected-box strong {
+      color: #1a4170;
+      font-weight: 700;
+    }
+
+    .danger-box {
+      border: 1px solid #f0c2c2;
+      background: #fff7f7;
+      border-radius: 12px;
+      padding: 10px;
+    }
+
+    .archived-list {
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+      max-height: 300px;
+      overflow: auto;
+    }
+
+    .archived-item {
+      border: 1px solid #dbe6f6;
+      background: #f7fbff;
+      border-radius: 12px;
+      padding: 9px;
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      justify-content: space-between;
+    }
+
+    .archived-title {
+      color: #1a4170;
+      font-weight: 700;
+      line-height: 1.25;
+    }
+
+    .archived-meta {
+      margin-top: 3px;
+      color: #4d6283;
+      font-weight: 400;
+      font-size: 0.86rem;
+    }
+
+    .editor-wrap {
+      border: 1px solid #dbe6f6;
+      border-radius: 12px;
+      background: #fff;
+      overflow: hidden;
+    }
+
+    .editor-toolbar {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      align-items: center;
+      padding: 8px;
+      border-bottom: 1px solid #dbe6f6;
+      background: #f7fbff;
+    }
+
+    .tool-btn {
+      border: 1px solid #cbd8ea;
+      background: #fff;
+      color: #1a4170;
+      border-radius: 8px;
+      padding: 6px 9px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.84rem;
+    }
+
+    .tool-btn:hover {
+      background: #eaf1fb;
+    }
+
+    .editor-area {
+      min-height: 280px;
+      padding: 14px;
+      outline: none;
+      color: #10233f;
+      line-height: 1.5;
+      font-size: 0.96rem;
+      background: #fff;
+      overflow: auto;
+    }
+
+    .editor-area:empty::before {
+      content: "Type policy text here...";
+      color: #8090a8;
+    }
+
+    .editor-meta {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin: 9px 0;
+      color: #4d6283;
+      font-size: 0.88rem;
+    }
+
+    .version-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      max-height: 420px;
+      overflow: auto;
+    }
+
+    .version-item {
+      border: 1px solid #dbe6f6;
+      background: #f7fbff;
+      border-radius: 12px;
+      padding: 10px;
+    }
+
+    .version-title {
+      color: #1a4170;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .version-meta {
+      color: #4d6283;
+      font-weight: 400;
+      line-height: 1.35;
+      font-size: 0.88rem;
+    }
+
+    .content-workflow {
+      border: 1px solid #dbe6f6;
+      border-radius: 12px;
+      background: #f9fbfe;
+      padding: 10px;
+      margin-bottom: 10px;
+      color: #213a5f;
+      font-size: 0.9rem;
+      line-height: 1.35;
+    }
+
+    @media (max-width: 900px) {
+      .layout {
+        flex-direction: column;
+      }
+
+      .chapter-panel,
+      .viewer-panel {
+        width: 100%;
+        max-width: 100%;
+      }
+
+      .chapter-list {
+        width: 100%;
+      }
+
+      .chapter-btn {
+        width: max-content;
+        min-width: 100%;
+      }
+
+      .viewer-panel {
+        min-width: 0;
+      }
+    }
+  </style>
+
+  <link rel="stylesheet" href="./csvb-ui-polish.css?v=20260430_1" />
+  <link rel="stylesheet" href="./csvb-help-tooltips.css?v=20260430_1" />
+  <link rel="stylesheet" href="./csvb-100pct-fit.css?v=20260430_1" />
+  <link rel="stylesheet" href="./csvb-mobile-polish.css?v=20260528_1" />
+  <link rel="stylesheet" href="./csvb-mobile-fixes-20260528-2.css?v=20260528_2" />
+</head>
+
+<body>
+  <div class="topbar">
+    <div class="csvb-brand">
+      <img class="csvb-brand-logo" src="./assets/csv-beacon-icon.png" alt="C.S.V. BEACON logo" />
+      <div class="csvb-brand-text">
+        <div class="csvb-brand-title">C.S.V. BEACON</div>
+        <div class="csvb-brand-subtitle">Marine Assurance & Compliance Platform</div>
+      </div>
+    </div>
+
+    <div class="row">
+      <div id="userBadge" style="font-weight:500;opacity:.95;"></div>
+      <button class="btn2" id="loginBtn" type="button" style="display:none;">Login</button>
+      <button class="btn2" id="switchUserBtn" type="button">Switch User</button>
+      <button class="btn" id="logoutBtn" type="button" style="display:none;">Logout</button>
+      <button class="btn2" type="button" onclick="location.href='./q-dashboard.html'">Dashboard</button>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <div id="warnBox" class="warn"></div>
+    <div id="okBox" class="ok"></div>
+
+    <div class="page-head">
+      <h1 class="page-title">Company Policy</h1>
+      <div class="page-subtitle">
+        Controlled policy book structure. The full policy text will be inserted later by Word/PDF import or controlled editing.
+      </div>
+
+      <div class="tabs">
+        <button class="tab-btn active" type="button" data-tab="policyBook">Policy Book</button>
+        <button class="tab-btn" type="button" data-tab="search">Search</button>
+        <button class="tab-btn" type="button" data-tab="aiSearch">AI Search</button>
+        <button class="tab-btn" type="button" data-tab="changeRequests">Change Requests</button>
+        <button class="tab-btn" type="button" data-tab="manuals">Manuals / Documents</button>
+        <button class="tab-btn" type="button" data-tab="adminSetup">Admin / Setup</button>
+      </div>
+    </div>
+
+    <section id="tab-policyBook" class="tab-panel">
+      <div class="layout">
+        <div class="panel chapter-panel">
+          <div class="panel-title">Policy Book Chapters</div>
+          <div id="chapterList" class="chapter-list"></div>
+        </div>
+
+        <div class="panel viewer-panel">
+          <div class="viewer-header">
+            <div>
+              <h2 id="chapterTitle" class="viewer-title">Select a policy item</h2>
+              <div id="chapterMeta" class="viewer-meta">No policy item selected.</div>
+            </div>
+            <div class="row">
+              <span id="contentStatusPill" class="status-pill">No published text</span>
+              <button id="submitChangeRequestBtn" class="btn2" type="button">Submit Change Request</button>
+              <button id="editDraftBtn" class="btn" type="button" disabled>Edit Draft</button>
+            </div>
+          </div>
+
+          <div class="content-tabs">
+            <button class="content-tab-btn active" type="button" data-content-tab="published">Published View</button>
+            <button class="content-tab-btn" type="button" data-content-tab="draft">Draft Editor</button>
+            <button class="content-tab-btn" type="button" data-content-tab="history">Version History</button>
+          </div>
+
+          <div style="height:10px;"></div>
+
+          <div id="contentTab-published" class="content-panel">
+            <div id="chapterContent" class="content-box published-content">
+              Select a policy item from the left side.
+            </div>
+          </div>
+
+          <div id="contentTab-draft" class="content-panel hidden">
+            <div id="editorDeniedBox" class="content-box hidden">
+              Draft editing is restricted to Super Admin.
+            </div>
+
+            <div id="editorTools" class="hidden">
+              <div id="editorStateBox" class="content-workflow">
+                No draft loaded.
+              </div>
+
+              <div class="field">
+                <label>Change summary</label>
+                <input id="policyChangeSummary" placeholder="Brief description of the policy change" />
+              </div>
+
+              <div class="editor-wrap">
+                <div class="editor-toolbar">
+                  <button class="tool-btn" type="button" data-editor-cmd="bold">Bold</button>
+                  <button class="tool-btn" type="button" data-editor-cmd="italic">Italic</button>
+                  <button class="tool-btn" type="button" data-editor-cmd="underline">Underline</button>
+                  <button class="tool-btn" type="button" data-editor-block="p">Paragraph</button>
+                  <button class="tool-btn" type="button" data-editor-block="h2">Heading</button>
+                  <button class="tool-btn" type="button" data-editor-block="h3">Subheading</button>
+                  <button class="tool-btn" type="button" data-editor-cmd="insertUnorderedList">Bullets</button>
+                  <button class="tool-btn" type="button" data-editor-cmd="insertOrderedList">Numbering</button>
+                  <button class="tool-btn" type="button" data-editor-cmd="justifyLeft">Left</button>
+                  <button class="tool-btn" type="button" data-editor-cmd="justifyCenter">Center</button>
+                  <button class="tool-btn" type="button" data-editor-cmd="justifyRight">Right</button>
+                  <button class="tool-btn" type="button" id="insertLinkBtn">Link</button>
+                  <button class="tool-btn" type="button" data-editor-cmd="removeFormat">Clear Format</button>
+                </div>
+
+                <div id="policyEditor" class="editor-area" contenteditable="true"></div>
+              </div>
+
+              <div class="admin-actions">
+                <button class="btn" id="saveDraftBtn" type="button">Save Draft</button>
+                <button class="btn2" id="submitDraftBtn" type="button">Submit for Approval</button>
+                <button class="btn2" id="approveVersionBtn" type="button">Approve</button>
+                <button class="btn" id="publishVersionBtn" type="button">Publish</button>
+                <button class="btnDanger" id="rejectVersionBtn" type="button">Reject</button>
+                <button class="btnDanger" id="discardWorkVersionBtn" type="button">Discard Work Version</button>
+                <button class="btn2" id="reloadEditorBtn" type="button">Reload Editor</button>
+              </div>
+            </div>
+          </div>
+
+          <div id="contentTab-history" class="content-panel hidden">
+            <div id="versionHistoryBox" class="version-list">
+              No version history loaded.
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="tab-search" class="tab-panel hidden">
+      <div class="panel">
+        <div class="panel-title">Exact Search</div>
+        <div class="search-row">
+          <input id="searchInput" class="search-input" type="search" placeholder="Search chapter number or title..." />
+          <button id="searchBtn" class="btn" type="button">Search</button>
+          <button id="clearSearchBtn" class="btn2" type="button">Clear</button>
+        </div>
+        <div id="searchResults" class="result-list"></div>
+      </div>
+    </section>
+
+    <section id="tab-aiSearch" class="tab-panel hidden">
+      <div class="panel">
+        <div class="panel-title">AI Policy Search</div>
+        <div class="content-box">
+          AI Policy Search is intentionally not active yet.
+          <br /><br />
+          It will be added after the approved policy text exists and has been indexed. The AI answer must be based only on approved policy text and must show the source chapter/section used.
+        </div>
+      </div>
+    </section>
+
+    <section id="tab-changeRequests" class="tab-panel hidden">
+      <div class="panel">
+        <div class="panel-title">Change Requests</div>
+        <div class="module-grid">
+          <div class="mini-card">
+            <div class="mini-card-title">Submit Request</div>
+            <div class="mini-card-text">
+              Users with permission will be able to request corrections, additions, deletions, or clarifications against a chapter/section.
+            </div>
+          </div>
+          <div class="mini-card">
+            <div class="mini-card-title">Review / Approval</div>
+            <div class="mini-card-text">
+              Reviewers will be able to approve, reject, or close requests. This will be tied to the future approval workflow.
+            </div>
+          </div>
+          <div class="mini-card">
+            <div class="mini-card-title">Traceability</div>
+            <div class="mini-card-text">
+              Every request and decision will be traceable to the user, company, chapter, time, and decision comment.
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="tab-manuals" class="tab-panel hidden">
+      <div class="panel">
+        <div class="panel-title">Manuals / Documents Repository</div>
+        <div class="module-grid">
+          <div class="mini-card">
+            <div class="mini-card-title">Folders</div>
+            <div class="mini-card-text">
+              Future folders for company manuals, vessel manuals, maker manuals, forms, circulars, and vessel-specific documents.
+            </div>
+          </div>
+          <div class="mini-card">
+            <div class="mini-card-title">Files</div>
+            <div class="mini-card-text">
+              Future upload area for PDF, Word, images, and other controlled documents.
+            </div>
+          </div>
+          <div class="mini-card">
+            <div class="mini-card-title">Company / Vessel Scope</div>
+            <div class="mini-card-text">
+              Documents will later be assigned to a company and optionally to a specific vessel.
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="tab-adminSetup" class="tab-panel hidden">
+      <div class="panel">
+        <div class="panel-title">Policy structure administration</div>
+
+        <div id="adminDeniedBox" class="content-box hidden">
+          Structure administration is restricted to Super Admin.
+        </div>
+
+        <div id="adminTools" class="admin-layout hidden">
+          <div class="admin-card">
+            <div class="admin-card-title">Create policy item</div>
+            <div class="admin-note">
+              Create a top-level chapter or add a child item under any existing chapter, subchapter, section, or heading.
+            </div>
+
+            <div class="field">
+              <label>Parent item</label>
+              <select id="createParentNode"></select>
+            </div>
+
+            <div class="admin-grid">
+              <div class="field">
+                <label>Item type</label>
+                <select id="createNodeType">
+                  <option value="chapter">Chapter</option>
+                  <option value="subchapter">Subchapter</option>
+                  <option value="section">Section</option>
+                  <option value="subsection">Subsection</option>
+                  <option value="paragraph">Paragraph</option>
+                  <option value="heading">Heading</option>
+                  <option value="annex">Annex</option>
+                  <option value="appendix">Appendix</option>
+                  <option value="book_part">Book part</option>
+                </select>
+              </div>
+
+              <div class="field">
+                <label>Code</label>
+                <input id="createNodeCode" placeholder="e.g. 7.9.1" />
+              </div>
+
+              <div class="field">
+                <label>Sort order</label>
+                <input id="createSortOrder" type="number" step="0.01" placeholder="Auto if blank" />
+              </div>
+            </div>
+
+            <div class="field">
+              <label>Title</label>
+              <input id="createNodeTitle" placeholder="New policy item title" />
+            </div>
+
+            <label class="checkbox-line">
+              <input id="createIsContentNode" type="checkbox" checked />
+              This item can contain policy text
+            </label>
+
+            <div class="admin-actions">
+              <button class="btn" id="createNodeBtn" type="button">Create item</button>
+              <button class="btn2" id="createChildOfSelectedBtn" type="button">Use selected as parent</button>
+              <button class="btn2" id="clearCreateBtn" type="button">Clear</button>
+            </div>
+          </div>
+
+          <div class="admin-card">
+            <div class="admin-card-title">Edit selected item</div>
+            <div id="selectedAdminBox" class="selected-box">
+              No policy item selected.
+            </div>
+
+            <div class="admin-grid">
+              <div class="field">
+                <label>Item type</label>
+                <select id="editNodeType">
+                  <option value="chapter">Chapter</option>
+                  <option value="subchapter">Subchapter</option>
+                  <option value="section">Section</option>
+                  <option value="subsection">Subsection</option>
+                  <option value="paragraph">Paragraph</option>
+                  <option value="heading">Heading</option>
+                  <option value="annex">Annex</option>
+                  <option value="appendix">Appendix</option>
+                  <option value="book_part">Book part</option>
+                </select>
+              </div>
+
+              <div class="field">
+                <label>Code</label>
+                <input id="editNodeCode" />
+              </div>
+
+              <div class="field">
+                <label>Sort order</label>
+                <input id="editSortOrder" type="number" step="0.01" />
+              </div>
+            </div>
+
+            <div class="field">
+              <label>Title</label>
+              <input id="editNodeTitle" />
+            </div>
+
+            <label class="checkbox-line">
+              <input id="editIsContentNode" type="checkbox" />
+              This item can contain policy text
+            </label>
+
+            <div class="admin-actions">
+              <button class="btn" id="saveNodeBtn" type="button">Save selected item</button>
+              <button class="btn2" id="reloadPolicyBtn" type="button">Reload tree</button>
+            </div>
+          </div>
+
+          <div class="admin-card">
+            <div class="admin-card-title">Move selected item</div>
+            <div class="admin-note">
+              Move the selected item under another parent. Descendant levels are recalculated automatically.
+            </div>
+
+            <div class="field">
+              <label>New parent item</label>
+              <select id="moveParentNode"></select>
+            </div>
+
+            <div class="field">
+              <label>New sort order</label>
+              <input id="moveSortOrder" type="number" step="0.01" placeholder="Auto if blank" />
+            </div>
+
+            <div class="admin-actions">
+              <button class="btn" id="moveNodeBtn" type="button">Move selected item</button>
+            </div>
+          </div>
+
+          <div class="admin-card danger-box">
+            <div class="admin-card-title">Archive selected item</div>
+            <div class="admin-note">
+              Archiving removes the item from the active Policy Book but keeps history and audit traceability. This is not a physical delete.
+            </div>
+
+            <label class="checkbox-line">
+              <input id="archiveChildren" type="checkbox" checked />
+              Archive child items also
+            </label>
+
+            <div class="field">
+              <label>Reason</label>
+              <textarea id="archiveReason" placeholder="Optional reason"></textarea>
+            </div>
+
+            <div class="admin-actions">
+              <button class="btnDanger" id="archiveNodeBtn" type="button">Archive selected item</button>
+            </div>
+          </div>
+
+          <div class="admin-card">
+            <div class="admin-card-title">Archived items</div>
+            <div class="admin-note">
+              Restore archived policy structure items when required.
+            </div>
+
+            <label class="checkbox-line">
+              <input id="restoreChildren" type="checkbox" />
+              Restore child items also
+            </label>
+
+            <div class="admin-actions">
+              <button class="btn2" id="refreshArchivedBtn" type="button">Refresh archived list</button>
+            </div>
+
+            <div style="height:8px;"></div>
+            <div id="archivedNodesList" class="archived-list">
+              No archived items loaded.
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script src="./company_policy.js?v=20260615_policy_deeplink_v04f_a1"></script>
+  <script src="./company_policy_change_requests.js?v=20260506_1"></script>
+  <script src="./company_policy_documents.js?v=20260507_1"></script>
+  <script src="./company_policy_search.js?v=20260507_1"></script>
+  <script src="./company_policy_ai_search.js?v=20260507_1"></script>
+  <script src="./company_policy_permissions.js?v=20260507_1"></script>
+  <script src="./company_policy_editor_assets.js?v=20260507_1"></script>
+  <script src="./company_policy_editor_tables.js?v=20260507_1"></script>
+  <script src="./company_policy_editor_blocks.js?v=20260507_1"></script>
+  <script src="./company_policy_editor_paste_cleanup.js?v=20260507_1"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script>
+    if (window.pdfjsLib) {
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc =
+        "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+    }
+  </script>
+  <script src="./company_policy_editor_import.js?v=20260507_3"></script>
+  <script src="./company_policy_editor_import_splitter.js?v=20260507_1"></script>
+  <script src="./company_policy_print_export.js?v=20260507_1"></script>
+  <script src="./csvb-ui-polish.js?v=20260430_1"></script>
+  <script src="./csvb-help-tooltips.js?v=20260430_1"></script>
+  <script src="./csvb-100pct-fit.js?v=20260430_1"></script>
+  <script src="./csvb-build-badge.js?v=20260528_01"></script>
+  <script src="./csvb-global-busy.js?v=20260629_global_busy_v01"></script>
+</body>
+</html>

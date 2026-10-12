@@ -1,0 +1,79 @@
+<!-- public/inspection-event-create.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>C.S.V. BEACON - Create Inspection Event</title>
+  <link rel="stylesheet" href="./csv-beacon-theme.css?v=20260428_3" />
+  <link rel="stylesheet" href="./style.css?v=20260428_3" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="./auth.js"></script>
+  <script src="./csvb-module-guard.js?v=20260522_dashboard_button_guard"></script>
+  <style>
+    body{margin:0;padding:10px;background:#eef4fb;font-family:"Segoe UI",Arial,sans-serif;color:#06305c}
+    .wrap{width:min(1400px,calc(100vw - 20px));margin:0 auto}.topbar{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;background:#062b55;color:#fff;border-radius:14px;padding:9px 12px;margin-bottom:10px}
+    .title{font-size:1.04rem;font-weight:700}.sub{font-size:.82rem;color:#d9ecff}.actions{display:flex;gap:7px;flex-wrap:wrap}
+    .btn{border:1px solid #b9d4ee;border-radius:9px;padding:7px 10px;font-weight:650;text-decoration:none;background:#063b71;color:#fff;min-height:34px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer}
+    .btn.secondary{background:#eef7ff;color:#07345f}.btn:disabled{opacity:.55;cursor:not-allowed}.build{border:1px solid rgba(255,255,255,.35);border-radius:999px;padding:3px 8px;font-size:.72rem;color:#d9ecff}
+    .card{background:#fff;border:1px solid #d5deef;border-radius:14px;padding:10px;box-shadow:0 3px 14px rgba(18,44,87,.10)}.note{border:1px solid #d5deef;border-radius:12px;background:#f7fbff;color:#35507b;padding:8px;margin:8px 0}
+    .warn,.ok{display:none;border-radius:12px;font-weight:600;line-height:1.35;padding:9px;margin:8px 0;white-space:pre-wrap}.warn{border:1px solid #f1c7c7;background:#fff2f2;color:#7a1f1f}.ok{border:1px solid #bce9c9;background:#effff4;color:#11612b}
+    .formGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.full{grid-column:1/-1}label{display:block;margin:8px 0 4px;font-size:.85rem;font-weight:650;color:#1a4170}
+    input,select,textarea{width:100%;box-sizing:border-box;border:1px solid #cbd7ee;border-radius:9px;padding:7px 9px;min-height:36px;color:#1a4170;font-family:"Segoe UI",Arial,sans-serif}textarea{min-height:82px;resize:vertical}.small{font-size:.82rem;color:#48628e;margin-top:4px}.formActions{display:flex;gap:7px;flex-wrap:wrap;margin-top:12px}
+    @media(max-width:800px){.formGrid{grid-template-columns:1fr}.actions,.btn{width:100%}.btn{justify-content:center}}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <div><div class="title">Create Inspection Event</div><div class="sub" id="subLine">Checking session...</div></div>
+      <div class="actions">
+        <span class="build">build: assurance_inspection_event_create_v01_20260602_2</span>
+        <a class="btn" href="./inspection-events.html">Inspection Events</a>
+        <a class="btn" href="./inspection-question-sets.html">Question Sets</a>
+        <a class="btn" href="./inspection-assurance.html">Assurance Home</a>
+        <button class="btn" id="logoutBtn" type="button">Logout</button>
+      </div>
+    </div>
+
+    <div id="warnBox" class="warn"></div>
+    <div id="okBox" class="ok"></div>
+
+    <div class="card">
+      <h2 style="margin:0;">New Inspection Event</h2>
+      <div class="note">Creates an event header from an existing Question Set Template. The answering workspace will be added next.</div>
+
+      <div class="formGrid">
+        <div class="full"><label for="questionSetId">Question Set Template</label><select id="questionSetId"><option value="">Loading...</option></select><div class="small" id="questionSetInfo">Select a question set.</div></div>
+        <div><label for="vesselId">Vessel</label><select id="vesselId"><option value="">Loading...</option></select></div>
+        <div><label for="inspectionType">Inspection Type</label><select id="inspectionType">
+          <option value="pre_sire_2_prep">Pre-SIRE 2.0 Preparation</option>
+          <option value="marine_superintendent_inspection">Marine Superintendent Inspection</option>
+          <option value="technical_superintendent_inspection">Technical Superintendent Inspection</option>
+          <option value="hsqe_inspection">HSQE Inspection</option>
+          <option value="vessel_self_assessment">Vessel Self-Assessment</option>
+          <option value="company_internal_audit">Company Internal Audit</option>
+          <option value="cargo_operation_attendance">Cargo Operation Attendance</option>
+          <option value="mooring_inspection">Mooring Inspection</option>
+          <option value="navigation_inspection">Navigation Inspection</option>
+          <option value="engine_room_inspection">Engine Room Inspection</option>
+          <option value="risq_preparation">RISQ Preparation</option>
+          <option value="company_specific_inspection">Company Specific Inspection</option>
+        </select></div>
+        <div><label for="eventStatus">Initial Status</label><select id="eventStatus"><option value="draft">Draft</option><option value="assigned">Assigned</option></select></div>
+        <div><label for="plannedDate">Planned Date</label><input id="plannedDate" type="date" /></div>
+        <div><label for="dueDate">Due Date</label><input id="dueDate" type="date" /></div>
+        <div class="full"><label for="inspectionTitle">Inspection Title</label><input id="inspectionTitle" placeholder="e.g. OLYMPIC EXAMPLE - Pre-SIRE 2.0 Preparation" /></div>
+        <div><label for="assignedToProfileId">Assigned To</label><select id="assignedToProfileId"><option value="">Not assigned</option></select></div>
+        <div><label for="reviewerProfileId">Reviewer</label><select id="reviewerProfileId"><option value="">No reviewer selected</option></select></div>
+        <div class="full"><label for="remarks">Remarks</label><textarea id="remarks"></textarea></div>
+      </div>
+
+      <div class="formActions"><button class="btn" id="createBtn" type="button">Create Inspection Event</button><button class="btn secondary" id="resetBtn" type="button">Reset</button></div>
+    </div>
+  </div>
+
+  <script type="module" src="./inspection-event-create-v01.js?v=20260602_2"></script>
+  <script src="./csvb-global-busy.js?v=20260629_global_busy_v01"></script>
+</body>
+</html>

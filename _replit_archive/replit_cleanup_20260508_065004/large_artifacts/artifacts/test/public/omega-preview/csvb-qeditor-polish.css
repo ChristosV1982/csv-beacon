@@ -1,0 +1,94 @@
+/* C.S.V. BEACON — MC-10D2 Questions Editor Polish */
+
+html[data-csvb-page="q-questions-editor.html"] .csvb-qeditor-helper{
+  width:100%;
+  max-width:100%;
+  margin:8px auto 10px;
+  padding:9px 12px;
+  border:1px solid #D6E4F5;
+  border-radius:12px;
+  background:#fff;
+  box-shadow:0 8px 20px rgba(3,27,63,.05);
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  flex-wrap:wrap;
+}
+
+html[data-csvb-page="q-questions-editor.html"] .csvb-qeditor-helper-title{
+  color:#062A5E;
+  font-weight:700;
+  display:flex;
+  align-items:center;
+  gap:7px;
+}
+
+html[data-csvb-page="q-questions-editor.html"] .csvb-qeditor-helper-note{
+  color:#5E6F86;
+  font-size:.9rem;
+}
+
+html[data-csvb-page="q-questions-editor.html"] .csvb-qeditor-workflow{
+  width:100%;
+  max-width:100%;
+  margin:6px auto 8px;
+  display:grid;
+  grid-template-columns:repeat(3, minmax(180px, 1fr));
+  gap:8px;
+}
+
+@media(max-width:1000px){
+  html[data-csvb-page="q-questions-editor.html"] .csvb-qeditor-workflow{
+    grid-template-columns:1fr;
+  }
+}
+
+html[data-csvb-page="q-questions-editor.html"] .csvb-qeditor-workflow-item{
+  border:1px solid #D6E4F5;
+  border-radius:10px;
+  background:#F7FAFE;
+  color:#163457;
+  padding:8px 9px;
+  font-size:.88rem;
+  line-height:1.25;
+}
+
+html[data-csvb-page="q-questions-editor.html"] .csvb-qeditor-workflow-item b{
+  color:#062A5E;
+  font-weight:700;
+}
+
+html[data-csvb-page="q-questions-editor.html"] .csvb-qeditor-badge{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  width:24px;
+  height:24px;
+  border-radius:8px;
+  background:#E9F7FB;
+  border:1px solid #AEE3F1;
+  color:#062A5E;
+  margin-right:5px;
+}
+
+html[data-csvb-page="q-questions-editor.html"] .csvb-qeditor-separation-note{
+  margin:6px 0 8px;
+  padding:8px 10px;
+  border-radius:10px;
+  border:1px solid #F6D58F;
+  background:#FFF6E0;
+  color:#8A5A00;
+  font-size:.9rem;
+  font-weight:500;
+}
+
+html[data-csvb-page="q-questions-editor.html"] .csvb-override-launcher-wrap{
+  justify-content:center !important;
+  margin-top:6px !important;
+  margin-bottom:6px !important;
+}
+
+html[data-csvb-page="q-questions-editor.html"] table{
+  font-size:.9rem !important;
+}

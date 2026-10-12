@@ -1,0 +1,83 @@
+/* public/csvb-sire-viewer-mobile-filters-v3.css
+   C.S.V. BEACON — SIRE Viewer mobile filter ribbon fix.
+   CSS only. Scope: q-sire-questions-viewer.html only. */
+
+@media (max-width: 760px) {
+  html[data-csvb-page="q-sire-questions-viewer.html"] #filterRibbon {
+    position: relative !important;
+    display: block !important;
+    overflow: visible !important;
+    padding: 10px 10px 12px !important;
+  }
+
+  html[data-csvb-page="q-sire-questions-viewer.html"] #filterRibbon .facetWrapRibbon {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 8px !important;
+    align-items: start !important;
+    width: 100% !important;
+    overflow: visible !important;
+  }
+
+  html[data-csvb-page="q-sire-questions-viewer.html"] #filterRibbon details.facet {
+    position: relative !important;
+    display: block !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    z-index: 1 !important;
+  }
+
+  html[data-csvb-page="q-sire-questions-viewer.html"] #filterRibbon details.facet[open] {
+    grid-column: 1 / -1 !important;
+    z-index: 20 !important;
+  }
+
+  html[data-csvb-page="q-sire-questions-viewer.html"] #filterRibbon details.facet > summary {
+    width: 100% !important;
+    min-height: 44px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+  }
+
+  html[data-csvb-page="q-sire-questions-viewer.html"] #filterRibbon .facetBody {
+    position: static !important;
+    top: auto !important;
+    left: auto !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    margin-top: 8px !important;
+    box-shadow: 0 10px 28px rgba(3, 27, 63, .12) !important;
+  }
+
+  html[data-csvb-page="q-sire-questions-viewer.html"] #filterRibbon .facetOptions {
+    max-height: 260px !important;
+    overflow: auto !important;
+  }
+
+  /*
+    The AI Search launcher is injected as a direct child of #filterRibbon
+    and was absolutely positioned at mobile widths. Make direct action
+    children flow after the filter grid so they cannot cover an open filter.
+  */
+  html[data-csvb-page="q-sire-questions-viewer.html"] #filterRibbon > .csvb-ai-source-launcher,
+  html[data-csvb-page="q-sire-questions-viewer.html"] #filterRibbon > [class*="print"],
+  html[data-csvb-page="q-sire-questions-viewer.html"] #filterRibbon > [class*="export"],
+  html[data-csvb-page="q-sire-questions-viewer.html"] #filterRibbon > [class*="actions"] {
+    position: static !important;
+    top: auto !important;
+    right: auto !important;
+    bottom: auto !important;
+    left: auto !important;
+    transform: none !important;
+    margin-top: 10px !important;
+    max-width: 100% !important;
+  }
+}
+
+@media (max-width: 520px) {
+  html[data-csvb-page="q-sire-questions-viewer.html"] #filterRibbon .facetWrapRibbon {
+    grid-template-columns: 1fr !important;
+  }
+}

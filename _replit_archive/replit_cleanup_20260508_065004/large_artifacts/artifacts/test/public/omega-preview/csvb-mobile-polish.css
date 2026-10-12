@@ -1,0 +1,221 @@
+/* public/csvb-mobile-polish.css
+   C.S.V. BEACON — Mobile Polish Phase 1
+   Responsive-only CSS. No data, auth, device, grant, or offline logic. */
+
+:root {
+  --csvb-touch-target: 44px;
+}
+
+@media (max-width: 900px) {
+  html,
+  body {
+    min-width: 0 !important;
+    overflow-x: hidden;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  .topbar,
+  header.topbar,
+  .csvb-topbar {
+    align-items: stretch !important;
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+  }
+
+  .topbar > *,
+  header.topbar > *,
+  .csvb-topbar > * {
+    min-width: 0 !important;
+  }
+
+  .topbar .row,
+  header.topbar .row,
+  header.topbar .topbar-left,
+  header.topbar .topbar-right,
+  .csvb-company-view-wrap {
+    width: 100%;
+    min-width: 0 !important;
+    flex-wrap: wrap !important;
+  }
+
+  .csvb-brand,
+  .csvb-brand-text,
+  .brand,
+  .topbar-left,
+  .topbar-right {
+    max-width: 100% !important;
+  }
+
+  .wrap,
+  .page,
+  main.wrap,
+  main.page {
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 10px !important;
+  }
+
+  .grid,
+  .grid2,
+  .grid3,
+  .card-grid,
+  .cards,
+  .dashboard-grid,
+  .modules-grid,
+  .csvb-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .card,
+  .panel,
+  .box,
+  .tile,
+  .section,
+  .csvb-card,
+  .csvb-panel {
+    max-width: 100% !important;
+  }
+
+  .row,
+  .toolbar,
+  .actions,
+  .csvb-actions,
+  .filterRibbon,
+  .facetWrap,
+  .csvb-dev-toolbar {
+    flex-wrap: wrap !important;
+    max-width: 100% !important;
+  }
+
+  button,
+  .btn,
+  .btn2,
+  .qa-btn,
+  .qo-btn,
+  input,
+  select,
+  textarea {
+    min-height: var(--csvb-touch-target);
+    max-width: 100% !important;
+    font-size: 16px;
+  }
+
+  input:not([type="checkbox"]):not([type="radio"]),
+  select,
+  textarea {
+    width: 100%;
+  }
+
+  input[type="checkbox"],
+  input[type="radio"] {
+    width: auto !important;
+    min-height: 0;
+  }
+
+  .table-wrap,
+  .tableContainer,
+  .csvb-table-wrap,
+  .csvb-dev-table-wrap,
+  .listCard,
+  .qList {
+    max-width: 100% !important;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  table {
+    min-width: 720px;
+  }
+
+  #csvbBuildBadge {
+    left: 4px !important;
+    bottom: 4px !important;
+    font-size: 9px !important;
+    padding: 2px 6px !important;
+  }
+}
+
+@media (max-width: 760px) {
+  html[data-csvb-page="q-sire-questions-viewer.html"] .layout {
+    display: block !important;
+  }
+
+  html[data-csvb-page="q-sire-questions-viewer.html"] .sidebar,
+  html[data-csvb-page="q-sire-questions-viewer.html"] .main {
+    width: 100% !important;
+    max-width: 100% !important;
+    position: static !important;
+  }
+
+  html[data-csvb-page="q-sire-questions-viewer.html"] .qList {
+    max-height: 38vh;
+    overflow-y: auto;
+  }
+
+  html[data-csvb-page="q-sire-questions-viewer.html"] .filterRibbon,
+  html[data-csvb-page="q-sire-questions-viewer.html"] .facetWrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  html[data-csvb-page="q-sire-questions-viewer.html"] .facet {
+    min-width: 150px;
+  }
+
+  html[data-csvb-page="q-sire-questions-viewer.html"] .hdr,
+  html[data-csvb-page="q-sire-questions-viewer.html"] .vhdr-top,
+  html[data-csvb-page="q-sire-questions-viewer.html"] .csvb-sire-viewer-panel-badges {
+    align-items: stretch !important;
+    flex-wrap: wrap !important;
+  }
+
+  #tab-registered-devices .csvb-dev-table-wrap {
+    border: 1px solid #D6E4F5;
+    border-radius: 12px;
+  }
+
+  #tab-registered-devices table {
+    min-width: 980px;
+  }
+}
+
+@media (max-width: 560px) {
+  .card,
+  .panel,
+  .box,
+  .tile,
+  .section,
+  .csvb-card,
+  .csvb-panel {
+    padding: 10px !important;
+  }
+
+  .topbar,
+  header.topbar,
+  .csvb-topbar {
+    padding: 8px 10px !important;
+  }
+
+  .csvb-brand-logo {
+    width: 34px !important;
+    height: 34px !important;
+  }
+
+  .csvb-status-pill {
+    max-width: 100% !important;
+  }
+
+  button,
+  .btn,
+  .btn2,
+  .qa-btn,
+  .qo-btn {
+    white-space: normal !important;
+  }
+}

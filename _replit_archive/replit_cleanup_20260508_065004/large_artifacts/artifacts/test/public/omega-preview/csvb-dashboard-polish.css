@@ -1,0 +1,78 @@
+/* C.S.V. BEACON — MC-10D1 Dashboard Polish */
+
+html[data-csvb-page="q-dashboard.html"] .csvb-dashboard-helper-strip{
+  width:100%;
+  max-width:100%;
+  margin:8px auto 10px;
+  padding:9px 12px;
+  border:1px solid #D6E4F5;
+  border-radius:12px;
+  background:#FFFFFF;
+  box-shadow:0 8px 20px rgba(3,27,63,.05);
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  flex-wrap:wrap;
+}
+
+html[data-csvb-page="q-dashboard.html"] .csvb-dashboard-helper-title{
+  color:#062A5E;
+  font-weight:700;
+  display:flex;
+  align-items:center;
+  gap:7px;
+}
+
+html[data-csvb-page="q-dashboard.html"] .csvb-dashboard-helper-note{
+  color:#5E6F86;
+  font-size:.9rem;
+}
+
+html[data-csvb-page="q-dashboard.html"] [data-card]{
+  min-height:132px !important;
+  display:flex !important;
+  flex-direction:column !important;
+  justify-content:space-between !important;
+}
+
+html[data-csvb-page="q-dashboard.html"] [data-card] h1,
+html[data-csvb-page="q-dashboard.html"] [data-card] h2,
+html[data-csvb-page="q-dashboard.html"] [data-card] h3,
+html[data-csvb-page="q-dashboard.html"] [data-card] b{
+  font-size:1.02rem !important;
+  line-height:1.2 !important;
+}
+
+html[data-csvb-page="q-dashboard.html"] [data-card] p,
+html[data-csvb-page="q-dashboard.html"] [data-card] .muted{
+  font-size:.9rem !important;
+  line-height:1.25 !important;
+}
+
+html[data-csvb-page="q-dashboard.html"] .csvb-card-purpose{
+  margin-top:6px;
+  color:#5E6F86;
+  font-size:.82rem;
+  line-height:1.25;
+  border-top:1px solid #E1ECF7;
+  padding-top:6px;
+}
+
+html[data-csvb-page="q-dashboard.html"] .csvb-dashboard-section-label{
+  width:100%;
+  margin:12px 0 4px;
+  color:#062A5E;
+  font-weight:700;
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+
+html[data-csvb-page="q-dashboard.html"] .csvb-dashboard-section-label::before{
+  content:"";
+  width:4px;
+  height:18px;
+  border-radius:999px;
+  background:#062A5E;
+}
