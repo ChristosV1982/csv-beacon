@@ -46,6 +46,14 @@ header.topbar {
   object-fit: contain;
 }
 
+@media (max-width: 560px) {
+  .csvb-brand-logo.omega-brand-logo {
+    width: min(210px, 52vw) !important;
+    height: 38px !important;
+    object-fit: contain;
+  }
+}
+
 .csvb-company-view-label {
   color: #FFFFFF;
 }

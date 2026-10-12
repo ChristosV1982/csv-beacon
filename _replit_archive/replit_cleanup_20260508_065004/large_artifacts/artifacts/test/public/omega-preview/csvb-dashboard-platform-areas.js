@@ -209,6 +209,12 @@
   }
 
   async function loadPlatformAreas() {
+    if (window.OMEGA_VISUAL_PREVIEW === true) {
+      platformAreas = DEFAULT_PLATFORM_AREAS.map(enrichAreaCards);
+      platformAreaSource = "local-preview";
+      return;
+    }
+
     try {
       const dbAreas = await loadPlatformAreasFromSupabase();
       platformAreas = dbAreas;

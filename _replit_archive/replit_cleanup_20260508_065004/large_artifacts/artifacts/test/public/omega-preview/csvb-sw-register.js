@@ -1,57 +1,37 @@
-// public/csvb-sw-register.js
-// C.S.V. BEACON — PWA registration helper.
-// Phase 1 only. No database writes. No module business logic.
+// Isolated Omega preview: do not register the copied application service worker.
 
 (() => {
   "use strict";
 
-  const BUILD = "SWREG-2026-05-26-PHASE1";
-  const SW_URL = "./service-worker.js";
-
+  const previewScope = new URL("./", window.location.href);
   const status = {
-    build: BUILD,
+    build: "OMEGA-VISUAL-PREVIEW-NO-SERVICE-WORKER",
     supported: "serviceWorker" in navigator,
     registered: false,
-    controlled: false,
-    scope: "",
+    controlled: !!navigator.serviceWorker?.controller,
+    scope: previewScope.href,
     error: "",
   };
 
-  function publish() {
-    status.controlled = !!navigator.serviceWorker?.controller;
-    window.CSVB_SW_STATUS = { ...status };
-    return status;
-  }
-
-  async function start() {
-    publish();
-
-    if (!status.supported) {
-      status.error = "Service worker not supported.";
-      publish();
+  window.CSVB_SW_STATUS = status;
+  window.CSVB_SW_REGISTER = {
+    BUILD: status.build,
+    status,
+    start: async () => {
+      if (!navigator.serviceWorker?.getRegistrations) return status;
+      const registrations = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(registrations
+        .filter((registration) => {
+          const scope = new URL(registration.scope);
+          return scope.origin === previewScope.origin && scope.pathname === previewScope.pathname;
+        })
+        .map((registration) => registration.unregister()));
+      status.controlled = !!navigator.serviceWorker.controller;
       return status;
-    }
+    },
+  };
 
-    try {
-      const reg = await navigator.serviceWorker.register(SW_URL, { scope: "./" });
-      status.registered = true;
-      status.scope = reg.scope || "./";
-      status.error = "";
-      try { await reg.update(); } catch (_) {}
-    } catch (e) {
-      status.registered = false;
-      status.error = String(e?.message || e || "Registration failed.");
-    }
-
-    publish();
-    return status;
-  }
-
-  window.CSVB_SW_REGISTER = { BUILD, start, status };
-
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", start);
-  } else {
-    start();
-  }
+  window.CSVB_SW_REGISTER.start().catch((error) => {
+    status.error = String(error?.message || error || "Preview service-worker cleanup failed.");
+  });
 })();
