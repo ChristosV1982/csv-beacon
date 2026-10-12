@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "packageStatus": "approved",
+  "packageVersion": "01.00.00003",
+  "brand": {
+    "key": "omega-beacon",
+    "productName": "Omega Beacon",
+    "productNameUpper": "OMEGA BEACON",
+    "subtitle": "Marine Assurance & Compliance Platform"
+  },
+  "deployment": {
+    "environment": "production",
+    "primaryDomain": "omegabeacon.app",
+    "redirectDomains": [
+      "www.omegabeacon.app",
+      "omegabeaconapp.com"
+    ]
+  },
+  "support": {
+    "supportEmail": "support@omegabeacon.app",
+    "systemSenderName": "Omega Beacon",
+    "systemSenderEmail": "noreply@omegabeacon.app"
+  },
+  "assets": {
+    "logoFull": "assets/logo-full.png",
+    "logoHeader": "assets/logo-header.png",
+    "icon": "assets/icons/icon.png",
+    "favicon": "assets/icons/favicon.ico",
+    "pwa192": "assets/icons/pwa-192.png",
+    "pwa512": "assets/icons/pwa-512.png",
+    "monoBlack": "assets/mono/logo-black.png",
+    "monoWhite": "assets/mono/logo-white.png",
+    "loginEmblem": "assets/icons/login-emblem.png"
+  },
+  "colors": {
+    "primaryNavy": "#001840",
+    "primaryOrange": "#F86000"
+  },
+  "pwa": {
+    "name": "Omega Beacon",
+    "shortName": "Omega Beacon"
+  },
+  "labels": {}
+}

@@ -1,0 +1,50 @@
+:root {
+  --omega-navy: #001840;
+  --omega-navy-dark: #000D24;
+  --omega-orange: #F86000;
+  --omega-orange-hover: #D95100;
+}
+
+body.omega-login-active {
+  background:
+    radial-gradient(
+      1200px 700px at 20% 10%,
+      var(--omega-navy) 0%,
+      var(--omega-navy-dark) 58%,
+      #000714 100%
+    ) !important;
+}
+
+body.omega-login-active .login-shell {
+  border-top: 3px solid var(--omega-orange) !important;
+}
+
+body.omega-login-active .csvb-login-brand-icon {
+  object-fit: contain !important;
+  filter: none !important;
+}
+
+body.omega-login-active .csvb-login-brand-hero {
+  background: none !important;
+  box-shadow: none !important;
+  border: none !important;
+}
+
+body.omega-login-active .btn-primary,
+body.omega-login-active #loginBtn {
+  background: var(--omega-orange) !important;
+  border-color: var(--omega-orange) !important;
+  color: #ffffff !important;
+}
+
+body.omega-login-active .btn-primary:hover,
+body.omega-login-active #loginBtn:hover {
+  background: var(--omega-orange-hover) !important;
+  border-color: var(--omega-orange-hover) !important;
+}
+
+body.omega-login-active input:focus {
+  border-color: var(--omega-orange) !important;
+  box-shadow: 0 0 0 2px rgba(248, 96, 0, 0.22) !important;
+  outline: none !important;
+}

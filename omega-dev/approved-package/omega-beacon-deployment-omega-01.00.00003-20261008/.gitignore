@@ -1,0 +1,18 @@
+# Local / temporary files
+*.tmp
+*.bak
+*.swp
+.DS_Store
+Thumbs.db
+
+# Secrets must never be committed
+.env
+.env.*
+secrets/
+*.secret
+*.key
+*.pem
+
+# Deployment-generated temporary artifacts
+tmp/
+cache/

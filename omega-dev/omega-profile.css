@@ -1,0 +1,59 @@
+/* Isolated Omega Beacon development profile; active C.S.V. assets stay unchanged. */
+:root {
+  --brand-navy: #001840;
+  --brand-navy-dark: #000d24;
+  --brand-teal: #f86000;
+  --brand-teal-soft: #ffe7d9;
+  --brand-gold: #f86000;
+  --navy-900: #000d24;
+  --navy-800: #001840;
+  --ocean-600: #f86000;
+  --ocean-500: #d95100;
+  --link: #f86000;
+  --btn-primary-bg: #f86000;
+  --btn-primary-bg-hover: #d95100;
+  --focus: rgba(248, 96, 0, 0.25);
+}
+
+html[data-theme="dark"] {
+  --link: #ff8a43;
+  --btn-primary-bg: #f86000;
+  --btn-primary-bg-hover: #d95100;
+  --focus: rgba(248, 96, 0, 0.32);
+}
+
+.topbar {
+  background: linear-gradient(90deg, #000d24, #001840) !important;
+  border-bottom: 2px solid #f86000;
+  min-height: 54px;
+  padding: 8px 14px !important;
+}
+
+.csvb-brand {
+  gap: 10px;
+}
+
+.csvb-brand-logo {
+  display: block;
+  width: auto;
+  height: 34px;
+  max-width: min(220px, 48vw);
+  object-fit: contain;
+}
+
+.topbar .csvb-brand-text {
+  display: none !important;
+}
+
+.csvb-brand-subtitle {
+  display: none !important;
+}
+
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid #f86000;
+  outline-offset: 2px;
+}
