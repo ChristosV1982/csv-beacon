@@ -39,9 +39,17 @@ externalPort = 3001
 localPort = 24783
 externalPort = 3000
 
+[[ports]]
+localPort = 24784
+externalPort = 3003
+
 [deployment]
 publicDir = "public"
 deploymentTarget = "static"
 
 [agent]
 expertMode = true
+
+[postMerge]
+path = "scripts/post-merge.sh"
+timeoutMs = 180000
