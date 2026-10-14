@@ -664,6 +664,73 @@ function findControlledSocNoc(tailLines, designation, controlledNocs) {
 
   return null;
 }
+
+function isHardwarePairBoundary(line) {
+  const t = normSpaces(String(line || ""));
+  if (!t) return false;
+
+  return (
+    /^Unvalidated PIQ Responses$/i.test(t) ||
+    isOperatorCommentsStart(t) ||
+    isReportSectionHeading(t) ||
+    Boolean(isQuestionHeaderStart(t)) ||
+    Boolean(parseResponseStart(t))
+  );
+}
+
+function findControlledSocNocPairs(tailLines, designation, controlledNocs) {
+  if (designation !== "Hardware") return [];
+
+  const pairs = [];
+  let index = 0;
+
+  while (index < tailLines.length) {
+    const line = normSpaces(String(tailLines[index] || ""));
+    if (isHardwarePairBoundary(line)) break;
+
+    if (!isLikelyHardwareCodeLine(line)) {
+      index++;
+      continue;
+    }
+
+    let segmentEnd = index + 1;
+    while (segmentEnd < tailLines.length) {
+      const candidate = normSpaces(String(tailLines[segmentEnd] || ""));
+      if (
+        isHardwarePairBoundary(candidate) ||
+        isLikelyHardwareCodeLine(candidate)
+      ) {
+        break;
+      }
+      segmentEnd++;
+    }
+
+    const match = findControlledSocNoc(
+      tailLines.slice(index, segmentEnd),
+      designation,
+      controlledNocs
+    );
+
+    if (!match) {
+      index++;
+      continue;
+    }
+
+    const consumedLineCount = Math.max(
+      1,
+      Number(match.consumed_line_count || 1)
+    );
+    pairs.push({
+      ...match,
+      start_index: index,
+      end_index: index + consumedLineCount,
+    });
+    index += consumedLineCount;
+  }
+
+  return pairs;
+}
+
 // NEW IN v31
 function isOperatorCommentsStart(line) {
   const t = line.trim();
@@ -804,6 +871,66 @@ function parseResponseBlock(block, controlledNocs = {}) {
     source_excerpt: headerLine || null,
   };
 }
+
+function parseResponseBlockObservations(block, controlledNocs = {}) {
+  const observation = parseResponseBlock(block, controlledNocs);
+  if (!observation) return [];
+
+  if (
+    block.response_type !== "negative" ||
+    block.designation !== "Hardware"
+  ) {
+    return [observation];
+  }
+
+  const tailLines = block.lines
+    .slice(1)
+    .map((x) => x.text)
+    .filter(Boolean);
+  const pairs = findControlledSocNocPairs(
+    tailLines,
+    block.designation,
+    controlledNocs
+  );
+
+  // Preserve the established single-observation parser unless multiple
+  // controlled Hardware category/NOC pairs are present in the same block.
+  if (pairs.length < 2 || pairs[0].start_index !== 0) {
+    return [observation];
+  }
+
+  return pairs.map((pair, pairIndex) => {
+    const segmentEnd =
+      pairs[pairIndex + 1]?.start_index ?? tailLines.length;
+    const commentParts = [];
+
+    for (
+      let lineIndex = pair.end_index;
+      lineIndex < segmentEnd;
+      lineIndex++
+    ) {
+      const t = normSpaces(tailLines[lineIndex]);
+      if (!t) continue;
+      if (isReportHeaderOrFooter(t)) continue;
+      if (/^PIQ additional data$/i.test(t)) continue;
+      if (isReportSectionHeading(t)) break;
+      if (isOperatorCommentsStart(t)) break;
+      if (isLikelyHardwareCodeLine(t)) continue;
+      if (isPhotoUploadHeading(t)) continue;
+      commentParts.push(t);
+    }
+
+    return {
+      ...observation,
+      classification_coding: pair.classification_coding,
+      nature_of_concern: pair.nature_of_concern,
+      observation_text: cleanOcimfFooterFragments(
+        commentParts.join(" ")
+      ),
+    };
+  });
+}
+
 function dedupeObservations(observations) {
   const seen = new Set();
   const out = [];
@@ -990,12 +1117,12 @@ function extractFindingsFromPages(pages, controlledNocs = {}) {
     const blocks = buildResponseBlocks(section);
 
     for (const block of blocks) {
-      const observation = parseResponseBlock(
+      const blockObservations = parseResponseBlockObservations(
         block,
         controlledNocs
       );
 
-      if (observation) observations.push(observation);
+      observations.push(...blockObservations);
     }
   }
 
