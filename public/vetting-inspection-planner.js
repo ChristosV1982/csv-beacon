@@ -1,4 +1,4 @@
-const PLANNER_BUILD = "vetting_inspection_planner_v2_2026-10-14";
+const PLANNER_BUILD = "vetting_inspection_planner_v3_2026-10-14";
 const PLANNER_MODULE_CODE = "VETTING_INSPECTION_PLANNER";
 const DEFAULT_INTERVAL_MONTHS = 6;
 
@@ -6,6 +6,7 @@ const plannerState = {
   supabase: null,
   user: null,
   vessels: [],
+  drafts: new Map(),
   canEdit: false,
   saving: new Set(),
 };
@@ -220,6 +221,47 @@ function displayAverage(value) {
     : number.toFixed(2);
 }
 
+function normalizeRemarks(value) {
+  let source = value;
+  if (typeof source === "string") {
+    const text = source.trim();
+    if (!text) return [];
+    if (text.startsWith("[") || text.startsWith("{")) {
+      try {
+        source = JSON.parse(text);
+      } catch (_) {
+        return [{ id: null, text: source }];
+      }
+    } else {
+      return [{ id: null, text: source }];
+    }
+  }
+  if (!Array.isArray(source) && source && typeof source === "object") {
+    source = source.remarks || source.items || source.rows || [source];
+  }
+  if (!Array.isArray(source)) return [];
+  return source.map((item) => {
+    if (typeof item === "string") return { id: null, text: item };
+    return {
+      id: firstValue(item, ["remark_id", "id", "vessel_remark_id"], null),
+      text: String(firstValue(item, ["remark_text", "text", "remark", "content", "value"], "")),
+    };
+  });
+}
+
+function vesselDraft(row) {
+  let draft = plannerState.drafts.get(row.vessel_id);
+  if (!draft) {
+    draft = {
+      alternative01: row.planned_oil_major_alternative_01 || "",
+      alternative02: row.planned_oil_major_alternative_02 || "",
+      remarks: (row.remarks || []).map((remark) => ({ ...remark })),
+    };
+    plannerState.drafts.set(row.vessel_id, draft);
+  }
+  return draft;
+}
+
 function normalizeHistory(records) {
   const source = Array.isArray(records) ? records : [];
   const normalized = source
@@ -368,7 +410,23 @@ function normalizePlannerData(data) {
           "planned_oil_major",
           "next_oil_major",
         ])),
-        remarks: String(firstValue(row, ["remarks", "vessel_remarks"])),
+        planned_oil_major_alternative_01: String(firstValue(row, [
+          "planned_oil_major_alternative_01",
+          "planned_oil_major_alt_01",
+          "planned_next_oil_major_alternative_01",
+          "planned_next_oil_major_alt_01",
+          "alternative_01_oil_major",
+          "alternative_oil_major_01",
+        ])),
+        planned_oil_major_alternative_02: String(firstValue(row, [
+          "planned_oil_major_alternative_02",
+          "planned_oil_major_alt_02",
+          "planned_next_oil_major_alternative_02",
+          "planned_next_oil_major_alt_02",
+          "alternative_02_oil_major",
+          "alternative_oil_major_02",
+        ])),
+        remarks: normalizeRemarks(firstValue(row, ["remarks", "vessel_remarks"], "")),
         suggestion: suggestionFromRow(row),
       };
     })
@@ -404,12 +462,21 @@ function renderVesselCard(row) {
   const overrideValue = row.interval_override_months == null ? "" : String(row.interval_override_months);
   const includeChecked = row.include_in_planner === true ? "checked" : "";
   const suggestion = row.suggestion || {};
+  const draft = vesselDraft(row);
   const intervalOptions = [
     `<option value="" ${overrideValue === "" ? "selected" : ""}>Default — 6 months</option>`,
     ...[1, 2, 3, 4, 5, 6].map((month) =>
       `<option value="${month}" ${overrideValue === String(month) ? "selected" : ""}>${month} month${month === 1 ? "" : "s"}</option>`
     ),
   ].join("");
+  const remarksMarkup = draft.remarks.length
+    ? `<div class="remarks-list">${draft.remarks.map((remark, index) => `
+        <div class="remark-row">
+          <div class="remark-number">Remark #${String(index + 1).padStart(2, "0")}</div>
+          <textarea class="remark-text" data-vessel-remark-text data-vessel-id="${plannerEsc(row.vessel_id)}" data-remark-index="${index}" maxlength="4000" aria-label="Remark ${String(index + 1).padStart(2, "0")}" ${disabled ? "disabled" : ""}>${plannerEsc(remark.text)}</textarea>
+          <button class="planner-btn remark-remove" type="button" data-remove-remark="${plannerEsc(row.vessel_id)}" data-remark-index="${index}" ${disabled ? "disabled" : ""}>Remove</button>
+        </div>`).join("")}</div>`
+    : `<div class="remarks-empty">No vessel remarks added yet.</div>`;
   const status = row.status;
   return `
     <article class="vessel-card" data-vessel-id="${plannerEsc(row.vessel_id)}" data-vessel-name="${plannerEsc(row.vessel_name.toLowerCase())}" data-status="${plannerEsc(status.key)}" data-included="${row.include_in_planner ? "true" : "false"}">
@@ -444,26 +511,41 @@ function renderVesselCard(row) {
             <select id="interval-${plannerEsc(row.vessel_id)}" data-plan-field="interval" ${disabled ? "disabled" : ""}>${intervalOptions}</select>
             <div class="field-hint">Choose Default to use the six-month interval.</div>
           </div>
-          <div class="planner-suggestion">
-            <div class="suggestion-title">Backend suggestion</div>
-            <div class="suggestion-major">${plannerEsc(suggestion.major || "No suggested major available")}</div>
+          <div class="oil-major-fields">
+            <div class="planner-field">
+              <label for="major-${plannerEsc(row.vessel_id)}">Planned next oil major</label>
+              <input id="major-${plannerEsc(row.vessel_id)}" data-plan-field="major" maxlength="200" value="${plannerEsc(row.planned_next_oil_major)}" ${disabled ? "disabled" : ""} />
+            </div>
+            <div class="planner-field">
+              <label for="major-alt-01-${plannerEsc(row.vessel_id)}">Alternative 01</label>
+              <input id="major-alt-01-${plannerEsc(row.vessel_id)}" data-alternative-field="alternative01" data-vessel-id="${plannerEsc(row.vessel_id)}" maxlength="200" value="${plannerEsc(draft.alternative01)}" ${disabled ? "disabled" : ""} />
+            </div>
+            <div class="planner-field">
+              <label for="major-alt-02-${plannerEsc(row.vessel_id)}">Alternative 02</label>
+              <input id="major-alt-02-${plannerEsc(row.vessel_id)}" data-alternative-field="alternative02" data-vessel-id="${plannerEsc(row.vessel_id)}" maxlength="200" value="${plannerEsc(draft.alternative02)}" ${disabled ? "disabled" : ""} />
+            </div>
+          </div>
+          <button class="planner-btn primary" type="button" data-save-vessel="${plannerEsc(row.vessel_id)}" ${disabled ? "disabled" : ""}>${plannerState.saving.has(row.vessel_id) ? "Saving…" : "Save"}</button>
+        </div>
+        <div class="planner-draft-note">Save stores the primary major, interval, and planner inclusion. Alternative majors and vessel remarks are editable drafts only and are not saved by the current backend contract.</div>
+        <div class="planner-suggestion">
+          <div class="suggestion-copy">
+            <span class="suggestion-title">Backend suggestion</span>
+            <strong class="suggestion-major">${plannerEsc(suggestion.major || "No suggested major available")}</strong>
             <div class="suggestion-metrics">
               <span>Vessel last-5 average: <strong>${plannerEsc(displayAverage(suggestion.vesselAverage))}</strong></span>
               <span>Suggested-major average: <strong>${plannerEsc(displayAverage(suggestion.majorAverage))}</strong></span>
             </div>
             <p>${plannerEsc(suggestion.explanation || "No explanation was returned by the planner service.")}</p>
-            <button class="planner-btn" type="button" data-use-suggestion="${plannerEsc(row.vessel_id)}" ${disabled || !suggestion.major ? "disabled" : ""}>Use suggestion</button>
           </div>
-          <div class="planner-field">
-            <label for="major-${plannerEsc(row.vessel_id)}">Planned next oil major</label>
-            <input id="major-${plannerEsc(row.vessel_id)}" data-plan-field="major" maxlength="200" value="${plannerEsc(row.planned_next_oil_major)}" ${disabled ? "disabled" : ""} />
+          <button class="planner-btn" type="button" data-use-suggestion="${plannerEsc(row.vessel_id)}" ${disabled || !suggestion.major ? "disabled" : ""}>Use suggestion</button>
+        </div>
+        <div class="planner-remarks">
+          <div class="remarks-header">
+            <div><h4 class="remarks-title">Vessel remarks</h4></div>
+            <button class="planner-btn" type="button" data-add-remark="${plannerEsc(row.vessel_id)}" ${disabled ? "disabled" : ""}>Add Remark</button>
           </div>
-          <div class="planner-field">
-            <label for="remarks-${plannerEsc(row.vessel_id)}">Vessel remarks (read-only)</label>
-            <textarea id="remarks-${plannerEsc(row.vessel_id)}" data-plan-field="remarks" maxlength="4000" readonly>${plannerEsc(row.remarks)}</textarea>
-            <div class="field-hint">The current planner save service does not write remarks.</div>
-          </div>
-          <button class="planner-btn primary" type="button" data-save-vessel="${plannerEsc(row.vessel_id)}" ${disabled ? "disabled" : ""}>${plannerState.saving.has(row.vessel_id) ? "Saving…" : "Save"}</button>
+          ${remarksMarkup}
         </div>
         ${plannerState.canEdit ? "" : `<div class="planner-readonly-note">You have view access only. An authorized editor can update these planning fields.</div>`}
       </section>
@@ -511,6 +593,44 @@ function renderPlanner() {
     input.addEventListener("change", () =>
       saveVesselPlan(input.dataset.includeVessel, { includeInPlanner: input.checked })
     );
+  });
+  host.querySelectorAll("[data-alternative-field]").forEach((input) => {
+    input.addEventListener("input", () => {
+      const row = plannerState.vessels.find((vessel) => vessel.vessel_id === input.dataset.vesselId);
+      if (!row) return;
+      vesselDraft(row)[input.dataset.alternativeField] = input.value;
+    });
+  });
+  host.querySelectorAll("[data-vessel-remark-text]").forEach((input) => {
+    input.addEventListener("input", () => {
+      const row = plannerState.vessels.find((vessel) => vessel.vessel_id === input.dataset.vesselId);
+      const index = Number(input.dataset.remarkIndex);
+      const remark = row && vesselDraft(row).remarks[index];
+      if (remark) remark.text = input.value;
+    });
+  });
+  host.querySelectorAll("[data-add-remark]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const row = plannerState.vessels.find((vessel) => vessel.vessel_id === button.dataset.addRemark);
+      if (!row || !plannerState.canEdit || plannerState.saving.has(row.vessel_id)) return;
+      vesselDraft(row).remarks.push({ id: null, text: "" });
+      renderPlanner();
+      const card = host.querySelector(`.vessel-card[data-vessel-id="${CSS.escape(row.vessel_id)}"]`);
+      const inputs = card?.querySelectorAll("[data-vessel-remark-text]");
+      inputs?.[inputs.length - 1]?.focus();
+    });
+  });
+  host.querySelectorAll("[data-remove-remark]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const row = plannerState.vessels.find((vessel) => vessel.vessel_id === button.dataset.removeRemark);
+      const index = Number(button.dataset.remarkIndex);
+      if (!row || !plannerState.canEdit || plannerState.saving.has(row.vessel_id)) return;
+      const remarks = vesselDraft(row).remarks;
+      if (!Number.isInteger(index) || index < 0 || index >= remarks.length) return;
+      remarks.splice(index, 1);
+      renderPlanner();
+      showPlannerMessage("Remark removed from this page draft. It has not been deleted from the saved plan.", "success");
+    });
   });
   host.querySelectorAll("[data-use-suggestion]").forEach((button) => {
     button.addEventListener("click", () => {
@@ -594,7 +714,7 @@ async function saveVesselPlan(vesselId, { includeInPlanner } = {}) {
     if (!savedRow || savedRow.include_in_planner !== include || !intervalPersisted) {
       throw new Error("The server did not return the saved planner visibility or interval value after reload.");
     }
-    showPlannerMessage(`Planning settings saved for ${row.vessel_name}.`, "success");
+    showPlannerMessage(`Saved the primary major, interval, and planner inclusion for ${row.vessel_name}. Alternative majors and remarks remain page drafts and were not saved.`, "success");
   } catch (error) {
     showPlannerMessage(`Could not save planning settings for ${row.vessel_name}: ${error?.message || String(error)}`);
   } finally {
