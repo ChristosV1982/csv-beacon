@@ -1,4 +1,4 @@
-const PLANNER_BUILD = "vetting_inspection_planner_v4_2026-10-14";
+const PLANNER_BUILD = "vetting_inspection_planner_v5_2026-10-14";
 const PLANNER_MODULE_CODE = "VETTING_INSPECTION_PLANNER";
 const DEFAULT_INTERVAL_MONTHS = 6;
 
@@ -504,27 +504,20 @@ function renderVesselCard(row) {
     : `<div class="remarks-empty">No vessel remarks added yet.</div>`;
   const status = row.status;
   return `
-    <article class="vessel-card" data-vessel-id="${plannerEsc(row.vessel_id)}" data-vessel-name="${plannerEsc(row.vessel_name.toLowerCase())}" data-status="${plannerEsc(status.key)}" data-included="${row.include_in_planner ? "true" : "false"}">
+    <tr class="vessel-card" data-vessel-id="${plannerEsc(row.vessel_id)}" data-vessel-name="${plannerEsc(row.vessel_name.toLowerCase())}" data-status="${plannerEsc(status.key)}" data-included="${row.include_in_planner ? "true" : "false"}">
+      <td class="planner-vessel-card-cell" colspan="6">
       <details class="planner-card-details">
-        <summary class="planner-card-summary">
-          <span class="planner-summary-vessel">${plannerEsc(row.vessel_name)}</span>
-          <span class="planner-summary-fact">
-            <span class="planner-summary-label">Last Inspection Date</span>
-            <span class="planner-summary-value">${plannerEsc(displayDate(lastInspectionDate))}</span>
+        <summary class="planner-card-summary" title="Show or hide details for ${plannerEsc(row.vessel_name)}">
+          <span class="planner-summary-cell planner-summary-vessel">${plannerEsc(row.vessel_name)}</span>
+          <span class="planner-summary-cell planner-summary-date">${plannerEsc(displayDate(lastInspectionDate))}</span>
+          <span class="planner-summary-cell planner-summary-major">${plannerEsc(lastOilMajor || "—")}</span>
+          <span class="planner-summary-cell planner-summary-negative">${plannerEsc(lastNegativeCount)}</span>
+          <span class="planner-summary-cell planner-summary-status">
+            <span class="vessel-status status-${plannerEsc(status.key)}" ${status.style ? `style="${plannerEsc(status.style)}"` : ""}>${plannerEsc(status.label)}</span>
           </span>
-          <span class="planner-summary-fact">
-            <span class="planner-summary-label">Last inspecting Oil Major</span>
-            <span class="planner-summary-value">${plannerEsc(lastOilMajor || "—")}</span>
-          </span>
-          <span class="planner-summary-fact">
-            <span class="planner-summary-label">Last inspection negative observations</span>
-            <span class="planner-summary-value">${plannerEsc(lastNegativeCount)}</span>
-          </span>
-          <span class="vessel-status status-${plannerEsc(status.key)}" ${status.style ? `style="${plannerEsc(status.style)}"` : ""}>${plannerEsc(status.label)}</span>
-          <span class="planner-expand-affordance" aria-hidden="true">
-            <span class="planner-expand-closed">Expand</span>
-            <span class="planner-expand-open">Collapse</span>
-            <span class="planner-expand-chevron"></span>
+          <span class="planner-summary-cell planner-expand-affordance" title="Show or hide vessel details">
+            <span class="planner-expand-chevron" aria-hidden="true"></span>
+            <span class="planner-sr-only">Show or hide details for ${plannerEsc(row.vessel_name)}</span>
           </span>
         </summary>
         <div class="planner-card-expanded">
@@ -594,7 +587,8 @@ function renderVesselCard(row) {
           </section>
         </div>
       </details>
-    </article>
+      </td>
+    </tr>
   `;
 }
 
@@ -628,7 +622,23 @@ function renderPlanner() {
   if (!host) return;
   const cards = plannerState.vessels.map(renderVesselCard).join("");
   host.innerHTML = cards
-    ? `${cards}<div id="plannerNoResults" class="planner-panel planner-empty" hidden>No vessels match these filters.</div>`
+    ? `<div class="planner-vessel-table-wrap">
+        <table class="planner-vessel-table" aria-label="Vetting inspection planner vessels">
+          <colgroup><col /><col /><col /><col /><col /><col /></colgroup>
+          <thead><tr>
+            <th scope="col">Vessel</th>
+            <th scope="col">Last Inspection Date</th>
+            <th scope="col">Last Inspecting Oil Major</th>
+            <th scope="col">Last Inspection Negative Observations</th>
+            <th scope="col">Status / Expiry</th>
+            <th scope="col"><span class="planner-sr-only">Vessel details</span></th>
+          </tr></thead>
+          <tbody>
+            ${cards}
+            <tr id="plannerNoResults" class="planner-no-results" hidden><td colspan="6">No vessels match these filters.</td></tr>
+          </tbody>
+        </table>
+      </div>`
     : `<div class="planner-panel planner-empty">No accessible active vessels were returned for this account.</div>`;
   applyFilters();
   host.querySelectorAll("[data-save-vessel]").forEach((button) => {

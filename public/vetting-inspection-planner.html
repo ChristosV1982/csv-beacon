@@ -9,11 +9,11 @@
   <style>
     :root {
       color-scheme: light;
-      --planner-navy: #0b2a4a;
-      --planner-blue: #143a63;
-      --planner-muted: #5e7188;
-      --planner-border: #d7e2ef;
-      --planner-bg: #f2f6fb;
+      --planner-navy: var(--brand-navy, #062A5E);
+      --planner-blue: var(--brand-navy-dark, #031B3F);
+      --planner-muted: var(--text-muted, #5E6F86);
+      --planner-border: var(--border-soft, #D6E4F5);
+      --planner-bg: var(--bg-main, #F4F8FC);
     }
     * { box-sizing: border-box; }
     body {
@@ -61,35 +61,57 @@
     .planner-message { display: none; padding: 8px 10px; margin-bottom: 8px; border-radius: 8px; white-space: pre-wrap; }
     .planner-message.error { display: block; border: 1px solid #e7b4b4; background: #fff2f2; color: #8d2525; }
     .planner-message.success { display: block; border: 1px solid #b5dbc6; background: #f0fbf4; color: #21643b; }
-    .vessel-card {
-      overflow: hidden; margin-bottom: 6px; border: 1px solid var(--planner-border);
-      border-radius: 10px; background: #fff; box-shadow: 0 4px 12px rgba(0,0,0,.1);
+    .planner-vessel-table-wrap {
+      max-width: 100%; overflow-x: auto; border: 1px solid var(--planner-border);
+      border-radius: 9px; background: #fff; box-shadow: 0 4px 12px rgba(3,27,63,.1);
     }
+    .planner-vessel-table { width: 100%; min-width: 1100px; table-layout: fixed; border-collapse: separate; border-spacing: 0; background: #fff; }
+    .planner-vessel-table col:nth-child(1) { width: 17%; }
+    .planner-vessel-table col:nth-child(2) { width: 15%; }
+    .planner-vessel-table col:nth-child(3) { width: 20%; }
+    .planner-vessel-table col:nth-child(4) { width: 21%; }
+    .planner-vessel-table col:nth-child(5) { width: 22%; }
+    .planner-vessel-table col:nth-child(6) { width: 5%; }
+    .planner-vessel-table thead th {
+      padding: 8px 10px; border: 0; border-bottom: 1px solid var(--brand-navy-dark, #031B3F);
+      background: linear-gradient(90deg, var(--brand-navy-dark, #031B3F), var(--brand-navy, #062A5E)) !important;
+      color: #fff !important; font-size: .79rem; font-weight: 850; line-height: 1.2;
+      text-align: left; vertical-align: middle; white-space: normal;
+    }
+    .planner-vessel-table thead th:first-child { border-top-left-radius: 8px; }
+    .planner-vessel-table thead th:last-child { border-top-right-radius: 8px; }
+    .planner-vessel-table tbody tr.vessel-card > td {
+      padding: 0; border: 0; border-bottom: 1px solid var(--planner-border);
+      background: #fff; vertical-align: top;
+    }
+    .planner-vessel-table tbody tr.vessel-card:last-of-type > td { border-bottom: 0; }
+    .planner-vessel-table tbody tr.vessel-card:hover > td { background: #f7fbfe; }
+    .planner-vessel-table tbody tr.vessel-card[hidden] { display: none; }
+    .planner-vessel-table tbody tr.planner-no-results > td { padding: 12px; color: var(--planner-muted); text-align: center; }
+    .planner-vessel-card-cell { width: 100%; }
     .vessel-card-head {
       display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
       padding: 6px 9px; border-bottom: 1px solid #e4ebf4;
       background: linear-gradient(120deg, #f8fbff, #eef4fa);
     }
-    .planner-card-details { min-width: 0; }
+    .planner-card-details { display: block; min-width: 0; }
     .planner-card-summary {
-      display: grid; grid-template-columns: minmax(155px, 1.15fr) repeat(3, minmax(130px, 1fr)) auto auto;
-      align-items: center; gap: 7px; padding: 7px 9px; cursor: pointer;
-      list-style: none; background: linear-gradient(120deg, #f8fbff, #eef4fa);
+      display: grid; grid-template-columns: 17% 15% 20% 21% 22% 5%;
+      align-items: center; min-height: 38px; cursor: pointer; list-style: none;
+      background: #fff; color: #17324d;
     }
     .planner-card-summary::-webkit-details-marker { display: none; }
-    .planner-card-summary:hover { background: #edf4fb; }
-    .planner-card-summary:focus-visible { outline: 3px solid #75a7df; outline-offset: -3px; }
-    .planner-card-summary .planner-summary-vessel { min-width: 0; color: var(--planner-navy); font-size: 1.02rem; font-weight: 900; overflow-wrap: anywhere; }
-    .planner-summary-fact { display: grid; min-width: 0; gap: 1px; }
-    .planner-summary-label { color: var(--planner-muted); font-size: .69rem; font-weight: 800; letter-spacing: .02em; text-transform: uppercase; }
-    .planner-summary-value { min-width: 0; color: #203b58; font-size: .84rem; font-weight: 800; overflow-wrap: anywhere; }
-    .planner-expand-affordance { display: inline-flex; align-items: center; gap: 5px; color: #345b80; font-size: .78rem; font-weight: 850; white-space: nowrap; }
-    .planner-expand-open { display: none; }
-    .planner-card-details[open] .planner-expand-closed { display: none; }
-    .planner-card-details[open] .planner-expand-open { display: inline; }
+    .planner-card-summary:hover { background: #f4f8fc; }
+    .planner-card-summary:focus-visible { outline: 3px solid var(--focus, rgba(0,151,167,.35)); outline-offset: -3px; }
+    .planner-summary-cell { display: flex; align-items: center; align-self: stretch; min-width: 0; padding: 5px 10px; overflow-wrap: anywhere; font-size: .84rem; line-height: 1.2; }
+    .planner-summary-vessel { color: var(--planner-navy); font-weight: 850; }
+    .planner-summary-date, .planner-summary-major, .planner-summary-negative { color: var(--text-main, #17324d); font-weight: 600; }
+    .planner-summary-status { justify-content: flex-start; }
+    .planner-expand-affordance { justify-content: center; padding: 0 4px; color: var(--planner-blue); }
     .planner-expand-chevron { width: 8px; height: 8px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg) translateY(-2px); transition: transform .15s ease; }
     .planner-card-details[open] .planner-expand-chevron { transform: rotate(225deg) translate(-1px, -1px); }
-    .planner-card-expanded { border-top: 1px solid #e4ebf4; }
+    .planner-sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+    .planner-card-expanded { border-top: 1px solid #e4ebf4; background: #fff; }
     .vessel-card-toggles { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
     .planner-switch { display: inline-flex; align-items: center; gap: 8px; color: #35506c; font-size: .82rem; font-weight: 800; cursor: pointer; }
     .planner-switch input { position: absolute; width: 1px; height: 1px; margin: -1px; opacity: 0; }
@@ -157,10 +179,7 @@
       .vessel-card-head { flex-direction: column; }
       .remark-row { grid-template-columns: minmax(0, 1fr) auto; }
       .remark-number { grid-column: 1 / -1; padding-top: 0; }
-      .planner-card-summary { grid-template-columns: minmax(0, 1fr) auto; gap: 6px; padding: 7px; }
-      .planner-summary-vessel { grid-column: 1 / -1; }
-      .planner-summary-fact { grid-column: 1 / -1; }
-      .planner-expand-affordance { grid-column: 1 / -1; justify-self: end; }
+      .planner-vessel-table { min-width: 1100px; }
     }
   </style>
 </head>
@@ -213,6 +232,6 @@
   <script src="./app-config.js"></script>
   <script src="./auth.js"></script>
   <script src="./csvb-module-guard.js?v=20261014_vetting_planner_1"></script>
-  <script type="module" src="./vetting-inspection-planner.js?v=20261014_vetting_planner_5"></script>
+  <script type="module" src="./vetting-inspection-planner.js?v=20261014_vetting_planner_6"></script>
 </body>
 </html>
