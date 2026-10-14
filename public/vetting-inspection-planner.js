@@ -1,4 +1,4 @@
-const PLANNER_BUILD = "vetting_inspection_planner_v1_2026-10-14";
+const PLANNER_BUILD = "vetting_inspection_planner_v2_2026-10-14";
 const PLANNER_MODULE_CODE = "VETTING_INSPECTION_PLANNER";
 const DEFAULT_INTERVAL_MONTHS = 6;
 
@@ -60,22 +60,60 @@ function addCalendarMonths(value, count) {
   return `${targetYear}-${String(targetMonth + 1).padStart(2, "0")}-${String(targetDay).padStart(2, "0")}`;
 }
 
-function normalizedStatus(row, dueDate, hasHistory) {
+function addCalendarDays(value, count) {
+  const iso = dateOnly(value);
+  if (!iso) return "";
+  const date = new Date(`${iso}T00:00:00`);
+  date.setDate(date.getDate() + count);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function daysBetween(fromDate, toDate) {
+  const from = dateOnly(fromDate);
+  const to = dateOnly(toDate);
+  if (!from || !to) return null;
+  return Math.round((new Date(`${to}T00:00:00`).getTime() - new Date(`${from}T00:00:00`).getTime()) / 86400000);
+}
+
+function normalizedStatus(row, dueDate, lastInspectionDate, hasHistory) {
   if (!hasHistory) return { key: "none", label: "No inspection history" };
   if (dueDate) {
     const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const due = new Date(`${dueDate}T00:00:00`);
-    const days = Math.ceil((due.getTime() - today.getTime()) / 86400000);
-    if (days < 0) return { key: "overdue", label: "Overdue" };
-    if (days <= 30) return { key: "soon", label: "Due within 30 days" };
-    return { key: "within", label: "Within window" };
+    const todayIso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+    const daysToDue = daysBetween(todayIso, dueDate);
+    if (daysToDue < 0) return { key: "overdue", label: "OVERDUE", daysToDue };
+    if (daysToDue <= 15) {
+      return { key: "warning", label: `Due in ${daysToDue} day${daysToDue === 1 ? "" : "s"}`, daysToDue };
+    }
+
+    const greenThrough = lastInspectionDate ? addCalendarMonths(lastInspectionDate, 2) : "";
+    const warningBegins = addCalendarDays(dueDate, -15);
+    if (!greenThrough || todayIso < greenThrough) {
+      return { key: "within", label: "Within interval", daysToDue };
+    }
+
+    if (todayIso < warningBegins) {
+      const transitionDays = daysBetween(greenThrough, warningBegins);
+      const elapsedDays = daysBetween(greenThrough, todayIso);
+      const progress = transitionDays > 0
+        ? Math.max(0, Math.min(1, elapsedDays / transitionDays))
+        : 1;
+      const hue = Math.round(120 * (1 - progress));
+      return {
+        key: "approaching",
+        label: `Due in ${daysToDue} days`,
+        daysToDue,
+        style: `--planner-status-hue:${hue}`,
+      };
+    }
+
+    return { key: "warning", label: `Due in ${daysToDue} days`, daysToDue };
   }
   const supplied = String(
     row?.decision_status ?? row?.status ?? row?.due_status ?? row?.decision ?? ""
   ).trim().toLowerCase().replaceAll("-", "_").replaceAll(" ", "_");
-  if (/overdue|past_due/.test(supplied)) return { key: "overdue", label: "Overdue" };
-  if (/due_soon|due_within|amber/.test(supplied)) return { key: "soon", label: "Due within 30 days" };
+  if (/overdue|past_due/.test(supplied)) return { key: "overdue", label: "OVERDUE" };
+  if (/due_soon|due_within|soon|amber|warning/.test(supplied)) return { key: "warning", label: "Due soon" };
   if (/within|current|green|not_due/.test(supplied)) return { key: "within", label: "Within window" };
   return { key: "none", label: "No inspection history" };
 }
@@ -86,6 +124,100 @@ function firstValue(object, keys, fallback = "") {
     if (value !== undefined && value !== null && value !== "") return value;
   }
   return fallback;
+}
+
+function asBoolean(value, fallback = true) {
+  if (value === true || value === false) return value;
+  if (value === 1 || value === 0) return Boolean(value);
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (["true", "t", "1", "yes", "included", "active"].includes(normalized)) return true;
+    if (["false", "f", "0", "no", "hidden", "excluded", "inactive"].includes(normalized)) return false;
+  }
+  return fallback;
+}
+
+function parseSuggestion(value) {
+  if (value && typeof value === "object") return value;
+  if (typeof value !== "string" || !value.trim()) return {};
+  try {
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch (_) {
+    return {};
+  }
+}
+
+function suggestionFromRow(row) {
+  const nested = parseSuggestion(firstValue(row, [
+    "suggestion",
+    "suggestion_details",
+    "suggestion_data",
+    "oil_major_suggestion",
+    "oil_major_recommendation",
+    "next_oil_major_suggestion",
+    "recommendation",
+  ], {}));
+  const get = (keys) => firstValue(row, keys, firstValue(nested, keys, ""));
+  const major = String(get([
+    "suggested_major",
+    "suggested_major_name",
+    "suggested_oil_major",
+    "suggested_oil_major_name",
+    "suggested_next_oil_major",
+    "suggested_next_inspecting_company",
+    "suggested_inspecting_company",
+    "suggested_inspecting_oil_major",
+    "suggested_company",
+    "recommended_oil_major",
+  ])).trim();
+  const vesselAverage = get([
+    "vessel_last_5_average_negative_observations",
+    "vessel_last_5_avg_negative_observations",
+    "vessel_last5_average_negative_observations",
+    "vessel_last5_avg_negative_observations",
+    "vessel_last_5_avg",
+    "vessel_last5_avg",
+    "last_5_average_negative_observations",
+    "last_5_avg_negative_observations",
+    "average_negative_observations_last_5",
+    "avg_negative_observations_last_5",
+    "vessel_avg_negative_last_5",
+    "vessel_avg_negative_observations_last_5",
+    "vessel_average_negative_observations",
+  ]);
+  const majorAverage = get([
+    "suggested_major_average_negative_observations",
+    "suggested_major_avg_negative_observations",
+    "suggested_major_avg",
+    "suggested_major_avg_negative_per_inspection",
+    "suggested_oil_major_average_negative_observations",
+    "suggested_oil_major_avg_negative_observations",
+    "suggested_company_average_negative_observations",
+    "suggested_company_avg_negative_observations",
+    "suggested_company_avg_negative_per_inspection",
+  ]);
+  const explanation = String(get([
+    "suggestion_explanation",
+    "suggested_major_explanation",
+    "recommendation_explanation",
+    "suggestion_reason",
+    "explanation",
+    "reason",
+  ])).trim();
+  return {
+    major,
+    vesselAverage: vesselAverage === "" ? null : Number(vesselAverage),
+    majorAverage: majorAverage === "" ? null : Number(majorAverage),
+    explanation,
+  };
+}
+
+function displayAverage(value) {
+  const number = Number(value);
+  return value === null || value === "" || !Number.isFinite(number)
+    ? "—"
+    : number.toFixed(2);
 }
 
 function normalizeHistory(records) {
@@ -103,7 +235,7 @@ function normalizeHistory(records) {
         "company_name",
       ]),
       report_ref: firstValue(item, ["report_ref", "report_reference"]),
-      negative_observations: Number(firstValue(item, [
+      negative_observations_count: Number(firstValue(item, [
         "negative_observations_count",
         "negative_observation_count",
         "negative_count",
@@ -164,7 +296,12 @@ function normalizePlannerData(data) {
         port_name: source.port_name,
         ocimf_inspecting_company: source.ocimf_inspecting_company || source.inspecting_company || source.oil_major,
         report_ref: source.report_ref || source.report_reference,
-        negative_observations_count: source.negative_observations_count || source.negative_observation_count || source.negative_count,
+        negative_observations_count: firstValue(source, [
+          "negative_observations_count",
+          "negative_observation_count",
+          "negative_count",
+          "negative_observations",
+        ], 0),
       });
     }
   }
@@ -200,7 +337,15 @@ function normalizePlannerData(data) {
         ["next_due_date", "due_date"],
         lastInspectionDate ? addCalendarMonths(lastInspectionDate, effective) : ""
       ));
-      const status = normalizedStatus(row, dueDate, Boolean(lastInspectionDate || history.length));
+      const includeValue = firstValue(row, [
+        "include_in_planner",
+        "is_included_in_planner",
+        "planner_included",
+        "include_vessel_in_planner",
+        "is_planner_included",
+        "planner_enabled",
+      ], true);
+      const status = normalizedStatus(row, dueDate, lastInspectionDate, Boolean(lastInspectionDate || history.length));
       return {
         ...row,
         vessel_id: String(row.vessel_id),
@@ -211,15 +356,17 @@ function normalizePlannerData(data) {
         effective_interval_months: effective,
         next_due_date: dueDate,
         status,
+        include_in_planner: asBoolean(includeValue, true),
         planned_next_oil_major: String(firstValue(row, [
           "planned_next_oil_major",
-        "planned_next_inspecting_company",
-        "planned_inspecting_oil_major",
+          "planned_next_inspecting_company",
+          "planned_inspecting_oil_major",
           "planned_inspecting_company",
           "planned_oil_major",
           "next_oil_major",
         ])),
         remarks: String(firstValue(row, ["remarks", "vessel_remarks"])),
+        suggestion: suggestionFromRow(row),
       };
     })
     .sort((a, b) => a.vessel_name.localeCompare(b.vessel_name));
@@ -241,7 +388,7 @@ function renderHistory(history) {
             <td>${plannerEsc(item.port_name || "—")}</td>
             <td>${plannerEsc(item.inspecting_company || "—")}</td>
             <td>${plannerEsc(item.report_ref || "—")}</td>
-            <td>${plannerEsc(item.negative_observations)}</td>
+            <td>${plannerEsc(item.negative_observations_count)}</td>
           </tr>
         `).join("")}</tbody>
       </table>
@@ -252,6 +399,8 @@ function renderHistory(history) {
 function renderVesselCard(row) {
   const disabled = !plannerState.canEdit || plannerState.saving.has(row.vessel_id);
   const overrideValue = row.interval_override_months == null ? "" : String(row.interval_override_months);
+  const includeChecked = row.include_in_planner === true ? "checked" : "";
+  const suggestion = row.suggestion || {};
   const intervalOptions = [
     `<option value="" ${overrideValue === "" ? "selected" : ""}>Default — 6 months</option>`,
     ...[1, 2, 3, 4, 5, 6].map((month) =>
@@ -260,10 +409,20 @@ function renderVesselCard(row) {
   ].join("");
   const status = row.status;
   return `
-    <article class="vessel-card" data-vessel-id="${plannerEsc(row.vessel_id)}" data-vessel-name="${plannerEsc(row.vessel_name.toLowerCase())}" data-status="${plannerEsc(status.key)}">
+    <article class="vessel-card" data-vessel-id="${plannerEsc(row.vessel_id)}" data-vessel-name="${plannerEsc(row.vessel_name.toLowerCase())}" data-status="${plannerEsc(status.key)}" data-included="${row.include_in_planner ? "true" : "false"}">
       <header class="vessel-card-head">
-        <h2 class="vessel-name">${plannerEsc(row.vessel_name)}</h2>
-        <span class="vessel-status status-${plannerEsc(status.key)}">${plannerEsc(status.label)}</span>
+        <div>
+          <h2 class="vessel-name">${plannerEsc(row.vessel_name)}</h2>
+          <div class="vessel-card-toggles">
+            <label class="planner-switch" for="include-${plannerEsc(row.vessel_id)}">
+              <input id="include-${plannerEsc(row.vessel_id)}" type="checkbox" data-include-vessel="${plannerEsc(row.vessel_id)}" ${includeChecked} ${disabled ? "disabled" : ""} />
+              <span class="planner-switch-track" aria-hidden="true"></span>
+              <span>Include in planner</span>
+            </label>
+            ${row.include_in_planner ? "" : `<span class="planner-hidden-label">Hidden from planner</span>`}
+          </div>
+        </div>
+        <span class="vessel-status status-${plannerEsc(status.key)}" ${status.style ? `style="${plannerEsc(status.style)}"` : ""}>${plannerEsc(status.label)}</span>
       </header>
       <div class="vessel-summary">
         <div><div class="summary-label">Last inspection</div><div class="summary-value">${plannerEsc(displayDate(row.last_inspection_date))}</div></div>
@@ -282,8 +441,18 @@ function renderVesselCard(row) {
             <select id="interval-${plannerEsc(row.vessel_id)}" data-plan-field="interval" ${disabled ? "disabled" : ""}>${intervalOptions}</select>
             <div class="field-hint">Choose Default to use the six-month interval.</div>
           </div>
+          <div class="planner-suggestion">
+            <div class="suggestion-title">Backend suggestion</div>
+            <div class="suggestion-major">${plannerEsc(suggestion.major || "No suggested major available")}</div>
+            <div class="suggestion-metrics">
+              <span>Vessel last-5 average: <strong>${plannerEsc(displayAverage(suggestion.vesselAverage))}</strong></span>
+              <span>Suggested-major average: <strong>${plannerEsc(displayAverage(suggestion.majorAverage))}</strong></span>
+            </div>
+            <p>${plannerEsc(suggestion.explanation || "No explanation was returned by the planner service.")}</p>
+            <button class="planner-btn" type="button" data-use-suggestion="${plannerEsc(row.vessel_id)}" ${disabled || !suggestion.major ? "disabled" : ""}>Use suggestion</button>
+          </div>
           <div class="planner-field">
-            <label for="major-${plannerEsc(row.vessel_id)}">Planned next oil major / company</label>
+            <label for="major-${plannerEsc(row.vessel_id)}">Planned next oil major</label>
             <input id="major-${plannerEsc(row.vessel_id)}" data-plan-field="major" maxlength="200" value="${plannerEsc(row.planned_next_oil_major)}" ${disabled ? "disabled" : ""} />
           </div>
           <div class="planner-field">
@@ -301,15 +470,23 @@ function renderVesselCard(row) {
 function applyFilters() {
   const search = String(plannerEl("vesselSearch")?.value || "").trim().toLowerCase();
   const status = plannerEl("statusFilter")?.value || "";
+  const showHidden = plannerEl("showHiddenVessels")?.checked === true;
   let visible = 0;
+  const hiddenCount = plannerState.vessels.filter((vessel) => !vessel.include_in_planner).length;
   document.querySelectorAll(".vessel-card").forEach((card) => {
-    const match = card.dataset.vesselName.includes(search) && (!status || card.dataset.status === status);
+    const included = card.dataset.included !== "false";
+    const match = (showHidden || included) &&
+      card.dataset.vesselName.includes(search) &&
+      (!status || card.dataset.status === status);
     card.hidden = !match;
     if (match) visible += 1;
   });
   const statusEl = plannerEl("plannerStatus");
   if (statusEl && plannerState.vessels.length) {
-    statusEl.textContent = `${visible} of ${plannerState.vessels.length} active vessel(s) shown.`;
+    const hiddenNote = hiddenCount && !showHidden
+      ? ` ${hiddenCount} hidden; turn on “Show hidden vessels” to view them.`
+      : "";
+    statusEl.textContent = `${visible} of ${plannerState.vessels.length} active vessel(s) shown.${hiddenNote}`;
   }
   const empty = plannerEl("plannerNoResults");
   if (empty) empty.hidden = visible > 0;
@@ -325,6 +502,22 @@ function renderPlanner() {
   applyFilters();
   host.querySelectorAll("[data-save-vessel]").forEach((button) => {
     button.addEventListener("click", () => saveVesselPlan(button.dataset.saveVessel));
+  });
+  host.querySelectorAll("[data-include-vessel]").forEach((input) => {
+    input.addEventListener("change", () =>
+      saveVesselPlan(input.dataset.includeVessel, { includeInPlanner: input.checked })
+    );
+  });
+  host.querySelectorAll("[data-use-suggestion]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const row = plannerState.vessels.find((vessel) => vessel.vessel_id === button.dataset.useSuggestion);
+      if (!row?.suggestion?.major) return;
+      const majorInput = plannerEl(`major-${row.vessel_id}`);
+      if (!majorInput || majorInput.disabled) return;
+      majorInput.value = row.suggestion.major;
+      majorInput.focus();
+      showPlannerMessage("Suggestion copied to Planned next oil major. Save the vessel plan to store it.", "success");
+    });
   });
 }
 
@@ -344,14 +537,15 @@ async function waitForModuleGuard() {
 async function loadPlanner() {
   showPlannerMessage("");
   plannerEl("plannerStatus").textContent = "Loading accessible active vessels and inspection history…";
-  const { data, error } = await plannerState.supabase.rpc("csvb_vetting_inspection_planner_for_me");
+  const { data, error } = await plannerState.supabase.rpc("csvb_vetting_inspection_planner_for_me_v2");
   if (error) throw new Error(error.message || "Could not load the inspection plan.");
   plannerState.vessels = normalizePlannerData(data);
   renderPlanner();
   plannerEl("plannerStatus").textContent = `${plannerState.vessels.length} active vessel(s) loaded.`;
+  return plannerState.vessels;
 }
 
-async function saveVesselPlan(vesselId) {
+async function saveVesselPlan(vesselId, { includeInPlanner } = {}) {
   const row = plannerState.vessels.find((vessel) => vessel.vessel_id === String(vesselId));
   if (!row || !plannerState.canEdit || plannerState.saving.has(row.vessel_id)) return;
 
@@ -364,31 +558,46 @@ async function saveVesselPlan(vesselId) {
 
   const major = String(plannerEl(`major-${row.vessel_id}`)?.value || "").trim();
   const remarks = String(plannerEl(`remarks-${row.vessel_id}`)?.value || "").trim();
+  const includeInput = plannerEl(`include-${row.vessel_id}`);
+  const include = typeof includeInPlanner === "boolean"
+    ? includeInPlanner
+    : (includeInput?.checked ?? row.include_in_planner);
   const saveButton = document.querySelector(`[data-save-vessel="${CSS.escape(row.vessel_id)}"]`);
   plannerState.saving.add(row.vessel_id);
   if (saveButton) {
     saveButton.disabled = true;
     saveButton.textContent = "Saving…";
   }
+  if (includeInput) includeInput.disabled = true;
   showPlannerMessage("");
 
   try {
-    const { data, error } = await plannerState.supabase.rpc("csvb_vetting_inspection_plan_save", {
+    const { data, error } = await plannerState.supabase.rpc("csvb_vetting_inspection_plan_save_v2", {
       p_vessel_id: row.vessel_id,
       p_interval_override_months: intervalOverride,
       p_planned_next_oil_major: major || null,
       p_remarks: remarks || null,
+      p_include_in_planner: include,
     });
     if (error) throw error;
     if (data === false || data?.success === false) {
       throw new Error(data?.message || "The planning settings were not saved.");
     }
-    await loadPlanner();
+    const refreshed = await loadPlanner();
+    const savedRow = refreshed.find((vessel) => vessel.vessel_id === row.vessel_id);
+    const intervalPersisted = intervalOverride === null
+      ? savedRow?.interval_override_months === null
+      : savedRow?.interval_override_months === intervalOverride ||
+        savedRow?.effective_interval_months === intervalOverride;
+    if (!savedRow || savedRow.include_in_planner !== include || !intervalPersisted) {
+      throw new Error("The server did not return the saved planner visibility or interval value after reload.");
+    }
     showPlannerMessage(`Planning settings saved for ${row.vessel_name}.`, "success");
   } catch (error) {
     showPlannerMessage(`Could not save planning settings for ${row.vessel_name}: ${error?.message || String(error)}`);
   } finally {
     plannerState.saving.delete(row.vessel_id);
+    if (includeInput) includeInput.disabled = false;
     renderPlanner();
   }
 }
@@ -428,9 +637,11 @@ async function initPlanner() {
   );
   plannerEl("vesselSearch").addEventListener("input", applyFilters);
   plannerEl("statusFilter").addEventListener("change", applyFilters);
+  plannerEl("showHiddenVessels").addEventListener("change", applyFilters);
   plannerEl("clearFiltersBtn").addEventListener("click", () => {
     plannerEl("vesselSearch").value = "";
     plannerEl("statusFilter").value = "";
+    plannerEl("showHiddenVessels").checked = false;
     applyFilters();
   });
   await loadPlanner();

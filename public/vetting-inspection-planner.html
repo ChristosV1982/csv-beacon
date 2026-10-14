@@ -48,7 +48,9 @@
       padding: 14px; margin-bottom: 12px; border: 1px solid var(--planner-border);
       border-radius: 16px; background: #fff; box-shadow: 0 8px 24px rgba(0,0,0,.14);
     }
-    .planner-filters { display: grid; grid-template-columns: minmax(220px, 1fr) minmax(190px, .55fr) auto; align-items: end; gap: 10px; }
+    .planner-filters { display: grid; grid-template-columns: minmax(220px, 1fr) minmax(190px, .55fr) auto auto; align-items: end; gap: 10px; }
+    .planner-show-hidden { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 8px; color: var(--planner-blue); font-size: .87rem; font-weight: 800; white-space: nowrap; }
+    .planner-show-hidden input { width: 17px; height: 17px; accent-color: #1d5ca0; }
     .planner-field label { display: block; margin: 0 0 5px; color: var(--planner-blue); font-size: .87rem; font-weight: 850; }
     .planner-field input, .planner-field select, .planner-field textarea {
       width: 100%; min-height: 40px; padding: 9px 10px; border: 1px solid #cbd8e8;
@@ -68,13 +70,24 @@
       padding: 14px 16px; border-bottom: 1px solid #e4ebf4;
       background: linear-gradient(120deg, #f8fbff, #eef4fa);
     }
+    .vessel-card-toggles { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 8px; }
+    .planner-switch { display: inline-flex; align-items: center; gap: 8px; color: #35506c; font-size: .82rem; font-weight: 800; cursor: pointer; }
+    .planner-switch input { position: absolute; width: 1px; height: 1px; margin: -1px; opacity: 0; }
+    .planner-switch-track { position: relative; width: 38px; height: 22px; flex: none; border-radius: 999px; background: #a8b5c4; transition: background .18s ease; }
+    .planner-switch-track::after { position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.25); content: ""; transition: transform .18s ease; }
+    .planner-switch input:checked + .planner-switch-track { background: #287347; }
+    .planner-switch input:checked + .planner-switch-track::after { transform: translateX(16px); }
+    .planner-switch input:focus-visible + .planner-switch-track { outline: 3px solid #75a7df; outline-offset: 2px; }
+    .planner-switch input:disabled ~ span { opacity: .6; cursor: not-allowed; }
+    .planner-hidden-label { padding: 4px 8px; border: 1px solid #d7dee7; border-radius: 999px; background: #f2f4f7; color: #596779; font-size: .74rem; font-weight: 850; }
     .vessel-name { margin: 0; color: var(--planner-navy); font-size: 1.12rem; font-weight: 900; }
     .vessel-status {
       flex: none; padding: 6px 10px; border: 1px solid transparent; border-radius: 999px;
       font-size: .82rem; font-weight: 850; white-space: nowrap;
     }
-    .status-overdue { border-color: #e6b5b5; background: #fff0f0; color: #a32121; }
-    .status-soon { border-color: #ebd18e; background: #fff8e5; color: #825600; }
+    .status-overdue { padding: 9px 14px; border-color: #7f1d1d; background: #b91c1c; color: #fff; font-size: 1rem; font-weight: 950; letter-spacing: .04em; text-transform: uppercase; box-shadow: 0 0 0 3px rgba(185,28,28,.15); }
+    .status-warning { border-color: #dc2626; background: #fee2e2; color: #991b1b; }
+    .status-approaching { border-color: hsl(var(--planner-status-hue, 120) 55% 62%); background: hsl(var(--planner-status-hue, 120) 80% 94%); color: hsl(var(--planner-status-hue, 120) 75% 25%); transition: color .2s linear, background-color .2s linear, border-color .2s linear; }
     .status-within { border-color: #b8ddc5; background: #effaf2; color: #246b3e; }
     .status-none { border-color: #d7dee7; background: #f2f4f7; color: #596779; }
     .vessel-summary {
@@ -93,12 +106,18 @@
     .history-table tr:last-child td { border-bottom: 0; }
     .history-empty { padding: 12px; color: var(--planner-muted); }
     .plan-fields { display: grid; grid-template-columns: minmax(200px, .75fr) minmax(220px, 1fr) minmax(280px, 1.5fr) auto; gap: 10px; align-items: end; }
+    .planner-suggestion { grid-column: span 2; padding: 10px 12px; border: 1px solid #cbd9eb; border-radius: 11px; background: #f4f8fd; }
+    .suggestion-title { color: #526982; font-size: .74rem; font-weight: 850; letter-spacing: .04em; text-transform: uppercase; }
+    .suggestion-major { margin-top: 3px; color: var(--planner-navy); font-size: 1rem; font-weight: 900; }
+    .suggestion-metrics { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 6px; color: #425b75; font-size: .8rem; }
+    .planner-suggestion p { margin: 7px 0 9px; color: #4e6278; font-size: .81rem; line-height: 1.4; }
     .field-hint { margin-top: 4px; color: var(--planner-muted); font-size: .77rem; }
     .planner-empty { padding: 24px; color: var(--planner-muted); text-align: center; }
     .planner-readonly-note { margin-top: 8px; color: var(--planner-muted); font-size: .82rem; }
     @media (max-width: 760px) {
       body { padding: 9px; }
       .planner-filters, .plan-fields { grid-template-columns: 1fr; }
+      .planner-suggestion { grid-column: auto; }
       .vessel-summary { grid-template-columns: 1fr 1fr; }
       .vessel-card-head { flex-direction: column; }
     }
@@ -126,12 +145,17 @@
           <label for="vesselSearch">Search vessel</label>
           <input id="vesselSearch" type="search" placeholder="Type a vessel name" autocomplete="off" />
         </div>
+        <label class="planner-show-hidden" for="showHiddenVessels">
+          <input id="showHiddenVessels" type="checkbox" />
+          <span>Show hidden vessels</span>
+        </label>
         <div class="planner-field">
           <label for="statusFilter">Decision status</label>
           <select id="statusFilter">
             <option value="">All statuses</option>
             <option value="overdue">Overdue</option>
-            <option value="soon">Due within 30 days</option>
+            <option value="warning">Due within 15 days</option>
+            <option value="approaching">Approaching due</option>
             <option value="within">Within window</option>
             <option value="none">No inspection history</option>
           </select>
@@ -148,6 +172,6 @@
   <script src="./app-config.js"></script>
   <script src="./auth.js"></script>
   <script src="./csvb-module-guard.js?v=20261014_vetting_planner_1"></script>
-  <script type="module" src="./vetting-inspection-planner.js?v=20261014_vetting_planner_1"></script>
+  <script type="module" src="./vetting-inspection-planner.js?v=20261014_vetting_planner_2"></script>
 </body>
 </html>
