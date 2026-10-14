@@ -7,6 +7,8 @@ Omega Beacon work must use the approved deployment package 01.00.00003 as its ba
 
 The user confirms the current managed Supabase project used by this workspace is for development/testing and wants Omega to share that same application backend for now. Serve the current app configuration read-only; do not switch Omega to a new backend or use production data.
 
-**Why:** The user explicitly requires preservation of C.S.V. Beacon default branding, behavior, authentication, database schema, permissions, routes, service worker, and production deployment.
+As of 2026-10-14, the user has paused Omega work and wants to work only on C.S.V. Beacon until they explicitly resume Omega.
 
-**How to apply:** Locate the approved package and assets before editing. Keep the active `public/` tree read-only, use a separate preview profile, preserve the user's existing development/testing backend, and do not publish or deploy.
+**Why:** The user explicitly requires preservation of C.S.V. Beacon and, for now, has directed that only C.S.V. Beacon remain active.
+
+**How to apply:** Keep C.S.V. Beacon as the only project workflow started. Do not start or recreate Omega workflows or servers; leave Omega package/archive files in place. If Omega work resumes later, follow the approved package, backend, and isolation constraints above.
