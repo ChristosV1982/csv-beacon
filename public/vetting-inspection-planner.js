@@ -313,7 +313,9 @@ function normalizePlannerData(data) {
   }
 
   return [...grouped.values()]
-    .filter((row) => row.is_active !== false && row.active !== false)
+    // `active` is ambiguous in v2 and may mean planner inclusion. Only exclude
+    // explicit global-vessel inactive flags so hidden planner rows remain restorable.
+    .filter((row) => row.is_active !== false && row.vessel_is_active !== false && row.is_vessel_active !== false)
     .map((row) => {
       const history = normalizeHistory(row.history);
       const lastInspectionDate = dateOnly(firstValue(
@@ -323,6 +325,7 @@ function normalizePlannerData(data) {
       ));
       const overrideRaw = firstValue(row, [
         "interval_override_months",
+        "interval_months_override",
         "override_interval_months",
         "vessel_interval_override_months",
         "inspection_interval_override_months",
@@ -456,8 +459,9 @@ function renderVesselCard(row) {
             <input id="major-${plannerEsc(row.vessel_id)}" data-plan-field="major" maxlength="200" value="${plannerEsc(row.planned_next_oil_major)}" ${disabled ? "disabled" : ""} />
           </div>
           <div class="planner-field">
-            <label for="remarks-${plannerEsc(row.vessel_id)}">Vessel remarks</label>
-            <textarea id="remarks-${plannerEsc(row.vessel_id)}" data-plan-field="remarks" maxlength="4000" ${disabled ? "disabled" : ""}>${plannerEsc(row.remarks)}</textarea>
+            <label for="remarks-${plannerEsc(row.vessel_id)}">Vessel remarks (read-only)</label>
+            <textarea id="remarks-${plannerEsc(row.vessel_id)}" data-plan-field="remarks" maxlength="4000" readonly>${plannerEsc(row.remarks)}</textarea>
+            <div class="field-hint">The current planner save service does not write remarks.</div>
           </div>
           <button class="planner-btn primary" type="button" data-save-vessel="${plannerEsc(row.vessel_id)}" ${disabled ? "disabled" : ""}>${plannerState.saving.has(row.vessel_id) ? "Saving…" : "Save"}</button>
         </div>
@@ -557,7 +561,6 @@ async function saveVesselPlan(vesselId, { includeInPlanner } = {}) {
   }
 
   const major = String(plannerEl(`major-${row.vessel_id}`)?.value || "").trim();
-  const remarks = String(plannerEl(`remarks-${row.vessel_id}`)?.value || "").trim();
   const includeInput = plannerEl(`include-${row.vessel_id}`);
   const include = typeof includeInPlanner === "boolean"
     ? includeInPlanner
@@ -574,9 +577,8 @@ async function saveVesselPlan(vesselId, { includeInPlanner } = {}) {
   try {
     const { data, error } = await plannerState.supabase.rpc("csvb_vetting_inspection_plan_save_v2", {
       p_vessel_id: row.vessel_id,
-      p_interval_override_months: intervalOverride,
-      p_planned_next_oil_major: major || null,
-      p_remarks: remarks || null,
+      p_interval_months_override: intervalOverride,
+      p_planned_oil_major: major || null,
       p_include_in_planner: include,
     });
     if (error) throw error;
