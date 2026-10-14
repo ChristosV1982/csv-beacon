@@ -1,4 +1,4 @@
-const PLANNER_BUILD = "vetting_inspection_planner_v3_2026-10-14";
+const PLANNER_BUILD = "vetting_inspection_planner_v4_2026-10-14";
 const PLANNER_MODULE_CODE = "VETTING_INSPECTION_PLANNER";
 const DEFAULT_INTERVAL_MONTHS = 6;
 
@@ -82,15 +82,26 @@ function normalizedStatus(row, dueDate, lastInspectionDate, hasHistory) {
     const today = new Date();
     const todayIso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
     const daysToDue = daysBetween(todayIso, dueDate);
-    if (daysToDue < 0) return { key: "overdue", label: "OVERDUE", daysToDue };
+    const remaining = `${daysToDue} day${daysToDue === 1 ? "" : "s"} remaining`;
+    if (daysToDue < 0) {
+      const overdueDays = Math.abs(daysToDue);
+      return {
+        key: "overdue",
+        label: `OVERDUE • ${overdueDays} day${overdueDays === 1 ? "" : "s"}`,
+        daysToDue,
+      };
+    }
     if (daysToDue <= 15) {
-      return { key: "warning", label: `Due in ${daysToDue} day${daysToDue === 1 ? "" : "s"}`, daysToDue };
+      const label = daysToDue === 0
+        ? "Due today • 0 days remaining"
+        : `Due soon • ${remaining}`;
+      return { key: "warning", label, daysToDue };
     }
 
     const greenThrough = lastInspectionDate ? addCalendarMonths(lastInspectionDate, 2) : "";
     const warningBegins = addCalendarDays(dueDate, -15);
     if (!greenThrough || todayIso < greenThrough) {
-      return { key: "within", label: "Within interval", daysToDue };
+      return { key: "within", label: `Within interval • ${remaining}`, daysToDue };
     }
 
     if (todayIso < warningBegins) {
@@ -100,22 +111,25 @@ function normalizedStatus(row, dueDate, lastInspectionDate, hasHistory) {
         ? Math.max(0, Math.min(1, elapsedDays / transitionDays))
         : 1;
       const hue = Math.round(120 * (1 - progress));
+      const label = daysToDue <= 30
+        ? `Due soon • ${remaining}`
+        : `Approaching due • ${remaining}`;
       return {
         key: "approaching",
-        label: `Due in ${daysToDue} days`,
+        label,
         daysToDue,
         style: `--planner-status-hue:${hue}`,
       };
     }
 
-    return { key: "warning", label: `Due in ${daysToDue} days`, daysToDue };
+    return { key: "warning", label: `Due soon • ${remaining}`, daysToDue };
   }
   const supplied = String(
     row?.decision_status ?? row?.status ?? row?.due_status ?? row?.decision ?? ""
   ).trim().toLowerCase().replaceAll("-", "_").replaceAll(" ", "_");
-  if (/overdue|past_due/.test(supplied)) return { key: "overdue", label: "OVERDUE" };
-  if (/due_soon|due_within|soon|amber|warning/.test(supplied)) return { key: "warning", label: "Due soon" };
-  if (/within|current|green|not_due/.test(supplied)) return { key: "within", label: "Within window" };
+  if (/overdue|past_due/.test(supplied)) return { key: "overdue", label: "OVERDUE • days unavailable" };
+  if (/due_soon|due_within|soon|amber|warning/.test(supplied)) return { key: "warning", label: "Due soon • days unavailable" };
+  if (/within|current|green|not_due/.test(supplied)) return { key: "within", label: "Within interval • days unavailable" };
   return { key: "none", label: "No inspection history" };
 }
 
@@ -463,6 +477,17 @@ function renderVesselCard(row) {
   const includeChecked = row.include_in_planner === true ? "checked" : "";
   const suggestion = row.suggestion || {};
   const draft = vesselDraft(row);
+  const lastInspection = row.history[0] || null;
+  const lastInspectionDate = row.last_inspection_date || lastInspection?.inspection_date || "";
+  const lastOilMajor = lastInspection?.inspecting_company ||
+    firstValue(row, ["last_inspecting_oil_major", "last_inspecting_company", "last_oil_major"], "—");
+  const lastNegativeCount = lastInspection
+    ? lastInspection.negative_observations_count
+    : firstValue(row, [
+      "last_inspection_negative_observations_count",
+      "last_negative_observations_count",
+      "last_inspection_negative_count",
+    ], "—");
   const intervalOptions = [
     `<option value="" ${overrideValue === "" ? "selected" : ""}>Default — 6 months</option>`,
     ...[1, 2, 3, 4, 5, 6].map((month) =>
@@ -480,75 +505,95 @@ function renderVesselCard(row) {
   const status = row.status;
   return `
     <article class="vessel-card" data-vessel-id="${plannerEsc(row.vessel_id)}" data-vessel-name="${plannerEsc(row.vessel_name.toLowerCase())}" data-status="${plannerEsc(status.key)}" data-included="${row.include_in_planner ? "true" : "false"}">
-      <header class="vessel-card-head">
-        <div>
-          <h2 class="vessel-name">${plannerEsc(row.vessel_name)}</h2>
-          <div class="vessel-card-toggles">
-            <label class="planner-switch" for="include-${plannerEsc(row.vessel_id)}">
-              <input id="include-${plannerEsc(row.vessel_id)}" type="checkbox" data-include-vessel="${plannerEsc(row.vessel_id)}" ${includeChecked} ${disabled ? "disabled" : ""} />
-              <span class="planner-switch-track" aria-hidden="true"></span>
-              <span>Include in planner</span>
-            </label>
-            ${row.include_in_planner ? "" : `<span class="planner-hidden-label">Hidden from planner</span>`}
-          </div>
-        </div>
-        <span class="vessel-status status-${plannerEsc(status.key)}" ${status.style ? `style="${plannerEsc(status.style)}"` : ""}>${plannerEsc(status.label)}</span>
-      </header>
-      <div class="vessel-summary">
-        <div><div class="summary-label">Last inspection</div><div class="summary-value">${plannerEsc(displayDate(row.last_inspection_date))}</div></div>
-        <div><div class="summary-label">Effective interval</div><div class="summary-value">${row.last_inspection_date ? `${plannerEsc(row.effective_interval_months)} months` : "—"}</div></div>
-        <div><div class="summary-label">Next due date</div><div class="summary-value">${plannerEsc(displayDate(row.next_due_date))}</div></div>
-      </div>
-      <section class="planner-section">
-        <h3 class="section-title">Last 5 vetting inspections</h3>
-        ${renderHistory(row.history)}
-      </section>
-      <section class="planner-section">
-        <h3 class="section-title">Next inspection plan</h3>
-        <div class="plan-fields">
-          <div class="planner-field">
-            <label for="interval-${plannerEsc(row.vessel_id)}">Interval override</label>
-            <select id="interval-${plannerEsc(row.vessel_id)}" data-plan-field="interval" ${disabled ? "disabled" : ""}>${intervalOptions}</select>
-            <div class="field-hint">Choose Default to use the six-month interval.</div>
-          </div>
-          <div class="oil-major-fields">
-            <div class="planner-field">
-              <label for="major-${plannerEsc(row.vessel_id)}">Planned next oil major</label>
-              <input id="major-${plannerEsc(row.vessel_id)}" data-plan-field="major" maxlength="200" value="${plannerEsc(row.planned_next_oil_major)}" ${disabled ? "disabled" : ""} />
-            </div>
-            <div class="planner-field">
-              <label for="major-alt-01-${plannerEsc(row.vessel_id)}">Alternative 01</label>
-              <input id="major-alt-01-${plannerEsc(row.vessel_id)}" data-alternative-field="alternative01" data-vessel-id="${plannerEsc(row.vessel_id)}" maxlength="200" value="${plannerEsc(draft.alternative01)}" ${disabled ? "disabled" : ""} />
-            </div>
-            <div class="planner-field">
-              <label for="major-alt-02-${plannerEsc(row.vessel_id)}">Alternative 02</label>
-              <input id="major-alt-02-${plannerEsc(row.vessel_id)}" data-alternative-field="alternative02" data-vessel-id="${plannerEsc(row.vessel_id)}" maxlength="200" value="${plannerEsc(draft.alternative02)}" ${disabled ? "disabled" : ""} />
+      <details class="planner-card-details">
+        <summary class="planner-card-summary">
+          <span class="planner-summary-vessel">${plannerEsc(row.vessel_name)}</span>
+          <span class="planner-summary-fact">
+            <span class="planner-summary-label">Last Inspection Date</span>
+            <span class="planner-summary-value">${plannerEsc(displayDate(lastInspectionDate))}</span>
+          </span>
+          <span class="planner-summary-fact">
+            <span class="planner-summary-label">Last inspecting Oil Major</span>
+            <span class="planner-summary-value">${plannerEsc(lastOilMajor || "—")}</span>
+          </span>
+          <span class="planner-summary-fact">
+            <span class="planner-summary-label">Last inspection negative observations</span>
+            <span class="planner-summary-value">${plannerEsc(lastNegativeCount)}</span>
+          </span>
+          <span class="vessel-status status-${plannerEsc(status.key)}" ${status.style ? `style="${plannerEsc(status.style)}"` : ""}>${plannerEsc(status.label)}</span>
+          <span class="planner-expand-affordance" aria-hidden="true">
+            <span class="planner-expand-closed">Expand</span>
+            <span class="planner-expand-open">Collapse</span>
+            <span class="planner-expand-chevron"></span>
+          </span>
+        </summary>
+        <div class="planner-card-expanded">
+          <div class="vessel-card-head">
+            <div class="vessel-card-toggles">
+              <label class="planner-switch" for="include-${plannerEsc(row.vessel_id)}">
+                <input id="include-${plannerEsc(row.vessel_id)}" type="checkbox" data-include-vessel="${plannerEsc(row.vessel_id)}" ${includeChecked} ${disabled ? "disabled" : ""} />
+                <span class="planner-switch-track" aria-hidden="true"></span>
+                <span>Include in planner</span>
+              </label>
+              ${row.include_in_planner ? "" : `<span class="planner-hidden-label">Hidden from planner</span>`}
             </div>
           </div>
-          <button class="planner-btn primary" type="button" data-save-vessel="${plannerEsc(row.vessel_id)}" ${disabled ? "disabled" : ""}>${plannerState.saving.has(row.vessel_id) ? "Saving…" : "Save"}</button>
-        </div>
-        <div class="planner-draft-note">Save stores the primary major, interval, and planner inclusion. Alternative majors and vessel remarks are editable drafts only and are not saved by the current backend contract.</div>
-        <div class="planner-suggestion">
-          <div class="suggestion-copy">
-            <span class="suggestion-title">Backend suggestion</span>
-            <strong class="suggestion-major">${plannerEsc(suggestion.major || "No suggested major available")}</strong>
-            <div class="suggestion-metrics">
-              <span>Vessel last-5 average: <strong>${plannerEsc(displayAverage(suggestion.vesselAverage))}</strong></span>
-              <span>Suggested-major average: <strong>${plannerEsc(displayAverage(suggestion.majorAverage))}</strong></span>
+          <div class="vessel-summary">
+            <div><div class="summary-label">Effective interval</div><div class="summary-value">${row.last_inspection_date ? `${plannerEsc(row.effective_interval_months)} months` : "—"}</div></div>
+            <div><div class="summary-label">Next due date</div><div class="summary-value">${plannerEsc(displayDate(row.next_due_date))}</div></div>
+          </div>
+          <section class="planner-section">
+            <h3 class="section-title">Last 5 vetting inspections</h3>
+            ${renderHistory(row.history)}
+          </section>
+          <section class="planner-section">
+            <h3 class="section-title">Next inspection plan</h3>
+            <div class="plan-fields">
+              <div class="planner-field">
+                <label for="interval-${plannerEsc(row.vessel_id)}">Interval override</label>
+                <select id="interval-${plannerEsc(row.vessel_id)}" data-plan-field="interval" ${disabled ? "disabled" : ""}>${intervalOptions}</select>
+                <div class="field-hint">Choose Default to use the six-month interval.</div>
+              </div>
+              <div class="oil-major-fields">
+                <div class="planner-field">
+                  <label for="major-${plannerEsc(row.vessel_id)}">Planned next oil major</label>
+                  <input id="major-${plannerEsc(row.vessel_id)}" data-plan-field="major" maxlength="200" value="${plannerEsc(row.planned_next_oil_major)}" ${disabled ? "disabled" : ""} />
+                </div>
+                <div class="planner-field">
+                  <label for="major-alt-01-${plannerEsc(row.vessel_id)}">Alternative 01</label>
+                  <input id="major-alt-01-${plannerEsc(row.vessel_id)}" data-alternative-field="alternative01" data-vessel-id="${plannerEsc(row.vessel_id)}" maxlength="200" value="${plannerEsc(draft.alternative01)}" ${disabled ? "disabled" : ""} />
+                </div>
+                <div class="planner-field">
+                  <label for="major-alt-02-${plannerEsc(row.vessel_id)}">Alternative 02</label>
+                  <input id="major-alt-02-${plannerEsc(row.vessel_id)}" data-alternative-field="alternative02" data-vessel-id="${plannerEsc(row.vessel_id)}" maxlength="200" value="${plannerEsc(draft.alternative02)}" ${disabled ? "disabled" : ""} />
+                </div>
+              </div>
+              <button class="planner-btn primary" type="button" data-save-vessel="${plannerEsc(row.vessel_id)}" ${disabled ? "disabled" : ""}>${plannerState.saving.has(row.vessel_id) ? "Saving…" : "Save"}</button>
             </div>
-            <p>${plannerEsc(suggestion.explanation || "No explanation was returned by the planner service.")}</p>
-          </div>
-          <button class="planner-btn" type="button" data-use-suggestion="${plannerEsc(row.vessel_id)}" ${disabled || !suggestion.major ? "disabled" : ""}>Use suggestion</button>
+            <div class="planner-draft-note">Save stores the primary major, interval, and planner inclusion. Alternative majors and vessel remarks are editable drafts only and are not saved by the current backend contract.</div>
+            <div class="planner-suggestion">
+              <div class="suggestion-copy">
+                <span class="suggestion-title">Backend suggestion</span>
+                <strong class="suggestion-major">${plannerEsc(suggestion.major || "No suggested major available")}</strong>
+                <div class="suggestion-metrics">
+                  <span>Vessel last-5 average: <strong>${plannerEsc(displayAverage(suggestion.vesselAverage))}</strong></span>
+                  <span>Suggested-major average: <strong>${plannerEsc(displayAverage(suggestion.majorAverage))}</strong></span>
+                </div>
+                <p>${plannerEsc(suggestion.explanation || "No explanation was returned by the planner service.")}</p>
+              </div>
+              <button class="planner-btn" type="button" data-use-suggestion="${plannerEsc(row.vessel_id)}" ${disabled || !suggestion.major ? "disabled" : ""}>Use suggestion</button>
+            </div>
+            <div class="planner-remarks">
+              <div class="remarks-header">
+                <div><h4 class="remarks-title">Vessel remarks</h4></div>
+                <button class="planner-btn" type="button" data-add-remark="${plannerEsc(row.vessel_id)}" ${disabled ? "disabled" : ""}>Add Remark</button>
+              </div>
+              ${remarksMarkup}
+            </div>
+            ${plannerState.canEdit ? "" : `<div class="planner-readonly-note">You have view access only. An authorized editor can update these planning fields.</div>`}
+          </section>
         </div>
-        <div class="planner-remarks">
-          <div class="remarks-header">
-            <div><h4 class="remarks-title">Vessel remarks</h4></div>
-            <button class="planner-btn" type="button" data-add-remark="${plannerEsc(row.vessel_id)}" ${disabled ? "disabled" : ""}>Add Remark</button>
-          </div>
-          ${remarksMarkup}
-        </div>
-        ${plannerState.canEdit ? "" : `<div class="planner-readonly-note">You have view access only. An authorized editor can update these planning fields.</div>`}
-      </section>
+      </details>
     </article>
   `;
 }

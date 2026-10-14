@@ -19,7 +19,7 @@
     body {
       margin: 0;
       min-height: 100vh;
-      padding: 10px;
+      padding: 6px;
       background: radial-gradient(1100px 550px at 15% 0%, #1a4170 0%, #0b1c33 58%, #071426 100%);
       color: #15283d;
       font-family: "Segoe UI", Arial, sans-serif;
@@ -27,7 +27,7 @@
     .planner-wrap { width: 100%; max-width: none; margin: 0; }
     .planner-topbar {
       display: flex; align-items: center; justify-content: space-between; gap: 12px;
-      flex-wrap: wrap; padding: 9px 12px; margin-bottom: 8px;
+      flex-wrap: wrap; padding: 7px 10px; margin-bottom: 6px;
       border: 1px solid rgba(255,255,255,.24); border-radius: 12px;
       background: rgba(12,33,58,.78); color: #fff;
       box-shadow: 0 10px 34px rgba(0,0,0,.22);
@@ -45,16 +45,16 @@
     .planner-btn:disabled { opacity: .55; cursor: not-allowed; }
     .planner-btn.primary { border-color: #1d5ca0; background: #1d5ca0; color: #fff; }
     .planner-panel {
-      padding: 10px; margin-bottom: 8px; border: 1px solid var(--planner-border);
-      border-radius: 12px; background: #fff; box-shadow: 0 6px 18px rgba(0,0,0,.12);
+      padding: 8px; margin-bottom: 6px; border: 1px solid var(--planner-border);
+      border-radius: 10px; background: #fff; box-shadow: 0 5px 14px rgba(0,0,0,.11);
     }
     .planner-filters { display: grid; grid-template-columns: minmax(220px, 1fr) minmax(190px, .55fr) auto auto; align-items: end; gap: 10px; }
     .planner-show-hidden { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 8px; color: var(--planner-blue); font-size: .87rem; font-weight: 800; white-space: nowrap; }
     .planner-show-hidden input { width: 17px; height: 17px; accent-color: #1d5ca0; }
     .planner-field label { display: block; margin: 0 0 5px; color: var(--planner-blue); font-size: .87rem; font-weight: 850; }
     .planner-field input, .planner-field select, .planner-field textarea {
-      width: 100%; min-height: 35px; padding: 6px 8px; border: 1px solid #cbd8e8;
-      border-radius: 8px; background: #fff; color: #162b42; font: inherit;
+      width: 100%; min-height: 32px; padding: 5px 7px; border: 1px solid #cbd8e8;
+      border-radius: 7px; background: #fff; color: #162b42; font: inherit;
     }
     .planner-field textarea { min-height: 54px; resize: vertical; }
     .planner-statusline { min-height: 18px; margin: 0 0 6px; color: var(--planner-muted); font-size: .9rem; }
@@ -62,14 +62,34 @@
     .planner-message.error { display: block; border: 1px solid #e7b4b4; background: #fff2f2; color: #8d2525; }
     .planner-message.success { display: block; border: 1px solid #b5dbc6; background: #f0fbf4; color: #21643b; }
     .vessel-card {
-      overflow: hidden; margin-bottom: 8px; border: 1px solid var(--planner-border);
-      border-radius: 12px; background: #fff; box-shadow: 0 5px 16px rgba(0,0,0,.11);
+      overflow: hidden; margin-bottom: 6px; border: 1px solid var(--planner-border);
+      border-radius: 10px; background: #fff; box-shadow: 0 4px 12px rgba(0,0,0,.1);
     }
     .vessel-card-head {
       display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
-      padding: 8px 12px; border-bottom: 1px solid #e4ebf4;
+      padding: 6px 9px; border-bottom: 1px solid #e4ebf4;
       background: linear-gradient(120deg, #f8fbff, #eef4fa);
     }
+    .planner-card-details { min-width: 0; }
+    .planner-card-summary {
+      display: grid; grid-template-columns: minmax(155px, 1.15fr) repeat(3, minmax(130px, 1fr)) auto auto;
+      align-items: center; gap: 7px; padding: 7px 9px; cursor: pointer;
+      list-style: none; background: linear-gradient(120deg, #f8fbff, #eef4fa);
+    }
+    .planner-card-summary::-webkit-details-marker { display: none; }
+    .planner-card-summary:hover { background: #edf4fb; }
+    .planner-card-summary:focus-visible { outline: 3px solid #75a7df; outline-offset: -3px; }
+    .planner-card-summary .planner-summary-vessel { min-width: 0; color: var(--planner-navy); font-size: 1.02rem; font-weight: 900; overflow-wrap: anywhere; }
+    .planner-summary-fact { display: grid; min-width: 0; gap: 1px; }
+    .planner-summary-label { color: var(--planner-muted); font-size: .69rem; font-weight: 800; letter-spacing: .02em; text-transform: uppercase; }
+    .planner-summary-value { min-width: 0; color: #203b58; font-size: .84rem; font-weight: 800; overflow-wrap: anywhere; }
+    .planner-expand-affordance { display: inline-flex; align-items: center; gap: 5px; color: #345b80; font-size: .78rem; font-weight: 850; white-space: nowrap; }
+    .planner-expand-open { display: none; }
+    .planner-card-details[open] .planner-expand-closed { display: none; }
+    .planner-card-details[open] .planner-expand-open { display: inline; }
+    .planner-expand-chevron { width: 8px; height: 8px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg) translateY(-2px); transition: transform .15s ease; }
+    .planner-card-details[open] .planner-expand-chevron { transform: rotate(225deg) translate(-1px, -1px); }
+    .planner-card-expanded { border-top: 1px solid #e4ebf4; }
     .vessel-card-toggles { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
     .planner-switch { display: inline-flex; align-items: center; gap: 8px; color: #35506c; font-size: .82rem; font-weight: 800; cursor: pointer; }
     .planner-switch input { position: absolute; width: 1px; height: 1px; margin: -1px; opacity: 0; }
@@ -91,17 +111,17 @@
     .status-within { border-color: #b8ddc5; background: #effaf2; color: #246b3e; }
     .status-none { border-color: #d7dee7; background: #f2f4f7; color: #596779; }
     .vessel-summary {
-      display: grid; grid-template-columns: repeat(3, minmax(130px, 1fr)); gap: 8px;
-      padding: 7px 12px; border-bottom: 1px solid #e4ebf4;
+      display: grid; grid-template-columns: repeat(2, minmax(130px, 1fr)); gap: 6px;
+      padding: 6px 9px; border-bottom: 1px solid #e4ebf4;
     }
     .summary-label { color: var(--planner-muted); font-size: .76rem; font-weight: 750; text-transform: uppercase; letter-spacing: .035em; }
     .summary-value { margin-top: 2px; color: var(--planner-navy); font-weight: 850; }
-    .planner-section { padding: 7px 12px; }
+    .planner-section { padding: 6px 9px; }
     .planner-section + .planner-section { border-top: 1px solid #e4ebf4; }
     .section-title { margin: 0 0 5px; color: var(--planner-blue); font-size: .95rem; font-weight: 900; }
     .history-wrap { overflow-x: auto; border: 1px solid #e2e9f1; border-radius: 10px; }
     .history-table { width: 100%; min-width: 700px; border-collapse: collapse; font-size: .86rem; }
-    .history-table th, .history-table td { padding: 5px 7px; border-bottom: 1px solid #e9eef5; text-align: left; vertical-align: top; line-height: 1.22; }
+    .history-table th, .history-table td { padding: 3px 5px; border-bottom: 1px solid #e9eef5; text-align: left; vertical-align: top; line-height: 1.2; }
     .history-table th { background: #f4f7fb; color: #284761; font-size: .78rem; white-space: nowrap; }
     .history-table tr:last-child td { border-bottom: 0; }
     .history-empty { padding: 8px; color: var(--planner-muted); }
@@ -127,9 +147,9 @@
     .field-hint { margin-top: 3px; color: var(--planner-muted); font-size: .75rem; }
     .planner-empty { padding: 16px; color: var(--planner-muted); text-align: center; }
     .planner-readonly-note { margin-top: 6px; color: var(--planner-muted); font-size: .82rem; }
-    .vessel-card .planner-btn { padding: 6px 9px; }
+    .vessel-card .planner-btn { padding: 5px 8px; }
     @media (max-width: 760px) {
-      body { padding: 8px; }
+      body { padding: 5px; }
       .planner-filters, .plan-fields, .oil-major-fields { grid-template-columns: 1fr; }
       .planner-suggestion { width: 100%; align-items: flex-start; flex-wrap: wrap; }
       .planner-suggestion p { max-width: none; }
@@ -137,6 +157,10 @@
       .vessel-card-head { flex-direction: column; }
       .remark-row { grid-template-columns: minmax(0, 1fr) auto; }
       .remark-number { grid-column: 1 / -1; padding-top: 0; }
+      .planner-card-summary { grid-template-columns: minmax(0, 1fr) auto; gap: 6px; padding: 7px; }
+      .planner-summary-vessel { grid-column: 1 / -1; }
+      .planner-summary-fact { grid-column: 1 / -1; }
+      .planner-expand-affordance { grid-column: 1 / -1; justify-self: end; }
     }
   </style>
 </head>
@@ -189,6 +213,6 @@
   <script src="./app-config.js"></script>
   <script src="./auth.js"></script>
   <script src="./csvb-module-guard.js?v=20261014_vetting_planner_1"></script>
-  <script type="module" src="./vetting-inspection-planner.js?v=20261014_vetting_planner_4"></script>
+  <script type="module" src="./vetting-inspection-planner.js?v=20261014_vetting_planner_5"></script>
 </body>
 </html>
