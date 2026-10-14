@@ -37,6 +37,7 @@
         "tasks",
         "vessel",
         "post",
+        "vetting_planner",
         "poststats",
         "compare",
         "inspector_intelligence",
@@ -128,7 +129,12 @@
       normalized.cards = [
         SIRE_VIEWER_CARD_KEY,
         RISQ_VIEWER_CARD_KEY,
-        ...normalized.cards.filter((card) => card !== SIRE_VIEWER_CARD_KEY && card !== RISQ_VIEWER_CARD_KEY)
+        "vetting_planner",
+        ...normalized.cards.filter((card) =>
+          card !== SIRE_VIEWER_CARD_KEY &&
+          card !== RISQ_VIEWER_CARD_KEY &&
+          card !== "vetting_planner"
+        )
       ];
     }
 

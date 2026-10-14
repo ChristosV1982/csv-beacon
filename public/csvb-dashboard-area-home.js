@@ -96,6 +96,13 @@
           title: "Post-inspection and intelligence",
           items: [
             {
+            label: "Vetting Inspection Planner",
+            text: "Review recent vetting inspections, due status, and vessel-level plans.",
+            href: "./vetting-inspection-planner.html",
+            cardKey: "vetting_planner",
+            icon: "🗓️",
+            },
+            {
               label: "Post-Inspection Entry",
               text: "Import and review stored SIRE post-inspection reports.",
               href: "./post_inspection.html",

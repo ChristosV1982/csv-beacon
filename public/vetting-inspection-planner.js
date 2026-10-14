@@ -1,0 +1,443 @@
+const PLANNER_BUILD = "vetting_inspection_planner_v1_2026-10-14";
+const PLANNER_MODULE_CODE = "VETTING_INSPECTION_PLANNER";
+const DEFAULT_INTERVAL_MONTHS = 6;
+
+const plannerState = {
+  supabase: null,
+  user: null,
+  vessels: [],
+  canEdit: false,
+  saving: new Set(),
+};
+
+const plannerEl = (id) => document.getElementById(id);
+
+function plannerEsc(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function showPlannerMessage(message = "", kind = "") {
+  const box = plannerEl("plannerMessage");
+  if (!box) return;
+  box.textContent = message;
+  box.className = `planner-message${message ? ` ${kind || "error"}` : ""}`;
+}
+
+function dateOnly(value) {
+  const text = String(value ?? "").trim();
+  const match = text.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!match) return "";
+  const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+  if (
+    date.getFullYear() !== Number(match[1]) ||
+    date.getMonth() !== Number(match[2]) - 1 ||
+    date.getDate() !== Number(match[3])
+  ) return "";
+  return `${match[1]}-${match[2]}-${match[3]}`;
+}
+
+function displayDate(value) {
+  const iso = dateOnly(value);
+  if (!iso) return "—";
+  const [year, month, day] = iso.split("-");
+  return `${day}/${month}/${year}`;
+}
+
+function addCalendarMonths(value, count) {
+  const iso = dateOnly(value);
+  if (!iso) return "";
+  const [year, month, day] = iso.split("-").map(Number);
+  const targetMonthIndex = year * 12 + (month - 1) + Number(count || 0);
+  const targetYear = Math.floor(targetMonthIndex / 12);
+  const targetMonth = targetMonthIndex % 12;
+  const lastDay = new Date(targetYear, targetMonth + 1, 0).getDate();
+  const targetDay = Math.min(day, lastDay);
+  return `${targetYear}-${String(targetMonth + 1).padStart(2, "0")}-${String(targetDay).padStart(2, "0")}`;
+}
+
+function normalizedStatus(row, dueDate, hasHistory) {
+  if (!hasHistory) return { key: "none", label: "No inspection history" };
+  if (dueDate) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const due = new Date(`${dueDate}T00:00:00`);
+    const days = Math.ceil((due.getTime() - today.getTime()) / 86400000);
+    if (days < 0) return { key: "overdue", label: "Overdue" };
+    if (days <= 30) return { key: "soon", label: "Due within 30 days" };
+    return { key: "within", label: "Within window" };
+  }
+  const supplied = String(
+    row?.decision_status ?? row?.status ?? row?.due_status ?? row?.decision ?? ""
+  ).trim().toLowerCase().replaceAll("-", "_").replaceAll(" ", "_");
+  if (/overdue|past_due/.test(supplied)) return { key: "overdue", label: "Overdue" };
+  if (/due_soon|due_within|amber/.test(supplied)) return { key: "soon", label: "Due within 30 days" };
+  if (/within|current|green|not_due/.test(supplied)) return { key: "within", label: "Within window" };
+  return { key: "none", label: "No inspection history" };
+}
+
+function firstValue(object, keys, fallback = "") {
+  for (const key of keys) {
+    const value = object?.[key];
+    if (value !== undefined && value !== null && value !== "") return value;
+  }
+  return fallback;
+}
+
+function normalizeHistory(records) {
+  const source = Array.isArray(records) ? records : [];
+  const normalized = source
+    .map((item) => ({
+      inspection_date: firstValue(item, ["inspection_date", "date"]),
+      port_name: firstValue(item, ["port_name", "port"]),
+      inspecting_company: firstValue(item, [
+        "ocimf_inspecting_company",
+        "inspecting_company",
+        "inspecting_oil_major",
+        "inspecting_company_name",
+        "oil_major",
+        "company_name",
+      ]),
+      report_ref: firstValue(item, ["report_ref", "report_reference"]),
+      negative_observations: Number(firstValue(item, [
+        "negative_observations_count",
+        "negative_observation_count",
+        "negative_count",
+        "negative_observations",
+      ], 0)) || 0,
+    }))
+    .filter((item) => dateOnly(item.inspection_date))
+    .sort((a, b) => dateOnly(b.inspection_date).localeCompare(dateOnly(a.inspection_date)));
+  const seen = new Set();
+  return normalized.filter((item) => {
+    const key = `${item.report_ref || ""}|${dateOnly(item.inspection_date)}|${item.port_name || ""}|${item.inspecting_company || ""}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  }).slice(0, 5);
+}
+
+function normalizePlannerData(data) {
+  const object = !Array.isArray(data) && data && typeof data === "object" ? data : {};
+  const vesselRows = Array.isArray(data)
+    ? data
+    : (object.vessels || object.rows || object.plans || object.items || []);
+  const extras = {
+    history: object.history || object.inspections || object.inspection_history || [],
+  };
+  const grouped = new Map();
+
+  for (const source of Array.isArray(vesselRows) ? vesselRows : []) {
+    const vesselId = String(firstValue(source, ["vessel_id", "id"], ""));
+    if (!vesselId) continue;
+    let row = grouped.get(vesselId);
+    if (!row) {
+      row = {
+        ...source,
+        vessel_id: vesselId,
+        vessel_name: firstValue(source, ["vessel_name", "name"], "Unnamed vessel"),
+        history: [],
+      };
+      grouped.set(vesselId, row);
+    }
+    const nested = firstValue(source, [
+      "last_5_inspections",
+      "last_five_inspections",
+      "last_5_reports",
+      "inspections_last_5",
+      "inspection_history",
+      "history",
+      "inspections",
+    ], []);
+    if (Array.isArray(nested)) row.history.push(...nested);
+
+    // The RPC may return a flat row per inspection instead of nested history.
+    if (dateOnly(source.inspection_date || source.last_inspection_date) && (
+      source.report_ref || source.report_reference || source.port_name
+    )) {
+      row.history.push({
+        inspection_date: source.inspection_date || source.last_inspection_date,
+        port_name: source.port_name,
+        ocimf_inspecting_company: source.ocimf_inspecting_company || source.inspecting_company || source.oil_major,
+        report_ref: source.report_ref || source.report_reference,
+        negative_observations_count: source.negative_observations_count || source.negative_observation_count || source.negative_count,
+      });
+    }
+  }
+
+  for (const historyRow of extras.history) {
+    const vesselId = String(historyRow?.vessel_id || "");
+    const row = grouped.get(vesselId);
+    if (row) row.history.push(historyRow);
+  }
+
+  return [...grouped.values()]
+    .filter((row) => row.is_active !== false && row.active !== false)
+    .map((row) => {
+      const history = normalizeHistory(row.history);
+      const lastInspectionDate = dateOnly(firstValue(
+        row,
+        ["last_inspection_date"],
+        history[0]?.inspection_date || ""
+      ));
+      const overrideRaw = firstValue(row, [
+        "interval_override_months",
+        "override_interval_months",
+        "vessel_interval_override_months",
+        "inspection_interval_override_months",
+      ], "");
+      const override = overrideRaw === "" ? null : Number(overrideRaw);
+      const effective = Number(firstValue(row, [
+        "effective_interval_months",
+        "interval_months",
+      ], override || DEFAULT_INTERVAL_MONTHS)) || DEFAULT_INTERVAL_MONTHS;
+      const dueDate = dateOnly(firstValue(
+        row,
+        ["next_due_date", "due_date"],
+        lastInspectionDate ? addCalendarMonths(lastInspectionDate, effective) : ""
+      ));
+      const status = normalizedStatus(row, dueDate, Boolean(lastInspectionDate || history.length));
+      return {
+        ...row,
+        vessel_id: String(row.vessel_id),
+        vessel_name: String(row.vessel_name || "Unnamed vessel"),
+        history,
+        last_inspection_date: lastInspectionDate,
+        interval_override_months: Number.isFinite(override) ? override : null,
+        effective_interval_months: effective,
+        next_due_date: dueDate,
+        status,
+        planned_next_oil_major: String(firstValue(row, [
+          "planned_next_oil_major",
+        "planned_next_inspecting_company",
+        "planned_inspecting_oil_major",
+          "planned_inspecting_company",
+          "planned_oil_major",
+          "next_oil_major",
+        ])),
+        remarks: String(firstValue(row, ["remarks", "vessel_remarks"])),
+      };
+    })
+    .sort((a, b) => a.vessel_name.localeCompare(b.vessel_name));
+}
+
+function renderHistory(history) {
+  if (!history.length) {
+    return `<div class="history-empty">No stored vetting inspections for this vessel.</div>`;
+  }
+  return `
+    <div class="history-wrap">
+      <table class="history-table">
+        <thead><tr>
+          <th>Date</th><th>Port</th><th>Inspecting oil major / company</th><th>Report reference</th><th>Negative observations</th>
+        </tr></thead>
+        <tbody>${history.map((item) => `
+          <tr>
+            <td>${plannerEsc(displayDate(item.inspection_date))}</td>
+            <td>${plannerEsc(item.port_name || "—")}</td>
+            <td>${plannerEsc(item.inspecting_company || "—")}</td>
+            <td>${plannerEsc(item.report_ref || "—")}</td>
+            <td>${plannerEsc(item.negative_observations)}</td>
+          </tr>
+        `).join("")}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+function renderVesselCard(row) {
+  const disabled = !plannerState.canEdit || plannerState.saving.has(row.vessel_id);
+  const overrideValue = row.interval_override_months == null ? "" : String(row.interval_override_months);
+  const intervalOptions = [
+    `<option value="" ${overrideValue === "" ? "selected" : ""}>Default — 6 months</option>`,
+    ...[1, 2, 3, 4, 5, 6].map((month) =>
+      `<option value="${month}" ${overrideValue === String(month) ? "selected" : ""}>${month} month${month === 1 ? "" : "s"}</option>`
+    ),
+  ].join("");
+  const status = row.status;
+  return `
+    <article class="vessel-card" data-vessel-id="${plannerEsc(row.vessel_id)}" data-vessel-name="${plannerEsc(row.vessel_name.toLowerCase())}" data-status="${plannerEsc(status.key)}">
+      <header class="vessel-card-head">
+        <h2 class="vessel-name">${plannerEsc(row.vessel_name)}</h2>
+        <span class="vessel-status status-${plannerEsc(status.key)}">${plannerEsc(status.label)}</span>
+      </header>
+      <div class="vessel-summary">
+        <div><div class="summary-label">Last inspection</div><div class="summary-value">${plannerEsc(displayDate(row.last_inspection_date))}</div></div>
+        <div><div class="summary-label">Effective interval</div><div class="summary-value">${row.last_inspection_date ? `${plannerEsc(row.effective_interval_months)} months` : "—"}</div></div>
+        <div><div class="summary-label">Next due date</div><div class="summary-value">${plannerEsc(displayDate(row.next_due_date))}</div></div>
+      </div>
+      <section class="planner-section">
+        <h3 class="section-title">Last 5 vetting inspections</h3>
+        ${renderHistory(row.history)}
+      </section>
+      <section class="planner-section">
+        <h3 class="section-title">Next inspection plan</h3>
+        <div class="plan-fields">
+          <div class="planner-field">
+            <label for="interval-${plannerEsc(row.vessel_id)}">Interval override</label>
+            <select id="interval-${plannerEsc(row.vessel_id)}" data-plan-field="interval" ${disabled ? "disabled" : ""}>${intervalOptions}</select>
+            <div class="field-hint">Choose Default to use the six-month interval.</div>
+          </div>
+          <div class="planner-field">
+            <label for="major-${plannerEsc(row.vessel_id)}">Planned next oil major / company</label>
+            <input id="major-${plannerEsc(row.vessel_id)}" data-plan-field="major" maxlength="200" value="${plannerEsc(row.planned_next_oil_major)}" ${disabled ? "disabled" : ""} />
+          </div>
+          <div class="planner-field">
+            <label for="remarks-${plannerEsc(row.vessel_id)}">Vessel remarks</label>
+            <textarea id="remarks-${plannerEsc(row.vessel_id)}" data-plan-field="remarks" maxlength="4000" ${disabled ? "disabled" : ""}>${plannerEsc(row.remarks)}</textarea>
+          </div>
+          <button class="planner-btn primary" type="button" data-save-vessel="${plannerEsc(row.vessel_id)}" ${disabled ? "disabled" : ""}>${plannerState.saving.has(row.vessel_id) ? "Saving…" : "Save"}</button>
+        </div>
+        ${plannerState.canEdit ? "" : `<div class="planner-readonly-note">You have view access only. An authorized editor can update these planning fields.</div>`}
+      </section>
+    </article>
+  `;
+}
+
+function applyFilters() {
+  const search = String(plannerEl("vesselSearch")?.value || "").trim().toLowerCase();
+  const status = plannerEl("statusFilter")?.value || "";
+  let visible = 0;
+  document.querySelectorAll(".vessel-card").forEach((card) => {
+    const match = card.dataset.vesselName.includes(search) && (!status || card.dataset.status === status);
+    card.hidden = !match;
+    if (match) visible += 1;
+  });
+  const statusEl = plannerEl("plannerStatus");
+  if (statusEl && plannerState.vessels.length) {
+    statusEl.textContent = `${visible} of ${plannerState.vessels.length} active vessel(s) shown.`;
+  }
+  const empty = plannerEl("plannerNoResults");
+  if (empty) empty.hidden = visible > 0;
+}
+
+function renderPlanner() {
+  const host = plannerEl("vesselCards");
+  if (!host) return;
+  const cards = plannerState.vessels.map(renderVesselCard).join("");
+  host.innerHTML = cards
+    ? `${cards}<div id="plannerNoResults" class="planner-panel planner-empty" hidden>No vessels match these filters.</div>`
+    : `<div class="planner-panel planner-empty">No accessible active vessels were returned for this account.</div>`;
+  applyFilters();
+  host.querySelectorAll("[data-save-vessel]").forEach((button) => {
+    button.addEventListener("click", () => saveVesselPlan(button.dataset.saveVessel));
+  });
+}
+
+async function waitForModuleGuard() {
+  const deadline = Date.now() + 6000;
+  while (Date.now() < deadline) {
+    const guard = window.CSVB_MODULE_GUARD;
+    if (guard?.page === "vetting-inspection-planner.html") {
+      if (guard.allowed === true) return guard;
+      if (guard.allowed === false) throw new Error("You do not have permission to open the Vetting Inspection Planner.");
+    }
+    await new Promise((resolve) => setTimeout(resolve, 60));
+  }
+  throw new Error("The module access check did not finish. Reload this page and try again.");
+}
+
+async function loadPlanner() {
+  showPlannerMessage("");
+  plannerEl("plannerStatus").textContent = "Loading accessible active vessels and inspection history…";
+  const { data, error } = await plannerState.supabase.rpc("csvb_vetting_inspection_planner_for_me");
+  if (error) throw new Error(error.message || "Could not load the inspection plan.");
+  plannerState.vessels = normalizePlannerData(data);
+  renderPlanner();
+  plannerEl("plannerStatus").textContent = `${plannerState.vessels.length} active vessel(s) loaded.`;
+}
+
+async function saveVesselPlan(vesselId) {
+  const row = plannerState.vessels.find((vessel) => vessel.vessel_id === String(vesselId));
+  if (!row || !plannerState.canEdit || plannerState.saving.has(row.vessel_id)) return;
+
+  const intervalValue = plannerEl(`interval-${row.vessel_id}`)?.value ?? "";
+  const intervalOverride = intervalValue === "" ? null : Number(intervalValue);
+  if (intervalOverride !== null && (!Number.isInteger(intervalOverride) || intervalOverride < 1 || intervalOverride > 6)) {
+    showPlannerMessage("The interval override must be between 1 and 6 months.");
+    return;
+  }
+
+  const major = String(plannerEl(`major-${row.vessel_id}`)?.value || "").trim();
+  const remarks = String(plannerEl(`remarks-${row.vessel_id}`)?.value || "").trim();
+  const saveButton = document.querySelector(`[data-save-vessel="${CSS.escape(row.vessel_id)}"]`);
+  plannerState.saving.add(row.vessel_id);
+  if (saveButton) {
+    saveButton.disabled = true;
+    saveButton.textContent = "Saving…";
+  }
+  showPlannerMessage("");
+
+  try {
+    const { data, error } = await plannerState.supabase.rpc("csvb_vetting_inspection_plan_save", {
+      p_vessel_id: row.vessel_id,
+      p_interval_override_months: intervalOverride,
+      p_planned_next_oil_major: major || null,
+      p_remarks: remarks || null,
+    });
+    if (error) throw error;
+    if (data === false || data?.success === false) {
+      throw new Error(data?.message || "The planning settings were not saved.");
+    }
+    await loadPlanner();
+    showPlannerMessage(`Planning settings saved for ${row.vessel_name}.`, "success");
+  } catch (error) {
+    showPlannerMessage(`Could not save planning settings for ${row.vessel_name}: ${error?.message || String(error)}`);
+  } finally {
+    plannerState.saving.delete(row.vessel_id);
+    renderPlanner();
+  }
+}
+
+async function initPlanner() {
+  if (!window.AUTH?.getSessionUserProfile || !window.AUTH?.ensureSupabase) {
+    throw new Error("Authentication is unavailable. Reload the application.");
+  }
+  const bundle = await window.AUTH.getSessionUserProfile();
+  if (!bundle?.session?.user) {
+    window.location.href = "./login.html";
+    return;
+  }
+  plannerState.user = bundle.profile || {};
+  plannerState.supabase = window.AUTH.ensureSupabase();
+  window.AUTH.fillUserBadge?.(bundle, "userBadge");
+  plannerEl("logoutBtn").addEventListener("click", window.AUTH.logoutAndGoLogin);
+
+  await waitForModuleGuard();
+  const platform = ["super_admin", "platform_owner"].includes(plannerState.user.role);
+  const simulatingCompany = platform && Boolean(
+    localStorage.getItem("csvb_superuser_company_view_id")
+  );
+  const { data: permissionRows, error: permissionError } =
+    await plannerState.supabase.rpc("csvb_my_effective_app_permissions");
+  if (permissionError) throw new Error("Could not verify planner edit permission: " + permissionError.message);
+  plannerState.canEdit = window.CSVB_READ_ONLY_ACCESS !== true &&
+    ((platform && !simulatingCompany) ||
+      (permissionRows || []).some((permission) =>
+        permission.module_code === PLANNER_MODULE_CODE &&
+        permission.permission_action === "edit" &&
+        permission.is_granted === true
+      ));
+
+  plannerEl("refreshPlannerBtn").addEventListener("click", () =>
+    loadPlanner().catch((error) => showPlannerMessage(error?.message || String(error)))
+  );
+  plannerEl("vesselSearch").addEventListener("input", applyFilters);
+  plannerEl("statusFilter").addEventListener("change", applyFilters);
+  plannerEl("clearFiltersBtn").addEventListener("click", () => {
+    plannerEl("vesselSearch").value = "";
+    plannerEl("statusFilter").value = "";
+    applyFilters();
+  });
+  await loadPlanner();
+}
+
+initPlanner().catch((error) => {
+  console.error("Vetting Inspection Planner failed:", error);
+  plannerEl("plannerStatus").textContent = "The planner could not be loaded.";
+  showPlannerMessage(error?.message || String(error));
+});

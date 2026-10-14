@@ -32,6 +32,7 @@
     "post_inspection.html": "post_inspection",
     "post_inspection_detail.html": "post_inspection",
     "post_inspection_observation_detail.html": "post_inspection",
+    "vetting-inspection-planner.html": "vetting_planner",
 
     "post_inspection_stats.html": "post_inspection_stats",
     "post_inspection_kpis.html": "post_inspection_stats",
@@ -275,6 +276,7 @@
       risq_questions_viewer: "RISQ_QUESTIONS_VIEWER",
       self_assessment: "VESSEL_QUESTIONNAIRES",
       post_inspection: "POST_INSPECTION",
+      vetting_planner: "VETTING_INSPECTION_PLANNER",
       post_inspection_stats: "POST_INSPECTION_STATS",
       inspector_intelligence: "INSPECTOR_INTELLIGENCE",
       audit_observations: "AUDIT_OBSERVATIONS",

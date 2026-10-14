@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Vetting Inspection Planner</title>
+  <link rel="stylesheet" href="./csv-beacon-theme.css?v=20260428_3" />
+  <link rel="stylesheet" href="./style.css?v=20260428_3" />
+  <style>
+    :root {
+      color-scheme: light;
+      --planner-navy: #0b2a4a;
+      --planner-blue: #143a63;
+      --planner-muted: #5e7188;
+      --planner-border: #d7e2ef;
+      --planner-bg: #f2f6fb;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      padding: 16px;
+      background: radial-gradient(1100px 550px at 15% 0%, #1a4170 0%, #0b1c33 58%, #071426 100%);
+      color: #15283d;
+      font-family: "Segoe UI", Arial, sans-serif;
+    }
+    .planner-wrap { width: min(1500px, 100%); margin: 0 auto; }
+    .planner-topbar {
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      flex-wrap: wrap; padding: 14px 16px; margin-bottom: 14px;
+      border: 1px solid rgba(255,255,255,.24); border-radius: 16px;
+      background: rgba(12,33,58,.78); color: #fff;
+      box-shadow: 0 10px 34px rgba(0,0,0,.22);
+    }
+    .planner-title { margin: 0; font-size: 1.2rem; font-weight: 900; }
+    .planner-subtitle { margin-top: 4px; color: #d7e6f7; font-size: .9rem; }
+    .planner-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .planner-badge { color: #fff; font-size: .84rem; font-weight: 750; }
+    .planner-btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+      padding: 9px 12px; border: 1px solid #c7d5e5; border-radius: 10px;
+      background: #fff; color: var(--planner-blue); font: inherit; font-weight: 800;
+      text-decoration: none; cursor: pointer;
+    }
+    .planner-btn:disabled { opacity: .55; cursor: not-allowed; }
+    .planner-btn.primary { border-color: #1d5ca0; background: #1d5ca0; color: #fff; }
+    .planner-panel {
+      padding: 14px; margin-bottom: 12px; border: 1px solid var(--planner-border);
+      border-radius: 16px; background: #fff; box-shadow: 0 8px 24px rgba(0,0,0,.14);
+    }
+    .planner-filters { display: grid; grid-template-columns: minmax(220px, 1fr) minmax(190px, .55fr) auto; align-items: end; gap: 10px; }
+    .planner-field label { display: block; margin: 0 0 5px; color: var(--planner-blue); font-size: .87rem; font-weight: 850; }
+    .planner-field input, .planner-field select, .planner-field textarea {
+      width: 100%; min-height: 40px; padding: 9px 10px; border: 1px solid #cbd8e8;
+      border-radius: 9px; background: #fff; color: #162b42; font: inherit;
+    }
+    .planner-field textarea { min-height: 76px; resize: vertical; }
+    .planner-statusline { min-height: 22px; margin: 0 0 10px; color: var(--planner-muted); font-size: .9rem; }
+    .planner-message { display: none; padding: 10px 12px; margin-bottom: 12px; border-radius: 10px; white-space: pre-wrap; }
+    .planner-message.error { display: block; border: 1px solid #e7b4b4; background: #fff2f2; color: #8d2525; }
+    .planner-message.success { display: block; border: 1px solid #b5dbc6; background: #f0fbf4; color: #21643b; }
+    .vessel-card {
+      overflow: hidden; margin-bottom: 12px; border: 1px solid var(--planner-border);
+      border-radius: 15px; background: #fff; box-shadow: 0 8px 24px rgba(0,0,0,.13);
+    }
+    .vessel-card-head {
+      display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
+      padding: 14px 16px; border-bottom: 1px solid #e4ebf4;
+      background: linear-gradient(120deg, #f8fbff, #eef4fa);
+    }
+    .vessel-name { margin: 0; color: var(--planner-navy); font-size: 1.12rem; font-weight: 900; }
+    .vessel-status {
+      flex: none; padding: 6px 10px; border: 1px solid transparent; border-radius: 999px;
+      font-size: .82rem; font-weight: 850; white-space: nowrap;
+    }
+    .status-overdue { border-color: #e6b5b5; background: #fff0f0; color: #a32121; }
+    .status-soon { border-color: #ebd18e; background: #fff8e5; color: #825600; }
+    .status-within { border-color: #b8ddc5; background: #effaf2; color: #246b3e; }
+    .status-none { border-color: #d7dee7; background: #f2f4f7; color: #596779; }
+    .vessel-summary {
+      display: grid; grid-template-columns: repeat(3, minmax(130px, 1fr)); gap: 10px;
+      padding: 12px 16px; border-bottom: 1px solid #e4ebf4;
+    }
+    .summary-label { color: var(--planner-muted); font-size: .76rem; font-weight: 750; text-transform: uppercase; letter-spacing: .035em; }
+    .summary-value { margin-top: 3px; color: var(--planner-navy); font-weight: 850; }
+    .planner-section { padding: 12px 16px; }
+    .planner-section + .planner-section { border-top: 1px solid #e4ebf4; }
+    .section-title { margin: 0 0 9px; color: var(--planner-blue); font-size: .95rem; font-weight: 900; }
+    .history-wrap { overflow-x: auto; border: 1px solid #e2e9f1; border-radius: 10px; }
+    .history-table { width: 100%; min-width: 700px; border-collapse: collapse; font-size: .86rem; }
+    .history-table th, .history-table td { padding: 8px 9px; border-bottom: 1px solid #e9eef5; text-align: left; vertical-align: top; }
+    .history-table th { background: #f4f7fb; color: #284761; font-size: .78rem; white-space: nowrap; }
+    .history-table tr:last-child td { border-bottom: 0; }
+    .history-empty { padding: 12px; color: var(--planner-muted); }
+    .plan-fields { display: grid; grid-template-columns: minmax(200px, .75fr) minmax(220px, 1fr) minmax(280px, 1.5fr) auto; gap: 10px; align-items: end; }
+    .field-hint { margin-top: 4px; color: var(--planner-muted); font-size: .77rem; }
+    .planner-empty { padding: 24px; color: var(--planner-muted); text-align: center; }
+    .planner-readonly-note { margin-top: 8px; color: var(--planner-muted); font-size: .82rem; }
+    @media (max-width: 760px) {
+      body { padding: 9px; }
+      .planner-filters, .plan-fields { grid-template-columns: 1fr; }
+      .vessel-summary { grid-template-columns: 1fr 1fr; }
+      .vessel-card-head { flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <main class="planner-wrap">
+    <header class="planner-topbar">
+      <div>
+        <h1 class="planner-title">Vetting Inspection Planner</h1>
+        <div class="planner-subtitle">Inspection Libraries &amp; Vetting</div>
+      </div>
+      <div class="planner-actions">
+        <span class="planner-badge" id="userBadge">Loading account…</span>
+        <a class="planner-btn" href="./q-dashboard.html">Dashboard</a>
+        <button class="planner-btn" id="refreshPlannerBtn" type="button">Refresh</button>
+        <button class="planner-btn primary" id="logoutBtn" type="button">Logout</button>
+      </div>
+    </header>
+
+    <section class="planner-panel">
+      <div id="plannerMessage" class="planner-message" role="status" aria-live="polite"></div>
+      <div class="planner-filters">
+        <div class="planner-field">
+          <label for="vesselSearch">Search vessel</label>
+          <input id="vesselSearch" type="search" placeholder="Type a vessel name" autocomplete="off" />
+        </div>
+        <div class="planner-field">
+          <label for="statusFilter">Decision status</label>
+          <select id="statusFilter">
+            <option value="">All statuses</option>
+            <option value="overdue">Overdue</option>
+            <option value="soon">Due within 30 days</option>
+            <option value="within">Within window</option>
+            <option value="none">No inspection history</option>
+          </select>
+        </div>
+        <button class="planner-btn" id="clearFiltersBtn" type="button">Clear filters</button>
+      </div>
+    </section>
+
+    <div class="planner-statusline" id="plannerStatus" aria-live="polite">Loading accessible active vessels and inspection history…</div>
+    <section id="vesselCards" aria-live="polite"></section>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="./app-config.js"></script>
+  <script src="./auth.js"></script>
+  <script src="./csvb-module-guard.js?v=20261014_vetting_planner_1"></script>
+  <script type="module" src="./vetting-inspection-planner.js?v=20261014_vetting_planner_1"></script>
+</body>
+</html>

@@ -17,6 +17,7 @@
     company: "COMPANY_BUILDER",
     assignments: "SELF_ASSESSMENT_ASSIGNMENTS",
     post: "POST_INSPECTION",
+    vetting_planner: "VETTING_INSPECTION_PLANNER",
     poststats: "POST_INSPECTION_STATS",
     inspector_intelligence: "INSPECTOR_INTELLIGENCE",
     audit_observations: "AUDIT_OBSERVATIONS",

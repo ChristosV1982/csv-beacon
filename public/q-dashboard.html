@@ -156,6 +156,14 @@
         </div>
       </div>
 
+      <div class="card" data-card="vetting_planner">
+        <div class="title">Vetting Inspection Planner</div>
+        <div class="muted">Review vessel inspection history, due dates, and plan the next vetting inspection.</div>
+        <div style="margin-top:12px;">
+          <button class="btn2" type="button" onclick="location.href='./vetting-inspection-planner.html'">Open</button>
+        </div>
+      </div>
+
       <div class="card" data-card="poststats">
         <div class="title">Post-Inspection Stats</div>
         <div class="muted">Statistics for the post-inspection module.</div>
@@ -344,6 +352,7 @@
       mooring_anchoring_inventories: "mooring_anchoring_inventories",
       port_call_intelligence: "port_call_intelligence",
       portable_lifting_appliances_wires: "portable_lifting_appliances_wires",
+      vetting_planner: "vetting_planner",
       suadmin: "platform_administration"
     };
 
@@ -529,6 +538,7 @@
           "company",
           "assignments",
           "post",
+          "vetting_planner",
           "poststats",
           "risk_rating_profiles",
           "inspector_intelligence",
@@ -574,6 +584,7 @@
           "company",
           "assignments",
           "post",
+          "vetting_planner",
           "poststats",
           "inspector_intelligence",
           "audit_observations",
@@ -596,6 +607,7 @@
         setVisible("company", false, moduleAccess);
         setVisible("assignments", false, moduleAccess);
         setVisible("post", true, moduleAccess);
+        setVisible("vetting_planner", true, moduleAccess);
         setVisible("poststats", true, moduleAccess);
         setVisible("inspector_intelligence", true, moduleAccess);
         setVisible("audit_observations", true, moduleAccess);
