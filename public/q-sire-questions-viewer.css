@@ -172,6 +172,10 @@ html[data-csvb-page="q-sire-questions-viewer.html"] #viewPanel .collBody {
   padding: 7px 9px 9px;
 }
 
+html[data-csvb-page="q-sire-questions-viewer.html"] #vEeList .masterTiny {
+  color: #000;
+}
+
 html[data-csvb-page="q-sire-questions-viewer.html"] #vCollAttrs {
   margin-top: 6px;
   margin-bottom: 6px;
