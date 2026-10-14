@@ -892,31 +892,83 @@ function headerInputs() {
   };
 }
 
-async function createReportHeader(payload) {
-  try {
-    const { data, error } = await state.supabase
-      .from("post_inspection_reports")
-      .insert([payload])
-      .select(
-        "id, vessel_id, inspection_date, port_name, port_code, ocimf_inspecting_company, report_ref, title, inspector_name, inspector_company, pdf_storage_path, examined_questions, examined_count, created_at, updated_at"
-      )
-      .single();
-    if (error) throw error;
-    return data;
-  } catch {
-    const safe = { ...payload };
-    delete safe.examined_questions;
-    delete safe.examined_count;
-    const { data, error } = await state.supabase
-      .from("post_inspection_reports")
-      .insert([safe])
-      .select(
-        "id, vessel_id, inspection_date, port_name, port_code, ocimf_inspecting_company, report_ref, title, inspector_name, inspector_company, pdf_storage_path, created_at, updated_at"
-      )
-      .single();
-    if (error) throw error;
-    return data;
+function isMissingOptionalExaminedFieldsError(error) {
+  const code = String(error?.code || "").toUpperCase();
+  const message = [
+    error?.message,
+    error?.details,
+    error?.hint,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+  const missingColumnCode = code === "42703" || code === "PGRST204";
+  const namesOptionalExaminedField =
+    /examined_questions|examined_count/.test(message);
+  return missingColumnCode && namesOptionalExaminedField;
+}
+
+function isReportReferenceUniqueConflict(error) {
+  const code = String(error?.code || "");
+  const message = [
+    error?.message,
+    error?.details,
+    error?.hint,
+    error?.constraint,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+  return (
+    code === "23505" &&
+    (message.includes("post_inspection_reports_report_ref_uniq") ||
+      message.includes("report_ref"))
+  );
+}
+
+async function findAccessibleReportsByReference(reportRef) {
+  const reference = String(reportRef || "").trim();
+  if (!reference) return [];
+
+  const { data, error } = await state.supabase
+    .from("post_inspection_reports")
+    .select("id, report_ref, vessel_id, inspection_date, port_name")
+    .eq("report_ref", reference)
+    .limit(2);
+
+  if (error) {
+    throw new Error(
+      `Could not safely check whether report ${reference} already exists. The import was stopped before creating a report. ${error.message || error}`
+    );
   }
+
+  return Array.isArray(data) ? data : [];
+}
+
+async function createReportHeader(payload) {
+  const { data, error } = await state.supabase
+    .from("post_inspection_reports")
+    .insert([payload])
+    .select(
+      "id, vessel_id, inspection_date, port_name, port_code, ocimf_inspecting_company, report_ref, title, inspector_name, inspector_company, pdf_storage_path, examined_questions, examined_count, created_at, updated_at"
+    )
+    .single();
+
+  if (!error) return data;
+  if (!isMissingOptionalExaminedFieldsError(error)) throw error;
+
+  const safe = { ...payload };
+  delete safe.examined_questions;
+  delete safe.examined_count;
+  const retry = await state.supabase
+    .from("post_inspection_reports")
+    .insert([safe])
+    .select(
+      "id, vessel_id, inspection_date, port_name, port_code, ocimf_inspecting_company, report_ref, title, inspector_name, inspector_company, pdf_storage_path, created_at, updated_at"
+    )
+    .single();
+  if (retry.error) throw retry.error;
+  return retry.data;
 }
 
 async function updateReportHeader(reportId, payload) {
@@ -2036,6 +2088,65 @@ async function importReportPdfAiFromFile(file) {
   assertPostInspectionPdfFunctionVersion(data);
   const extracted = data.extracted || {};
   const h = extracted.header || {};
+
+  if (!state.activeReport?.id) {
+    const candidateRef = String(
+      h.report_reference || headerInputs().report_ref || ""
+    ).trim();
+    if (candidateRef) {
+      let matches;
+      try {
+        matches = await findAccessibleReportsByReference(candidateRef);
+      } catch (error) {
+        const cleanupError = await cleanupTemporaryPdfSource(tempPath);
+        throw new Error(
+          (error?.message || String(error)) +
+          (cleanupError
+            ? ` Temporary PDF cleanup also failed: ${cleanupError}`
+            : "")
+        );
+      }
+
+      if (matches.length > 0) {
+        const cleanupError = await cleanupTemporaryPdfSource(tempPath);
+        if (matches.length > 1) {
+          setSaveStatus("Multiple matching reports found — import stopped");
+          throw new Error(
+            `More than one accessible report has reference ${candidateRef}. No new report was created. Open the correct report from the existing reports list and use “Re-import PDF / Replace Findings” if you intend to replace findings.` +
+            (cleanupError
+              ? ` Temporary PDF cleanup also failed: ${cleanupError}`
+              : "")
+          );
+        }
+
+        const existing = matches[0];
+        const vesselName = (state.vessels || []).find(
+          (vessel) => String(vessel.id) === String(existing.vessel_id)
+        )?.name;
+        const openExisting = confirm(
+          `A Post-Inspection report with reference ${existing.report_ref || candidateRef} already exists` +
+          (vesselName ? ` for ${vesselName}` : "") +
+          (existing.inspection_date ? ` (${existing.inspection_date})` : "") +
+          `.\n\nNo new report will be created and the existing report will not be changed.\n\nOpen the existing report now? After it loads, use “Re-import PDF / Replace Findings” and select this PDF again if you want to replace findings through the guarded review.`
+        );
+
+        if (cleanupError) {
+          alert(
+            "The temporary PDF upload could not be removed: " +
+            cleanupError
+          );
+        }
+        if (openExisting) {
+          window.location.href =
+            `./post_inspection_detail.html?report_id=${encodeURIComponent(existing.id)}`;
+        } else {
+          setSaveStatus("Existing report found — no new report created");
+        }
+        return;
+      }
+    }
+  }
+
   const obs = Array.isArray(extracted.observations) ? extracted.observations : [];
   const examined_questions = Array.isArray(extracted.examined_questions) ? extracted.examined_questions : [];
   const examined_count = Number(extracted.examined_count || examined_questions.length || 0);
@@ -2070,10 +2181,23 @@ async function importReportPdfAiFromFile(file) {
   }
 
   let report;
-  if (state.activeReport?.id) {
-    report = await updateReportHeader(state.activeReport.id, payload);
-  } else {
-    report = await createReportHeader(payload);
+  try {
+    if (state.activeReport?.id) {
+      report = await updateReportHeader(state.activeReport.id, payload);
+    } else {
+      report = await createReportHeader(payload);
+    }
+  } catch (error) {
+    if (!state.activeReport?.id && isReportReferenceUniqueConflict(error)) {
+      const cleanupError = await cleanupTemporaryPdfSource(tempPath);
+      throw new Error(
+        `A Post-Inspection report with reference ${payload.report_ref || "(blank)"} already exists, but it was not visible in the accessible report lookup. No new report row or findings were created. Open the existing report if you have access, or ask an administrator to confirm your access before trying again.` +
+        (cleanupError
+          ? ` Temporary PDF cleanup also failed: ${cleanupError}`
+          : "")
+      );
+    }
+    throw error;
   }
 
   await persistExaminedFields(report.id, examined_questions, examined_count);
