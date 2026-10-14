@@ -107,6 +107,7 @@ const state = {
   storedDateYears: new Set(),
   storedDateMonths: new Set(),
   openFilterCol: null,
+  showOfficerNames: false,
 };
 
 async function loadReportsFromDb() {
@@ -167,6 +168,73 @@ function reportPassesStoredFilters(r) {
     if (!set.has(v)) return false;
   }
   return true;
+}
+
+function renderStoredTableHead() {
+  const head = el("storedTableHead");
+  if (!head) return;
+
+  const officerColumns = state.showOfficerNames
+    ? `
+      <th style="width:180px;">
+        <div class="filter-head">
+          <span>Master</span>
+          <button class="filter-btn" type="button" title="Open column filter." data-csvb-help="Open column filter." data-filter-col="master_name_at_inspection">▼</button>
+        </div>
+      </th>
+      <th style="width:200px;">
+        <div class="filter-head">
+          <span>Chief Engineer</span>
+          <button class="filter-btn" type="button" title="Open column filter." data-csvb-help="Open column filter." data-filter-col="chief_engineer_name_at_inspection">▼</button>
+        </div>
+      </th>
+    `
+    : "";
+
+  head.innerHTML = `
+    <tr>
+      <th style="width:180px;">
+        <div class="filter-head">
+          <span>Vessel</span>
+          <button class="filter-btn" type="button" title="Open column filter." data-csvb-help="Open column filter." data-filter-col="vessel_name">▼</button>
+        </div>
+      </th>
+      <th style="width:140px;">
+        <div class="filter-head">
+          <span>Date</span>
+          <button class="filter-btn" type="button" title="Open column filter." data-csvb-help="Open column filter." data-filter-col="inspection_date">▼</button>
+        </div>
+      </th>
+      <th style="width:190px;">Report Ref</th>
+      <th style="width:260px;">
+        <div class="filter-head">
+          <span>Title</span>
+          <button class="filter-btn" type="button" title="Open column filter." data-csvb-help="Open column filter." data-filter-col="title">▼</button>
+        </div>
+      </th>
+      <th style="width:260px;">
+        <div class="filter-head">
+          <span>OCIMF Inspecting Company</span>
+          <button class="filter-btn" type="button" title="Open column filter." data-csvb-help="Open column filter." data-filter-col="ocimf_inspecting_company">▼</button>
+        </div>
+      </th>
+      <th style="width:220px;">
+        <div class="filter-head">
+          <span>Inspector Name</span>
+          <button class="filter-btn" type="button" title="Open column filter." data-csvb-help="Open column filter." data-filter-col="inspector_name">▼</button>
+        </div>
+      </th>
+      <th style="width:240px;">
+        <div class="filter-head">
+          <span>Inspector’s Company</span>
+          <button class="filter-btn" type="button" title="Open column filter." data-csvb-help="Open column filter." data-filter-col="inspector_company">▼</button>
+        </div>
+      </th>
+      ${officerColumns}
+      <th style="width:150px;" data-stored-risk-col="1">Risk</th>
+      <th style="width:120px;" data-stored-kpi-col="1">KPIs</th>
+    </tr>
+  `;
 }
 
 
@@ -996,12 +1064,14 @@ function renderStoredTable() {
   const body = el("storedTableBody");
   const rows = (state.reports || []).filter(reportPassesStoredFilters);
 
+  renderStoredTableHead();
   renderRiskAveragePanel();
 
   el("storedCount").textContent = `${rows.length} inspection(s)`;
 
   if (!rows.length) {
-    body.innerHTML = `<tr><td colspan="9" class="muted">No inspections found.</td></tr>`;
+    const columnCount = state.showOfficerNames ? 11 : 9;
+    body.innerHTML = `<tr><td colspan="${columnCount}" class="muted">No inspections found.</td></tr>`;
     return;
   }
 
@@ -1015,6 +1085,10 @@ function renderStoredTable() {
         <td title="${esc(r.ocimf_inspecting_company || "")}">${esc(r.ocimf_inspecting_company || "—")}</td>
         <td title="${esc(r.inspector_name || "")}">${esc(r.inspector_name || "—")}</td>
         <td title="${esc(r.inspector_company || "")}">${esc(r.inspector_company || "—")}</td>
+        ${state.showOfficerNames ? `
+          <td title="${esc(r.master_name_at_inspection || "")}">${esc(r.master_name_at_inspection || "—")}</td>
+          <td title="${esc(r.chief_engineer_name_at_inspection || "")}">${esc(r.chief_engineer_name_at_inspection || "—")}</td>
+        ` : ""}
         <td>${riskMiniGaugeHtml(r.id)}</td>
         <td>
           <button class="btn muted stored-kpi-btn" type="button" data-kpi-id="${esc(r.id)}" title="Quick KPI view for this inspection.">KPIs</button>
@@ -1168,6 +1242,8 @@ function openStoredFilterForCol(col) {
     ocimf_inspecting_company: "OCIMF Inspecting Company",
     inspector_name: "Inspector Name",
     inspector_company: "Inspector’s Company",
+    master_name_at_inspection: "Master",
+    chief_engineer_name_at_inspection: "Chief Engineer",
   };
 
   el("storedFilterTitle").textContent = titleMap[col] || "Filters";
@@ -1223,13 +1299,30 @@ async function init() {
     renderStoredTable();
   });
 
-  document.querySelectorAll(".filter-btn[data-filter-col]").forEach((btn) => {
-    btn.addEventListener("click", (e) => {
-      e.preventDefault();
-      const col = btn.getAttribute("data-filter-col");
-      if (!col) return;
-      openStoredFilterForCol(col);
-    });
+  el("showOfficerNamesToggle").addEventListener("change", (e) => {
+    state.showOfficerNames = e.currentTarget.checked === true;
+    if (!state.showOfficerNames) {
+      delete state.storedFilters.master_name_at_inspection;
+      delete state.storedFilters.chief_engineer_name_at_inspection;
+      closeStoredFilterDialog();
+      el("storedFilterList").replaceChildren();
+      el("storedFilterTitle").textContent = "Filters";
+      el("storedFilterSub").textContent = "";
+      el("storedFilterSearch").value = "";
+    }
+    renderStoredTable();
+  });
+
+  el("storedTableHead").addEventListener("click", (e) => {
+    const target = e.target;
+    const btn = target instanceof Element
+      ? target.closest(".filter-btn[data-filter-col]")
+      : null;
+    if (!btn) return;
+    e.preventDefault();
+    const col = btn.getAttribute("data-filter-col");
+    if (!col) return;
+    openStoredFilterForCol(col);
   });
 
   el("storedFilterSearch").addEventListener("input", () => {

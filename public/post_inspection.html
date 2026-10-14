@@ -141,6 +141,22 @@
       font-weight:950;
     }
 
+    .officer-visibility-toggle{
+      display:inline-flex;
+      align-items:center;
+      gap:7px;
+      color:#55708f;
+      font-size:.84rem;
+      font-weight:800;
+      white-space:nowrap;
+      cursor:pointer;
+    }
+
+    .officer-visibility-toggle input{
+      accent-color:#143a63;
+      margin:0;
+    }
+
     .tbl-wrap{
       overflow:auto;
       border:1px solid #e5eefc;
@@ -356,13 +372,17 @@
 
         <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
           <span class="tableCount" id="storedCount">0 inspection(s)</span>
+          <label class="officer-visibility-toggle" for="showOfficerNamesToggle">
+            <input id="showOfficerNamesToggle" type="checkbox" />
+            <span>Show Master / Chief Engineer</span>
+          </label>
           <button class="btn muted" id="clearStoredFiltersBtn" type="button" title="Clear all active table filters." data-csvb-help="Clear all active table filters.">Clear table filters</button>
         </div>
       </div>
 
       <div class="tbl-wrap">
         <table>
-          <thead>
+          <thead id="storedTableHead">
             <tr>
               <th style="width:180px;">
                 <div class="filter-head">
@@ -512,7 +532,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js" defer></script>
   <script src="./app-config.js" defer></script>
   <script src="./auth.js" defer></script>
-  <script type="module" src="./post_inspection.js?v=20261014_sequential_risk_refresh_v19"></script>
+  <script type="module" src="./post_inspection.js?v=20261014_officer_visibility_v1"></script>
   <script src="./csvb-ui-polish.js?v=20260430_1"></script>
   <script src="./csvb-help-tooltips.js?v=20260430_1"></script>
   <script src="./csvb-100pct-fit.js?v=20260430_1"></script>

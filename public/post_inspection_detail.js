@@ -865,6 +865,8 @@ function loadReportIntoHeader(r) {
   el("reportTitle").value = String(r.title || "").trim() || DEFAULT_POST_INSPECTION_TITLE;
   el("inspectorName").value = r.inspector_name || "";
   el("inspectorCompany").value = r.inspector_company || "";
+  el("masterNameAtInspection").value = r.master_name_at_inspection || "";
+  el("chiefEngineerNameAtInspection").value = r.chief_engineer_name_at_inspection || "";
   el("pdfStatus").textContent = r.pdf_storage_path
     ? `Stored: ${r.pdf_storage_path.split("/").pop()}`
     : "No PDF linked";
@@ -888,6 +890,8 @@ function headerInputs() {
     title: String(el("reportTitle").value || "").trim() || DEFAULT_POST_INSPECTION_TITLE,
     inspector_name: String(el("inspectorName").value || "").trim() || null,
     inspector_company: String(el("inspectorCompany").value || "").trim() || null,
+    master_name_at_inspection: String(el("masterNameAtInspection").value || "").trim() || null,
+    chief_engineer_name_at_inspection: String(el("chiefEngineerNameAtInspection").value || "").trim() || null,
     pdf_storage_path: state.activeReport?.pdf_storage_path || null,
   };
 }
@@ -950,7 +954,7 @@ async function createReportHeader(payload) {
     .from("post_inspection_reports")
     .insert([payload])
     .select(
-      "id, vessel_id, inspection_date, port_name, port_code, ocimf_inspecting_company, report_ref, title, inspector_name, inspector_company, pdf_storage_path, examined_questions, examined_count, created_at, updated_at"
+      "id, vessel_id, inspection_date, port_name, port_code, ocimf_inspecting_company, report_ref, title, inspector_name, inspector_company, master_name_at_inspection, chief_engineer_name_at_inspection, pdf_storage_path, examined_questions, examined_count, created_at, updated_at"
     )
     .single();
 
@@ -964,7 +968,7 @@ async function createReportHeader(payload) {
     .from("post_inspection_reports")
     .insert([safe])
     .select(
-      "id, vessel_id, inspection_date, port_name, port_code, ocimf_inspecting_company, report_ref, title, inspector_name, inspector_company, pdf_storage_path, created_at, updated_at"
+      "id, vessel_id, inspection_date, port_name, port_code, ocimf_inspecting_company, report_ref, title, inspector_name, inspector_company, master_name_at_inspection, chief_engineer_name_at_inspection, pdf_storage_path, created_at, updated_at"
     )
     .single();
   if (retry.error) throw retry.error;
@@ -978,7 +982,7 @@ async function updateReportHeader(reportId, payload) {
       .update(payload)
       .eq("id", reportId)
       .select(
-        "id, vessel_id, inspection_date, port_name, port_code, ocimf_inspecting_company, report_ref, title, inspector_name, inspector_company, pdf_storage_path, examined_questions, examined_count, created_at, updated_at"
+        "id, vessel_id, inspection_date, port_name, port_code, ocimf_inspecting_company, report_ref, title, inspector_name, inspector_company, master_name_at_inspection, chief_engineer_name_at_inspection, pdf_storage_path, examined_questions, examined_count, created_at, updated_at"
       )
       .single();
     if (error) throw error;
@@ -992,7 +996,7 @@ async function updateReportHeader(reportId, payload) {
       .update(safe)
       .eq("id", reportId)
       .select(
-        "id, vessel_id, inspection_date, port_name, port_code, ocimf_inspecting_company, report_ref, title, inspector_name, inspector_company, pdf_storage_path, created_at, updated_at"
+        "id, vessel_id, inspection_date, port_name, port_code, ocimf_inspecting_company, report_ref, title, inspector_name, inspector_company, master_name_at_inspection, chief_engineer_name_at_inspection, pdf_storage_path, created_at, updated_at"
       )
       .single();
     if (error) throw error;
