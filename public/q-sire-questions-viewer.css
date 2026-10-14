@@ -185,6 +185,10 @@ html[data-csvb-page="q-sire-questions-viewer.html"] #vCollAttrs > summary {
   background: #FFFDF6;
 }
 
+html[data-csvb-page="q-sire-questions-viewer.html"] #viewPanel #vCollAttrs .attrGrid .lbl {
+  color: #143A63 !important;
+}
+
 html[data-csvb-page="q-sire-questions-viewer.html"] .csvb-sire-viewer-advanced {
   display: none;
 }
