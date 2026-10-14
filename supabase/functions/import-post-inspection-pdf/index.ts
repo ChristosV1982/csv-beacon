@@ -1,7 +1,7 @@
 export const config = {
   verify_jwt: false
 };
-const FUNCTION_VERSION = "cors-jwt-off-v46_sire_multi_hardware_linked_reextract";
+const FUNCTION_VERSION = "cors-jwt-off-v47_hardware_pair_ownership_uploaded_findings_reimport";
 import { createClient } from "npm:@supabase/supabase-js@2.45.4";
 import * as pdfjsLib from "npm:pdfjs-dist@4.2.67/legacy/build/pdf.mjs";
 import { extractEmbeddedPhotoMetadata } from "./photo_probe.ts";
@@ -931,6 +931,175 @@ function parseResponseBlockObservations(block, controlledNocs = {}) {
   });
 }
 
+function displacedHardwarePairSupportEnd(tailLines, pair, nextPair) {
+  const limit = nextPair?.start_index ?? tailLines.length;
+  let index = pair.end_index;
+  const first = normSpaces(String(tailLines[index] || ""));
+
+  // A displaced controlled Hardware pair may sit inside a later Human/Process
+  // block after PDF text ordering has crossed a page/response boundary. Only
+  // claim its immediately following observed-finding paragraph, not the rest
+  // of that later response block.
+  if (!/^It was observed that\b/i.test(first)) return index;
+
+  while (index < limit) {
+    const line = normSpaces(String(tailLines[index] || ""));
+    if (
+      !line ||
+      parseResponseStart(line) ||
+      isQuestionHeaderStart(line) ||
+      isReportSectionHeading(line) ||
+      isOperatorCommentsStart(line) ||
+      isLikelyHardwareCodeLine(line) ||
+      isLikelyHumanPifLine(line) ||
+      isLikelyProcessCodeLine(line) ||
+      (index > pair.end_index && /^It was observed that\b/i.test(line))
+    ) {
+      break;
+    }
+
+    index++;
+    if (/[.!?][)"'\]]?$/.test(line)) break;
+  }
+
+  return index;
+}
+
+function relocateHardwarePairsFromLaterResponseBlocks(blocks, controlledNocs) {
+  const relocatedByOwner = new Map();
+  const removedRangesByBlock = new Map();
+  let latestHardwareNegativeBlockIndex = -1;
+
+  for (let blockIndex = 0; blockIndex < blocks.length; blockIndex++) {
+    const block = blocks[blockIndex];
+    if (block.designation === "Hardware") {
+      latestHardwareNegativeBlockIndex =
+        block.response_type === "negative" ? blockIndex : -1;
+      continue;
+    }
+
+    if (
+      block.designation !== "Human" &&
+      block.designation !== "Process"
+    ) {
+      latestHardwareNegativeBlockIndex = -1;
+      continue;
+    }
+
+    if (
+      latestHardwareNegativeBlockIndex < 0
+    ) {
+      continue;
+    }
+
+    const tailLines = block.lines
+      .slice(1)
+      .map((line) => line.text)
+      .filter(Boolean);
+    const pairs = findControlledSocNocPairs(
+      tailLines,
+      "Hardware",
+      controlledNocs
+    );
+    if (!pairs.length) continue;
+
+    const ownerEntries =
+      relocatedByOwner.get(latestHardwareNegativeBlockIndex) || [];
+    const removedRanges = removedRangesByBlock.get(blockIndex) || [];
+
+    for (let pairIndex = 0; pairIndex < pairs.length; pairIndex++) {
+      const pair = pairs[pairIndex];
+      const supportEnd = displacedHardwarePairSupportEnd(
+        tailLines,
+        pair,
+        pairs[pairIndex + 1]
+      );
+      ownerEntries.push({
+        pair,
+        sourceBlock: block,
+        tailLines,
+        supportEnd,
+      });
+      removedRanges.push({
+        start: pair.start_index,
+        end: Math.max(pair.end_index, supportEnd),
+      });
+    }
+
+    relocatedByOwner.set(
+      latestHardwareNegativeBlockIndex,
+      ownerEntries
+    );
+    removedRangesByBlock.set(blockIndex, removedRanges);
+  }
+
+  return {
+    relocatedByOwner,
+    removedRangesByBlock,
+  };
+}
+
+function parseQuestionSectionObservations(section, controlledNocs = {}) {
+  const blocks = buildResponseBlocks(section);
+  const {
+    relocatedByOwner,
+    removedRangesByBlock,
+  } = relocateHardwarePairsFromLaterResponseBlocks(blocks, controlledNocs);
+  const observations = [];
+
+  for (let blockIndex = 0; blockIndex < blocks.length; blockIndex++) {
+    const block = blocks[blockIndex];
+    const removedRanges = removedRangesByBlock.get(blockIndex) || [];
+    const preparedBlock = removedRanges.length
+      ? {
+          ...block,
+          lines: [
+            block.lines[0],
+            ...block.lines.slice(1).filter((_, tailIndex) =>
+              !removedRanges.some(
+                (range) =>
+                  tailIndex >= range.start &&
+                  tailIndex < range.end
+              )
+            ),
+          ],
+        }
+      : block;
+
+    const blockObservations = parseResponseBlockObservations(
+      preparedBlock,
+      controlledNocs
+    );
+    observations.push(...blockObservations);
+
+    const relocatedPairs = relocatedByOwner.get(blockIndex) || [];
+    if (!relocatedPairs.length) continue;
+
+    const hardwareBase = parseResponseBlock(block, controlledNocs);
+    if (!hardwareBase) continue;
+
+    for (const entry of relocatedPairs) {
+      const observationText = entry.tailLines
+        .slice(entry.pair.end_index, entry.supportEnd)
+        .map((line) => normSpaces(String(line || "")))
+        .filter(Boolean)
+        .join(" ");
+
+      observations.push({
+        ...hardwareBase,
+        classification_coding: entry.pair.classification_coding,
+        nature_of_concern: entry.pair.nature_of_concern,
+        observation_text: cleanOcimfFooterFragments(observationText),
+        page_hint:
+          entry.sourceBlock.lines[entry.pair.start_index + 1]?.page ??
+          hardwareBase.page_hint,
+      });
+    }
+  }
+
+  return observations;
+}
+
 function dedupeObservations(observations) {
   const seen = new Set();
   const out = [];
@@ -1114,16 +1283,9 @@ function extractFindingsFromPages(pages, controlledNocs = {}) {
   const observations = [];
 
   for (const section of questionSections) {
-    const blocks = buildResponseBlocks(section);
-
-    for (const block of blocks) {
-      const blockObservations = parseResponseBlockObservations(
-        block,
-        controlledNocs
-      );
-
-      observations.push(...blockObservations);
-    }
+    observations.push(
+      ...parseQuestionSectionObservations(section, controlledNocs)
+    );
   }
 
   const dedup = dedupeObservations(observations);
@@ -1250,8 +1412,9 @@ async function requirePersistenceReportAccess(
   }
 
   if (
+    pdfStoragePath &&
     String(report.pdf_storage_path || "") !==
-    String(pdfStoragePath || "")
+      String(pdfStoragePath)
   ) {
     throw new Error(
       "Bad request: PDF path does not match the selected report"
@@ -1606,6 +1769,10 @@ Deno.serve(async (req)=>{
       payload?.reextract_findings_from_linked_pdf === true ||
       payload?.reextract_findings_from_linked_pdf === "true";
 
+    const wantUploadedPdfFindingsReimport =
+      payload?.reimport_findings_only_from_uploaded_pdf === true ||
+      payload?.reimport_findings_only_from_uploaded_pdf === "true";
+
     const persistenceMode =
       photoPersistenceMode(
         payload?.photo_persistence_mode
@@ -1653,9 +1820,37 @@ Deno.serve(async (req)=>{
       }, 400);
     }
 
+    if (
+      wantUploadedPdfFindingsReimport &&
+      (!reportId || reportId === "temp")
+    ) {
+      return json(req, {
+        ok: false,
+        error:
+          "A stored report is required to replace its findings"
+      }, 400);
+    }
+
+    if (
+      wantUploadedPdfFindingsReimport &&
+      !pdfStoragePath.startsWith(
+        `post_inspections/tmp/reimport_${reportId}_`
+      )
+    ) {
+      return json(req, {
+        ok: false,
+        error:
+          "Uploaded-PDF re-import requires a temporary PDF path for this report"
+      }, 400);
+    }
+
     let persistenceReport = null;
 
-    if (wantPhotoPersistence || wantLinkedPdfReextract) {
+    if (
+      wantPhotoPersistence ||
+      wantLinkedPdfReextract ||
+      wantUploadedPdfFindingsReimport
+    ) {
       if (wantLinkedPdfReextract && (!reportId || reportId === "temp")) {
         return json(req, {
           ok: false,
@@ -1665,7 +1860,8 @@ Deno.serve(async (req)=>{
       }
 
       const requestApiKey = req.headers.get("apikey") || "";
-      const accessApiKey = wantLinkedPdfReextract
+      const accessApiKey =
+        wantLinkedPdfReextract || wantUploadedPdfFindingsReimport
         ? requestApiKey || SUPABASE_ANON_KEY || ""
         : SUPABASE_ANON_KEY || requestApiKey;
 
@@ -1681,7 +1877,9 @@ Deno.serve(async (req)=>{
           accessApiKey,
           jwt,
           reportId,
-          pdfStoragePath
+          wantUploadedPdfFindingsReimport
+            ? null
+            : pdfStoragePath
         );
     }
 

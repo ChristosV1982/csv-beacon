@@ -1,13 +1,13 @@
 import { loadLockedLibraryJson } from "./question_library_loader.js";
 
-const DETAIL_BUILD = "post_inspection_detail_v30_linked_pdf_reextract_2026-10-14";
+const DETAIL_BUILD = "post_inspection_detail_v31_findings_only_pdf_reimport_2026-10-14";
 const PDF_BUCKET_DEFAULT = "inspection-reports";
 const PDF_FOLDER_PREFIX = "post_inspections";
 const HUMAN_POSITIVE_FIXED_NOC = "Exceeded normal expectation.";
 const LOCKED_LIBRARY_JSON = "./sire_questions_all_columns_named.json";
 const DEFAULT_POST_INSPECTION_TITLE = "SIRE 2.0 Inspection Report";
 const POST_INSPECTION_PDF_FUNCTION_VERSION =
-  "cors-jwt-off-v46_sire_multi_hardware_linked_reextract";
+  "cors-jwt-off-v47_hardware_pair_ownership_uploaded_findings_reimport";
 
 async function formatEdgeFunctionError(error, action = "Edge Function request failed") {
   const context = error?.context;
@@ -41,11 +41,11 @@ async function formatEdgeFunctionError(error, action = "Edge Function request fa
   return `${action}${statusText}: ${detail}`.slice(0, 1800);
 }
 
-function assertLinkedPdfReextractFunctionVersion(data) {
+function assertPostInspectionPdfFunctionVersion(data) {
   const actualVersion = String(data?.function_version || "unknown");
   if (actualVersion !== POST_INSPECTION_PDF_FUNCTION_VERSION) {
     throw new Error(
-      `Linked-PDF re-extraction requires function ${POST_INSPECTION_PDF_FUNCTION_VERSION}; the deployed function reported ${actualVersion}. No report data was changed.`
+      `This PDF action requires function ${POST_INSPECTION_PDF_FUNCTION_VERSION}; the deployed function reported ${actualVersion}. No report data was changed.`
     );
   }
 }
@@ -850,8 +850,10 @@ async function loadReportById(reportId) {
 
 function loadReportIntoHeader(r) {
   const reextractButton = el("reextractLinkedPdfBtn");
+  const reimportButton = el("reimportFindingsPdfBtn");
   if (!r) {
     if (reextractButton) reextractButton.disabled = true;
+    if (reimportButton) reimportButton.disabled = true;
     return;
   }
   el("vesselSelect").value = r.vessel_id || "";
@@ -869,6 +871,9 @@ function loadReportIntoHeader(r) {
   if (reextractButton) {
     reextractButton.disabled =
       !r.id || !String(r.pdf_storage_path || "").trim();
+  }
+  if (reimportButton) {
+    reimportButton.disabled = !r.id;
   }
 }
 
@@ -1595,6 +1600,15 @@ function protectedImportWorkLabels(item) {
 
   if (hasManualPgnoSelection(item?.pgno_selected)) labels.push("Manual PGNO selection");
 
+  const importedText = String(item?.remarks || "").trim();
+  const currentText = String(item?.observation_text || "").trim();
+  if (
+    hasMeaningfulImportProtectionValue(item?.source_excerpt) &&
+    importedText !== currentText
+  ) {
+    labels.push("Edited supporting observation text");
+  }
+
   return labels;
 }
 
@@ -1865,12 +1879,19 @@ async function confirmPdfImportReviewBeforePersist(
   data,
   extracted,
   tempPath,
-  { preserveExistingReport = false } = {}
+  {
+    preserveExistingReport = false,
+    replaceExistingFindingsOnly = false,
+    cleanupOnCancel = true,
+  } = {}
 ) {
   const baseMessage = buildPdfImportReviewMessage(data, extracted);
-  const message = preserveExistingReport
-    ? "This is a re-extraction from the PDF already linked to this report. On confirmation, only extracted observation items will be replaced; the report header, reference, and linked PDF will remain unchanged.\n\n" + baseMessage
-    : baseMessage;
+  const messagePrefix = replaceExistingFindingsOnly
+    ? "This PDF is being used only as a temporary extraction source. On confirmation, only the extracted observation/finding rows for the existing report will be replaced; the report UUID, reference, header fields, examined-question metadata, and linked PDF will remain unchanged.\n\n"
+    : preserveExistingReport
+      ? "This is a re-extraction from the PDF already linked to this report. On confirmation, only extracted observation items will be replaced; the report header, reference, and linked PDF will remain unchanged.\n\n"
+      : "";
+  const message = messagePrefix + baseMessage;
   const dialog = ensurePdfImportReviewDialog();
   const textBox = el("pdfImportReviewText");
   const notice = el("pdfImportReviewNotice");
@@ -1883,7 +1904,9 @@ async function confirmPdfImportReviewBeforePersist(
     textBox.textContent = message;
     if (notice) {
       notice.textContent =
-        preserveExistingReport
+        replaceExistingFindingsOnly
+          ? "Nothing has been written yet. The selected PDF is temporary; confirmation replaces findings only. The report header, examined-question data, and linked PDF stay unchanged."
+          : preserveExistingReport
           ? "Nothing has been written yet. Confirmation replaces only the extracted observation items; all report header fields and the linked PDF stay unchanged."
           : "Nothing has been written to the report yet. Confirm only when the header and extraction counts look correct.";
     }
@@ -1921,7 +1944,7 @@ async function confirmPdfImportReviewBeforePersist(
   setSaveStatus("Import cancelled");
 
   try {
-    if (tempPath) {
+    if (cleanupOnCancel && tempPath) {
       await state.supabase.storage.from(PDF_BUCKET_DEFAULT).remove([tempPath]);
     }
   } catch (e) {
@@ -2010,6 +2033,7 @@ async function importReportPdfAiFromFile(file) {
     );
   }
   if (!data?.ok) throw new Error(data?.error || "AI import failed");
+  assertPostInspectionPdfFunctionVersion(data);
   const extracted = data.extracted || {};
   const h = extracted.header || {};
   const obs = Array.isArray(extracted.observations) ? extracted.observations : [];
@@ -2124,6 +2148,24 @@ function sameIdSet(left, right) {
     [...leftSet].every((id) => rightSet.has(id));
 }
 
+function observationItemsSnapshot(rows, ids = null) {
+  const idFilter = ids ? new Set(ids.map(String)) : null;
+  return JSON.stringify(
+    (Array.isArray(rows) ? rows : [])
+      .filter((row) =>
+        !idFilter || idFilter.has(String(row?.id || ""))
+      )
+      .map((row) => {
+        const snapshot = {};
+        for (const key of Object.keys(row || {}).sort()) {
+          snapshot[key] = row[key];
+        }
+        return snapshot;
+      })
+      .sort((a, b) => String(a.id || "").localeCompare(String(b.id || "")))
+  );
+}
+
 async function deleteInsertedObservationRows(ids) {
   if (!ids.length) return null;
   try {
@@ -2151,6 +2193,7 @@ async function replaceExistingReportObservationItems(
   }
 
   const oldIds = observationItemIds(existingRows);
+  const originalRowsSnapshot = observationItemsSnapshot(existingRows, oldIds);
   const newRows = observations.map((item, index) => {
     const row = buildImportedObservationItemRow(item, reportId, index);
     row.id = globalThis.crypto.randomUUID();
@@ -2185,6 +2228,14 @@ async function replaceExistingReportObservationItems(
     if (!sameIdSet(expectedIds, currentIds)) {
       throw new Error(
         "The report's observation rows changed during replacement. The original items have not been removed."
+      );
+    }
+    if (
+      observationItemsSnapshot(afterInsertSafety.existing, oldIds) !==
+      originalRowsSnapshot
+    ) {
+      throw new Error(
+        "An existing finding changed during replacement. The original items have not been removed."
       );
     }
 
@@ -2225,6 +2276,225 @@ async function replaceExistingReportObservationItems(
       );
     }
     throw error;
+  }
+}
+
+async function cleanupTemporaryPdfSource(tempPath) {
+  if (!tempPath) return null;
+  try {
+    const { error } = await state.supabase
+      .storage
+      .from(PDF_BUCKET_DEFAULT)
+      .remove([tempPath]);
+    return error?.message || null;
+  } catch (error) {
+    return error?.message || String(error);
+  }
+}
+
+async function reimportPdfReplaceFindingsFromFile(file) {
+  if (!file) return;
+
+  const report = state.activeReport;
+  const reportId = String(report?.id || "").trim();
+  if (!reportId) {
+    throw new Error("Load an existing Post-Inspection report first.");
+  }
+
+  const button = el("reimportFindingsPdfBtn");
+  const baselineHeader = {
+    id: String(report.id || ""),
+    report_ref: String(report.report_ref || ""),
+    vessel_id: String(report.vessel_id || ""),
+    inspection_date: String(report.inspection_date || ""),
+    port_name: String(report.port_name || ""),
+    port_code: String(report.port_code || ""),
+    ocimf_inspecting_company: String(report.ocimf_inspecting_company || ""),
+    examined_questions: JSON.stringify(report.examined_questions || []),
+    examined_count: Number(report.examined_count || 0),
+    pdf_storage_path: String(report.pdf_storage_path || ""),
+  };
+  let tempPath = "";
+  let cleanupError = "";
+  let operationError = null;
+  let refreshError = "";
+  let replacementResult = null;
+
+  if (button) button.disabled = true;
+
+  try {
+    setSaveStatus("Checking report before PDF re-import…");
+    const initialSafety = await guardExistingObservationItemsBeforePdfImport({
+      reportId,
+      confirmReplacement: false,
+    });
+    if (!initialSafety.allowed) {
+      setSaveStatus("PDF re-import blocked");
+      return;
+    }
+    const baselineIds = observationItemIds(initialSafety.existing);
+    const baselineRowsSnapshot = observationItemsSnapshot(
+      initialSafety.existing,
+      baselineIds
+    );
+
+    const safeName = String(file.name || "report.pdf")
+      .replace(/[^a-zA-Z0-9._-]+/g, "_");
+    tempPath =
+      `${PDF_FOLDER_PREFIX}/tmp/reimport_${reportId}_${Date.now()}_${safeName}`;
+
+    setSaveStatus("Uploading PDF temporarily…");
+    const { error: uploadError } = await state.supabase
+      .storage
+      .from(PDF_BUCKET_DEFAULT)
+      .upload(tempPath, file, {
+        upsert: false,
+        contentType: "application/pdf",
+      });
+    if (uploadError) throw uploadError;
+
+    setSaveStatus("Extracting findings…");
+    const { data, error } = await state.supabase.functions.invoke(
+      "import-post-inspection-pdf",
+      {
+        body: {
+          report_id: reportId,
+          pdf_storage_path: tempPath,
+          reimport_findings_only_from_uploaded_pdf: true,
+          debug: true,
+        },
+      }
+    );
+
+    if (error) {
+      throw new Error(
+        await formatEdgeFunctionError(error, "PDF re-import failed")
+      );
+    }
+    if (!data?.ok) {
+      throw new Error(data?.error || "PDF re-import failed.");
+    }
+    assertPostInspectionPdfFunctionVersion(data);
+
+    const extracted = data.extracted || {};
+    const observations = Array.isArray(extracted.observations)
+      ? extracted.observations
+      : [];
+    if (!observations.length) {
+      throw new Error(
+        "The selected PDF produced zero findings. No report data was changed."
+      );
+    }
+
+    const extractedRef = String(
+      extracted?.header?.report_reference || ""
+    ).trim().toUpperCase().replace(/\s+/g, "");
+    const storedRef = baselineHeader.report_ref
+      .trim()
+      .toUpperCase()
+      .replace(/\s+/g, "");
+    if (storedRef && extractedRef && storedRef !== extractedRef) {
+      throw new Error(
+        `The selected PDF report reference (${extractedRef}) does not match the stored report (${report.report_ref}). No data was changed.`
+      );
+    }
+
+    const reviewAccepted = await confirmPdfImportReviewBeforePersist(
+      data,
+      extracted,
+      tempPath,
+      {
+        replaceExistingFindingsOnly: true,
+        cleanupOnCancel: false,
+      }
+    );
+    if (!reviewAccepted) return;
+
+    if (String(state.activeReport?.id || "") !== reportId) {
+      throw new Error(
+        "The active report changed during extraction. No report data was changed."
+      );
+    }
+
+    setSaveStatus("Rechecking report before replacing findings…");
+    const finalSafety = await guardExistingObservationItemsBeforePdfImport({
+      reportId,
+      confirmReplacement: false,
+    });
+    if (!finalSafety.allowed) {
+      setSaveStatus("PDF re-import blocked");
+      return;
+    }
+    if (!sameIdSet(baselineIds, observationItemIds(finalSafety.existing))) {
+      throw new Error(
+        "The report's observation rows changed while the PDF was being reviewed. No data was changed; reload the report and review again."
+      );
+    }
+    if (
+      observationItemsSnapshot(finalSafety.existing, baselineIds) !==
+      baselineRowsSnapshot
+    ) {
+      throw new Error(
+        "An existing finding changed while the PDF was being reviewed. No data was changed; reload the report and review again."
+      );
+    }
+
+    setSaveStatus(`Replacing ${baselineIds.length} finding(s)…`);
+    replacementResult = await replaceExistingReportObservationItems(
+      reportId,
+      observations,
+      finalSafety.existing
+    );
+
+    try {
+      state.observationItems = await loadObservationItemsForReport(reportId);
+      rebuildExtractedItems();
+      renderObsTable();
+      renderObsSummary();
+      setActivePill("Loaded");
+      setSaveStatus("PDF re-import complete — findings only");
+    } catch (error) {
+      refreshError = error?.message || String(error);
+      setSaveStatus("Findings replaced; reload the report to refresh the display");
+    }
+  } catch (error) {
+    operationError = error;
+  } finally {
+    cleanupError = await cleanupTemporaryPdfSource(tempPath) || "";
+    if (cleanupError) {
+      console.warn("Temporary PDF cleanup failed:", cleanupError);
+      if (replacementResult) {
+        setSaveStatus("Findings replaced; temporary PDF cleanup needs attention");
+      }
+    }
+    if (button) {
+      button.disabled = !state.activeReport?.id;
+    }
+  }
+
+  if (operationError) {
+    const detail = operationError?.message || String(operationError);
+    throw new Error(
+      detail +
+      (cleanupError
+        ? `\n\nThe temporary PDF could not be removed: ${cleanupError}`
+        : "")
+    );
+  }
+
+  if (replacementResult) {
+    alert(
+      "PDF re-import complete — findings only.\n\n" +
+      `Previous extracted findings replaced: ${replacementResult.previousCount}\n` +
+      `New extracted findings: ${replacementResult.newCount}\n\n` +
+      "The report UUID, reference, header fields, examined-question metadata, and linked PDF were not changed." +
+      (refreshError
+        ? `\n\nThe findings were replaced, but the display could not be refreshed: ${refreshError}`
+        : "") +
+      (cleanupError
+        ? `\n\nTemporary PDF cleanup needs attention: ${cleanupError}`
+        : "")
+    );
   }
 }
 
@@ -2273,7 +2543,7 @@ async function reextractLinkedPdfFindings() {
     if (!data?.ok) {
       throw new Error(data?.error || "Linked PDF re-extraction failed.");
     }
-    assertLinkedPdfReextractFunctionVersion(data);
+    assertPostInspectionPdfFunctionVersion(data);
 
     const extracted = data.extracted || {};
     const observations = Array.isArray(extracted.observations)
@@ -3157,6 +3427,9 @@ async function init() {
 
   el("downloadPdfBtn").addEventListener("click", downloadActivePdf);
   el("importPdfBtn").addEventListener("click", () => el("importPdfFile").click());
+  el("reimportFindingsPdfBtn").addEventListener("click", () =>
+    el("reimportFindingsPdfFile").click()
+  );
   el("reextractLinkedPdfBtn").addEventListener("click", async () => {
     try {
       await reextractLinkedPdfFindings();
@@ -3177,6 +3450,18 @@ async function init() {
       console.error(err);
       alert("AI import failed:\n\n" + (err?.message || String(err)));
       setSaveStatus("Error");
+    } finally {
+      e.target.value = "";
+    }
+  });
+  el("reimportFindingsPdfFile").addEventListener("change", async (e) => {
+    const f = e.target.files && e.target.files[0];
+    try {
+      if (f) await reimportPdfReplaceFindingsFromFile(f);
+    } catch (err) {
+      console.error(err);
+      alert("PDF re-import failed:\n\n" + (err?.message || String(err)));
+      setSaveStatus("PDF re-import failed");
     } finally {
       e.target.value = "";
     }
