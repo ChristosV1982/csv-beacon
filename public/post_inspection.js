@@ -776,35 +776,96 @@ async function refreshAllRisksForStoredReports() {
   try {
     if (btn) {
       btn.disabled = true;
-      btn.textContent = "Refreshing…";
+      btn.textContent = "Preparing refresh…";
     }
 
-    const { data, error } = await state.supabase.rpc("csvb_refresh_all_post_inspection_risks_for_me");
+    const reportsById = new Map();
+    for (const report of state.reports || []) {
+      const reportId = String(report?.id || "").trim();
+      if (reportId && !reportsById.has(reportId)) {
+        reportsById.set(reportId, report);
+      }
+    }
+    const reports = [...reportsById.values()];
 
-    if (error) throw error;
+    if (!reports.length) {
+      await loadCurrentRiskScoresForStoredReports();
+      computeRiskAverages();
+      renderRiskAveragePanel();
+      renderStoredTable();
+      alert(
+        "Risk refresh completed.\n\n" +
+        "Total inspections: 0\n" +
+        "Succeeded: 0\n" +
+        "Failed: 0"
+      );
+      return;
+    }
 
+    let success = 0;
+    const errors = [];
+
+    for (let i = 0; i < reports.length; i++) {
+      const report = reports[i];
+      const reportId = String(report.id);
+      const reportLabel = [
+        String(report.report_ref || reportId),
+        String(report.vessel_name || "").trim(),
+      ].filter(Boolean).join(" — ");
+
+      if (btn) btn.textContent = `Refreshing ${i + 1} of ${reports.length}…`;
+
+      try {
+        const { data, error } = await state.supabase.rpc(
+          "csvb_store_post_inspection_risk_snapshots_all_profiles",
+          { p_report_id: reportId }
+        );
+
+        if (error) throw error;
+        if (data?.ok !== true) {
+          throw new Error(data?.error || "Risk calculation failed.");
+        }
+        success++;
+      } catch (err) {
+        errors.push({
+          report: reportLabel,
+          message: err?.message || String(err),
+        });
+        console.warn(`Risk refresh failed for ${reportLabel}:`, err);
+      }
+    }
+
+    if (btn) btn.textContent = "Updating displayed scores…";
     await loadCurrentRiskScoresForStoredReports();
     computeRiskAverages();
     renderRiskAveragePanel();
     renderStoredTable();
 
-    const failed = Number(data?.failed || 0);
-    const success = Number(data?.success || 0);
-    const total = Number(data?.total_reports || 0);
+    const failed = errors.length;
+    const total = reports.length;
 
     if (failed > 0) {
-      alert(
+      const summary = [
         "Risk refresh completed with errors.\n\n" +
-        "Total reports: " + total + "\n" +
+        "Total inspections: " + total + "\n" +
         "Succeeded: " + success + "\n" +
-        "Failed: " + failed + "\n\n" +
-        "Check console/logs for details."
-      );
-      console.warn("Risk refresh errors:", data?.errors || []);
+        "Failed: " + failed,
+      ];
+      summary.push("\nFailed inspections:");
+      for (const item of errors.slice(0, 8)) {
+        summary.push(`- ${item.report}: ${item.message}`);
+      }
+      if (errors.length > 8) {
+        summary.push(`- and ${errors.length - 8} more; see console for details.`);
+      }
+      alert(summary.join("\n"));
+      console.warn("Risk refresh errors:", errors);
     } else {
       alert(
         "Risk refresh completed.\n\n" +
-        "Reports refreshed: " + success + "\n" +
+        "Total inspections: " + total + "\n" +
+        "Succeeded: " + success + "\n" +
+        "Failed: 0\n\n" +
         "Active profiles were recalculated for each report."
       );
     }
