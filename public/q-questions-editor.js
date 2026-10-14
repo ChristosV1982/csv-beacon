@@ -214,6 +214,34 @@
     return nbNorm ? `${nbNorm}.${s2}` : `?.?.?.${s2}`;
   }
 
+  const PGNO_REMARKS_SERIALIZATION_PREFIX = "CSVB_PGNO_REMARKS_V1:";
+  function decodePgnoRemarks(value) {
+    if (Array.isArray(value)) return value.map(safeStr);
+
+    const raw = safeStr(value);
+    if (raw.startsWith(PGNO_REMARKS_SERIALIZATION_PREFIX)) {
+      try {
+        const packed = JSON.parse(raw.slice(PGNO_REMARKS_SERIALIZATION_PREFIX.length));
+        if (
+          packed?.version === 1 &&
+          Array.isArray(packed.remarks) &&
+          packed.remarks.every(item => typeof item === "string")
+        ) {
+          return packed.remarks.slice();
+        }
+      } catch {}
+    }
+
+    return raw === "" ? [] : [raw];
+  }
+
+  function encodePgnoRemarks(value) {
+    const remarks = decodePgnoRemarks(value);
+    return remarks.length
+      ? PGNO_REMARKS_SERIALIZATION_PREFIX + JSON.stringify({ version: 1, remarks })
+      : "";
+  }
+
   // ===== state =====
   let sb = null;
   let me = null;
@@ -693,12 +721,12 @@
       p.PGNO;
 
     if (Array.isArray(old)) {
-      selected.pgno_items = old.map(t => ({ text: safeStr(t), remarks: "" }));
+      selected.pgno_items = old.map(t => ({ text: safeStr(t), remarks: [] }));
       return;
     }
     if (typeof old === "string" && old.trim()) {
       const items = splitBulletsSmart(old);
-      selected.pgno_items = items.map(t => ({ text: t, remarks: "" }));
+      selected.pgno_items = items.map(t => ({ text: t, remarks: [] }));
       return;
     }
     selected.pgno_items = [];
@@ -773,14 +801,22 @@
     host.innerHTML = items.map((it, i) => {
       const code = pgnoCode(nb, i + 1, st);
       const t = safeStr(it.text);
-      const r = safeStr(it.remarks);
+      const remarks = decodePgnoRemarks(it.remarks);
+      const remarksHtml = remarks.length
+        ? remarks.map((remark, remarkIndex) =>
+            `<div class="pgno-remarks-item">${escapeHtml(remarkIndex + 1)}. ${escapeHtml(remark)}</div>`
+          ).join("")
+        : `<div class="muted pgno-remarks-empty">No specific remark for this PGNO added yet</div>`;
       return `
         <div class="masterRow">
           <div class="masterHdr">
             <div class="masterCode">${escapeHtml(code)}</div>
           </div>
           <div class="masterBody" style="margin-top:6px; white-space:pre-wrap;">${escapeHtml(t)}</div>
-          ${r ? `<div class="masterBody" style="margin-top:8px;"><b>Remarks:</b> ${escapeHtml(r)}</div>` : ``}
+          <section class="pgno-remarks-view">
+            <div class="masterBody"><b>Remarks</b></div>
+            ${remarksHtml}
+          </section>
         </div>
       `;
     }).join("");
@@ -801,10 +837,21 @@
     host.innerHTML = "";
 
     items.forEach((it, idx) => {
+      const remarks = decodePgnoRemarks(it.remarks);
+      selected.pgno_items[idx].remarks = remarks;
       const row = document.createElement("div");
       row.className = "masterRow";
+      row.dataset.pgnoIndex = String(idx);
 
       const code = pgnoCode(nb, idx + 1, st);
+      const remarkFields = remarks.length
+        ? remarks.map((_, remarkIndex) => `
+            <div class="pgno-remark-entry">
+              <textarea class="ta" data-remark-index="${remarkIndex}" aria-label="Remark ${remarkIndex + 1} for ${escapeHtml(code)}"></textarea>
+              <button class="btn danger" type="button" data-del-remark="${remarkIndex}" aria-label="Remove remark ${remarkIndex + 1} from ${escapeHtml(code)}" title="Remove this remark only">Remove</button>
+            </div>
+          `).join("")
+        : `<div class="muted pgno-remarks-empty">No specific remark for this PGNO added yet</div>`;
 
       row.innerHTML = `
         <div class="masterHdr">
@@ -823,8 +870,13 @@
             <textarea class="ta" data-text="${idx}"></textarea>
           </div>
           <div class="full">
-            <label class="lbl">Remarks (per PGNO)</label>
-            <textarea class="ta" data-remarks="${idx}" placeholder="Optional remarks for this PGNO"></textarea>
+            <div class="pgno-remarks-toolbar">
+              <label class="lbl">Remarks (per PGNO)</label>
+              <button class="btn light" type="button" data-add-remark>Add Remark</button>
+            </div>
+            <div class="pgno-remarks-list">
+              ${remarkFields}
+            </div>
           </div>
         </div>
       `;
@@ -832,12 +884,38 @@
       host.appendChild(row);
 
       const taText = row.querySelector(`textarea[data-text="${idx}"]`);
-      const taRem = row.querySelector(`textarea[data-remarks="${idx}"]`);
       if (taText) taText.value = safeStr(it.text);
-      if (taRem) taRem.value = safeStr(it.remarks);
-
       if (taText) taText.addEventListener("input", () => { selected.pgno_items[idx].text = taText.value; });
-      if (taRem) taRem.addEventListener("input", () => { selected.pgno_items[idx].remarks = taRem.value; });
+
+      row.querySelectorAll("textarea[data-remark-index]").forEach(taRemark => {
+        const remarkIndex = Number(taRemark.dataset.remarkIndex);
+        taRemark.value = remarks[remarkIndex];
+        taRemark.addEventListener("input", () => {
+          selected.pgno_items[idx].remarks[remarkIndex] = taRemark.value;
+        });
+      });
+
+      const addRemarkBtn = row.querySelector("[data-add-remark]");
+      if (addRemarkBtn) {
+        addRemarkBtn.addEventListener("click", () => {
+          const nextRemarks = decodePgnoRemarks(selected.pgno_items[idx].remarks);
+          nextRemarks.push("");
+          selected.pgno_items[idx].remarks = nextRemarks;
+          renderPgnoEditor();
+          host.querySelector(`[data-pgno-index="${idx}"] textarea[data-remark-index="${nextRemarks.length - 1}"]`)?.focus();
+        });
+      }
+
+      row.querySelectorAll("button[data-del-remark]").forEach(removeBtn => {
+        removeBtn.addEventListener("click", () => {
+          const remarkIndex = Number(removeBtn.dataset.delRemark);
+          if (!window.confirm("Remove this remark? The PGNO itself will remain.")) return;
+          const nextRemarks = decodePgnoRemarks(selected.pgno_items[idx].remarks);
+          nextRemarks.splice(remarkIndex, 1);
+          selected.pgno_items[idx].remarks = nextRemarks;
+          renderPgnoEditor();
+        });
+      });
 
       const delBtn = row.querySelector(`button[data-del="${idx}"]`);
       if (delBtn) {
@@ -852,7 +930,7 @@
   function addPgnoRow() {
     if (!selected) return;
     ensurePgnoStateFromPayloadIfEmpty();
-    selected.pgno_items.push({ text: "", remarks: "" });
+    selected.pgno_items.push({ text: "", remarks: [] });
     renderPgnoEditor();
   }
 
@@ -1277,7 +1355,7 @@
     return (data || []).map(r => ({
       id: r.id,
       text: safeStr(r.pgno_text),
-      remarks: safeStr(r.remarks),
+      remarks: decodePgnoRemarks(r.remarks),
     }));
   }
 
@@ -1287,10 +1365,10 @@
       .map((x, idx) => ({
         seq: idx + 1,
         pgno_code: pgnoCode(numberBase, idx + 1, sourceType || "SIRE"),
-        pgno_text: safeStr(x.text).trim(),
-        remarks: safeStr(x.remarks).trim()
+        pgno_text: safeStr(x.text),
+        remarks: encodePgnoRemarks(x.remarks)
       }))
-      .filter(x => x.pgno_text.length > 0);
+      .filter(x => x.pgno_text.trim().length > 0);
 
     const { error } = await sb.rpc("csvb_replace_pgno_for_question_for_me", {
       p_question_id: questionId,
@@ -1588,8 +1666,8 @@ async function deleteSelected() {
       ensureEeStateFromPayloadIfEmpty();
 
       payload.potential_grounds_for_negative_observations = (selected.pgno_items || [])
-        .map(x => safeStr(x.text).trim())
-        .filter(Boolean);
+        .map(x => safeStr(x.text))
+        .filter(text => text.trim().length > 0);
 
       payload.expected_evidence = (selected.ee_items || [])
         .map(x => safeStr(x.text).trim())

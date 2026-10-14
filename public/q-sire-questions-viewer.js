@@ -894,6 +894,27 @@
     renderFacets();
   }
 
+  const PGNO_REMARKS_SERIALIZATION_PREFIX = "CSVB_PGNO_REMARKS_V1:";
+  function decodePgnoRemarks(value) {
+    if (Array.isArray(value)) return value.map(s);
+
+    const raw = s(value);
+    if (raw.startsWith(PGNO_REMARKS_SERIALIZATION_PREFIX)) {
+      try {
+        const packed = JSON.parse(raw.slice(PGNO_REMARKS_SERIALIZATION_PREFIX.length));
+        if (
+          packed?.version === 1 &&
+          Array.isArray(packed.remarks) &&
+          packed.remarks.every(item => typeof item === "string")
+        ) {
+          return packed.remarks.slice();
+        }
+      } catch {}
+    }
+
+    return raw === "" ? [] : [raw];
+  }
+
   async function loadPgno(questionId) {
     if (offlineMode) return loadOfflinePgno(questionId);
 
@@ -963,12 +984,23 @@
       host.innerHTML = `<div class="muted">No PGNOs recorded for this question.</div>`;
       return;
     }
-    host.innerHTML = items.map((it, i) => `
-      <div class="masterRow">
-        <div class="masterHdr"><div class="masterCode">${esc(pgnoCode(selected, i))}</div></div>
-        <div class="masterBody" style="margin-top:6px; white-space:pre-wrap;">${esc(it.text)}</div>
-        ${it.remarks ? `<div class="masterBody" style="margin-top:8px;"><b>Remarks:</b> ${esc(it.remarks)}</div>` : ""}
-      </div>`).join("");
+    host.innerHTML = items.map((it, i) => {
+      const remarks = decodePgnoRemarks(it.remarks);
+      const remarksHtml = remarks.length
+        ? remarks.map((remark, remarkIndex) =>
+            `<div class="pgno-remarks-item">${remarkIndex + 1}. ${esc(remark)}</div>`
+          ).join("")
+        : `<div class="muted pgno-remarks-empty">No specific remark for this PGNO added yet</div>`;
+      return `
+        <div class="masterRow">
+          <div class="masterHdr"><div class="masterCode">${esc(pgnoCode(selected, i))}</div></div>
+          <div class="masterBody" style="margin-top:6px; white-space:pre-wrap;">${esc(it.text)}</div>
+          <section class="pgno-remarks-view">
+            <div class="masterBody"><b>Remarks</b></div>
+            ${remarksHtml}
+          </section>
+        </div>`;
+    }).join("");
   }
 
   async function selectRow(row) {

@@ -378,6 +378,38 @@ a{ color:inherit; }
 }
 .masterGrid .full{ grid-column: 1 / -1; }
 
+.pgno-remarks-toolbar{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+}
+.pgno-remarks-toolbar .lbl{ margin:0 0 6px; }
+.pgno-remarks-list{ display:grid; gap:8px; }
+.pgno-remark-entry{
+  display:grid;
+  grid-template-columns:minmax(0, 1fr) auto;
+  align-items:start;
+  gap:8px;
+}
+.pgno-remark-entry .ta{ min-height:68px; }
+.pgno-remark-entry .btn{ align-self:start; }
+.pgno-remarks-empty{
+  margin-top:4px;
+  padding:8px 10px;
+  border:1px dashed var(--line);
+  border-radius:10px;
+}
+.pgno-remarks-view{ margin-top:8px; }
+.pgno-remarks-item{
+  margin-top:5px;
+  white-space:pre-wrap;
+}
+@media (max-width: 560px){
+  .pgno-remark-entry{ grid-template-columns:1fr; }
+  .pgno-remark-entry .btn{ justify-self:end; }
+}
+
 .chkRow{
   display:flex;
   gap:14px;
