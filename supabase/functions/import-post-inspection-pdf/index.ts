@@ -1,7 +1,7 @@
 export const config = {
   verify_jwt: false
 };
-const FUNCTION_VERSION = "cors-jwt-off-v45_inspector_photo_structured_pgno";
+const FUNCTION_VERSION = "cors-jwt-off-v46_sire_multi_hardware_linked_reextract";
 import { createClient } from "npm:@supabase/supabase-js@2.45.4";
 import * as pdfjsLib from "npm:pdfjs-dist@4.2.67/legacy/build/pdf.mjs";
 import { extractEmbeddedPhotoMetadata } from "./photo_probe.ts";
@@ -1602,6 +1602,10 @@ Deno.serve(async (req)=>{
       payload?.photo_probe === true ||
       payload?.photo_probe === "true";
 
+    const wantLinkedPdfReextract =
+      payload?.reextract_findings_from_linked_pdf === true ||
+      payload?.reextract_findings_from_linked_pdf === "true";
+
     const persistenceMode =
       photoPersistenceMode(
         payload?.photo_persistence_mode
@@ -1618,10 +1622,7 @@ Deno.serve(async (req)=>{
       }, 400);
     }
 
-    if (
-      wantPhotoPersistence &&
-      !SUPABASE_ANON_KEY
-    ) {
+    if (wantPhotoPersistence && !SUPABASE_ANON_KEY) {
       throw new Error(
         "Missing function secret SUPABASE_ANON_KEY"
       );
@@ -1654,11 +1655,30 @@ Deno.serve(async (req)=>{
 
     let persistenceReport = null;
 
-    if (wantPhotoPersistence) {
+    if (wantPhotoPersistence || wantLinkedPdfReextract) {
+      if (wantLinkedPdfReextract && (!reportId || reportId === "temp")) {
+        return json(req, {
+          ok: false,
+          error:
+            "A stored report is required to re-extract its linked PDF"
+        }, 400);
+      }
+
+      const requestApiKey = req.headers.get("apikey") || "";
+      const accessApiKey = wantLinkedPdfReextract
+        ? requestApiKey || SUPABASE_ANON_KEY || ""
+        : SUPABASE_ANON_KEY || requestApiKey;
+
+      if (!accessApiKey) {
+        throw new Error(
+          "Missing API key required to verify report access"
+        );
+      }
+
       persistenceReport =
         await requirePersistenceReportAccess(
           SUPABASE_URL,
-          SUPABASE_ANON_KEY,
+          accessApiKey,
           jwt,
           reportId,
           pdfStoragePath

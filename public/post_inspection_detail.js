@@ -1,11 +1,65 @@
 import { loadLockedLibraryJson } from "./question_library_loader.js";
 
-const DETAIL_BUILD = "post_inspection_detail_v29_inspector_observation_photos_2026-09-03";
+const DETAIL_BUILD = "post_inspection_detail_v30_linked_pdf_reextract_2026-10-14";
 const PDF_BUCKET_DEFAULT = "inspection-reports";
 const PDF_FOLDER_PREFIX = "post_inspections";
 const HUMAN_POSITIVE_FIXED_NOC = "Exceeded normal expectation.";
 const LOCKED_LIBRARY_JSON = "./sire_questions_all_columns_named.json";
 const DEFAULT_POST_INSPECTION_TITLE = "SIRE 2.0 Inspection Report";
+const POST_INSPECTION_PDF_FUNCTION_VERSION =
+  "cors-jwt-off-v46_sire_multi_hardware_linked_reextract";
+
+async function formatEdgeFunctionError(error, action = "Edge Function request failed") {
+  const context = error?.context;
+  const status = Number(context?.status || error?.status || 0);
+  let detail = "";
+
+  if (context && typeof context.clone === "function") {
+    try {
+      const responseText = await context.clone().text();
+      if (responseText) {
+        try {
+          const body = JSON.parse(responseText);
+          detail = String(
+            body?.error || body?.message || body?.detail || ""
+          ).trim();
+          if (!detail) detail = responseText;
+        } catch {
+          detail = responseText;
+        }
+      }
+    } catch {}
+  }
+
+  if (!detail) {
+    detail = String(
+      context?.message || error?.message || error || "Unknown error"
+    ).trim();
+  }
+
+  const statusText = status ? ` (HTTP ${status})` : "";
+  return `${action}${statusText}: ${detail}`.slice(0, 1800);
+}
+
+function assertLinkedPdfReextractFunctionVersion(data) {
+  const actualVersion = String(data?.function_version || "unknown");
+  if (actualVersion !== POST_INSPECTION_PDF_FUNCTION_VERSION) {
+    throw new Error(
+      `Linked-PDF re-extraction requires function ${POST_INSPECTION_PDF_FUNCTION_VERSION}; the deployed function reported ${actualVersion}. No report data was changed.`
+    );
+  }
+}
+
+function assertCompatiblePhotoPersistenceFunctionVersion(data) {
+  const actualVersion = String(data?.function_version || "unknown");
+  const compatibleVersions = [
+    "cors-jwt-off-v45_inspector_photo_structured_pgno",
+    POST_INSPECTION_PDF_FUNCTION_VERSION,
+  ];
+  if (!compatibleVersions.includes(actualVersion)) {
+    throw new Error(`Unexpected Edge Function version: ${actualVersion}`);
+  }
+}
 
 function el(id) {
   return document.getElementById(id);
@@ -795,7 +849,11 @@ async function loadReportById(reportId) {
 }
 
 function loadReportIntoHeader(r) {
-  if (!r) return;
+  const reextractButton = el("reextractLinkedPdfBtn");
+  if (!r) {
+    if (reextractButton) reextractButton.disabled = true;
+    return;
+  }
   el("vesselSelect").value = r.vessel_id || "";
   el("inspectionDate").value = r.inspection_date || "";
   el("portName").value = r.port_name || "";
@@ -808,6 +866,10 @@ function loadReportIntoHeader(r) {
   el("pdfStatus").textContent = r.pdf_storage_path
     ? `Stored: ${r.pdf_storage_path.split("/").pop()}`
     : "No PDF linked";
+  if (reextractButton) {
+    reextractButton.disabled =
+      !r.id || !String(r.pdf_storage_path || "").trim();
+  }
 }
 
 function headerInputs() {
@@ -1536,41 +1598,23 @@ function protectedImportWorkLabels(item) {
   return labels;
 }
 
-async function guardExistingObservationItemsBeforePdfImport() {
-  const reportId = state.activeReport?.id;
-  if (!reportId) return true;
+async function inspectExistingObservationItemsForPdfReplacement(reportId) {
+  if (!reportId) {
+    return {
+      existing: [],
+      protectedRows: [],
+      dependentLabels: [],
+    };
+  }
 
   const { data, error } = await state.supabase
     .from("post_inspection_observation_items")
-    .select([
-      "id",
-      "question_no",
-      "question_base",
-      "obs_type",
-      "designation",
-      "response_status",
-      "responsible_person_id",
-      "verifier_person_id",
-      "target_date",
-      "close_out_date",
-      "closed_by_user_id",
-      "closed_at",
-      "immediate_cause",
-      "immediate_cause_subcomments",
-      "root_cause",
-      "root_cause_subcomments",
-      "corrective_action",
-      "corrective_action_subcomments",
-      "preventative_action",
-      "preventative_action_subcomments",
-      "pgno_selected"
-    ].join(", "))
+    .select("*")
     .eq("report_id", reportId);
 
   if (error) throw error;
 
   const existing = Array.isArray(data) ? data : [];
-  if (!existing.length) return true;
 
   const protectedRows = existing
     .map((item) => ({
@@ -1578,6 +1622,72 @@ async function guardExistingObservationItemsBeforePdfImport() {
       labels: protectedImportWorkLabels(item),
     }))
     .filter((x) => x.labels.length > 0);
+
+  const itemIds = existing
+    .map((item) => String(item.id || "").trim())
+    .filter(Boolean);
+  const dependentTables = [
+    {
+      table: "risk_observation_scores",
+      label: "risk score history",
+    },
+    {
+      table: "post_inspection_observation_photos",
+      label: "linked observation photos",
+    },
+    {
+      table: "post_inspection_observation_mscat",
+      label: "MS-CAT classifications",
+    },
+    {
+      table: "post_inspection_observation_mscat_audit",
+      label: "MS-CAT audit history",
+    },
+  ];
+  const dependentLabels = [];
+
+  for (const dependency of dependentTables) {
+    let found = false;
+    for (let offset = 0; offset < itemIds.length; offset += 100) {
+      const idBatch = itemIds.slice(offset, offset + 100);
+      const { data: linkedRows, error: linkedError } =
+        await state.supabase
+          .from(dependency.table)
+          .select("observation_item_id")
+          .in("observation_item_id", idBatch)
+          .limit(1);
+
+      if (linkedError) {
+        throw new Error(
+          `Could not verify ${dependency.label}; PDF replacement was stopped. ${linkedError.message || linkedError}`
+        );
+      }
+
+      if (Array.isArray(linkedRows) && linkedRows.length > 0) {
+        found = true;
+        break;
+      }
+    }
+
+    if (found) dependentLabels.push(dependency.label);
+  }
+
+  return {
+    existing,
+    protectedRows,
+    dependentLabels,
+  };
+}
+
+async function guardExistingObservationItemsBeforePdfImport({
+  reportId = state.activeReport?.id,
+  confirmReplacement = true,
+} = {}) {
+  const {
+    existing,
+    protectedRows,
+    dependentLabels,
+  } = await inspectExistingObservationItemsForPdfReplacement(reportId);
 
   if (protectedRows.length > 0) {
     const examples = protectedRows.slice(0, 12).map((x) => {
@@ -1595,15 +1705,42 @@ async function guardExistingObservationItemsBeforePdfImport() {
       "\n\nExport the current report JSON first, or create a new report for testing the new PDF import."
     );
 
-    return false;
+    return {
+      allowed: false,
+      existing,
+    };
   }
 
-  return confirm(
-    `This report already has ${existing.length} extracted observation item(s).\n\n` +
-    "Re-importing the PDF will replace the existing extracted observation rows for this report.\n\n" +
-    "No populated response / close-out workflow fields were detected.\n\n" +
-    "Continue with replacement?"
-  );
+  if (dependentLabels.length > 0) {
+    alert(
+      "PDF re-import blocked.\n\n" +
+      "These observation items have linked records that would be deleted if the items were replaced: " +
+      dependentLabels.join(", ") +
+      ".\n\nNo report or observation data was changed."
+    );
+    return {
+      allowed: false,
+      existing,
+    };
+  }
+
+  if (existing.length > 0 && confirmReplacement) {
+    const allowed = confirm(
+      `This report already has ${existing.length} extracted observation item(s).\n\n` +
+      "Re-importing the PDF will replace the existing extracted observation rows for this report.\n\n" +
+      "No populated response / close-out workflow fields or linked dependent records were detected.\n\n" +
+      "Continue with replacement?"
+    );
+    return {
+      allowed,
+      existing,
+    };
+  }
+
+  return {
+    allowed: true,
+    existing,
+  };
 }
 
 
@@ -1707,7 +1844,7 @@ function ensurePdfImportReviewDialog() {
       <h3>PDF Import Review</h3>
       <div class="dlg-sub">Review the extracted PDF data before anything is written to the report.</div>
 
-      <div style="background:#f8fbff;border:1px solid #d8e8fb;border-radius:14px;color:#143a63;font-weight:800;padding:10px 12px;margin:10px 0 12px;">
+      <div id="pdfImportReviewNotice" style="background:#f8fbff;border:1px solid #d8e8fb;border-radius:14px;color:#143a63;font-weight:800;padding:10px 12px;margin:10px 0 12px;">
         Nothing has been written to the report yet. Confirm only when the header and extraction counts look correct.
       </div>
 
@@ -1724,10 +1861,19 @@ function ensurePdfImportReviewDialog() {
   return dialog;
 }
 
-async function confirmPdfImportReviewBeforePersist(data, extracted, tempPath) {
-  const message = buildPdfImportReviewMessage(data, extracted);
+async function confirmPdfImportReviewBeforePersist(
+  data,
+  extracted,
+  tempPath,
+  { preserveExistingReport = false } = {}
+) {
+  const baseMessage = buildPdfImportReviewMessage(data, extracted);
+  const message = preserveExistingReport
+    ? "This is a re-extraction from the PDF already linked to this report. On confirmation, only extracted observation items will be replaced; the report header, reference, and linked PDF will remain unchanged.\n\n" + baseMessage
+    : baseMessage;
   const dialog = ensurePdfImportReviewDialog();
   const textBox = el("pdfImportReviewText");
+  const notice = el("pdfImportReviewNotice");
   const cancelBtn = el("pdfImportReviewCancelBtn");
   const confirmBtn = el("pdfImportReviewConfirmBtn");
 
@@ -1735,6 +1881,12 @@ async function confirmPdfImportReviewBeforePersist(data, extracted, tempPath) {
 
   if (dialog && textBox && cancelBtn && confirmBtn && typeof dialog.showModal === "function") {
     textBox.textContent = message;
+    if (notice) {
+      notice.textContent =
+        preserveExistingReport
+          ? "Nothing has been written yet. Confirmation replaces only the extracted observation items; all report header fields and the linked PDF stay unchanged."
+          : "Nothing has been written to the report yet. Confirm only when the header and extraction counts look correct.";
+    }
 
     ok = await new Promise((resolve) => {
       let settled = false;
@@ -1780,11 +1932,52 @@ async function confirmPdfImportReviewBeforePersist(data, extracted, tempPath) {
 }
 
 
+function buildImportedObservationItemRow(item, reportId, sortIndex) {
+  const designation =
+    normDesignation(item.designation) ||
+    (item.obs_type === "positive" ? "Human" : null);
+  const normalized = normalizeImportedSocNocFields(
+    designation,
+    item.obs_type,
+    item.classification_coding,
+    item.nature_of_concern
+  );
+
+  const row = {
+    report_id: reportId,
+    question_no: canonicalQno(item.question_base || ""),
+    question_base: canonicalQno(item.question_base || ""),
+    question_full: String(item.question_full || "").trim() || null,
+    has_observation: true,
+    observation_type: item.obs_type === "negative"
+      ? "negative_observation"
+      : item.obs_type === "positive"
+        ? "positive_observation"
+        : "note_improvement",
+    obs_type: String(item.obs_type || "").trim(),
+    designation,
+    positive_rank: String(item.positive_rank || "").trim() || null,
+    nature_of_concern: normalized.nature_of_concern,
+    classification_coding: normalized.classification_coding,
+    observation_text: String(item.observation_text || "").trim() || null,
+    remarks: String(item.observation_text || "").trim() || null,
+    pgno_selected: [],
+    page_hint: item.page_hint ?? null,
+    source_excerpt: String(item.source_excerpt || "").trim() || null,
+    confidence: item.confidence ?? null,
+    sort_index: sortIndex,
+  };
+
+  row.pgno_selected = autoMatchPgnoForImportedItem(row);
+  return row;
+}
+
+
 async function importReportPdfAiFromFile(file) {
   if (!file) return;
 
-  const importAllowed = await guardExistingObservationItemsBeforePdfImport();
-  if (!importAllowed) {
+  const importGuard = await guardExistingObservationItemsBeforePdfImport();
+  if (!importGuard.allowed) {
     setSaveStatus("Import blocked");
     return;
   }
@@ -1811,9 +2004,12 @@ async function importReportPdfAiFromFile(file) {
     }
   );
 
-  if (error) throw error;
+  if (error) {
+    throw new Error(
+      await formatEdgeFunctionError(error, "PDF extraction failed")
+    );
+  }
   if (!data?.ok) throw new Error(data?.error || "AI import failed");
-
   const extracted = data.extracted || {};
   const h = extracted.header || {};
   const obs = Array.isArray(extracted.observations) ? extracted.observations : [];
@@ -1879,42 +2075,7 @@ async function importReportPdfAiFromFile(file) {
   await state.supabase.from("post_inspection_observation_items").delete().eq("report_id", report.id);
 
   for (let i = 0; i < obs.length; i++) {
-    const item = obs[i];
-    const designation = normDesignation(item.designation) || (item.obs_type === "positive" ? "Human" : null);
-
-    const normalized = normalizeImportedSocNocFields(
-      designation,
-      item.obs_type,
-      item.classification_coding,
-      item.nature_of_concern
-    );
-
-    const row = {
-      report_id: report.id,
-      question_no: canonicalQno(item.question_base || ""),
-      question_base: canonicalQno(item.question_base || ""),
-      question_full: String(item.question_full || "").trim() || null,
-      has_observation: true,
-      observation_type: item.obs_type === "negative"
-        ? "negative_observation"
-        : item.obs_type === "positive"
-          ? "positive_observation"
-          : "note_improvement",
-      obs_type: String(item.obs_type || "").trim(),
-      designation,
-      positive_rank: String(item.positive_rank || "").trim() || null,
-      nature_of_concern: normalized.nature_of_concern,
-      classification_coding: normalized.classification_coding,
-      observation_text: String(item.observation_text || "").trim() || null,
-      remarks: String(item.observation_text || "").trim() || null,
-      pgno_selected: [],
-      page_hint: item.page_hint ?? null,
-      source_excerpt: String(item.source_excerpt || "").trim() || null,
-      confidence: item.confidence ?? null,
-      sort_index: i,
-    };
-
-    row.pgno_selected = autoMatchPgnoForImportedItem(row);
+    const row = buildImportedObservationItemRow(obs[i], report.id, i);
 
     const { error: insErr } = await state.supabase
       .from("post_inspection_observation_items")
@@ -1946,6 +2107,251 @@ async function importReportPdfAiFromFile(file) {
 
   if (!getUrlParam("report_id") && report.id) {
     window.history.replaceState({}, "", `./post_inspection_detail.html?report_id=${encodeURIComponent(report.id)}`);
+  }
+}
+
+
+function observationItemIds(rows) {
+  return (Array.isArray(rows) ? rows : [])
+    .map((row) => String(row?.id || "").trim())
+    .filter(Boolean);
+}
+
+function sameIdSet(left, right) {
+  const leftSet = new Set((left || []).map(String));
+  const rightSet = new Set((right || []).map(String));
+  return leftSet.size === rightSet.size &&
+    [...leftSet].every((id) => rightSet.has(id));
+}
+
+async function deleteInsertedObservationRows(ids) {
+  if (!ids.length) return null;
+  try {
+    const { error } = await state.supabase
+      .from("post_inspection_observation_items")
+      .delete()
+      .in("id", ids);
+    return error?.message || null;
+  } catch (error) {
+    return error?.message || String(error);
+  }
+}
+
+async function replaceExistingReportObservationItems(
+  reportId,
+  observations,
+  existingRows
+) {
+  if (!observations.length) {
+    throw new Error("No observation items were extracted; no report data was changed.");
+  }
+
+  if (!globalThis.crypto?.randomUUID) {
+    throw new Error("This browser cannot safely create replacement item IDs.");
+  }
+
+  const oldIds = observationItemIds(existingRows);
+  const newRows = observations.map((item, index) => {
+    const row = buildImportedObservationItemRow(item, reportId, index);
+    row.id = globalThis.crypto.randomUUID();
+    return row;
+  });
+  const newIds = observationItemIds(newRows);
+
+  const { error: insertError } = await state.supabase
+    .from("post_inspection_observation_items")
+    .insert(newRows);
+
+  if (insertError) {
+    throw new Error(
+      `Could not insert the new extracted items; the existing items were not removed. ${insertError.message || insertError}`
+    );
+  }
+
+  try {
+    const afterInsertSafety = await guardExistingObservationItemsBeforePdfImport({
+      reportId,
+      confirmReplacement: false,
+    });
+
+    if (!afterInsertSafety.allowed) {
+      throw new Error(
+        "A safety check blocked replacement after the new items were staged. The original items have not been removed."
+      );
+    }
+
+    const expectedIds = [...oldIds, ...newIds];
+    const currentIds = observationItemIds(afterInsertSafety.existing);
+    if (!sameIdSet(expectedIds, currentIds)) {
+      throw new Error(
+        "The report's observation rows changed during replacement. The original items have not been removed."
+      );
+    }
+
+    if (oldIds.length > 0) {
+      const { data: deletedRows, error: deleteError } = await state.supabase
+        .from("post_inspection_observation_items")
+        .delete()
+        .in("id", oldIds)
+        .select("id");
+
+      if (deleteError) {
+        throw new Error(
+          `Could not remove the prior extracted items. ${deleteError.message || deleteError}`
+        );
+      }
+
+      const deletedIds = observationItemIds(deletedRows);
+      if (!sameIdSet(oldIds, deletedIds)) {
+        const partialError = new Error(
+          `Replacement did not finish cleanly: ${deletedIds.length} of ${oldIds.length} prior item(s) were removed, and ${newRows.length} new item(s) were inserted. The new items were retained to avoid losing the extraction. Review this report before trying again.`
+        );
+        partialError.keepInsertedRows = true;
+        throw partialError;
+      }
+    }
+
+    return {
+      previousCount: oldIds.length,
+      newCount: newRows.length,
+    };
+  } catch (error) {
+    if (error?.keepInsertedRows) throw error;
+
+    const cleanupError = await deleteInsertedObservationRows(newIds);
+    if (cleanupError) {
+      throw new Error(
+        `${error?.message || error}\n\nThe staged new items could not be rolled back (${cleanupError}). Review the report before retrying.`
+      );
+    }
+    throw error;
+  }
+}
+
+async function reextractLinkedPdfFindings() {
+  const button = el("reextractLinkedPdfBtn");
+  const report = state.activeReport;
+  const reportId = String(report?.id || "").trim();
+  const pdfStoragePath = String(report?.pdf_storage_path || "").trim();
+
+  if (!reportId || !pdfStoragePath) {
+    throw new Error("Load a stored report with a linked PDF first.");
+  }
+
+  if (button) button.disabled = true;
+
+  try {
+    setSaveStatus("Checking report before re-extraction…");
+    const initialSafety = await guardExistingObservationItemsBeforePdfImport({
+      reportId,
+      confirmReplacement: false,
+    });
+    if (!initialSafety.allowed) {
+      setSaveStatus("Re-extraction blocked");
+      return;
+    }
+    const baselineIds = observationItemIds(initialSafety.existing);
+
+    setSaveStatus("Re-extracting linked PDF…");
+    const { data, error } = await state.supabase.functions.invoke(
+      "import-post-inspection-pdf",
+      {
+        body: {
+          report_id: reportId,
+          pdf_storage_path: pdfStoragePath,
+          debug: true,
+          reextract_findings_from_linked_pdf: true,
+        },
+      }
+    );
+
+    if (error) {
+      throw new Error(
+        await formatEdgeFunctionError(error, "Linked PDF re-extraction failed")
+      );
+    }
+    if (!data?.ok) {
+      throw new Error(data?.error || "Linked PDF re-extraction failed.");
+    }
+    assertLinkedPdfReextractFunctionVersion(data);
+
+    const extracted = data.extracted || {};
+    const observations = Array.isArray(extracted.observations)
+      ? extracted.observations
+      : [];
+    if (!observations.length) {
+      throw new Error(
+        "The linked PDF produced zero observation items. No report or observation data was changed."
+      );
+    }
+
+    const extractedRef = String(
+      extracted?.header?.report_reference || ""
+    ).trim().toUpperCase().replace(/\s+/g, "");
+    const storedRef = String(report.report_ref || "")
+      .trim()
+      .toUpperCase()
+      .replace(/\s+/g, "");
+    if (storedRef && extractedRef && storedRef !== extractedRef) {
+      throw new Error(
+        `The linked PDF report reference (${extractedRef}) does not match the stored report (${report.report_ref}). No data was changed.`
+      );
+    }
+
+    const reviewAccepted = await confirmPdfImportReviewBeforePersist(
+      data,
+      extracted,
+      null,
+      { preserveExistingReport: true }
+    );
+    if (!reviewAccepted) return;
+
+    if (String(state.activeReport?.id || "") !== reportId) {
+      throw new Error(
+        "The active report changed during extraction. No report data was changed."
+      );
+    }
+
+    const finalSafety = await guardExistingObservationItemsBeforePdfImport({
+      reportId,
+      confirmReplacement: false,
+    });
+    if (!finalSafety.allowed) {
+      setSaveStatus("Re-extraction blocked");
+      return;
+    }
+    if (!sameIdSet(baselineIds, observationItemIds(finalSafety.existing))) {
+      throw new Error(
+        "The report's observation rows changed while the PDF was being reviewed. No data was changed; reload the report and review again."
+      );
+    }
+
+    setSaveStatus(`Replacing ${baselineIds.length} existing item(s)…`);
+    const result = await replaceExistingReportObservationItems(
+      reportId,
+      observations,
+      finalSafety.existing
+    );
+
+    state.observationItems = await loadObservationItemsForReport(reportId);
+    rebuildExtractedItems();
+    renderObsTable();
+    renderObsSummary();
+    setActivePill("Loaded");
+    setSaveStatus("Linked PDF re-extraction complete");
+
+    alert(
+      "Linked PDF re-extraction complete.\n\n" +
+      `Previous extracted items replaced: ${result.previousCount}\n` +
+      `New extracted items: ${result.newCount}\n\n` +
+      "The report header and linked PDF were not changed."
+    );
+  } finally {
+    if (button) {
+      button.disabled =
+        !state.activeReport?.id ||
+        !String(state.activeReport?.pdf_storage_path || "").trim();
+    }
   }
 }
 
@@ -2029,7 +2435,14 @@ async function importReportPdfQaDebugFromFile(file) {
       }
     );
 
-    if (invokeResult.error) throw invokeResult.error;
+    if (invokeResult.error) {
+      throw new Error(
+        await formatEdgeFunctionError(
+          invokeResult.error,
+          "PDF QA extraction failed"
+        )
+      );
+    }
 
     data = invokeResult.data;
 
@@ -2311,7 +2724,14 @@ async function invokeInspectorPhotoPersistence(
       }
     );
 
-  if (error) throw error;
+  if (error) {
+    throw new Error(
+      await formatEdgeFunctionError(
+        error,
+        "Inspector-photo operation failed"
+      )
+    );
+  }
 
   if (!data?.ok) {
     throw new Error(
@@ -2320,15 +2740,7 @@ async function invokeInspectorPhotoPersistence(
     );
   }
 
-  if (
-    data.function_version !==
-    "cors-jwt-off-v45_inspector_photo_structured_pgno"
-  ) {
-    throw new Error(
-      "Unexpected Edge Function version: " +
-      String(data.function_version || "unknown")
-    );
-  }
+  assertCompatiblePhotoPersistenceFunctionVersion(data);
 
   if (!data.photo_persistence) {
     throw new Error(
@@ -2745,6 +3157,18 @@ async function init() {
 
   el("downloadPdfBtn").addEventListener("click", downloadActivePdf);
   el("importPdfBtn").addEventListener("click", () => el("importPdfFile").click());
+  el("reextractLinkedPdfBtn").addEventListener("click", async () => {
+    try {
+      await reextractLinkedPdfFindings();
+    } catch (error) {
+      console.error(error);
+      alert(
+        "Linked PDF re-extraction failed:\n\n" +
+        (error?.message || String(error))
+      );
+      setSaveStatus("Re-extraction failed");
+    }
+  });
   el("importPdfFile").addEventListener("change", async (e) => {
     const f = e.target.files && e.target.files[0];
     try {
