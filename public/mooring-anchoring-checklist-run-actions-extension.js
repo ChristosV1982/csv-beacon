@@ -6,7 +6,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "MAI-CHECKLIST-WORKSPACE-20260512-1";
+  const BUILD = "MAI-CHECKLIST-WORKSPACE-20261015-REFRESH-GUARD-1";
 
   const state = {
     sb: null,
@@ -17,7 +17,9 @@
     activeRun: null,
     activeItems: [],
     activeAnswers: [],
-    busy: false
+    refreshPromise: null,
+    refreshTimer: null,
+    startInProgress: false
   };
 
   function $(id) {
@@ -128,6 +130,22 @@
   function getUniqueIdFromPage() {
     const text = $("detailTitle")?.textContent || "";
     return text.trim();
+  }
+
+  function currentComponentKey() {
+    return getComponentIdFromUrl() || getUniqueIdFromPage();
+  }
+
+  function workspaceIsRenderedForCurrentComponent() {
+    const host = $("checklistRunsHistory");
+    const componentKey = currentComponentKey();
+
+    return !!(
+      host &&
+      componentKey &&
+      host.getAttribute("data-mai-checklist-workspace-rendered-for") === componentKey &&
+      host.querySelector(".mai-checklist-workspace")
+    );
   }
 
   async function getProfileSafe() {
@@ -483,8 +501,6 @@
     const host = $("checklistRunsHistory");
     if (!host) return;
 
-    host.setAttribute("data-mai-checklist-workspace-rendered", "1");
-
     const actor = selectedActorText();
 
     host.innerHTML = `
@@ -527,7 +543,9 @@
         </div>
 
         <div class="actions-row">
-          <button id="startChecklistBtn" class="btn" type="button">Start New Checklist</button>
+          <button id="startChecklistBtn" class="btn" type="button" ${state.startInProgress ? "disabled" : ""}>
+            ${state.startInProgress ? "Starting..." : "Start New Checklist"}
+          </button>
           <button id="loadChecklistRunBtn" class="btn2" type="button">Load Selected Run</button>
         </div>
 
@@ -542,6 +560,11 @@
       </div>
     `;
 
+    host.setAttribute(
+      "data-mai-checklist-workspace-rendered-for",
+      String(state.component?.id || currentComponentKey())
+    );
+
     const runSelect = $("checklistRunSelect");
     if (runSelect && state.activeRun) {
       runSelect.value = state.activeRun.run_id;
@@ -551,7 +574,7 @@
   }
 
   function bindWorkspaceEvents() {
-    $("reloadChecklistRunsBtn")?.addEventListener("click", () => refresh().catch(handleError));
+    $("reloadChecklistRunsBtn")?.addEventListener("click", () => refresh({ force: true }).catch(handleError));
     $("startChecklistBtn")?.addEventListener("click", () => startChecklistRun().catch(handleError));
     $("loadChecklistRunBtn")?.addEventListener("click", () => loadSelectedRun().catch(handleError));
     $("saveChecklistAnswersBtn")?.addEventListener("click", () => saveChecklistAnswers().catch(handleError));
@@ -586,41 +609,59 @@
   }
 
   async function startChecklistRun() {
-    const component = await loadComponent();
-    if (!component) {
-      toast("warn", "No component is open.");
-      return;
+    if (state.startInProgress) return;
+
+    state.startInProgress = true;
+    const startButton = $("startChecklistBtn");
+    if (startButton) {
+      startButton.disabled = true;
+      startButton.textContent = "Starting...";
     }
 
-    const templateId = $("checklistTemplateSelect")?.value || "";
-    const inspectionDate = $("checklistInspectionDate")?.value || todayIso();
-    const inspectedBy = $("checklistInspectedBy")?.value || null;
-    const remarks = $("checklistRemarks")?.value || null;
+    try {
+      const component = await loadComponent();
+      if (!component) {
+        toast("warn", "No component is open.");
+        return;
+      }
 
-    if (!templateId) {
-      toast("warn", "Select an available checklist template first.");
-      return;
-    }
+      const templateId = $("checklistTemplateSelect")?.value || "";
+      const inspectionDate = $("checklistInspectionDate")?.value || todayIso();
+      const inspectedBy = $("checklistInspectedBy")?.value || null;
+      const remarks = $("checklistRemarks")?.value || null;
 
-    const data = await rpc("mai_start_inspection_run", {
-      p_component_id: component.id,
-      p_template_id: templateId,
-      p_inspection_date: inspectionDate,
-      p_inspected_by: inspectedBy,
-      p_remarks: remarks
-    });
+      if (!templateId) {
+        toast("warn", "Select an available checklist template first.");
+        return;
+      }
 
-    const runId = typeof data === "string" ? data : (data?.run_id || data?.id || "");
+      const data = await rpc("mai_start_inspection_run", {
+        p_component_id: component.id,
+        p_template_id: templateId,
+        p_inspection_date: inspectionDate,
+        p_inspected_by: inspectedBy,
+        p_remarks: remarks
+      });
 
-    toast("ok", "Checklist run started.");
+      const runId = typeof data === "string" ? data : (data?.run_id || data?.id || "");
 
-    await loadRuns();
+      toast("ok", "Checklist run started.");
 
-    const newRunId = runId || state.runs[0]?.run_id || "";
-    if (newRunId) {
-      await loadRunDetail(newRunId);
-    } else {
-      await renderWorkspace();
+      await loadRuns();
+
+      const newRunId = runId || state.runs[0]?.run_id || "";
+      if (newRunId) {
+        await loadRunDetail(newRunId);
+      } else {
+        await renderWorkspace();
+      }
+    } finally {
+      state.startInProgress = false;
+      const currentButton = $("startChecklistBtn");
+      if (currentButton) {
+        currentButton.disabled = false;
+        currentButton.textContent = "Start New Checklist";
+      }
     }
   }
 
@@ -746,7 +787,7 @@
       state.activeAnswers = [];
     }
 
-    await refresh();
+    await refresh({ force: true });
   }
 
   function handleError(error) {
@@ -842,11 +883,14 @@
     document.head.appendChild(style);
   }
 
-  async function refresh() {
-    if (state.busy) return;
-    state.busy = true;
+  async function refresh({ force = false } = {}) {
+    if (state.refreshPromise) return state.refreshPromise;
+    if (!force && workspaceIsRenderedForCurrentComponent()) return;
 
-    try {
+    const requestedComponentKey = currentComponentKey();
+    if (!requestedComponentKey) return;
+
+    state.refreshPromise = (async () => {
       addStyles();
 
       state.sb = state.sb || window.AUTH.ensureSupabase();
@@ -854,26 +898,63 @@
 
       const component = await loadComponent();
       if (!component) return;
+      if (requestedComponentKey !== currentComponentKey()) return;
 
       await Promise.all([
         loadTemplates(),
         loadRuns()
       ]);
 
+      if (requestedComponentKey !== currentComponentKey()) return;
       await renderWorkspace();
+    })();
+
+    try {
+      return await state.refreshPromise;
     } finally {
-      state.busy = false;
+      state.refreshPromise = null;
     }
   }
 
-  function startObserver() {
-    const observer = new MutationObserver(() => {
-      const host = $("checklistRunsHistory");
-      if (!host) return;
+  function scheduleRefresh() {
+    if (state.refreshTimer) {
+      window.clearTimeout(state.refreshTimer);
+    }
 
-      const rendered = host.getAttribute("data-mai-checklist-workspace-rendered") === "1";
-      if (!rendered) {
-        window.setTimeout(() => refresh().catch(handleError), 250);
+    const requestedComponentKey = currentComponentKey();
+    state.refreshTimer = window.setTimeout(() => {
+      state.refreshTimer = null;
+
+      // Re-check after the debounce: another callback may already have rendered
+      // this component, or the page may have navigated to a different component.
+      if (!requestedComponentKey || requestedComponentKey !== currentComponentKey()) return;
+      if (workspaceIsRenderedForCurrentComponent()) return;
+      if (state.refreshPromise) return;
+
+      refresh().catch(handleError);
+    }, 180);
+  }
+
+  function mutationTouchesChecklistHost(records, host) {
+    if (!host) return false;
+
+    return records.some((record) => {
+      const target = record.target?.nodeType === Node.TEXT_NODE
+        ? record.target.parentElement
+        : record.target;
+      if (target === host || host.contains(target)) return true;
+
+      return [...record.addedNodes, ...record.removedNodes].some((node) =>
+        node === host || (node.nodeType === Node.ELEMENT_NODE && node.contains(host))
+      );
+    });
+  }
+
+  function startObserver() {
+    const observer = new MutationObserver((records) => {
+      const host = $("checklistRunsHistory");
+      if (mutationTouchesChecklistHost(records, host) && !workspaceIsRenderedForCurrentComponent()) {
+        scheduleRefresh();
       }
     });
 
@@ -887,9 +968,11 @@
     window.CSVB_MAI_CHECKLIST_WORKSPACE_BUILD = BUILD;
 
     startObserver();
+    window.addEventListener("csvb:mai-component-detail-ready", scheduleRefresh);
 
-    window.setTimeout(() => refresh().catch(handleError), 800);
-    window.setTimeout(() => refresh().catch(handleError), 1800);
+    if (window.CSVB_MAI_COMPONENT_DETAIL_READY === currentComponentKey()) {
+      scheduleRefresh();
+    }
   }
 
   if (document.readyState === "loading") {

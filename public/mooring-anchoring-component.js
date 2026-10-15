@@ -463,6 +463,15 @@
     await loadFields();
     await loadSupportingData();
     renderAll();
+
+    const componentReady = state.component?.id || state.componentId;
+    window.CSVB_MAI_COMPONENT_DETAIL_READY = componentReady;
+    window.dispatchEvent(new CustomEvent("csvb:mai-component-detail-ready", {
+      detail: {
+        componentId: state.component?.id || state.componentId,
+        uniqueId: state.component?.unique_id || ""
+      }
+    }));
   }
 
   async function saveFields() {

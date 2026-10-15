@@ -5,7 +5,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "MAI-EVENT-WORKSPACE-20260511-2";
+  const BUILD = "MAI-EVENT-WORKSPACE-20261015-REFRESH-GUARD-1";
   const BUCKET = "mai-evidence";
 
   const ACCEPT_STRING = [
@@ -46,7 +46,8 @@
   let events = [];
   let attachments = [];
   let selectedEventId = "";
-  let busy = false;
+  let refreshPromise = null;
+  let refreshTimer = null;
 
   function $(id) {
     return document.getElementById(id);
@@ -651,8 +652,6 @@
 
     const eventDetail = await renderEventDetail();
 
-    host.setAttribute("data-mai-event-workspace-rendered-for", getUniqueIdFromPage());
-
     host.innerHTML = `
       <div class="mai-workspace">
         <div class="mai-workspace-head">
@@ -671,6 +670,8 @@
         </div>
       </div>
     `;
+
+    host.setAttribute("data-mai-event-workspace-rendered-for", getUniqueIdFromPage());
 
     host.querySelectorAll("[data-mai-view-event]").forEach((btn) => {
       btn.addEventListener("click", () => {
@@ -744,17 +745,20 @@
   }
 
   async function refreshWorkspace() {
-    if (busy) return;
-    busy = true;
+    if (refreshPromise) return refreshPromise;
 
-    try {
+    refreshPromise = (async () => {
       const ok = await loadData();
       if (!ok) return;
 
       await renderWorkspace();
       renderRunEvidenceBox();
+    })();
+
+    try {
+      return await refreshPromise;
     } finally {
-      busy = false;
+      refreshPromise = null;
     }
   }
 
@@ -901,33 +905,75 @@
   }
 
   function startObserver() {
-    const observer = new MutationObserver(() => {
-      softenIdentityFields();
-
-      const hasDetail = !!$("detailPanel") && !$("detailPanel").classList.contains("hidden");
+    const observer = new MutationObserver((records) => {
       const host = $("lifecycleEventHistory");
-      const currentUniqueId = getUniqueIdFromPage();
-
-      // Important:
-      // Do not re-render continuously. Re-rendering destroys selected files in file inputs.
-      // Only initialize the workspace when it is missing or when another component is opened.
-      const alreadyRenderedFor = host?.getAttribute("data-mai-event-workspace-rendered-for") || "";
-      const needsInitialRender =
-        hasDetail &&
-        host &&
-        currentUniqueId &&
-        currentUniqueId !== "Component Detail" &&
-        alreadyRenderedFor !== currentUniqueId;
-
-      if (needsInitialRender) {
-        window.setTimeout(refreshWorkspace, 350);
-      }
+      if (mutationTouchesIdentityFields(records)) softenIdentityFields();
+      if (host && mutationTouchesEventHost(records, host)) scheduleInitialRender();
     });
 
     observer.observe(document.body, {
       childList: true,
       subtree: true
     });
+  }
+
+  function mutationTouchesIdentityFields(records) {
+    const selector = "#lifecyclePerformedBy, #checklistInspectedBy, #inspectionBy";
+    return records.some((record) => {
+      const target = record.target?.nodeType === Node.TEXT_NODE
+        ? record.target.parentElement
+        : record.target;
+      if (target?.matches?.(selector) || target?.closest?.(selector)) return true;
+
+      return [...record.addedNodes, ...record.removedNodes].some((node) =>
+        node.nodeType === Node.ELEMENT_NODE &&
+        (node.matches(selector) || node.querySelector(selector))
+      );
+    });
+  }
+
+  function mutationTouchesEventHost(records, host) {
+    return records.some((record) => {
+      const target = record.target?.nodeType === Node.TEXT_NODE
+        ? record.target.parentElement
+        : record.target;
+      if (target === host || host.contains(target)) return true;
+
+      return [...record.addedNodes, ...record.removedNodes].some((node) =>
+        node === host || (node.nodeType === Node.ELEMENT_NODE && node.contains(host))
+      );
+    });
+  }
+
+  function needsInitialRender() {
+    const hasDetail = !!$("detailPanel") && !$("detailPanel").classList.contains("hidden");
+    const host = $("lifecycleEventHistory");
+    const currentUniqueId = getUniqueIdFromPage();
+    const alreadyRenderedFor = host?.getAttribute("data-mai-event-workspace-rendered-for") || "";
+
+    return !!(
+      hasDetail &&
+      host &&
+      currentUniqueId &&
+      currentUniqueId !== "Component Detail" &&
+      (alreadyRenderedFor !== currentUniqueId || !host.querySelector(".mai-workspace"))
+    );
+  }
+
+  function scheduleInitialRender() {
+    if (refreshTimer) window.clearTimeout(refreshTimer);
+
+    const requestedUniqueId = getUniqueIdFromPage();
+    refreshTimer = window.setTimeout(() => {
+      refreshTimer = null;
+
+      // Ignore stale observer callbacks and unrelated page mutations. Only the
+      // first render for the currently displayed component may start a load.
+      if (!requestedUniqueId || requestedUniqueId !== getUniqueIdFromPage()) return;
+      if (!needsInitialRender() || refreshPromise) return;
+
+      refreshWorkspace().catch(console.error);
+    }, 180);
   }
 
   async function init() {
@@ -953,14 +999,11 @@
 
     softenIdentityFields();
     startObserver();
+    window.addEventListener("csvb:mai-component-detail-ready", scheduleInitialRender);
 
-    // Keep auto-actor field softening, but do not auto-refresh the event workspace.
-    // Auto-refresh destroys selected files in browser file inputs.
-    window.setInterval(() => {
-      softenIdentityFields();
-    }, 4500);
-
-    window.setTimeout(refreshWorkspace, 1200);
+    if (window.CSVB_MAI_COMPONENT_DETAIL_READY) {
+      scheduleInitialRender();
+    }
   }
 
   if (document.readyState === "loading") {
