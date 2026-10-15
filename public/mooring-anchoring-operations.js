@@ -4,9 +4,8 @@
 (() => {
   "use strict";
 
-  const BUILD = "MAI-OPERATIONS-20260511-3";
+  const BUILD = "MAI-OPERATIONS-20261015-4";
   const PORT_OPTION_LIMIT = 350;
-  const FETCH_PAGE_SIZE = 1000;
 
   const state = {
     sb: null,
@@ -17,8 +16,18 @@
     operationTypes: [],
     components: [],
     operations: [],
+    portCountries: [],
     ports: [],
     facilities: [],
+    facilitiesByPort: new Map(),
+    portLookupRequestId: 0,
+    portLookupTimer: null,
+    portLookupStatus: "idle",
+    portLookupError: "",
+    activeFacilityPortId: "",
+    facilityLookupRequestId: 0,
+    facilityLookupStatus: "idle",
+    facilityLookupError: "",
     selectedComponents: new Set()
   };
 
@@ -153,47 +162,30 @@
     return data;
   }
 
-  async function fetchAll(queryFactory, pageSize = FETCH_PAGE_SIZE) {
-    const all = [];
-    let from = 0;
-
-    while (true) {
-      const to = from + pageSize - 1;
-      const { data, error } = await queryFactory().range(from, to);
-      if (error) throw error;
-
-      const rows = data || [];
-      all.push(...rows);
-
-      if (rows.length < pageSize) break;
-      from += pageSize;
-
-      if (from > 100000) {
-        throw new Error("Fetch stopped at 100,000 rows. Narrow the query or review the port directory size.");
-      }
+  async function startupLookup(label, query) {
+    try {
+      const result = await query();
+      if (result?.error) throw result.error;
+      return result;
+    } catch (error) {
+      throw new Error(`Startup lookup failed while loading ${label}: ${error?.message || error || "Unknown error"}`);
     }
-
-    return all;
   }
 
   async function loadBaseData() {
-    const [vesselRes, typeRes, componentRes, portRows, facilityRows] = await Promise.all([
-      state.sb.from("vessels").select("id, name, hull_number, imo_number, company_id, is_active").eq("is_active", true).order("name"),
-      state.sb.from("mai_v_operation_type_definitions").select("*").order("sort_order"),
-      state.sb.from("mai_v_components_list").select("*").order("unique_id"),
-      fetchAll(() => state.sb.from("mai_v_ports_list").select("*").order("country_name").order("port_name")),
-      fetchAll(() => state.sb.from("mai_v_port_facilities_list").select("*").order("port_name").order("facility_name"))
+    const [vesselRes, typeRes, componentRes, countryRows] = await Promise.all([
+      startupLookup("active vessels", () => state.sb.from("vessels").select("id, name, hull_number, imo_number, company_id, is_active").eq("is_active", true).order("name")),
+      startupLookup("operation types", () => state.sb.from("mai_v_operation_type_definitions").select("*").order("sort_order")),
+      startupLookup("mooring components", () => state.sb.from("mai_v_components_list").select("*").order("unique_id")),
+      startupLookup("port countries", () => rpc("mai_operation_port_countries"))
     ]);
 
-    for (const res of [vesselRes, typeRes, componentRes]) {
-      if (res.error) throw res.error;
-    }
+    if (!Array.isArray(countryRows)) throw new Error("Startup lookup failed: port country lookup returned an unexpected response.");
 
     state.vessels = vesselRes.data || [];
     state.operationTypes = typeRes.data || [];
     state.components = componentRes.data || [];
-    state.ports = portRows || [];
-    state.facilities = facilityRows || [];
+    state.portCountries = countryRows;
   }
 
   async function loadOperationHistory() {
@@ -212,7 +204,7 @@
       .order("operation_start_at", { ascending: false })
       .limit(500);
 
-    if (error) throw error;
+    if (error) throw new Error(`Operation history lookup failed: ${error.message || error}`);
 
     state.operations = data || [];
     renderOperationHistory();
@@ -277,13 +269,13 @@
     const current = el.portCountrySelect.value || "";
     const countries = new Map();
 
-    state.ports.forEach((port) => {
-      const key = countryKey(port);
+    state.portCountries.forEach((country) => {
+      const key = country.country_code || country.country_name || "";
       if (!key) return;
       if (!countries.has(key)) {
         countries.set(key, {
           key,
-          label: countryLabel(port)
+          label: countryLabel(country)
         });
       }
     });
@@ -300,7 +292,8 @@
 
   function filteredPortsForPicker() {
     const country = el.portCountrySelect.value || "";
-    const q = norm(el.portSearch.value);
+    const rawQuery = norm(el.portSearch.value);
+    const q = rawQuery.length >= 2 ? rawQuery : "";
 
     return state.ports.filter((port) => {
       if (country && countryKey(port) !== country) return false;
@@ -323,11 +316,20 @@
   function renderPortOptions({ preserveSelection = true } = {}) {
     const current = preserveSelection ? el.portSelect.value || "" : "";
     const country = el.portCountrySelect.value || "";
-    const q = norm(el.portSearch.value);
+    const rawQuery = norm(el.portSearch.value);
+    const q = rawQuery.length >= 2 ? rawQuery : "";
 
-    if (!state.ports.length) {
-      el.portSelect.innerHTML = `<option value="">No ports imported — use manual port field</option>`;
-      el.portPickerHint.textContent = "No imported UN/LOCODE port records were found. Manual port entry remains available.";
+    if (state.portLookupStatus === "loading") {
+      el.portSelect.innerHTML = `<option value="">Searching ports…</option>`;
+      el.portPickerHint.textContent = "Searching the port directory…";
+      renderFacilities();
+      updateMapButton();
+      return;
+    }
+
+    if (state.portLookupStatus === "error") {
+      el.portSelect.innerHTML = `<option value="">Port search unavailable</option>`;
+      el.portPickerHint.textContent = state.portLookupError || "Port directory lookup failed. Manual port entry remains available.";
       renderFacilities();
       updateMapButton();
       return;
@@ -335,13 +337,21 @@
 
     if (!country && q.length < 2) {
       el.portSelect.innerHTML = `<option value="">Select country or type at least 2 characters...</option>`;
-      el.portPickerHint.textContent = `${state.ports.length.toLocaleString()} imported port record(s). Select a country or search by port name / UN/LOCODE.`;
+      el.portPickerHint.textContent = "Select a country or type at least 2 characters to search by port name / UN/LOCODE.";
       renderFacilities();
       updateMapButton();
       return;
     }
 
     const rows = filteredPortsForPicker();
+    if (!rows.length) {
+      el.portSelect.innerHTML = `<option value="">No matching ports found</option>`;
+      el.portPickerHint.textContent = "No matching imported ports were found. Manual port entry remains available.";
+      renderFacilities();
+      updateMapButton();
+      return;
+    }
+
     const limited = rows.slice(0, PORT_OPTION_LIMIT);
     const currentPort = current ? state.ports.find((p) => p.port_id === current) : null;
     const includeCurrent = currentPort && !limited.some((p) => p.port_id === currentPort.port_id);
@@ -356,14 +366,88 @@
       el.portSelect.value = current;
     }
 
-    const limitedText = rows.length > PORT_OPTION_LIMIT
-      ? ` Showing first ${PORT_OPTION_LIMIT.toLocaleString()}; narrow search for more.`
+    const limitedText = rows.length >= PORT_OPTION_LIMIT
+      ? ` Showing up to ${PORT_OPTION_LIMIT.toLocaleString()}; narrow search for more.`
       : "";
-
-    el.portPickerHint.textContent = `${rows.length.toLocaleString()} matching port record(s).${limitedText}`;
+    const shortQueryText = rawQuery.length === 1 ? " Type at least 2 characters to search." : "";
+    el.portPickerHint.textContent = `${rows.length.toLocaleString()} matching port record(s).${limitedText}${shortQueryText}`;
 
     renderFacilities();
     updateMapButton();
+  }
+
+  async function loadPortsForPicker({ source = "search" } = {}) {
+    const countryCode = el.portCountrySelect.value || null;
+    const rawQuery = norm(el.portSearch.value);
+    const query = rawQuery.length >= 2 ? rawQuery : null;
+    const currentPortId = el.portSelect.value || "";
+    const currentPort = state.ports.find((port) => port.port_id === currentPortId) || null;
+
+    if (!countryCode && !query) {
+      state.portLookupRequestId += 1;
+      state.ports = [];
+      state.portLookupStatus = "idle";
+      state.portLookupError = "";
+      renderPortOptions();
+      return;
+    }
+
+    const requestId = ++state.portLookupRequestId;
+    state.portLookupStatus = "loading";
+    state.portLookupError = "";
+    state.ports = [];
+    renderPortOptions();
+
+    try {
+      const rows = await rpc("mai_operation_port_search", {
+        p_country_code: countryCode,
+        p_query: query,
+        p_limit: PORT_OPTION_LIMIT
+      });
+      if (requestId !== state.portLookupRequestId) return;
+      if (!Array.isArray(rows)) throw new Error("The port search returned an unexpected response.");
+
+      state.ports = rows.slice(0, PORT_OPTION_LIMIT);
+      if (currentPort && !state.ports.some((port) => port.port_id === currentPort.port_id)) {
+        state.ports.unshift(currentPort);
+      }
+      state.portLookupStatus = "ready";
+      renderPortOptions();
+    } catch (error) {
+      if (requestId !== state.portLookupRequestId) return;
+      state.ports = [];
+      state.portLookupStatus = "error";
+      state.portLookupError = error?.message || String(error);
+      renderPortOptions();
+      const prefix = source === "startup" ? "Startup port lookup failed" : "Port search failed";
+      throw new Error(`${prefix}: ${state.portLookupError}`);
+    }
+  }
+
+  function schedulePortSearch(source = "search") {
+    if (state.portLookupTimer) clearTimeout(state.portLookupTimer);
+    state.portLookupRequestId += 1;
+    state.ports = [];
+    state.portLookupError = "";
+    state.facilityLookupRequestId += 1;
+    state.activeFacilityPortId = "";
+    state.facilities = [];
+    state.facilityLookupStatus = "idle";
+    state.facilityLookupError = "";
+    el.portSelect.value = "";
+    el.facilitySelect.value = "";
+    const countryCode = el.portCountrySelect.value || "";
+    const rawQuery = norm(el.portSearch.value);
+    const shouldLookup = Boolean(countryCode) || rawQuery.length >= 2;
+    state.portLookupStatus = shouldLookup ? "loading" : "idle";
+    renderPortOptions({ preserveSelection: false });
+    renderFacilities();
+
+    if (!shouldLookup) return;
+    state.portLookupTimer = setTimeout(() => {
+      state.portLookupTimer = null;
+      loadPortsForPicker({ source }).catch(handleError);
+    }, 250);
   }
 
   function portOption(port) {
@@ -373,20 +457,81 @@
     return `<option value="${esc(port.port_id)}">${esc(label)}</option>`;
   }
 
-  function renderPorts() {
+  async function renderPorts() {
     renderPortCountries();
-    renderPortOptions({ preserveSelection: true });
+    await loadPortsForPicker({ source: "startup" });
+    const portId = el.portSelect.value || "";
+    if (portId) {
+      await loadFacilitiesForPort(portId, { source: "startup" });
+    } else {
+      state.activeFacilityPortId = "";
+      state.facilities = [];
+      state.facilityLookupStatus = "idle";
+      state.facilityLookupError = "";
+      renderFacilities();
+    }
+  }
+
+  async function loadFacilitiesForPort(portId, { source = "selection" } = {}) {
+    const requestId = ++state.facilityLookupRequestId;
+    state.activeFacilityPortId = portId || "";
+    state.facilityLookupError = "";
+
+    if (!portId) {
+      state.facilities = [];
+      state.facilityLookupStatus = "idle";
+      renderFacilities();
+      return;
+    }
+
+    if (state.facilitiesByPort.has(portId)) {
+      state.facilities = state.facilitiesByPort.get(portId);
+      state.facilityLookupStatus = "ready";
+      renderFacilities();
+      return;
+    }
+
+    state.facilities = [];
+    state.facilityLookupStatus = "loading";
+    renderFacilities();
+    try {
+      const rows = await rpc("mai_operation_facilities_for_port", { p_port_id: portId });
+      if (requestId !== state.facilityLookupRequestId || el.portSelect.value !== portId) return;
+      if (!Array.isArray(rows)) throw new Error("The facility lookup returned an unexpected response.");
+      state.facilities = rows;
+      state.facilitiesByPort.set(portId, rows);
+      state.facilityLookupStatus = "ready";
+      renderFacilities();
+    } catch (error) {
+      if (requestId !== state.facilityLookupRequestId) return;
+      state.facilities = [];
+      state.facilityLookupStatus = "error";
+      state.facilityLookupError = error?.message || String(error);
+      renderFacilities();
+      const prefix = source === "startup" ? "Startup facility lookup failed" : "Facility lookup failed";
+      throw new Error(`${prefix}: ${state.facilityLookupError}`);
+    }
   }
 
   function renderFacilities() {
     const portId = el.portSelect.value || "";
-    const rows = state.facilities.filter((f) => f.port_id === portId);
 
     if (!portId) {
       el.facilitySelect.innerHTML = `<option value="">Select port first...</option>`;
       return;
     }
 
+    if (state.activeFacilityPortId !== portId || state.facilityLookupStatus === "loading") {
+      el.facilitySelect.innerHTML = `<option value="">Loading facilities…</option>`;
+      return;
+    }
+
+    if (state.facilityLookupStatus === "error") {
+      el.facilitySelect.innerHTML = `<option value="">Facility lookup failed</option>`;
+      return;
+    }
+
+    const rows = state.facilities;
     if (!rows.length) {
       el.facilitySelect.innerHTML = `<option value="">No ISPS / Port Facility records for selected port</option>`;
       return;
@@ -650,6 +795,20 @@
   function resetForm() {
     const currentVessel = el.operationVessel.value;
 
+    if (state.portLookupTimer) {
+      clearTimeout(state.portLookupTimer);
+      state.portLookupTimer = null;
+    }
+    state.portLookupRequestId += 1;
+    state.portLookupStatus = "idle";
+    state.portLookupError = "";
+    state.ports = [];
+    state.facilityLookupRequestId += 1;
+    state.activeFacilityPortId = "";
+    state.facilities = [];
+    state.facilityLookupStatus = "idle";
+    state.facilityLookupError = "";
+
     el.operationType.value = "";
     el.portCountrySelect.value = "";
     el.portSearch.value = "";
@@ -714,28 +873,36 @@
 
     if (!ok) return;
 
-    await rpc("mai_record_vessel_operation", {
-      p_vessel_id: vesselId,
-      p_operation_type_key: operationTypeKey,
-      p_operation_start_at: new Date(el.operationStart.value).toISOString(),
-      p_operation_end_at: new Date(el.operationEnd.value).toISOString(),
-      p_component_ids: Array.from(state.selectedComponents),
-      p_port_name: el.portName.value || null,
-      p_berth_or_terminal: el.berthTerminal.value || null,
-      p_anchorage_name: el.anchorageName.value || null,
-      p_operation_reference: el.operationReference.value || null,
-      p_unusual_event: el.unusualEvent.checked,
-      p_event_requires_inspection: el.requiresInspection.checked,
-      p_event_description: el.eventDescription.value || null,
-      p_remarks: el.operationRemarks.value || null,
-      p_port_id: el.portSelect.value || null,
-      p_port_facility_id: el.facilitySelect.value || null
-    });
+    try {
+      await rpc("mai_record_vessel_operation", {
+        p_vessel_id: vesselId,
+        p_operation_type_key: operationTypeKey,
+        p_operation_start_at: new Date(el.operationStart.value).toISOString(),
+        p_operation_end_at: new Date(el.operationEnd.value).toISOString(),
+        p_component_ids: Array.from(state.selectedComponents),
+        p_port_name: el.portName.value || null,
+        p_berth_or_terminal: el.berthTerminal.value || null,
+        p_anchorage_name: el.anchorageName.value || null,
+        p_operation_reference: el.operationReference.value || null,
+        p_unusual_event: el.unusualEvent.checked,
+        p_event_requires_inspection: el.requiresInspection.checked,
+        p_event_description: el.eventDescription.value || null,
+        p_remarks: el.operationRemarks.value || null,
+        p_port_id: el.portSelect.value || null,
+        p_port_facility_id: el.facilitySelect.value || null
+      });
+    } catch (error) {
+      throw new Error(`Record Operation failed: ${error?.message || error || "Unknown error"}`);
+    }
 
     toast("ok", "Vessel operation recorded and component working-hours credited.");
 
     resetForm();
-    await reloadAfterVesselChange();
+    try {
+      await reloadAfterVesselChange();
+    } catch (error) {
+      throw new Error(`The operation was recorded, but refreshing operation history failed: ${error?.message || error || "Unknown error"}`);
+    }
   }
 
   async function reloadAfterVesselChange() {
@@ -747,12 +914,17 @@
   }
 
   async function reload() {
+    renderViewerMode();
     await loadBaseData();
 
     renderViewerMode();
     renderVesselSelect();
     renderOperationTypes();
-    renderPorts();
+    try {
+      await renderPorts();
+    } catch (error) {
+      handleError(error);
+    }
 
     if (state.isVesselViewer && state.profile?.vessel_id) {
       el.operationVessel.value = state.profile.vessel_id;
@@ -786,19 +958,20 @@
     });
 
     el.portCountrySelect.addEventListener("change", () => {
-      el.portSelect.value = "";
-      renderPortOptions({ preserveSelection: false });
+      schedulePortSearch();
       renderSummary();
     });
 
     el.portSearch.addEventListener("input", () => {
-      el.portSelect.value = "";
-      renderPortOptions({ preserveSelection: false });
+      schedulePortSearch();
       renderSummary();
     });
 
     el.portSelect.addEventListener("change", () => {
-      renderFacilities();
+      el.facilitySelect.value = "";
+      loadFacilitiesForPort(el.portSelect.value || "")
+        .then(() => updateManualPortFields())
+        .catch(handleError);
       updateManualPortFields();
       updateMapButton();
       renderSummary();
@@ -876,6 +1049,8 @@
     });
 
     if (!bundle?.session?.user) {
+      el.viewerMode.textContent = "Not signed in";
+      el.viewerHint.textContent = "Sign in to load viewer permissions and vessel-operation data.";
       toast("warn", "You are logged out. Please login.");
       return;
     }
@@ -883,6 +1058,7 @@
     state.profile = bundle.profile || {};
     state.isOfficeViewer = roleIsOffice(state.profile.role);
     state.isVesselViewer = roleIsVessel(state.profile.role);
+    renderViewerMode();
 
     const now = nowLocalInput();
     el.operationStart.value = now;
