@@ -111,7 +111,7 @@ const state = {
 };
 
 async function loadReportsFromDb() {
-  const { data, error } = await state.supabase.rpc("csvb_post_inspection_reports_for_me");
+  const { data, error } = await state.supabase.rpc("csvb_post_inspection_reports_for_me_v2");
 
   if (error) throw error;
 
