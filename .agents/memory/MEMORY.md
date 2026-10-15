@@ -1,2 +1,3 @@
 - [Omega isolation](omega-isolation.md) — approved baseline and branding constraints; keep Omega preview work separate from C.S.V. Beacon production.
 - [Hosted SIRE parser deployment](hosted-sire-parser-deployment.md) — local importer edits do not reach Preview until the matching Supabase Edge Function version is deployed.
+- [Post-inspection officer field read-back](post-inspection-officer-field-readback.md) — verify access-controlled report RPC outputs as well as table columns when saved Master/Chief Engineer values appear blank.

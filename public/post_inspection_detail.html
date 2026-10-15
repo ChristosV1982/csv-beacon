@@ -106,6 +106,35 @@
       border-top:1px solid #e5eefc;
     }
 
+    .csvb-officer-privacy-control{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      flex-wrap:wrap;
+    }
+    .officer-visibility-toggle{
+      display:inline-flex;
+      align-items:center;
+      gap:7px;
+      color:#55708f;
+      font-size:.84rem;
+      font-weight:800;
+      white-space:nowrap;
+      cursor:pointer;
+    }
+    .officer-visibility-toggle input{
+      accent-color:#143a63;
+      margin:0;
+    }
+    .officer-read-status{
+      color:#8a5a00;
+      font-size:.78rem;
+      font-weight:700;
+    }
+    .pi-field[hidden]{
+      display:none !important;
+    }
+
     .obs-badge{
       display:inline-flex; align-items:center;
       font-weight:800; font-size:12px; padding:6px 10px; border-radius:999px;
@@ -252,12 +281,25 @@
           <input id="reportTitle" type="text" />
         </div>
 
-        <div class="pi-field pi-span3">
+        <div class="pi-span6 csvb-officer-privacy-control">
+          <label class="officer-visibility-toggle" for="showOfficerNamesDetailToggle">
+            <input
+              id="showOfficerNamesDetailToggle"
+              type="checkbox"
+              aria-controls="masterOfficerField chiefEngineerOfficerField"
+              aria-expanded="false"
+            />
+            <span>Show Master / Chief Engineer</span>
+          </label>
+          <span class="officer-read-status" id="officerFieldsReadStatus" hidden></span>
+        </div>
+
+        <div class="pi-field pi-span3" id="masterOfficerField" hidden>
           <label for="masterNameAtInspection">Master</label>
           <input id="masterNameAtInspection" type="text" autocomplete="off" />
         </div>
 
-        <div class="pi-field pi-span3">
+        <div class="pi-field pi-span3" id="chiefEngineerOfficerField" hidden>
           <label for="chiefEngineerNameAtInspection">Chief Engineer</label>
           <input id="chiefEngineerNameAtInspection" type="text" autocomplete="off" />
         </div>
@@ -501,7 +543,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js" defer></script>
   <script src="./app-config.js" defer></script>
   <script src="./auth.js" defer></script>
-  <script type="module" src="./post_inspection_detail.js?v=20261014_officer_fields_v1"></script>
+  <script type="module" src="./post_inspection_detail.js?v=20261015_officer_privacy_readback_v1"></script>
   <script src="./csvb-ui-polish.js?v=20260430_1"></script>
   <script src="./csvb-help-tooltips.js?v=20260430_1"></script>
   <script src="./csvb-100pct-fit.js?v=20260430_1"></script>

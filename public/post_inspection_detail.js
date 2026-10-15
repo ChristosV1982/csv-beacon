@@ -1,6 +1,6 @@
 import { loadLockedLibraryJson } from "./question_library_loader.js";
 
-const DETAIL_BUILD = "post_inspection_detail_v31_findings_only_pdf_reimport_2026-10-14";
+const DETAIL_BUILD = "post_inspection_detail_v32_officer_readback_privacy_2026-10-15";
 const PDF_BUCKET_DEFAULT = "inspection-reports";
 const PDF_FOLDER_PREFIX = "post_inspections";
 const HUMAN_POSITIVE_FIXED_NOC = "Exceeded normal expectation.";
@@ -507,6 +507,15 @@ const state = {
   lib: [],
   libByNo: new Map(),
   libCanonToExact: new Map(),
+  officerFieldState: {
+    reportId: "",
+    known: false,
+    values: {},
+    edited: {
+      master_name_at_inspection: false,
+      chief_engineer_name_at_inspection: false,
+    },
+  },
 };
 
 
@@ -830,6 +839,112 @@ function renderVesselsSelect() {
   }
 }
 
+const OFFICER_FIELD_KEYS = [
+  "master_name_at_inspection",
+  "chief_engineer_name_at_inspection",
+];
+
+function hasOfficerFieldValues(report) {
+  return OFFICER_FIELD_KEYS.every((key) =>
+    Object.prototype.hasOwnProperty.call(report || {}, key)
+  );
+}
+
+function rememberOfficerFields(report) {
+  const reportId = String(report?.id || "");
+  if (!reportId || !hasOfficerFieldValues(report)) return false;
+
+  state.officerFieldState = {
+    reportId,
+    known: true,
+    values: {
+      master_name_at_inspection: report.master_name_at_inspection ?? null,
+      chief_engineer_name_at_inspection:
+        report.chief_engineer_name_at_inspection ?? null,
+    },
+    edited: {
+      master_name_at_inspection: false,
+      chief_engineer_name_at_inspection: false,
+    },
+  };
+  setOfficerFieldsReadWarning("");
+  return true;
+}
+
+function setOfficerFieldsReadWarning(message = "") {
+  const warning = el("officerFieldsReadStatus");
+  if (!warning) return;
+  warning.textContent = message;
+  warning.hidden = !message;
+}
+
+function officerFieldInputValue(key) {
+  const id =
+    key === "master_name_at_inspection"
+      ? "masterNameAtInspection"
+      : "chiefEngineerNameAtInspection";
+  return String(el(id)?.value || "").trim() || null;
+}
+
+function markOfficerFieldEdited(key) {
+  const reportId = String(state.activeReport?.id || "");
+  if (state.officerFieldState.reportId !== reportId) {
+    state.officerFieldState = {
+      reportId,
+      known: false,
+      values: {},
+      edited: {
+        master_name_at_inspection: false,
+        chief_engineer_name_at_inspection: false,
+      },
+    };
+  }
+  state.officerFieldState.edited[key] = true;
+}
+
+function officerFieldPayload() {
+  const reportId = String(state.activeReport?.id || "");
+  const isExistingReport = Boolean(reportId);
+  const fieldState = state.officerFieldState;
+  const stateMatchesReport = fieldState.reportId === reportId;
+  const payload = {};
+
+  for (const key of OFFICER_FIELD_KEYS) {
+    // New reports may save the entered values (or null). For stored reports,
+    // omit any value that could not be read unless the user explicitly edited it.
+    if (
+      !isExistingReport ||
+      (stateMatchesReport && (fieldState.known || fieldState.edited[key]))
+    ) {
+      payload[key] = officerFieldInputValue(key);
+    }
+  }
+  return payload;
+}
+
+function syncOfficerFieldVisibility() {
+  const toggle = el("showOfficerNamesDetailToggle");
+  const show = toggle?.checked === true;
+  for (const id of ["masterOfficerField", "chiefEngineerOfficerField"]) {
+    const field = el(id);
+    if (field) field.hidden = !show;
+  }
+  if (toggle) toggle.setAttribute("aria-expanded", String(show));
+}
+
+function rememberUnknownOfficerFieldState(reportId) {
+  if (state.officerFieldState.reportId === reportId) return;
+  state.officerFieldState = {
+    reportId,
+    known: false,
+    values: {},
+    edited: {
+      master_name_at_inspection: false,
+      chief_engineer_name_at_inspection: false,
+    },
+  };
+}
+
 async function loadReportById(reportId) {
   if (!reportId) throw new Error("report_id is required.");
 
@@ -845,7 +960,55 @@ async function loadReportById(reportId) {
     throw new Error("Post-Inspection report not found or access denied for your company/vessel.");
   }
 
-  return row;
+  const id = String(row.id || reportId);
+  if (!rememberOfficerFields(row)) {
+    rememberUnknownOfficerFieldState(id);
+  }
+
+  try {
+    const { data: officerFields, error: officerFieldsError } =
+      await state.supabase
+        .from("post_inspection_reports")
+        .select(
+          "master_name_at_inspection, chief_engineer_name_at_inspection"
+        )
+        .eq("id", id)
+        .maybeSingle();
+
+    if (officerFieldsError) throw officerFieldsError;
+    if (!officerFields) {
+      throw new Error("No accessible report row was returned for officer fields.");
+    }
+
+    const reportWithOfficerFields = { ...row, ...officerFields };
+    rememberOfficerFields(reportWithOfficerFields);
+    setOfficerFieldsReadWarning("");
+    return reportWithOfficerFields;
+  } catch (error) {
+    console.warn(
+      "Officer names could not be refreshed from the report row; protecting unread fields from saves.",
+      error
+    );
+
+    const cached = state.officerFieldState;
+    if (cached.reportId === id && cached.known) {
+      setOfficerFieldsReadWarning(
+        "Could not refresh officer names; previously loaded values are being preserved."
+      );
+      return { ...row, ...cached.values };
+    }
+
+    if (hasOfficerFieldValues(row)) {
+      rememberOfficerFields(row);
+      setOfficerFieldsReadWarning("");
+      return row;
+    }
+
+    setOfficerFieldsReadWarning(
+      "Saved officer names could not be verified. Unedited fields will not be overwritten by Save Header or PDF import."
+    );
+    return row;
+  }
 }
 
 function loadReportIntoHeader(r) {
@@ -856,6 +1019,7 @@ function loadReportIntoHeader(r) {
     if (reimportButton) reimportButton.disabled = true;
     return;
   }
+  rememberOfficerFields(r);
   el("vesselSelect").value = r.vessel_id || "";
   el("inspectionDate").value = r.inspection_date || "";
   el("portName").value = r.port_name || "";
@@ -865,8 +1029,28 @@ function loadReportIntoHeader(r) {
   el("reportTitle").value = String(r.title || "").trim() || DEFAULT_POST_INSPECTION_TITLE;
   el("inspectorName").value = r.inspector_name || "";
   el("inspectorCompany").value = r.inspector_company || "";
-  el("masterNameAtInspection").value = r.master_name_at_inspection || "";
-  el("chiefEngineerNameAtInspection").value = r.chief_engineer_name_at_inspection || "";
+  const officerFieldState = state.officerFieldState;
+  const sameOfficerReport =
+    officerFieldState.reportId === String(r.id || "");
+  for (const key of OFFICER_FIELD_KEYS) {
+    if (sameOfficerReport && officerFieldState.known) {
+      const inputId =
+        key === "master_name_at_inspection"
+          ? "masterNameAtInspection"
+          : "chiefEngineerNameAtInspection";
+      el(inputId).value = officerFieldState.values[key] || "";
+      continue;
+    }
+    if (sameOfficerReport && officerFieldState.edited[key]) continue;
+
+    const inputId =
+      key === "master_name_at_inspection"
+        ? "masterNameAtInspection"
+        : "chiefEngineerNameAtInspection";
+    el(inputId).value = Object.prototype.hasOwnProperty.call(r, key)
+      ? r[key] || ""
+      : "";
+  }
   el("pdfStatus").textContent = r.pdf_storage_path
     ? `Stored: ${r.pdf_storage_path.split("/").pop()}`
     : "No PDF linked";
@@ -890,8 +1074,7 @@ function headerInputs() {
     title: String(el("reportTitle").value || "").trim() || DEFAULT_POST_INSPECTION_TITLE,
     inspector_name: String(el("inspectorName").value || "").trim() || null,
     inspector_company: String(el("inspectorCompany").value || "").trim() || null,
-    master_name_at_inspection: String(el("masterNameAtInspection").value || "").trim() || null,
-    chief_engineer_name_at_inspection: String(el("chiefEngineerNameAtInspection").value || "").trim() || null,
+    ...officerFieldPayload(),
     pdf_storage_path: state.activeReport?.pdf_storage_path || null,
   };
 }
@@ -3528,6 +3711,19 @@ async function init() {
 
   state.vessels = await loadVessels();
   renderVesselsSelect();
+
+  el("showOfficerNamesDetailToggle").addEventListener(
+    "change",
+    syncOfficerFieldVisibility
+  );
+  syncOfficerFieldVisibility();
+
+  el("masterNameAtInspection").addEventListener("input", () =>
+    markOfficerFieldEdited("master_name_at_inspection")
+  );
+  el("chiefEngineerNameAtInspection").addEventListener("input", () =>
+    markOfficerFieldEdited("chief_engineer_name_at_inspection")
+  );
 
   el("newReportBtn").addEventListener("click", () => {
     window.location.href = "./post_inspection_detail.html";
