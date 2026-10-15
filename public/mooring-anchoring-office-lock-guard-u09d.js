@@ -4,7 +4,8 @@
 (() => {
   "use strict";
 
-  const BUILD = "MAI-OFFICE-LOCK-GUARD-U09D-20260512-1";
+  const BUILD = "MAI-OFFICE-LOCK-GUARD-U09D-20261015-REQUEST-STORM-FIX-1";
+  let profilePromise = null;
 
   function isOfficeRole(role) {
     return [
@@ -18,7 +19,11 @@
   async function applyGuard() {
     if (!window.AUTH?.getSessionUserProfile) return;
 
-    const bundle = await window.AUTH.getSessionUserProfile();
+    if (!profilePromise) {
+      profilePromise = window.AUTH.getSessionUserProfile();
+    }
+
+    const bundle = await profilePromise;
     const role = bundle?.profile?.role || "";
     const isOffice = isOfficeRole(role);
 
@@ -41,17 +46,6 @@
 
   function start() {
     applyGuard().catch(console.error);
-    setTimeout(() => applyGuard().catch(console.error), 600);
-    setTimeout(() => applyGuard().catch(console.error), 1600);
-
-    const observer = new MutationObserver(() => {
-      applyGuard().catch(console.error);
-    });
-
-    observer.observe(document.body, {
-      childList: true,
-      subtree: true
-    });
   }
 
   if (document.readyState === "loading") {
