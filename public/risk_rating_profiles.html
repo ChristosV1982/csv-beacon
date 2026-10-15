@@ -258,6 +258,38 @@
       font-weight:650;
     }
 
+    input[type="checkbox"]{
+      width:17px;
+      height:17px;
+      margin:0;
+      padding:0;
+      accent-color:#0b5ea8;
+      flex:0 0 auto;
+    }
+
+    .check-setting{
+      display:flex;
+      align-items:flex-start;
+      gap:8px;
+      border:1px solid #d6e4f5;
+      border-radius:10px;
+      background:#f8fbff;
+      padding:9px 10px;
+      min-height:42px;
+      box-sizing:border-box;
+    }
+
+    .check-setting span{
+      color:#17324d;
+      font-size:.82rem;
+      line-height:1.35;
+      font-weight:750;
+    }
+
+    [hidden]{
+      display:none !important;
+    }
+
     textarea{
       min-height:70px;
       resize:vertical;
@@ -465,15 +497,38 @@
 
         <div style="height:8px;"></div>
 
-        <div class="grid2">
+        <div class="grid3">
           <div>
-            <label>Repetition lookback months</label>
+            <label for="repetitionLookbackMode">Repetition lookback mode</label>
+            <select id="repetitionLookbackMode">
+              <option value="all_history">All history</option>
+              <option value="last_n_months">Last N months</option>
+            </select>
+          </div>
+          <div id="lookbackMonthsWrap" hidden>
+            <label for="lookbackMonths">Lookback months</label>
             <input id="lookbackMonths" type="number" min="1" step="1" />
           </div>
           <div>
             <label>Selected profile/version ID</label>
             <input id="selectedIds" readonly />
           </div>
+        </div>
+
+        <div style="height:8px;"></div>
+
+        <div class="grid2">
+          <label class="check-setting" for="repetitionIncludeLargely">
+            <input id="repetitionIncludeLargely" type="checkbox" />
+            <span>Also count Largely as Expected in repetition history</span>
+          </label>
+          <label class="check-setting" for="repetitionRequireSameNoc">
+            <input id="repetitionRequireSameNoc" type="checkbox" />
+            <span>Also require same NOC</span>
+          </label>
+        </div>
+        <div class="muted small" style="margin-top:6px;">
+          Repetition matches the canonical question number and designation by default. Positive findings and SOC are not counted or matched.
         </div>
 
         <div class="section">
@@ -553,7 +608,7 @@
     </div>
   </main>
 
-  <script type="module" src="./risk_rating_profiles.js?v=20260521_1"></script>
+  <script type="module" src="./risk_rating_profiles.js?v=20261015_repetition_settings_v2"></script>
   <script src="./csvb-ui-polish.js?v=20260430_1"></script>
   <script src="./csvb-help-tooltips.js?v=20260430_1"></script>
   <script src="./csvb-100pct-fit.js?v=20260430_1"></script>

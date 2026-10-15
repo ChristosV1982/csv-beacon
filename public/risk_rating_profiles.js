@@ -1,4 +1,4 @@
-const BUILD = "risk_rating_profiles_v1_2026-05-21";
+const BUILD = "risk_rating_profiles_v2_2026-10-15";
 
 const state = {
   sb: null,
@@ -104,7 +104,7 @@ async function rpc(name, args = {}) {
 
 async function loadConfig() {
   clearMessages();
-  state.config = await rpc("csvb_admin_risk_rating_config");
+  state.config = await rpc("csvb_admin_risk_rating_config_v2");
 
   if (!state.selectedProfileId) {
     const defaultProfile = profiles().find((p) => p.is_default) || profiles()[0] || null;
@@ -162,7 +162,18 @@ function renderProfileForm() {
   el("includeLargely").value = String(!!v?.include_largely_as_expected);
   el("repetitionScope").value = v?.repetition_scope || "company";
   el("lookbackMonths").value = v?.repetition_lookback_months || 12;
+  el("repetitionLookbackMode").value =
+    v?.repetition_lookback_mode === "last_n_months" ? "last_n_months" : "all_history";
+  el("repetitionIncludeLargely").checked =
+    !!v?.repetition_include_largely_as_expected;
+  el("repetitionRequireSameNoc").checked = !!v?.repetition_require_same_noc;
+  syncRepetitionLookbackFields();
   el("selectedIds").value = p && v ? `${p.id} / ${v.id}` : "";
+}
+
+function syncRepetitionLookbackFields() {
+  const isMonthLimited = el("repetitionLookbackMode").value === "last_n_months";
+  el("lookbackMonthsWrap").hidden = !isMonthLimited;
 }
 
 function renderQuestionWeights() {
@@ -340,11 +351,20 @@ async function saveVersionSettings() {
   const v = selectedVersion();
   if (!v) throw new Error("No profile version selected.");
 
-  await rpc("csvb_admin_risk_update_version_settings", {
+  const lookbackMode = el("repetitionLookbackMode").value;
+  const lookbackMonths = Number(el("lookbackMonths").value);
+  if (!Number.isInteger(lookbackMonths) || lookbackMonths < 1) {
+    throw new Error("Lookback months must be a positive whole number.");
+  }
+
+  await rpc("csvb_admin_risk_update_version_settings_v2", {
     p_profile_version_id: v.id,
     p_include_largely_as_expected: el("includeLargely").value === "true",
     p_repetition_scope: el("repetitionScope").value,
-    p_repetition_lookback_months: Number(el("lookbackMonths").value || 12),
+    p_repetition_lookback_mode: lookbackMode,
+    p_repetition_lookback_months: lookbackMonths,
+    p_repetition_include_largely_as_expected: el("repetitionIncludeLargely").checked,
+    p_repetition_require_same_noc: el("repetitionRequireSameNoc").checked,
   });
 
   showOk("Version settings saved.");
@@ -369,7 +389,7 @@ async function cloneProfile() {
   if (!name) throw new Error("New profile name is required.");
   if (!code) code = codeFromName(name);
 
-  const resp = await rpc("csvb_admin_risk_clone_profile", {
+  const resp = await rpc("csvb_admin_risk_clone_profile_v2", {
     p_source_profile_version_id: v.id,
     p_new_profile_code: code,
     p_new_profile_name: name,
@@ -432,6 +452,7 @@ async function init() {
   });
 
   el("nocDesignationFilter").addEventListener("change", renderNocScores);
+  el("repetitionLookbackMode").addEventListener("change", syncRepetitionLookbackFields);
 
   await loadConfig();
 }
