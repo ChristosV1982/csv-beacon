@@ -800,6 +800,66 @@
     return overrides[field.field_key] ?? field.sort_order;
   }
 
+  async function prepareExistingCallEditorLocation(call) {
+    const portId = clean(call?.port_id);
+    if (!portId) throw new Error("This saved Draft is missing its port ID, so its location cannot be loaded safely.");
+
+    let port = state.ports.find((row) => row.port_id === portId) || null;
+    if (!port) {
+      const { data, error } = await state.sb.from("pci_v_ports_list").select("*").eq("port_id", portId).maybeSingle();
+      dbError(error, "Could not load the saved port for this Draft.");
+      port = data || null;
+    }
+    if (!port) {
+      const countryCode = call.country_code_snapshot || "";
+      const portName = call.port_name_snapshot || "";
+      if (!countryCode || !portName) throw new Error("The saved port is no longer available in the directory, and this Draft has no usable location snapshot.");
+      port = {
+        port_id: portId,
+        country_code: countryCode,
+        country_name: call.country_name_snapshot || "",
+        port_name: portName,
+        unlocode: call.unlocode_snapshot || ""
+      };
+    }
+
+    const countryCode = port.country_code || call.country_code_snapshot || "";
+    if (countryCode && (state.selectedCountryCode !== countryCode || !state.ports.some((row) => row.port_id === portId))) {
+      state.selectedCountryCode = countryCode;
+      await loadPortsForCountry(countryCode);
+    }
+    if (!state.ports.some((row) => row.port_id === portId)) {
+      state.ports.push({ ...port, country_code: countryCode });
+    }
+
+    state.selectedCountryCode = countryCode;
+    state.selectedPortId = portId;
+    state.selectedFacilityId = call.port_facility_id || "";
+    state.selectedCallId = call.id;
+    renderCountryOptions();
+    renderPortOptions();
+    await loadFacilities(portId);
+    await Promise.all([loadSelectedPort(), loadApprovedMemory()]);
+
+    const profile = state.profiles.find((row) => row.id === call.profile_id);
+    if (!profile) throw new Error("Could not load the saved location profile for this Draft. Its location was not changed.");
+
+    const storedFacilityId = call.port_facility_id || profile.port_facility_id || "";
+    if (storedFacilityId && state.facilities.some((row) => row.port_facility_id === storedFacilityId)) {
+      state.selectedFacilityId = storedFacilityId;
+    } else {
+      // Keep the report's saved location available to the editor as a snapshot;
+      // do not silently substitute a different terminal from the current list.
+      state.selectedFacilityId = "";
+    }
+
+    renderTerminalOptions();
+    const selected = selectedPort() || port;
+    const terminalSnapshot = call.terminal_name_snapshot || profile.terminal_name || "All terminals / port-wide";
+    $("portMeta").textContent = [selected.port_name || call.port_name_snapshot, selected.country_name || call.country_name_snapshot, selected.unlocode || call.unlocode_snapshot, terminalSnapshot].filter(Boolean).join(" • ");
+    await loadCallRegister(true);
+  }
+
   function renderDynamicSectionFields(list, valueMap) {
     const output = [], used = new Set();
     for (const field of list) {
@@ -819,8 +879,12 @@
   }
 
   async function openCallEditor(call = null) {
-    if (!state.selectedPortId) return showMessage("warn", "Select a port before creating a report.");
-    if (!state.facilities.length) return showMessage("warn", "No terminal is registered for this port. Use Add Terminal before creating the report.");
+    if (call) {
+      await task("Loading the saved Draft location…", () => prepareExistingCallEditorLocation(call));
+    } else {
+      if (!state.selectedPortId) return showMessage("warn", "Select a port before creating a report.");
+      if (!state.facilities.length) return showMessage("warn", "No terminal is registered for this port. Use Add Terminal before creating the report.");
+    }
     const officeAuthored = call ? call.report_origin === "office" : state.permissions.canCreateOfficeCall;
     if (!call && officeAuthored && !state.vessels.length) return showMessage("warn", "No active Company vessel is available for this office-entered call report.");
     const detail = call ? await task("Opening Draft…", () => loadCallDetails(call.id, true)) : { values: [], repeatRows: [], repeatValues: [], sections: [], hazards: [], attachments: [] };
@@ -828,8 +892,14 @@
     const fields = state.fields.filter((f) => f.storage_target === "call_value" && !HIDDEN_CALL_FIELDS.has(f.field_key)).sort((a, b) => editorSortOrder(a) - editorSortOrder(b));
     const sections = new Map(); fields.forEach((f) => { if (!sections.has(f.section_label)) sections.set(f.section_label, []); sections.get(f.section_label).push(f); });
     const callProfile = call ? state.profiles.find((p) => p.id === call.profile_id) : null;
-    const selectedTerminalId = callProfile?.port_facility_id || state.selectedFacilityId || "";
-    const terminalOptions = '<option value="">Select a terminal…</option>' + visibleFacilities().map((f) => `<option value="${attr(f.port_facility_id)}"${f.port_facility_id === selectedTerminalId ? " selected" : ""}>${esc(facilityName(f))}${f.company_id ? " — Company entry" : ""}</option>`).join("");
+    const savedTerminalName = clean(call?.terminal_name_snapshot || callProfile?.terminal_name);
+    const selectedTerminalId = call
+      ? call.port_facility_id || callProfile?.port_facility_id || ""
+      : state.selectedFacilityId || "";
+    const terminalPrompt = call && savedTerminalName && !visibleFacilities().some((f) => f.port_facility_id === selectedTerminalId)
+      ? `Saved terminal: ${esc(savedTerminalName)} — select a current terminal if this location needs correction`
+      : "Select a terminal…";
+    const terminalOptions = `<option value="">${terminalPrompt}</option>` + visibleFacilities().map((f) => `<option value="${attr(f.port_facility_id)}"${f.port_facility_id === selectedTerminalId ? " selected" : ""}>${esc(facilityName(f))}${f.company_id ? " — Company entry" : ""}</option>`).join("");
     const selectedVesselId = call?.vessel_id || "";
     const vesselOptions = '<option value="">Select the vessel that made the call…</option>' + state.vessels.map((vessel) => `<option value="${attr(vessel.vessel_id)}"${vessel.vessel_id === selectedVesselId ? " selected" : ""}>${esc(vessel.vessel_name)}${vessel.imo_number ? ` — IMO ${esc(vessel.imo_number)}` : ""}</option>`).join("");
     const vesselField = officeAuthored ? `<div class="pci-form-field"><label for="pciVessel">Vessel <span class="pci-required">*</span></label><select id="pciVessel" required${call ? " disabled" : ""}>${vesselOptions}</select><div class="pci-help">The office is entering this report on behalf of the selected Company vessel. This association cannot be changed after the Draft is created.</div></div>` : "";
@@ -837,7 +907,7 @@
     const sharedOffset = call?.all_lines_fast_utc_offset_minutes ?? call?.all_lines_clear_utc_offset_minutes ?? call?.port_entry_utc_offset_minutes;
     const core = `<datalist id="pciCargoGradeMemory">${state.cargoGradeMemory.map((name) => `<option value="${attr(name)}"></option>`).join("")}</datalist><datalist id="pciBerthMemory">${berthNames.map((name) => `<option value="${attr(name)}"></option>`).join("")}</datalist><section class="pci-form-section"><h3>Core call details</h3><div class="pci-form-grid">
       ${vesselField}
-      ${inputField({ id: "pciTerminal", label: "Terminal", required: true, options: terminalOptions, help: "If the terminal is missing, close this panel and use Add Terminal beside the main terminal selector." })}
+      ${inputField({ id: "pciTerminal", label: "Terminal", required: !call || Boolean(selectedTerminalId), options: terminalOptions, help: "If the terminal is missing, close this panel and use Add Terminal beside the main terminal selector." })}
       <div class="pci-form-field"><label for="pciBerth">Berth (Berth Name) <span class="pci-required">*</span></label><input id="pciBerth" type="text" list="pciBerthMemory" value="${attr(call?.berth_name_snapshot || "")}" required autocomplete="off" /><div class="pci-help">Approved berth names for the selected terminal are suggested; a new name may be entered.</div></div>
       ${inputField({ id: "pciUtcOffset", label: "Port-call UTC offset", required: true, options: offsetOptions(sharedOffset), help: "Applied to All Lines Fast, All Lines Clear and port entry time." })}
       <div class="pci-form-triple is-wide">${inputField({ id: "pciALF", label: "Arrival — All Lines Fast (local)", type: "datetime-local", value: call?.all_lines_fast_local || "", required: true })}${inputField({ id: "pciALC", label: "Departure — All Lines Clear (local)", type: "datetime-local", value: call?.all_lines_clear_local || "", required: true })}${inputField({ id: "pciEntry", label: "Port entry time used for UKC (local)", type: "datetime-local", value: call?.port_entry_local || "", required: true })}</div>
@@ -1032,9 +1102,18 @@
   function statusValue(id) { return clean($(`${id}Status`)?.value) || null; }
   function statusNumber(id) { return statusValue(id) === "reported" ? nullableNumber(id) : null; }
 
-  function validateCallForm() {
+  function validateCallForm(existingCall = null) {
     syncAchievedRateOperation();
-    const required = ["pciTerminal", "pciBerth", "pciUtcOffset", "pciALF", "pciALC", "pciEntry", "pciDraftF", "pciDraftA"];
+    const savedProfile = existingCall ? state.profiles.find((profile) => profile.id === existingCall.profile_id) : null;
+    const preserveSavedLocation = Boolean(
+      existingCall &&
+      savedProfile &&
+      state.selectedPortId === existingCall.port_id &&
+      !clean($("pciTerminal")?.value) &&
+      clean($("pciBerth")?.value) === clean(existingCall.berth_name_snapshot || savedProfile.berth_name)
+    );
+    const required = ["pciBerth", "pciUtcOffset", "pciALF", "pciALC", "pciEntry", "pciDraftF", "pciDraftA"];
+    if (!preserveSavedLocation) required.unshift("pciTerminal");
     if ($("pciVessel")) required.unshift("pciVessel");
     let first = null;
     required.forEach((id) => { const el = $(id), bad = !clean(el?.value); el?.classList.toggle("pci-form-error", bad); if (bad && !first) first = el; });
@@ -1068,6 +1147,7 @@
     }
     for (const composite of $("pciCallForm").querySelectorAll("[data-pci-composite-field-id]")) compositeValue(composite);
     if (first) { first.scrollIntoView({ behavior: "smooth", block: "center" }); first.focus(); throw new Error("Complete the highlighted core fields before saving the Draft."); }
+    return preserveSavedLocation;
   }
 
   async function ensureProfile(facility, berth) {
@@ -1082,7 +1162,7 @@
   function callHeaderPayload(profile, existingCall = null) {
     const vesselId = existingCall?.vessel_id || (state.permissions.canCreateOfficeCall ? nullable("pciVessel") : state.permissions.vesselId);
     const payload = {
-      company_id: state.permissions.companyId, vessel_id: vesselId, port_id: state.selectedPortId, profile_id: profile.id,
+      company_id: state.permissions.companyId, vessel_id: vesselId, port_id: existingCall?.port_id || state.selectedPortId, profile_id: profile.id,
       status: "draft", all_lines_fast_local: nullable("pciALF"), all_lines_fast_utc_offset_minutes: nullableNumber("pciUtcOffset"),
       all_lines_clear_local: nullable("pciALC"), all_lines_clear_utc_offset_minutes: nullableNumber("pciUtcOffset"),
       port_entry_local: nullable("pciEntry"), port_entry_utc_offset_minutes: nullableNumber("pciUtcOffset"),
@@ -1143,10 +1223,17 @@
 
   async function saveCallEditor(existingCall) {
     await task("Saving Draft…", async () => {
-      validateCallForm();
+      const preserveSavedLocation = validateCallForm(existingCall);
       const facility = state.facilities.find((f) => f.port_facility_id === $("pciTerminal").value), berth = clean($("pciBerth").value);
-      if (!facility) throw new Error("Select a valid terminal from the controlled list.");
-      const profile = await ensureProfile(facility, berth);
+      let profile;
+      if (facility) {
+        profile = await ensureProfile(facility, berth);
+      } else if (preserveSavedLocation) {
+        profile = state.profiles.find((candidate) => candidate.id === existingCall.profile_id);
+        if (!profile) throw new Error("Could not preserve the saved location profile for this Draft.");
+      } else {
+        throw new Error("Select a valid terminal from the controlled list.");
+      }
       let call;
       if (existingCall) {
         const { data, error } = await state.sb.from("pci_port_calls").update(callHeaderPayload(profile, existingCall)).eq("id", existingCall.id).select("*").single(); dbError(error); call = data;
