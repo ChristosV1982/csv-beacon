@@ -39,7 +39,9 @@ function parseHeading(line) {
   for (const [field, heading] of FIELD_HEADINGS) {
     const match = text.match(heading);
     if (!match) continue;
-    const rest = text.slice(match[0].length).replace(/^\s*:\s*/, "").trim();
+    const suffix = text.slice(match[0].length);
+    if (suffix.trim() && !/^\s*:/.test(suffix)) continue;
+    const rest = suffix.replace(/^\s*:\s*/, "").trim();
     return { field, inlineText: rest };
   }
   return null;
@@ -85,7 +87,7 @@ export function parseOperatorCommentSections(
       const text = textOf(line).trim();
       if (!text) continue;
       if (/^Operator Comments\b/i.test(text)) break;
-      if (isBoundary(line)) break;
+      if (isBoundary(line, j, source)) break;
       if (/^Operator Attachments\b/i.test(text)) break;
       if (/^(Inspector|Operator) uploaded photos$/i.test(text)) break;
       if (/^\d{1,2}\s+[A-Za-z]{3,9}\s+\d{4}\s+\d{2}:\d{2}\s+uploaded by\b/i.test(text)) {
@@ -96,6 +98,14 @@ export function parseOperatorCommentSections(
       if (parsedByline && !currentField) {
         timestamp = parsedByline.timestamp;
         byline = parsedByline.byline;
+        continue;
+      }
+      if (!currentField && /^\d{2}\/\d{2}\/\d{4}(?:\s+\d{2}:\d{2}(?::\d{2})?)?$/.test(text)) {
+        timestamp = text;
+        continue;
+      }
+      if (!currentField && /^by\s+\S/i.test(text)) {
+        byline = text.replace(/^by\s+/i, "").trim();
         continue;
       }
 

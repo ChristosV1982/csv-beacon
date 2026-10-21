@@ -58,3 +58,16 @@ test("stops Preventative Action at the next question or report section boundary"
   const [entry] = parseOperatorCommentSections(lines, { isBoundary: boundary });
   assert.equal(entry.preventative_action, "preventative");
 });
+
+test("captures separate timestamp/byline lines without storing metadata in responses", () => {
+  const [entry] = parseOperatorCommentSections([
+    "Operator Comments", "14/10/2026 09:42:16", "by Operator Example",
+    "Immediate Cause: Example cause", "Root Cause", "Example root",
+    "Corrective Action", "Example correction", "Preventative Action", "Example prevention",
+    "Operator Attachments", "Do not include attachment details",
+  ]);
+  assert.equal(entry.timestamp, "14/10/2026 09:42:16");
+  assert.equal(entry.byline, "Operator Example");
+  assert.equal(entry.immediate_cause, "Example cause");
+  assert.equal(entry.preventative_action, "Example prevention");
+});

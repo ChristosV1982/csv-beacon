@@ -1,7 +1,7 @@
 export const config = {
   verify_jwt: false
 };
-const FUNCTION_VERSION = "cors-jwt-off-v48_operator_comments_only";
+const FUNCTION_VERSION = "cors-jwt-off-v47_hardware_pair_ownership_uploaded_findings_reimport";
 import { createClient } from "npm:@supabase/supabase-js@2.45.4";
 import * as pdfjsLib from "npm:pdfjs-dist@4.2.67/legacy/build/pdf.mjs";
 import { extractEmbeddedPhotoMetadata } from "./photo_probe.ts";
@@ -495,14 +495,14 @@ function buildQuestionSections(flatLines) {
   }
   return sections;
 }
-function buildResponseBlocks(section) {
+function buildResponseBlocks(section, preservePhotoHeadings = false) {
   const blocks = [];
   let current = null;
   for(let i = 0; i < section.lines.length; i++){
     const line = section.lines[i];
     const t = line.text.trim();
     if (isReportHeaderOrFooter(t)) continue;
-    if (isPhotoUploadHeading(t)) continue;
+    if (isPhotoUploadHeading(t) && !preservePhotoHeadings) continue;
     if (i === 0 && isQuestionHeaderStart(t)) continue;
     const rs = parseResponseStart(t);
     if (rs) {
@@ -955,31 +955,42 @@ function extractOperatorCommentsFromPages(pages, controlledNocs = {}) {
   const extracted = [];
 
   for (const section of questionSections) {
-    const blocks = buildResponseBlocks(section);
+    const blocks = buildResponseBlocks(section, true);
 
     for (const block of blocks) {
       if (block.response_type !== "negative") continue;
 
-      const commentSections = parseOperatorCommentSections(block.lines, {
-        isBoundary: isOperatorCommentsBoundary,
-      });
-      if (!commentSections.length) continue;
-
-      const findingRows = parseResponseBlockObservations(
-        block,
-        controlledNocs,
-      );
       const tailLines = block.lines
         .slice(1)
         .map((line) => line.text)
         .filter(Boolean);
-      const hardwarePairs = block.designation === "Hardware"
-        ? findControlledSocNocPairs(
-          tailLines,
-          block.designation,
-          controlledNocs,
-        )
-        : [];
+      // The normal findings helper intentionally stops at Operator Comments.
+      // This separate mode must locate later finding identities as well,
+      // without changing the original importer's behavior.
+      const hardwarePairs = [];
+      if (block.designation === "Hardware") {
+        for (let index = 0; index < tailLines.length; index++) {
+          if (!isLikelyHardwareCodeLine(tailLines[index])) continue;
+          const pair = findControlledSocNoc(
+            tailLines.slice(index, index + 6),
+            block.designation,
+            controlledNocs,
+          );
+          if (!pair) continue;
+          hardwarePairs.push({
+            ...pair,
+            start_index: index,
+            end_index: index + Math.max(1, Number(pair.consumed_line_count || 1)),
+          });
+        }
+      }
+      const commentSections = parseOperatorCommentSections(block.lines, {
+        isBoundary: (line, index) =>
+          isOperatorCommentsBoundary(line) ||
+          hardwarePairs.some((pair) => pair.start_index === index - 1),
+      });
+      if (!commentSections.length) continue;
+      const findingRows = parseResponseBlockObservations(block, controlledNocs);
 
       for (const comments of commentSections) {
         let finding = null;
@@ -992,22 +1003,21 @@ function extractOperatorCommentsFromPages(pages, controlledNocs = {}) {
           );
           const nearestPair = precedingPairs.at(-1) || null;
 
-          if (nearestPair && findingRows.length === hardwarePairs.length) {
-            const matchingRows = findingRows.filter(
-              (row) =>
-                comparableTaxonomyText(row.classification_coding || "") ===
-                  comparableTaxonomyText(nearestPair.classification_coding || "") &&
-                comparableTaxonomyText(row.nature_of_concern || "") ===
-                  comparableTaxonomyText(nearestPair.nature_of_concern || ""),
+          if (nearestPair) {
+            const pairIndex = hardwarePairs.indexOf(nearestPair);
+            const nextPair = hardwarePairs[pairIndex + 1];
+            const pairLines = block.lines.slice(
+              nearestPair.start_index + 1,
+              nextPair ? nextPair.start_index + 1 : block.lines.length,
             );
-            if (matchingRows.length === 1) {
-              finding = matchingRows[0];
-              parserIdentityStatus = "unique_finding_identity";
-            } else if (matchingRows.length > 1) {
-              parserIdentityStatus = "ambiguous_finding_identity";
-            }
-          } else if (nearestPair && hardwarePairs.length > 1) {
-            parserIdentityStatus = "ambiguous_finding_identity";
+            finding = parseResponseBlock({
+              ...block,
+              page_hint: pairLines[0]?.page || block.page_hint,
+              lines: [block.lines[0], ...pairLines],
+            }, controlledNocs);
+            parserIdentityStatus = finding
+              ? "unique_finding_identity"
+              : "missing_finding_identity";
           }
         } else if (findingRows.length === 1) {
           finding = findingRows[0];
@@ -1886,6 +1896,10 @@ Deno.serve(async (req)=>{
       payload?.reimport_findings_only_from_uploaded_pdf === true ||
       payload?.reimport_findings_only_from_uploaded_pdf === "true";
 
+    const wantOperatorCommentsOnly =
+      payload?.operator_comments_only === true ||
+      payload?.operator_comments_only === "true";
+
     const persistenceMode =
       photoPersistenceMode(
         payload?.photo_persistence_mode
@@ -1893,6 +1907,17 @@ Deno.serve(async (req)=>{
 
     const wantPhotoPersistence =
       Boolean(persistenceMode);
+
+    if (
+      wantOperatorCommentsOnly &&
+      (wantLinkedPdfReextract || wantUploadedPdfFindingsReimport ||
+        wantPhotoProbe || wantPhotoPersistence)
+    ) {
+      return json(req, {
+        ok: false,
+        error: "Operator Comments extraction cannot be combined with findings or photo modes",
+      }, 400);
+    }
 
     if (wantPhotoProbe && !wantDebug) {
       return json(req, {
@@ -1957,12 +1982,26 @@ Deno.serve(async (req)=>{
       }, 400);
     }
 
+    if (
+      wantOperatorCommentsOnly &&
+      (reportId === "temp" ||
+        !pdfStoragePath.startsWith(
+          `post_inspections/tmp/operator_comments_${reportId}_`,
+        ))
+    ) {
+      return json(req, {
+        ok: false,
+        error: "Operator Comments import requires an existing report and its temporary extraction PDF",
+      }, 400);
+    }
+
     let persistenceReport = null;
 
     if (
       wantPhotoPersistence ||
       wantLinkedPdfReextract ||
-      wantUploadedPdfFindingsReimport
+      wantUploadedPdfFindingsReimport ||
+      wantOperatorCommentsOnly
     ) {
       if (wantLinkedPdfReextract && (!reportId || reportId === "temp")) {
         return json(req, {
@@ -1974,7 +2013,8 @@ Deno.serve(async (req)=>{
 
       const requestApiKey = req.headers.get("apikey") || "";
       const accessApiKey =
-        wantLinkedPdfReextract || wantUploadedPdfFindingsReimport
+        wantLinkedPdfReextract || wantUploadedPdfFindingsReimport ||
+          wantOperatorCommentsOnly
         ? requestApiKey || SUPABASE_ANON_KEY || ""
         : SUPABASE_ANON_KEY || requestApiKey;
 
@@ -1990,7 +2030,7 @@ Deno.serve(async (req)=>{
           accessApiKey,
           jwt,
           reportId,
-          wantUploadedPdfFindingsReimport
+          wantUploadedPdfFindingsReimport || wantOperatorCommentsOnly
             ? null
             : pdfStoragePath
         );
@@ -2039,10 +2079,32 @@ Deno.serve(async (req)=>{
       examined_questions,
       question_sections_count,
       response_blocks_count
-    } = extractFindingsFromPages(
-      pages,
-      controlledNocs
-    );
+    } = wantOperatorCommentsOnly
+      ? {
+        observations: [],
+        examined_questions: [],
+        question_sections_count: 0,
+        response_blocks_count: 0,
+      }
+      : extractFindingsFromPages(
+        pages,
+        controlledNocs
+      );
+    const operatorComments = wantOperatorCommentsOnly
+      ? extractOperatorCommentsFromPages(pages, controlledNocs)
+      : null;
+
+    if (
+      wantOperatorCommentsOnly &&
+      (!header?.report_reference ||
+        !persistenceReport?.report_ref ||
+        String(header.report_reference).replace(/\s+/g, "").toUpperCase() !==
+          String(persistenceReport.report_ref).replace(/\s+/g, "").toUpperCase())
+    ) {
+      throw new Error(
+        "Bad request: Operator Comments PDF must contain the same report reference as the selected report",
+      );
+    }
 
     if (
       persistenceReport?.report_ref &&
@@ -2066,6 +2128,9 @@ Deno.serve(async (req)=>{
       examined_count:
         examined_questions.length
     };
+    if (wantOperatorCommentsOnly) {
+      extracted.operator_comments = operatorComments;
+    }
 
     const responseBody = {
       ok: true,
@@ -2090,6 +2155,10 @@ Deno.serve(async (req)=>{
           examined_questions.slice(0, 20)
       }
     };
+    if (wantOperatorCommentsOnly) {
+      responseBody.debug.operator_comments_count = operatorComments.length;
+      responseBody.operator_comments_version = "operator-comments-v1";
+    }
 
     if (wantDebug) {
       responseBody.qa_debug =

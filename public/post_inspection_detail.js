@@ -1,6 +1,7 @@
 import { loadLockedLibraryJson } from "./question_library_loader.js";
+import { importOperatorCommentsFromPdf } from "./post_inspection_operator_comments.mjs?v=20261021_operator_comments_v2";
 
-const DETAIL_BUILD = "post_inspection_detail_v32_officer_readback_privacy_2026-10-15";
+const DETAIL_BUILD = "post_inspection_detail_v33_operator_comments_2026-10-21";
 const PDF_BUCKET_DEFAULT = "inspection-reports";
 const PDF_FOLDER_PREFIX = "post_inspections";
 const HUMAN_POSITIVE_FIXED_NOC = "Exceeded normal expectation.";
@@ -1014,9 +1015,11 @@ async function loadReportById(reportId) {
 function loadReportIntoHeader(r) {
   const reextractButton = el("reextractLinkedPdfBtn");
   const reimportButton = el("reimportFindingsPdfBtn");
+  const commentsButton = el("importOperatorCommentsBtn");
   if (!r) {
     if (reextractButton) reextractButton.disabled = true;
     if (reimportButton) reimportButton.disabled = true;
+    if (commentsButton) commentsButton.disabled = true;
     return;
   }
   rememberOfficerFields(r);
@@ -1061,6 +1064,7 @@ function loadReportIntoHeader(r) {
   if (reimportButton) {
     reimportButton.disabled = !r.id;
   }
+  if (commentsButton) commentsButton.disabled = !r.id;
 }
 
 function headerInputs() {
@@ -3754,6 +3758,42 @@ async function init() {
   el("reimportFindingsPdfBtn").addEventListener("click", () =>
     el("reimportFindingsPdfFile").click()
   );
+  el("importOperatorCommentsBtn").addEventListener("click", () =>
+    el("importOperatorCommentsFile").click()
+  );
+  el("importOperatorCommentsFile").addEventListener("change", async (event) => {
+    const file = event.target.files?.[0];
+    const button = el("importOperatorCommentsBtn");
+    if (!file || button.disabled) return;
+    button.disabled = true;
+    try {
+      await importOperatorCommentsFromPdf({
+        file,
+        report: state.activeReport,
+        supabase: state.supabase,
+        pdfBucket: PDF_BUCKET_DEFAULT,
+        pdfFolderPrefix: PDF_FOLDER_PREFIX,
+        assertFunctionVersion: assertPostInspectionPdfFunctionVersion,
+        formatEdgeFunctionError,
+        cleanupTemporaryPdfSource,
+        setSaveStatus,
+        getActiveReportId: () => state.activeReport?.id,
+        onApplied: async () => {
+          state.observationItems = await loadObservationItemsForReport(state.activeReport.id);
+          rebuildExtractedItems();
+          renderObsTable();
+          renderObsSummary();
+        },
+      });
+    } catch (error) {
+      console.error(error);
+      alert("Operator Comments import failed:\n\n" + (error?.message || String(error)));
+      setSaveStatus("Operator Comments import failed");
+    } finally {
+      event.target.value = "";
+      button.disabled = !state.activeReport?.id;
+    }
+  });
   el("reextractLinkedPdfBtn").addEventListener("click", async () => {
     try {
       await reextractLinkedPdfFindings();
