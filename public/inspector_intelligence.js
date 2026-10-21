@@ -26,6 +26,32 @@ function normName(s) {
   return String(s || "").trim().replace(/\s+/g, " ").toLowerCase();
 }
 
+function normalizeObservationType(value) {
+  const normalized = String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ");
+
+  if (normalized.includes("negative")) return "negative";
+  if (normalized.includes("positive")) return "positive";
+  if (normalized.includes("largely")) return "largely";
+  return "";
+}
+
+function observationTypeLabel(value) {
+  const key = normalizeObservationType(value);
+  return OBS_TYPES[key] || String(value || "").trim();
+}
+
+function selectedObservationTypes() {
+  const selected = new Set();
+  if (el("filterTypeNegative")?.checked) selected.add("negative");
+  if (el("filterTypePositive")?.checked) selected.add("positive");
+  if (el("filterTypeLargely")?.checked) selected.add("largely");
+  return selected;
+}
+
 function canonicalQno(qno) {
   const parts = String(qno || "").trim().split(".").filter(Boolean);
   if (!parts.length) return "";
@@ -318,11 +344,18 @@ function filteredCombinedRows() {
   const from = String(el("dateFrom").value || "").trim();
   const to = String(el("dateTo").value || "").trim();
   const source = String(el("sourceFilter").value || "combined").trim();
+  const selectedTypes = selectedObservationTypes();
+  const allTypesSelected = selectedTypes.size === Object.keys(OBS_TYPES).length;
+  const matchesFindingType = (row) => {
+    if (allTypesSelected) return true;
+    return selectedTypes.has(normalizeObservationType(row.obs_type));
+  };
 
   const ownRows = state.allOwnRows.filter((r) => {
     if (source === "third_party") return false;
     if (!names.has(normName(r.inspector_name))) return false;
     if (!dateInRange(r.inspection_date, from, to)) return false;
+    if (!matchesFindingType(r)) return false;
     return true;
   });
 
@@ -330,6 +363,7 @@ function filteredCombinedRows() {
     if (source === "own") return false;
     if (String(r.inspector_id) !== String(inspector.id)) return false;
     if (!dateInRange(r.inspection_date, from, to)) return false;
+    if (!matchesFindingType(r)) return false;
     return true;
   });
 
@@ -377,7 +411,7 @@ function renderRecordsTable(rows) {
       <td>${esc(r.inspection_date || "—")}</td>
       <td>${esc(reference || "—")}</td>
       <td class="mono">${esc(canonicalQno(r.question_no || "") || "—")}</td>
-      <td>${esc(OBS_TYPES[r.obs_type] || r.obs_type || "—")}</td>
+      <td>${esc(observationTypeLabel(r.obs_type) || "—")}</td>
       <td>${esc(r.designation || "—")}</td>
       <td>${esc(r.soc || "—")}</td>
       <td>${esc(r.noc || "—")}</td>
@@ -579,7 +613,7 @@ function exportCurrentViewCsv() {
       r.inspection_date || "",
       reference || "",
       canonicalQno(r.question_no || ""),
-      OBS_TYPES[r.obs_type] || r.obs_type || "",
+      observationTypeLabel(r.obs_type) || "",
       r.designation || "",
       r.soc || "",
       r.noc || "",
@@ -606,6 +640,114 @@ function exportCurrentViewCsv() {
   a.click();
   a.remove();
   URL.revokeObjectURL(a.href);
+}
+
+function exportCurrentViewPdf() {
+  const rows = state.currentRows || [];
+  const inspector = selectedInspector();
+  const sourceLabels = {
+    combined: "Combined view",
+    own: "Own fleet inspections only",
+    third_party: "Third-party only",
+  };
+  const source = String(el("sourceFilter").value || "combined");
+  const selectedTypes = selectedObservationTypes();
+  const typeLabels = ["negative", "positive", "largely"]
+    .filter((type) => selectedTypes.has(type))
+    .map((type) => OBS_TYPES[type]);
+  const from = String(el("dateFrom").value || "").trim() || "Any";
+  const to = String(el("dateTo").value || "").trim() || "Any";
+  const ownCount = rows.filter((row) => row.source_kind === "own").length;
+  const thirdCount = rows.filter((row) => row.source_kind === "third_party").length;
+  const questionCount = new Set(
+    rows.map((row) => String(row.question_no || "").trim()).filter(Boolean)
+  ).size;
+
+  const tableRows = rows.length
+    ? rows.map((row) => {
+        const reference = row.source_kind === "own"
+          ? `${row.report_ref || ""}${row.title ? ` — ${row.title}` : ""}`
+          : `${row.source_company || ""}${row.source_reference ? ` — ${row.source_reference}` : ""}`;
+
+        return `<tr>
+          <td>${esc(row.source_label || "")}</td>
+          <td>${esc(row.vessel_name || "—")}</td>
+          <td>${esc(row.inspection_date || "—")}</td>
+          <td>${esc(reference || "—")}</td>
+          <td>${esc(canonicalQno(row.question_no || "") || "—")}</td>
+          <td>${esc(observationTypeLabel(row.obs_type) || "—")}</td>
+          <td>${esc(row.designation || "—")}</td>
+          <td>${esc(row.soc || "—")}</td>
+          <td>${esc(row.noc || "—")}</td>
+          <td>${esc(row.inspector_company || "—")}</td>
+          <td>${esc(row.remarks || row.observation_text || "—")}</td>
+        </tr>`;
+      }).join("")
+    : `<tr><td colspan="11" class="empty">No records match the selected filters.</td></tr>`;
+
+  const printWindow = window.open("", "_blank");
+  if (!printWindow) {
+    alert("The print window was blocked. Allow pop-ups for this app and try again.");
+    return;
+  }
+
+  const title = `Inspector Intelligence — ${inspector?.inspector_name || "Current view"}`;
+  const generatedAt = new Date().toLocaleString();
+  printWindow.document.open();
+  printWindow.document.write(`<!doctype html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8"/>
+      <meta name="viewport" content="width=device-width, initial-scale=1"/>
+      <title>${esc(title)}</title>
+      <style>
+        *{box-sizing:border-box}
+        body{margin:0;padding:20px;color:#17345d;font:12px/1.4 "Segoe UI",Arial,sans-serif;background:#fff}
+        h1{margin:0 0 4px;color:#12345b;font-size:20px}
+        .generated{margin-bottom:14px;color:#64748b;font-size:10px}
+        .filters{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px 18px;margin:0 0 14px;padding:10px 12px;border:1px solid #cbd7ee;border-radius:8px;background:#f5f8fd}
+        .filters strong{color:#12345b}
+        .summary{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 14px}
+        .summary span{padding:5px 9px;border:1px solid #cbd7ee;border-radius:7px;background:#f5f8fd;font-weight:700}
+        .table-wrap{width:100%;overflow:visible}
+        table{width:100%;border-collapse:collapse;table-layout:fixed;font-size:9px}
+        th,td{padding:5px 6px;border:1px solid #cbd7ee;text-align:left;vertical-align:top;overflow-wrap:anywhere}
+        th{background:#eaf1fb;color:#12345b;font-weight:800}
+        .empty{text-align:center;color:#64748b;font-style:italic}
+        @page{size:A4 landscape;margin:8mm}
+        @media print{body{padding:0}.filters,.summary span{break-inside:avoid}thead{display:table-header-group}tr{break-inside:avoid}}
+      </style>
+    </head>
+    <body>
+      <h1>${esc(title)}</h1>
+      <div class="generated">Generated ${esc(generatedAt)}</div>
+      <section class="filters">
+        <div><strong>Inspector:</strong> ${esc(inspector?.inspector_name || "—")}</div>
+        <div><strong>Source:</strong> ${esc(sourceLabels[source] || source)}</div>
+        <div><strong>Date range:</strong> ${esc(from)} to ${esc(to)}</div>
+        <div><strong>Finding types:</strong> ${esc(typeLabels.length ? typeLabels.join(", ") : "None")}</div>
+      </section>
+      <section class="summary">
+        <span>Total records: ${rows.length}</span>
+        <span>Own fleet: ${ownCount}</span>
+        <span>Third-party: ${thirdCount}</span>
+        <span>Unique questions: ${questionCount}</span>
+      </section>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>Source</th><th>Vessel</th><th>Date</th><th>Report / Reference</th>
+            <th>Question</th><th>Type</th><th>Designation</th><th>SOC</th><th>NOC</th>
+            <th>Inspector Company</th><th>Remarks / Observation text</th>
+          </tr></thead>
+          <tbody>${tableRows}</tbody>
+        </table>
+      </div>
+    </body>
+    </html>`);
+  printWindow.document.close();
+  printWindow.focus();
+  setTimeout(() => printWindow.print(), 250);
 }
 
 async function reloadInspectorData() {
@@ -661,6 +803,9 @@ async function init() {
   el("sourceFilter").addEventListener("change", applyFilters);
   el("dateFrom").addEventListener("change", applyFilters);
   el("dateTo").addEventListener("change", applyFilters);
+  ["filterTypeNegative", "filterTypePositive", "filterTypeLargely"].forEach((id) => {
+    el(id).addEventListener("change", applyFilters);
+  });
   el("applyBtn").addEventListener("click", applyFilters);
 
   el("syncInspectorsBtn").addEventListener("click", async () => {
@@ -705,6 +850,7 @@ async function init() {
 
   el("clearThirdPartyFormBtn").addEventListener("click", clearThirdPartyForm);
   el("exportCsvBtn").addEventListener("click", exportCurrentViewCsv);
+  el("exportPdfBtn").addEventListener("click", exportCurrentViewPdf);
 
   renderAliases();
   applyFilters();

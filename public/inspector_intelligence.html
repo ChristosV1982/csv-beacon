@@ -182,6 +182,39 @@
 
     .muted{ color:#64748b; font-weight:800; }
     .remarksCell{ max-width:420px; white-space:normal; line-height:1.35; }
+    .finding-type-filters{
+      display:flex;
+      align-items:center;
+      flex-wrap:wrap;
+      gap:8px 14px;
+      margin-top:10px;
+      padding:8px 10px;
+      border:1px solid #d5deef;
+      border-radius:10px;
+      background:#f8fbff;
+    }
+    .finding-type-filters .finding-type-heading{
+      color:#1a4170;
+      font-size:.9rem;
+      font-weight:950;
+    }
+    .finding-type-filters label{
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      margin:0;
+      color:#1a4170;
+      font-size:.9rem;
+      font-weight:850;
+      cursor:pointer;
+    }
+    .finding-type-filters input[type="checkbox"]{
+      width:16px;
+      height:16px;
+      margin:0;
+      padding:0;
+      accent-color:#1a4170;
+    }
   </style>
   <link rel="stylesheet" href="./csvb-ui-polish.css?v=20260430_1" />
   <link rel="stylesheet" href="./csvb-help-tooltips.css?v=20260430_1" />
@@ -235,10 +268,18 @@
           </div>
         </div>
 
+        <div class="finding-type-filters" role="group" aria-label="Finding type filters">
+          <span class="finding-type-heading">Finding types</span>
+          <label><input id="filterTypeNegative" type="checkbox" checked/> Negative</label>
+          <label><input id="filterTypePositive" type="checkbox" checked/> Positive</label>
+          <label><input id="filterTypeLargely" type="checkbox" checked/> Largely as Expected</label>
+        </div>
+
         <div class="row" style="margin-top:10px;">
           <button class="btn btn-muted" id="applyBtn">Apply</button>
           <button class="btn btn-muted" id="syncInspectorsBtn">Sync inspectors from own reports</button>
           <button class="btn btn-muted" id="exportCsvBtn">Export current view CSV</button>
+          <button class="btn btn-muted" id="exportPdfBtn" type="button">Print / Save current view PDF</button>
         </div>
 
         <div class="statusLine">
@@ -424,7 +465,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="./auth.js"></script>
   <script src="./csvb-module-guard.js?v=20260522_dashboard_button_guard"></script>
-  <script type="module" src="./inspector_intelligence.js"></script>
+  <script type="module" src="./inspector_intelligence.js?v=20261021_ii_type_filters_pdf_v01"></script>
   <script src="./csvb-ui-polish.js?v=20260430_1"></script>
   <script src="./csvb-help-tooltips.js?v=20260430_1"></script>
   <script src="./csvb-100pct-fit.js?v=20260430_1"></script>
