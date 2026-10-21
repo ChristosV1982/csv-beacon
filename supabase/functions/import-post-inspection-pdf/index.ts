@@ -1,10 +1,11 @@
 export const config = {
   verify_jwt: false
 };
-const FUNCTION_VERSION = "cors-jwt-off-v47_hardware_pair_ownership_uploaded_findings_reimport";
+const FUNCTION_VERSION = "cors-jwt-off-v48_operator_comments_only";
 import { createClient } from "npm:@supabase/supabase-js@2.45.4";
 import * as pdfjsLib from "npm:pdfjs-dist@4.2.67/legacy/build/pdf.mjs";
 import { extractEmbeddedPhotoMetadata } from "./photo_probe.ts";
+import { parseOperatorCommentSections } from "./operator_comments_parser.mjs";
 /**
  * CORS
  */ function buildCorsHeaders(req) {
@@ -929,6 +930,118 @@ function parseResponseBlockObservations(block, controlledNocs = {}) {
       ),
     };
   });
+}
+
+function isOperatorCommentsBoundary(line) {
+  const text = normSpaces(
+    typeof line === "string" ? line : String(line?.text || ""),
+  );
+  if (!text) return false;
+  return (
+    isReportHeaderOrFooter(text) ||
+    isReportSectionHeading(text) ||
+    isQuestionHeaderStart(text) ||
+    Boolean(parseResponseStart(text)) ||
+    isPhotoUploadHeading(text) ||
+    /^Unvalidated PIQ Responses$/i.test(text) ||
+    /^Operator Attachments\b/i.test(text) ||
+    /^\d{1,2}\s+[A-Za-z]{3,9}\s+\d{4}\s+\d{2}:\d{2}\s+uploaded by\b/i.test(text)
+  );
+}
+
+function extractOperatorCommentsFromPages(pages, controlledNocs = {}) {
+  const flatLines = flattenPages(pages);
+  const questionSections = buildQuestionSections(flatLines);
+  const extracted = [];
+
+  for (const section of questionSections) {
+    const blocks = buildResponseBlocks(section);
+
+    for (const block of blocks) {
+      if (block.response_type !== "negative") continue;
+
+      const commentSections = parseOperatorCommentSections(block.lines, {
+        isBoundary: isOperatorCommentsBoundary,
+      });
+      if (!commentSections.length) continue;
+
+      const findingRows = parseResponseBlockObservations(
+        block,
+        controlledNocs,
+      );
+      const tailLines = block.lines
+        .slice(1)
+        .map((line) => line.text)
+        .filter(Boolean);
+      const hardwarePairs = block.designation === "Hardware"
+        ? findControlledSocNocPairs(
+          tailLines,
+          block.designation,
+          controlledNocs,
+        )
+        : [];
+
+      for (const comments of commentSections) {
+        let finding = null;
+        let parserIdentityStatus = "missing_finding_identity";
+
+        if (hardwarePairs.length) {
+          const tailIndex = comments.start_index - 1;
+          const precedingPairs = hardwarePairs.filter(
+            (pair) => pair.start_index <= tailIndex,
+          );
+          const nearestPair = precedingPairs.at(-1) || null;
+
+          if (nearestPair && findingRows.length === hardwarePairs.length) {
+            const matchingRows = findingRows.filter(
+              (row) =>
+                comparableTaxonomyText(row.classification_coding || "") ===
+                  comparableTaxonomyText(nearestPair.classification_coding || "") &&
+                comparableTaxonomyText(row.nature_of_concern || "") ===
+                  comparableTaxonomyText(nearestPair.nature_of_concern || ""),
+            );
+            if (matchingRows.length === 1) {
+              finding = matchingRows[0];
+              parserIdentityStatus = "unique_finding_identity";
+            } else if (matchingRows.length > 1) {
+              parserIdentityStatus = "ambiguous_finding_identity";
+            }
+          } else if (nearestPair && hardwarePairs.length > 1) {
+            parserIdentityStatus = "ambiguous_finding_identity";
+          }
+        } else if (findingRows.length === 1) {
+          finding = findingRows[0];
+          parserIdentityStatus = "unique_finding_identity";
+        } else if (findingRows.length > 1) {
+          parserIdentityStatus = "ambiguous_finding_identity";
+        }
+
+        extracted.push({
+          question_base: block.question_base,
+          question_full: block.question_full,
+          response_type: block.response_type,
+          designation: block.designation,
+          classification_coding: finding?.classification_coding || null,
+          nature_of_concern:
+            finding?.nature_of_concern || block.nature_of_concern || null,
+          observation_text: finding?.observation_text || null,
+          source_excerpt:
+            finding?.source_excerpt || block.lines[0]?.text || null,
+          finding_page_hint: finding?.page_hint || block.page_hint || null,
+          parser_identity_status: parserIdentityStatus,
+          immediate_cause: comments.immediate_cause,
+          root_cause: comments.root_cause,
+          corrective_action: comments.corrective_action,
+          preventative_action: comments.preventative_action,
+          comment_timestamp: comments.timestamp,
+          comment_byline: comments.byline,
+          comments_page_hint: comments.page,
+        });
+      }
+    }
+  }
+
+  return extracted;
 }
 
 function displacedHardwarePairSupportEnd(tailLines, pair, nextPair) {
