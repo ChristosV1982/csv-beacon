@@ -291,6 +291,8 @@ function renderInspectorSelect() {
   sel.appendChild(empty);
 
   for (const i of state.inspectors || []) {
+    if (i.is_active === false) continue;
+
     const o = document.createElement("option");
     o.value = i.id;
     o.textContent = `${i.inspector_name}${i.inspector_company ? ` (${i.inspector_company})` : ""}`;
