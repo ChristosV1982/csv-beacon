@@ -1,7 +1,7 @@
 import { loadLockedLibraryJson } from "./question_library_loader.js";
-import { importOperatorCommentsFromPdf } from "./post_inspection_operator_comments.mjs?v=20261021_operator_comments_v2";
+import { importOperatorCommentsFromPdf } from "./post_inspection_operator_comments.mjs?v=20261021_ocimf_rounds_v1";
 
-const DETAIL_BUILD = "post_inspection_detail_v33_operator_comments_2026-10-21";
+const DETAIL_BUILD = "post_inspection_detail_v34_operator_comment_rounds_2026-10-21";
 const PDF_BUCKET_DEFAULT = "inspection-reports";
 const PDF_FOLDER_PREFIX = "post_inspections";
 const HUMAN_POSITIVE_FIXED_NOC = "Exceeded normal expectation.";
@@ -1902,6 +1902,14 @@ async function inspectExistingObservationItemsForPdfReplacement(reportId) {
     },
   ];
   const dependentLabels = [];
+  const { data: commentRounds, error: commentRoundsError } = await state.supabase.rpc(
+    "csvb_post_inspection_comment_rounds_for_me", { p_report_id: reportId });
+  if (commentRoundsError) {
+    throw new Error(`Could not verify imported OCIMF comment history; PDF replacement was stopped. ${commentRoundsError.message || commentRoundsError}`);
+  }
+  if (Array.isArray(commentRounds) && commentRounds.length) {
+    dependentLabels.push("imported OCIMF comment rounds");
+  }
 
   for (const dependency of dependentTables) {
     let found = false;

@@ -1,6 +1,7 @@
 import { loadLockedLibraryJson } from "./question_library_loader.js";
+import { renderOcimfCommentRoundHistory } from "./post_inspection_comment_round_history.mjs?v=20261021_ocimf_rounds_v1";
 
-const OBS_DETAIL_BUILD = "post_inspection_observation_detail_v35_inspector_photos_2026-09-03";
+const OBS_DETAIL_BUILD = "post_inspection_observation_detail_v36_ocimf_rounds_2026-10-21";
 
 
 
@@ -1189,6 +1190,19 @@ function loadResponseFields() {
 
   openSubcommentsIfDataExists();
   renderWorkflowBadges();
+  const container = el("ocimfCommentRoundHistory");
+  if (container) {
+    if (String(item.id).startsWith("legacy-")) {
+      container.textContent = "Imported OCIMF comment history is available for modern observation items only.";
+    } else {
+      void renderOcimfCommentRoundHistory({
+        supabase: state.supabase,
+        reportId: item.report_id || getUrlParam("report_id"),
+        itemId: item.id,
+        container,
+      });
+    }
+  }
 }
 
 function getPgnoBullets(questionObj) {

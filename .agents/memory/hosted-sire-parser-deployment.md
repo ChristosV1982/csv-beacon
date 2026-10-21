@@ -14,3 +14,9 @@ For an additive extraction mode, retain the existing general version contract an
 **Why:** Existing clients enforce an exact general marker. Changing it during a hosted-function-only rollout would disable their otherwise-compatible PDF actions before the frontend is published.
 
 **How to apply:** Require the new capability marker in the new action; do not invalidate existing initial-import, findings-replacement or photo actions merely to identify an additive mode.
+
+The Supabase Management API function-body download can be a binary ESZIP archive, not UTF-8 source.
+
+**Why:** Decoding the body directly failed despite a successful deployment; this project's response was ESZIP2.3.
+
+**How to apply:** Inspect the response format before decoding. Search archive bytes for deployment markers when only capability verification is needed, or use an appropriate ESZIP reader for full source inspection.

@@ -110,3 +110,43 @@ Separate human finding.`,
   assert.equal(findings.filter((item) => item.designation === "Hardware").length, 2);
   assert.equal(findings.some((item) => String(item.observation_text).includes("Operator Comments")), false);
 });
+
+test("full comments extractor keeps cumulative rounds on one finding, including across pages", () => {
+  const source = fs.readFileSync(
+    new URL("../supabase/functions/import-post-inspection-pdf/index.ts", import.meta.url), "utf8",
+  ).split("Deno.serve(")[0]
+    .replace(/^import .*$/gm, "").replace(/^export const /gm, "const ");
+  const context = { parseOperatorCommentSections };
+  vm.runInNewContext(source + "\nthis.extract=extractOperatorCommentsFromPages;", context);
+  const noc = "Sudden failure – maintenance tasks available and up to date";
+  const comments = (day, text, marker = true) => `${marker ? "Operator Comments\n" : ""}${day}/10/2026 09:42:16 by Operator Example
+Immediate Cause
+${text} cause
+Root Cause
+${text} root
+Corrective Action
+${text} correction
+Preventative Action
+${text} prevention`;
+  const pages = [
+    `5.8.1. Were electrical systems maintained?
+Hardware Observable or detectable deficiency.
+Lighting - Deck: ${noc}
+It was observed that two deck lights were not functioning.
+${comments("01", "Original")}`,
+    `${comments("05", "Second")}
+${comments("10", "Third", false)}
+Human Largely as expected.
+1. Example human factor
+Separate human finding.`,
+  ];
+  const result = context.extract(pages, { Hardware: [noc], Process: [] });
+  assert.equal(result.length, 3);
+  assert.deepEqual(Array.from(result, (r) => r.classification_coding), Array(3).fill("Lighting - Deck"));
+  assert.deepEqual(Array.from(result, (r) => r.preventative_action),
+    ["Original prevention", "Second prevention", "Third prevention"]);
+  assert.deepEqual(Array.from(result, (r) => r.comment_source_order), [0, 1, 2]);
+  assert.equal(result[1].comments_page_hint, 2);
+  assert.equal(result[2].comment_timestamp, "10/10/2026 09:42:16");
+  assert.equal(result[2].observation_text, result[0].observation_text);
+});

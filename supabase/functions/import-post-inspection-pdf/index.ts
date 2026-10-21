@@ -1046,6 +1046,8 @@ function extractOperatorCommentsFromPages(pages, controlledNocs = {}) {
           comment_timestamp: comments.timestamp,
           comment_byline: comments.byline,
           comments_page_hint: comments.page,
+          comment_source_order: extracted.length,
+          comment_section: comments.start_index,
         });
       }
     }
@@ -2158,6 +2160,7 @@ Deno.serve(async (req)=>{
     if (wantOperatorCommentsOnly) {
       responseBody.debug.operator_comments_count = operatorComments.length;
       responseBody.operator_comments_version = "operator-comments-v1";
+      responseBody.operator_comments_rounds_version = "operator-comment-rounds-v1";
     }
 
     if (wantDebug) {

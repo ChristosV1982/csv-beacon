@@ -56,6 +56,23 @@ function joinedValue(lines) {
   return value || null;
 }
 
+function roundMetadata(text) {
+  const combined = parseByline(text);
+  if (combined) return combined;
+  if (/^\d{2}\/\d{2}\/\d{4}(?:\s+\d{2}:\d{2}(?::\d{2})?)?$/.test(text)) {
+    return { timestamp: text, byline: null };
+  }
+  if (/^by\s+\S/i.test(text)) return { timestamp: null, byline: text.replace(/^by\s+/i, "").trim() };
+  return null;
+}
+
+function isRoundMetadataStart(source, index) {
+  if (!roundMetadata(textOf(source[index]).trim())) return false;
+  // A standalone date in prose is not enough: a new round must lead to a heading.
+  const following = source.slice(index + 1, index + 5).map(textOf).map((s) => s.trim()).filter(Boolean);
+  return following.some((s, i) => parseHeading(s) && following.slice(0, i).every((v) => roundMetadata(v)));
+}
+
 /**
  * Parse all Operator Comments sections inside one already-bounded OCIMF
  * response block. The caller supplies response/question/report boundary rules.
@@ -66,10 +83,12 @@ export function parseOperatorCommentSections(
 ) {
   const source = Array.isArray(lines) ? lines : [];
   const sections = [];
+  let continuation = -1;
 
   for (let i = 0; i < source.length; i++) {
     const markerText = textOf(source[i]).trim();
-    if (!/^Operator Comments\b/i.test(markerText)) continue;
+    const hasMarker = /^(?:Subsequent\s+)?Operator Comments\b/i.test(markerText);
+    if (!hasMarker && i !== continuation) continue;
 
     const collected = {
       immediate_cause: [],
@@ -80,13 +99,17 @@ export function parseOperatorCommentSections(
     let currentField = null;
     let timestamp = null;
     let byline = null;
-    let j = i + 1;
+    let j = hasMarker ? i + 1 : i;
 
     for (; j < source.length; j++) {
       const line = source[j];
       const text = textOf(line).trim();
       if (!text) continue;
-      if (/^Operator Comments\b/i.test(text)) break;
+      if (/^(?:Subsequent\s+)?Operator Comments\b/i.test(text)) break;
+      if (currentField && isRoundMetadataStart(source, j)) {
+        continuation = j;
+        break;
+      }
       if (isBoundary(line, j, source)) break;
       if (/^Operator Attachments\b/i.test(text)) break;
       if (/^(Inspector|Operator) uploaded photos$/i.test(text)) break;
