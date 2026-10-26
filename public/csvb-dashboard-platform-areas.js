@@ -30,6 +30,7 @@
         "Question libraries, vetting inspection preparation, post-inspection handling, statistics, inspector intelligence, reporting and related discussion threads.",
       cards: [
         SIRE_VIEWER_CARD_KEY,
+        "sire_fleet_vetting_experience",
         RISQ_VIEWER_CARD_KEY,
         "company",
         "assignments",

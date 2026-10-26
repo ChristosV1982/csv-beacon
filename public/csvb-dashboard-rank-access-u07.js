@@ -9,6 +9,7 @@
   const CARD_TO_APP_MODULE_CODE = {
     library: "QUESTION_LIBRARY",
     sire_questions_viewer: "SIRE_QUESTIONS_VIEWER",
+    sire_fleet_vetting_experience: "SIRE_FLEET_VETTING_EXPERIENCE",
     risq_questions_viewer: "RISQ_QUESTIONS_VIEWER",
     risq_questions_editor: "RISQ_QUESTIONS_EDITOR",
     compare: "PRE_POST_COMPARE",

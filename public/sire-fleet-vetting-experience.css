@@ -1,0 +1,486 @@
+html[data-csvb-page="sire-fleet-vetting-experience.html"] {
+  --fleet-ink: #062A5E;
+  --fleet-muted: #5E6F86;
+  --fleet-accent: #1B5F93;
+  --fleet-line: #D6E4F5;
+  --fleet-wash: #F4F8FC;
+  --fleet-paper: #FFFFFF;
+  background: #F4F8FC;
+}
+
+html[data-csvb-page="sire-fleet-vetting-experience.html"] body {
+  color: var(--fleet-ink);
+  background: #F4F8FC;
+}
+
+html[data-csvb-page="sire-fleet-vetting-experience.html"] .topbar {
+  border-bottom: 1px solid #D6E4F5;
+  box-shadow: 0 3px 14px rgba(6, 42, 94, .045);
+}
+
+html[data-csvb-page="sire-fleet-vetting-experience.html"] .fleet-intro {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  margin: 12px auto 14px;
+  padding: 17px 22px 18px;
+  width: calc(100% - 28px);
+  border: 1px solid #D6E4F5;
+  border-radius: 14px;
+  background:
+    linear-gradient(105deg, rgba(6, 42, 94, .06), transparent 53%),
+    var(--fleet-paper);
+  box-shadow: 0 8px 22px rgba(6, 42, 94, .045);
+}
+
+html[data-csvb-page="sire-fleet-vetting-experience.html"] .fleet-eyebrow,
+html[data-csvb-page="sire-fleet-vetting-experience.html"] .fleet-controls-kicker {
+  color: var(--fleet-ink);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .14em;
+}
+
+html[data-csvb-page="sire-fleet-vetting-experience.html"] .fleet-intro h1 {
+  margin: 5px 0 4px;
+  color: var(--fleet-ink);
+  font-size: clamp(22px, 2.5vw, 30px);
+  line-height: 1.1;
+  letter-spacing: -.035em;
+}
+
+html[data-csvb-page="sire-fleet-vetting-experience.html"] .fleet-intro p {
+  margin: 0;
+  color: var(--fleet-muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+html[data-csvb-page="sire-fleet-vetting-experience.html"] .fleet-readonly {
+  flex: 0 0 auto;
+  padding: 7px 11px;
+  border: 1px solid #C8DAEF;
+  border-radius: 999px;
+  color: var(--fleet-ink);
+  background: #EAF3FB;
+  font-size: 11px;
+  font-weight: 750;
+  letter-spacing: .02em;
+}
+
+html[data-csvb-page="sire-fleet-vetting-experience.html"] #viewerRuntime {
+  min-height: 380px;
+}
+
+html[data-csvb-page="sire-fleet-vetting-experience.html"] .page {
+  width: calc(100% - 28px);
+  max-width: 100%;
+  margin: 0 auto;
+  padding: 0 0 24px;
+}
+
+html[data-csvb-page="sire-fleet-vetting-experience.html"] .layout {
+  display: grid;
+  grid-template-columns: minmax(290px, 350px) minmax(0, 1fr);
+  align-items: start;
+  gap: 12px;
+}
+
+html[data-csvb-page="sire-fleet-vetting-experience.html"] .sidebar {
+  min-width: 0;
+}
+
+html[data-csvb-page="sire-fleet-vetting-experience.html"] .main {
+  min-width: 0;
+}
+
+html[data-csvb-page="sire-fleet-vetting-experience.html"] .card {
+  min-width: 0;
+  padding: 11px;
+  border: 1px solid #D6E4F5;
+  border-radius: 11px;
+  background: var(--fleet-paper);
+  box-shadow: 0 5px 16px rgba(6, 42, 94, .04);
+}
+
+html[data-csvb-page="sire-fleet-vetting-experience.html"] .card-title {
+  margin-bottom: 8px;
+  color: var(--fleet-ink);
+  font-size: 14px;
+  font-weight: 750;
+}
+
+html[data-csvb-page="sire-fleet-vetting-experience.html"] .qList {
+  max-height: calc(100dvh - 245px);
+  overflow: auto;
+}
+
+html[data-csvb-page="sire-fleet-vetting-experience.html"] .qitem {
+  border-bottom: 1px solid #E5EEF8;
+  padding: 9px 8px;
+  cursor: pointer;
+}
+
+html[data-csvb-page="sire-fleet-vetting-experience.html"] .qitem:hover {
+  background: #F4F8FC;
+}
+
+html[data-csvb-page="sire-fleet-vetting-experience.html"] .qitem.active {
+  border-left: 3px solid var(--fleet-ink);
+  background: #EAF3FB;
+}
+
+html[data-csvb-page="sire-fleet-vetting-experience.html"] .qno {
+  color: var(--fleet-ink);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+html[data-csvb-page="sire-fleet-vetting-experience.html"] .qsub {
+  margin-top: 3px;
+  color: #385778;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+html[data-csvb-page="sire-fleet-vetting-experience.html"] .fleet-runtime-state,
+html[data-csvb-page="sire-fleet-vetting-experience.html"] .fleet-message {
+  margin: 12px auto;
+  padding: 13px 15px;
+  border: 1px solid var(--fleet-line);
+  border-radius: 10px;
+  color: var(--fleet-muted);
+  background: var(--fleet-paper);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+html[data-csvb-page="sire-fleet-vetting-experience.html"] .fleet-message-error {
+  border-color: #F5C2C2;
+  color: #8B1D1D;
+  background: #FFF4F4;
+}
+
+html[data-csvb-page="sire-fleet-vetting-experience.html"] .fleet-controls {
+  margin: 0 0 10px;
+  padding: 12px 14px 13px;
+  border: 1px solid var(--fleet-line);
+  border-radius: 12px;
+  background: var(--fleet-paper);
+  box-shadow: 0 5px 16px rgba(6, 42, 94, .035);
+}
+
+html[data-csvb-page="sire-fleet-vetting-experience.html"] .fleet-controls-heading,
+html[data-csvb-page="sire-fleet-vetting-experience.html"] .fleet-observations-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+html[data-csvb-page="sire-fleet-vetting-experience.html"] .fleet-controls-heading h2,
+html[data-csvb-page="sire-fleet-vetting-experience.html"] .fleet-observations-header h2 {
+  margin: 2px 0 0;
+  color: var(--fleet-ink);
+  font-size: 15px;
+  line-height: 1.25;
+  letter-spacing: -.01em;
+}
+
+html[data-csvb-page="sire-fleet-vetting-experience.html"] .fleet-filter-note {
+  color: #667C96;
+  font-size: 11px;
+}
+
+html[data-csvb-page="sire-fleet-vetting-experience.html"] .fleet-filter-grid {
+  display: grid;
+  grid-template-columns: minmax(190px, 1.25fr) repeat(5, minmax(130px, 1fr));
+  gap: 9px;
+  margin-top: 11px;
+}
+
+html[data-csvb-page="sire-fleet-vetting-experience.html"] .fleet-field {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+  color: #385778;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+html[data-csvb-page="sire-fleet-vetting-experience.html"] .fleet-field .inp {
+  min-width: 0;
+  min-height: 35px;
+  padding: 7px 9px;
+  border-color: #C8DAEF;
+  border-radius: 7px;
+  color: var(--fleet-ink);
+  background: #fff;
+  font-size: 12px;
+}
+
+html[data-csvb-page="sire-fleet-vetting-experience.html"] .fleet-field small {
+  overflow: hidden;
+  color: #667C96;
+  font-size: 10px;
+  font-weight: 450;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+html[data-csvb-page="sire-fleet-vetting-experience.html"] .fleet-data-status {
+  min-height: 17px;
+  margin-top: 8px;
+  color: #667C96;
+  font-size: 11px;
+}
+
+html[data-csvb-page="sire-fleet-vetting-experience.html"] .fleet-data-status .fleet-message {
+  margin: 0;
+  padding: 6px 9px;
+  border-color: #D6E4F5;
+  background: #F4F8FC;
+  font-size: 11px;
+}
+
+html[data-csvb-page="sire-fleet-vetting-experience.html"] .fleet-data-status .fleet-message-error {
+  border-color: #F5C2C2;
+  background: #FFF4F4;
+}
+
+html[data-csvb-page="sire-fleet-vetting-experience.html"] #viewPanel {
+  border-color: #D6E4F5;
+  background: var(--fleet-paper);
+}
+
+html[data-csvb-page="sire-fleet-vetting-experience.html"] #viewPanel .hdr {
+  border-bottom-color: #D6E4F5;
+}
+
+html[data-csvb-page="sire-fleet-vetting-experience.html"] #viewPanel .hnum {
+  color: var(--fleet-ink);
+}
+
+html[data-csvb-page="sire-fleet-vetting-experience.html"] #viewPanel .qbox {
+  border-color: #C8DAEF;
+  background: #EAF3FB;
+}
+
+html[data-csvb-page="sire-fleet-vetting-experience.html"] #viewPanel details.coll {
+  border-color: #D6E4F5;
+  background: #FFFFFF;
+}
+
+html[data-csvb-page="sire-fleet-vetting-experience.html"] #viewPanel details.coll > summary {
+  color: var(--fleet-ink);
+  background: #F4F8FC;
+}
+
+html[data-csvb-page="sire-fleet-vetting-experience.html"] .fleet-observations {
+  margin: 11px 0 13px;
+  padding: 13px;
+  border: 1px solid #C8DAEF;
+  border-top: 3px solid var(--fleet-ink);
+  border-radius: 11px;
+  background: #F7FAFE;
+}
+
+html[data-csvb-page="sire-fleet-vetting-experience.html"] .fleet-observations-header {
+  align-items: flex-start;
+}
+
+html[data-csvb-page="sire-fleet-vetting-experience.html"] .fleet-observations-header h2 {
+  margin-top: 3px;
+  font-size: 17px;
+}
+
+html[data-csvb-page="sire-fleet-vetting-experience.html"] .fleet-observations-header p {
+  margin: 7px 0 0;
+}
+
+html[data-csvb-page="sire-fleet-vetting-experience.html"] .fleet-result-count {
+  flex: 0 0 auto;
+  padding: 5px 9px;
+  border: 1px solid #C8DAEF;
+  border-radius: 999px;
+  color: var(--fleet-ink);
+  background: #EAF3FB;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+html[data-csvb-page="sire-fleet-vetting-experience.html"] .fleet-recurrence {
+  width: fit-content;
+  color: #284C77;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+html[data-csvb-page="sire-fleet-vetting-experience.html"] .fleet-recurrence[title] {
+  cursor: help;
+  text-decoration: underline dotted #9CB4D0;
+  text-underline-offset: 3px;
+}
+
+html[data-csvb-page="sire-fleet-vetting-experience.html"] .fleet-records {
+  display: grid;
+  gap: 9px;
+  margin-top: 11px;
+}
+
+html[data-csvb-page="sire-fleet-vetting-experience.html"] .fleet-record {
+  padding: 11px 12px;
+  border: 1px solid #D6E4F5;
+  border-radius: 9px;
+  background: #FFFFFF;
+}
+
+html[data-csvb-page="sire-fleet-vetting-experience.html"] .fleet-record-meta {
+  display: grid;
+  grid-template-columns: 1.15fr 1fr 1fr 1fr;
+  gap: 11px;
+}
+
+html[data-csvb-page="sire-fleet-vetting-experience.html"] .fleet-record-label {
+  margin-bottom: 3px;
+  color: #667C96;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .085em;
+  text-transform: uppercase;
+}
+
+html[data-csvb-page="sire-fleet-vetting-experience.html"] .fleet-record-value {
+  color: #173D63;
+  font-size: 12px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+html[data-csvb-page="sire-fleet-vetting-experience.html"] .fleet-observation-text {
+  margin-top: 9px;
+  padding-top: 9px;
+  border-top: 1px solid #E5EEF8;
+}
+
+html[data-csvb-page="sire-fleet-vetting-experience.html"] .fleet-observation-text .fleet-record-value {
+  white-space: pre-wrap;
+  line-height: 1.58;
+}
+
+html[data-csvb-page="sire-fleet-vetting-experience.html"] .fleet-record-placeholder,
+html[data-csvb-page="sire-fleet-vetting-experience.html"] .fleet-records > .fleet-message {
+  padding: 15px;
+  border: 1px dashed #C8DAEF;
+  border-radius: 8px;
+  color: #5E6F86;
+  background: #FFFFFF;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+html[data-csvb-page="sire-fleet-vetting-experience.html"] .fleet-pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+  color: #5E6F86;
+  font-size: 11px;
+}
+
+html[data-csvb-page="sire-fleet-vetting-experience.html"] .fleet-pagination[hidden] {
+  display: none;
+}
+
+html[data-csvb-page="sire-fleet-vetting-experience.html"] .fleet-pagination .btn {
+  padding: 6px 10px;
+  border-color: #C8DAEF;
+  color: var(--fleet-ink);
+  background: #FFFFFF;
+  font-size: 11px;
+}
+
+html[data-csvb-page="sire-fleet-vetting-experience.html"] .fleet-pagination .btn:disabled {
+  cursor: not-allowed;
+  opacity: .48;
+}
+
+html[data-csvb-page="sire-fleet-vetting-experience.html"] .csvb-question-observation-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 2px 5px;
+  border: 1px solid #C8DAEF;
+  border-radius: 999px;
+  color: #284C77;
+  background: #EAF3FB;
+  font-size: 9px;
+  font-weight: 700;
+  vertical-align: 1px;
+  white-space: nowrap;
+}
+
+html[data-csvb-page="sire-fleet-vetting-experience.html"] .csvb-sire-viewer-advanced {
+  display: none !important;
+}
+
+@media (max-width: 1100px) {
+  html[data-csvb-page="sire-fleet-vetting-experience.html"] .fleet-filter-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  html[data-csvb-page="sire-fleet-vetting-experience.html"] .page {
+    width: calc(100% - 20px);
+  }
+
+  html[data-csvb-page="sire-fleet-vetting-experience.html"] .layout {
+    grid-template-columns: 1fr;
+  }
+
+  html[data-csvb-page="sire-fleet-vetting-experience.html"] .qList {
+    max-height: 340px;
+  }
+
+  html[data-csvb-page="sire-fleet-vetting-experience.html"] .fleet-intro {
+    width: calc(100% - 20px);
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 10px;
+    padding: 15px;
+  }
+
+  html[data-csvb-page="sire-fleet-vetting-experience.html"] .fleet-filter-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  html[data-csvb-page="sire-fleet-vetting-experience.html"] .fleet-company-field {
+    grid-column: 1 / -1;
+  }
+
+  html[data-csvb-page="sire-fleet-vetting-experience.html"] .fleet-record-meta {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  html[data-csvb-page="sire-fleet-vetting-experience.html"] .fleet-observations {
+    padding: 10px;
+  }
+}
+
+@media (max-width: 420px) {
+  html[data-csvb-page="sire-fleet-vetting-experience.html"] .fleet-filter-grid {
+    grid-template-columns: 1fr;
+  }
+
+  html[data-csvb-page="sire-fleet-vetting-experience.html"] .fleet-company-field {
+    grid-column: auto;
+  }
+
+  html[data-csvb-page="sire-fleet-vetting-experience.html"] .fleet-filter-note {
+    display: none;
+  }
+}

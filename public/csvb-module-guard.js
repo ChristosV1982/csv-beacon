@@ -15,6 +15,7 @@
   const PAGE_MODULE_MAP = {
     "library.html": "read_only_library",
     "q-sire-questions-viewer.html": "sire_questions_viewer",
+    "sire-fleet-vetting-experience.html": "sire_fleet_vetting_experience",
     "risq-questions-viewer.html": "risq_questions_viewer",
 
     "q-dashboard.html": null,
@@ -273,6 +274,7 @@
     const map = {
       read_only_library: "QUESTION_LIBRARY",
       sire_questions_viewer: "SIRE_QUESTIONS_VIEWER",
+      sire_fleet_vetting_experience: "SIRE_FLEET_VETTING_EXPERIENCE",
       risq_questions_viewer: "RISQ_QUESTIONS_VIEWER",
       self_assessment: "VESSEL_QUESTIONNAIRES",
       post_inspection: "POST_INSPECTION",

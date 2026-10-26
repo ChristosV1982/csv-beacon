@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en" data-csvb-page="sire-fleet-vetting-experience.html">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>C.S.V. BEACON — SIRE 2.0 – Fleet Vetting Experience</title>
+  <link rel="stylesheet" href="./csv-beacon-theme.css?v=20260907_contrast_1">
+  <link id="fleetModuleStyles" rel="stylesheet" href="./sire-fleet-vetting-experience.css?v=20261026_fleet_experience_v1">
+  <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script defer src="./theme.js?v=20260212_1"></script>
+  <script defer src="./auth.js?v=20260130_1"></script>
+  <script defer src="./csvb-module-guard.js?v=20261026_fleet_experience_v1"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar-left">
+      <div class="brand">SIRE 2.0 – Fleet Vetting Experience</div>
+      <div class="muted small" id="modeLine">Role: — • Mode: Read-only • Module: SIRE_FLEET_VETTING_EXPERIENCE</div>
+    </div>
+    <div class="topbar-right">
+      <label class="themeCtl" for="themeSelect">
+        <span class="themeCtl-label">Theme</span>
+        <select id="themeSelect" class="btn light themeCtl-select">
+          <option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option>
+        </select>
+      </label>
+      <button class="btn light" type="button" onclick="location.href='./q-dashboard.html'">Dashboard</button>
+      <div id="userBadge" class="badge">Not signed in</div>
+      <button id="loginBtn" class="btn primary" type="button">Login</button>
+      <button id="switchUserBtn" class="btn light" type="button">Switch user</button>
+      <button id="logoutBtn" class="btn" type="button">Logout</button>
+    </div>
+  </header>
+  <section class="fleet-intro" aria-labelledby="fleetTitle">
+    <div>
+      <div class="fleet-eyebrow">C.S.V. BEACON · MARINE ASSURANCE LIBRARY</div>
+      <h1 id="fleetTitle">SIRE 2.0 – Fleet Vetting Experience</h1>
+      <p>Existing SIRE 2.0 questions, paired with your company’s recorded negative observations for awareness.</p>
+    </div>
+    <span class="fleet-readonly">Read-only library</span>
+  </section>
+  <main id="viewerRuntime" aria-live="polite">
+    <div class="fleet-runtime-state" role="status">Loading the live SIRE 2.0 question viewer…</div>
+  </main>
+  <script defer src="./sire-fleet-vetting-experience.js?v=20261026_fleet_experience_v1"></script>
+</body>
+</html>

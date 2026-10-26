@@ -44,6 +44,13 @@
               icon: "🔎",
             },
             {
+              label: "SIRE 2.0 – Fleet Vetting Experience",
+              text: "Combine the SIRE 2.0 question library with recent fleet vetting observations to support awareness and recurrence prevention.",
+              href: "./sire-fleet-vetting-experience.html",
+              cardKey: "sire_fleet_vetting_experience",
+              icon: "▤",
+            },
+            {
               label: "SIRE Questions Editor",
               text: "Restricted SIRE 2.0 question library, PGNOs, references and expected evidence management.",
               href: "./q-questions-editor.html",
