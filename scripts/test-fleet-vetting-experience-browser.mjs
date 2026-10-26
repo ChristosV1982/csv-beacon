@@ -133,16 +133,42 @@ assert.ok(rpcCalls.filter(r=>r.name==="csvb_pgno_master_for_question_for_me").le
 assert.equal(await evaluate("[...document.querySelectorAll('#viewPanel details.coll')].some(x=>x.open)"),false);
 await evaluate("[...document.querySelectorAll('.qitem')].find(x=>x.querySelector('[class*=badge]')).click()");
 await until("document.querySelectorAll('.fleet-record').length>0","populated question");
+assert.equal(await evaluate("document.getElementById('fleetOnlyObservedToggle').checked"),false);
+assert.equal(await evaluate("document.getElementById('showFullQuestionToggle').closest('.row').nextElementSibling.querySelector('input').id"),"fleetOnlyObservedToggle");
+const fullQuestionCount=await evaluate("document.querySelectorAll('.qitem').length");
+const originalSelected=await evaluate("window.CSVB_SIRE_QUESTIONS_VIEWER.getSelected().id");
+const toggleRpcStart=rpcCalls.length;
+await evaluate("document.getElementById('fleetOnlyObservedToggle').click()");
+assert.equal(await evaluate("[...document.querySelectorAll('.qitem')].every(x=>!!x.querySelector('[class*=badge]'))"),true);
+assert.ok(await evaluate("document.querySelectorAll('.qitem').length")<fullQuestionCount);
+assert.equal(await evaluate("window.CSVB_SIRE_QUESTIONS_VIEWER.getSelected().id"),originalSelected);
+await evaluate("document.getElementById('fleetOnlyObservedToggle').click()");
+assert.equal(await evaluate("document.querySelectorAll('.qitem').length"),fullQuestionCount);
+assert.equal(rpcCalls.length,toggleRpcStart,"Keeping a visible selection must cause no requests");
+const unobservedId=await evaluate("document.querySelector('.qitem:not(:has([class*=badge]))').dataset.qid");
+await evaluate("document.querySelector('.qitem:not(:has([class*=badge]))').click()");
+await until("document.getElementById('fleetResultCount').textContent==='0 records'","unobserved selection");
+assert.equal(await evaluate("window.CSVB_SIRE_QUESTIONS_VIEWER.getSelected().id"),unobservedId);
+const replacementStart=rpcCalls.length;
+await evaluate("document.getElementById('fleetOnlyObservedToggle').click()");
+await until("document.querySelector('.qitem.active [class*=badge]') && document.querySelectorAll('.fleet-record').length>0","automatic first matching selection");
+assert.equal(await evaluate("window.CSVB_SIRE_QUESTIONS_VIEWER.getSelected().id===document.querySelector('.qitem').dataset.qid"),true);
+assert.equal(rpcCalls.slice(replacementStart).filter(r=>r.name.endsWith("_counts")).length,0,"Toggle reuses badge counts");
+assert.equal(rpcCalls.slice(replacementStart).filter(r=>r.name.endsWith("_history")).length,1,"Only selected replacement history is loaded");
 before = await evaluate("document.getElementById('fleetRecurrence').textContent");
+const preservedId=await evaluate("window.CSVB_SIRE_QUESTIONS_VIEWER.getSelected().id");
 await evaluate("document.getElementById('fleetRange').value='12';document.getElementById('fleetRange').dispatchEvent(new Event('change'))");
-await until("document.getElementById('fleetDataStatus').innerText.includes('Filters applied')","history change");
+await until("document.getElementById('fleetDataStatus').innerText.includes('Filters applied') && !!document.querySelector('.qitem [class*=badge]')","history change");
 await new Promise(resolve=>setTimeout(resolve,700));
-await evaluate("document.querySelectorAll('.qitem')[1].click()");
+assert.equal(await evaluate("window.CSVB_SIRE_QUESTIONS_VIEWER.getSelected().id"),preservedId,"Selection survives pending counts when still visible");
+await evaluate("(document.querySelectorAll('.qitem')[1] || document.querySelector('.qitem')).click()");
 await until("!!document.getElementById('fleetFrom').value","question navigation");
 assert.equal(await evaluate("document.getElementById('fleetRange').value"),"12");
+assert.equal(await evaluate("document.getElementById('fleetOnlyObservedToggle').checked"),true,"Toggle survives question navigation");
 await evaluate("document.getElementById('fleetCategory').value='Human';document.getElementById('fleetCategory').dispatchEvent(new Event('change'))");
-await new Promise(resolve=>setTimeout(resolve,1400));
+await until("document.getElementById('fleetDataStatus').innerText.includes('Filters applied')","category change");
 assert.ok(rpcCalls.some(r=>r.name==="csvb_fleet_vetting_experience_counts"&&r.args.p_category==="Human"));
+assert.equal(await evaluate("[...document.querySelectorAll('.qitem')].every(x=>!!x.querySelector('[class*=badge]'))"),true);
 await evaluate("document.getElementById('fleetRange').value='all';document.getElementById('fleetRange').dispatchEvent(new Event('change'))");
 await until("!!document.querySelector('.qitem [class*=badge]') && document.getElementById('fleetDataStatus').innerText.includes('Filters applied')","all history counts");
 await new Promise(resolve=>setTimeout(resolve,700));
@@ -155,9 +181,10 @@ assert.equal(await evaluate("[...document.querySelectorAll('.fleet-record .fleet
 // Screenshot contains real server data through the disposable identity bridge.
 fs.writeFileSync("/tmp/csvb-fleet-experience-desktop.jpg",Buffer.from((await cdp("Page.captureScreenshot",{format:"jpeg",quality:80})).data,"base64"));
 await evaluate("document.getElementById('fleetOil').selectedIndex=1;document.getElementById('fleetOil').dispatchEvent(new Event('change'))");
-await new Promise(resolve=>setTimeout(resolve,1600));
+await until("document.getElementById('fleetDataStatus').innerText.includes('Filters applied')","oil-major change");
 const chosenOil=await evaluate("document.getElementById('fleetOil').value");
 assert.ok(rpcCalls.some(r=>r.name==="csvb_fleet_vetting_experience_counts"&&r.args.p_oil_major===chosenOil));
+assert.equal(await evaluate("[...document.querySelectorAll('.qitem')].every(x=>!!x.querySelector('[class*=badge]'))"),true);
 for(const call of rpcCalls.filter(r=>r.name==="csvb_fleet_vetting_experience_history"&&r.args.p_oil_major===chosenOil&&r.data)){
   assert.ok(call.data.rows.every(row=>row.oil_major===chosenOil));
 }
@@ -167,6 +194,10 @@ for(let n=0;n<100&&!rpcCalls.some(r=>r.name==="csvb_fleet_vetting_experience_cou
   await new Promise(resolve=>setTimeout(resolve,100));
 }
 assert.ok(rpcCalls.some(r=>r.name==="csvb_fleet_vetting_experience_counts"&&r.args.p_from_date==="2099-01-01"));
+await until("window.CSVB_SIRE_QUESTIONS_VIEWER.getSelected()===null && document.getElementById('emptyState').innerText.includes('No matching questions')","empty filtered question list");
+assert.equal(await evaluate("document.querySelectorAll('.qitem').length"),0);
+await evaluate("document.getElementById('fleetOnlyObservedToggle').click()");
+assert.equal(await evaluate("document.querySelectorAll('.qitem').length"),fullQuestionCount,"OFF restores complete question list even with no observations");
 const vessel = profiles.find(p=>p.role==="vessel");
 assert.ok(vessel,"Existing internal-company vessel account required");
 profile = vessel;
@@ -174,6 +205,7 @@ await cdp("Page.navigate",{url:base+"/sire-fleet-vetting-experience.html"});
 await until("window.CSVB_MODULE_GUARD?.allowed===true && document.getElementById('fleetCompany')?.value","vessel context");
 assert.equal(await evaluate("document.getElementById('fleetCompany').disabled"),true);
 await until("!!document.querySelector('.qitem [class*=badge]')","vessel fleet badges");
+assert.equal(await evaluate("document.getElementById('fleetOnlyObservedToggle').checked"),false,"New page defaults OFF");
 await evaluate("[...document.querySelectorAll('.qitem')].find(x=>x.querySelector('[class*=badge]')).click()");
 await until("document.querySelectorAll('.fleet-record').length>0","vessel limited records");
 assert.equal(await evaluate("document.querySelector('#fleetObservations a')!==null"),false);

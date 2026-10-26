@@ -116,6 +116,24 @@ html[data-csvb-page="sire-fleet-vetting-experience.html"] .qList {
   overflow: auto;
 }
 
+html[data-csvb-page="sire-fleet-vetting-experience.html"] .fleet-observation-filter {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 7px 0 2px;
+  color: #385778;
+  font-size: 11px;
+  line-height: 1.35;
+  cursor: pointer;
+}
+
+html[data-csvb-page="sire-fleet-vetting-experience.html"] .fleet-observation-filter input {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  accent-color: var(--fleet-ink);
+}
+
 html[data-csvb-page="sire-fleet-vetting-experience.html"] .qitem {
   border-bottom: 1px solid #E5EEF8;
   padding: 9px 8px;

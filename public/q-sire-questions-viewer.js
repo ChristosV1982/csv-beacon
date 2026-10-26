@@ -5,11 +5,16 @@
 (() => {
   "use strict";
 
-  const BUILD = "SIRE-QUESTIONS-VIEWER-20260527_OFFLINE_SAME_UI_4";
+  const BUILD = "SIRE-QUESTIONS-VIEWER-20261026_FLEET_OBSERVATION_FILTER_1";
   window.CSVB_SIRE_QUESTIONS_VIEWER_BUILD = BUILD;
   const fleetExperienceRoute = document.documentElement.dataset.csvbPage === "sire-fleet-vetting-experience.html";
   const viewerConfig = window.CSVB_SIRE_QUESTIONS_VIEWER_CONFIG || {};
+  const observationFilterAvailable = fleetExperienceRoute && viewerConfig.filterQuestionsWithObservations === true;
   let questionBadges = {};
+  let questionBadgesReady = !observationFilterAvailable;
+  let observationFilterEnabled = false;
+  let selectionRequestToken = 0;
+  let fleetSelectionNeedsReconcile = false;
 
   const $ = (id) => document.getElementById(id);
   const s = (v) => v === null || v === undefined ? "" : String(v);
@@ -808,7 +813,13 @@
 
   function filteredRows() {
     return rows
-      .filter(row => searchOk(row) && rowMatchesFacets(row))
+      .filter(row => {
+        if (!searchOk(row) || !rowMatchesFacets(row)) return false;
+        if (!observationFilterAvailable || !observationFilterEnabled) return true;
+        if (!questionBadgesReady) return false;
+        const badgeNumber = numberBase(row);
+        return !s(row?.number_suffix).trim() && Number(questionBadges[badgeNumber] || 0) > 0;
+      })
       .sort((a, b) => {
         const ka = qkey(a), kb = qkey(b);
         for (let i = 0; i < 3; i++) if (ka[i] !== kb[i]) return ka[i] - kb[i];
@@ -900,9 +911,48 @@
     txt("loadedLine", `Loaded ${rows.length} active SIRE 2.0 questions${offlineSourceSuffix()}${indexStatusText()}`);
     renderFacets();
     if (fleetExperienceRoute) {
+      const selectedVisible = selected && data.some(row => String(row.id) === String(selected.id));
+      const reconcile = observationFilterAvailable &&
+        (observationFilterEnabled || fleetSelectionNeedsReconcile) &&
+        (!observationFilterEnabled || questionBadgesReady);
+      if (reconcile && selected && !selectedVisible) {
+        if (data.length && (!observationFilterEnabled || questionBadgesReady)) {
+          selectRow(data[0]);
+        } else {
+          clearSelectedQuestion(data.length === 0);
+        }
+      } else if (reconcile && !selected && fleetSelectionNeedsReconcile && data.length &&
+          (!observationFilterEnabled || questionBadgesReady)) {
+        selectRow(data[0]);
+      } else if (reconcile && !selected && !data.length) {
+        clearSelectedQuestion(true);
+      }
       document.dispatchEvent(new CustomEvent("csvb:sire-viewer-list-rendered", {
         detail: { rows: data.map(row => ({ question_no: numberBase(row), number_suffix: s(row?.number_suffix), id: s(row?.id) })) }
       }));
+    }
+  }
+
+  function clearSelectedQuestion(noMatches = false) {
+    selectionRequestToken += 1;
+    selected = null;
+    fleetSelectionNeedsReconcile = noMatches;
+    if ($("viewPanel")) $("viewPanel").style.display = "none";
+    if ($("emptyState")) {
+      $("emptyState").style.display = "block";
+      const title = $("emptyState").querySelector(".card-title");
+      const description = $("emptyState").querySelector(".muted");
+      if (title) title.textContent = noMatches ? "No matching questions" : "No question selected";
+      if (description) {
+        description.textContent = noMatches
+          ? (observationFilterEnabled
+            ? "No questions with recorded observations match the current search and filters."
+            : "No questions match the current search and filters.")
+          : "Select a SIRE 2.0 question from the list on the left.";
+      }
+    }
+    if (fleetExperienceRoute) {
+      document.dispatchEvent(new CustomEvent("csvb:sire-viewer-question-selected", { detail: null }));
     }
   }
 
@@ -1017,12 +1067,16 @@
 
   async function selectRow(row) {
     selected = JSON.parse(JSON.stringify(row));
+    fleetSelectionNeedsReconcile = false;
+    const selectionToken = ++selectionRequestToken;
     msg("warnBox", "");
 
     let pgno = [];
     let ee = [];
     try { pgno = selected.id ? await loadPgno(selected.id) : []; } catch (e) { pgno = pgnoFallback(selected); msg("warnBox", "Warning: PGNO DB rows could not be loaded. Payload fallback is shown.\n\n" + s(e?.message || e)); }
+    if (fleetExperienceRoute && selectionToken !== selectionRequestToken) return;
     try { ee = selected.id ? await loadEe(selected.id) : []; } catch (e) { ee = eeFallback(selected); msg("warnBox", (s($("warnBox")?.textContent) ? $("warnBox").textContent + "\n\n---\n\n" : "") + "Warning: Expected Evidence DB rows could not be loaded. Payload fallback is shown.\n\n" + s(e?.message || e)); }
+    if (fleetExperienceRoute && selectionToken !== selectionRequestToken) return;
     if (!pgno.length) pgno = pgnoFallback(selected);
     if (!ee.length) ee = eeFallback(selected);
 
@@ -1183,7 +1237,12 @@
         : `Loaded ${rows.length} active SIRE 2.0 question(s). Building search indexes…`);
       renderList();
 
-      if (rows.length) await selectRow(rows.slice().sort((a,b) => qkey(a)[0] - qkey(b)[0] || qkey(a)[1] - qkey(b)[1] || qkey(a)[2] - qkey(b)[2])[0]);
+      const firstSortedRow = rows.slice().sort((a,b) => qkey(a)[0] - qkey(b)[0] || qkey(a)[1] - qkey(b)[1] || qkey(a)[2] - qkey(b)[2])[0];
+      const initialRow = fleetExperienceRoute && observationFilterEnabled
+        ? filteredRows()[0]
+        : firstSortedRow;
+      if (initialRow) await selectRow(initialRow);
+      else if (fleetExperienceRoute) clearSelectedQuestion(true);
       else {
         selected = null;
         if ($("emptyState")) $("emptyState").style.display = "block";
@@ -1218,6 +1277,14 @@
       renderList();
     });
     txt("showFullQuestionState", $("showFullQuestionToggle")?.checked ? "ON (Question)" : "OFF (Short Text)");
+    const observationToggle = $("fleetOnlyObservedToggle");
+    if (observationFilterAvailable && observationToggle) {
+      observationToggle.checked = false;
+      observationToggle.addEventListener("change", () => {
+        observationFilterEnabled = observationToggle.checked;
+        renderList();
+      });
+    }
 
     $("btnToggleAdvancedView")?.addEventListener("click", () => {
       const el = $("viewAdvanced");
@@ -1231,12 +1298,23 @@
       reload: loadQuestions,
       getRows: () => rows.slice(),
       getSelected: () => selected ? JSON.parse(JSON.stringify(selected)) : null,
-      setQuestionBadges: (counts) => {
+      setQuestionBadges: (counts, ready = true) => {
         const next = counts && typeof counts === "object" ? { ...counts } : {};
         const oldKeys = Object.keys(questionBadges);
         const nextKeys = Object.keys(next);
-        if (oldKeys.length === nextKeys.length && nextKeys.every(key => Number(questionBadges[key]) === Number(next[key]))) return;
+        const sameCounts = oldKeys.length === nextKeys.length &&
+          nextKeys.every(key => Number(questionBadges[key]) === Number(next[key]));
+        const nextReady = ready === true;
+        if (sameCounts && questionBadgesReady === nextReady) return;
         questionBadges = next;
+        questionBadgesReady = nextReady;
+        renderList();
+      },
+      setObservationFilterEnabled: (enabled) => {
+        if (!observationFilterAvailable) return;
+        observationFilterEnabled = enabled === true;
+        const toggle = $("fleetOnlyObservedToggle");
+        if (toggle) toggle.checked = observationFilterEnabled;
         renderList();
       },
       isOfflineMode: () => offlineMode === true,

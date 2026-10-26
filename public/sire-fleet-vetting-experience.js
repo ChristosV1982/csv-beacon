@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "SIRE_FLEET_VETTING_EXPERIENCE-20261026_fleet_experience_v1";
+  const BUILD = "SIRE_FLEET_VETTING_EXPERIENCE-20261026_observation_filter_v1";
   const ROOT = document.getElementById("viewerRuntime");
   const MODULE_KEY = "sire_fleet_vetting_experience";
   const COMPANY_VIEW_ID_KEY = "csvb_superuser_company_view_id";
@@ -19,6 +19,7 @@
     total: 0,
     last12: 0,
     countBadges: {},
+    countsReady: false,
     requestToken: 0,
     countsToken: 0,
     contextToken: 0,
@@ -76,7 +77,7 @@
 
   async function loadRuntimeShell() {
     try {
-      const response = await fetch("./q-sire-questions-viewer.html?v=20261026_fleet_experience_v1", {
+      const response = await fetch("./q-sire-questions-viewer.html?v=20261026_observation_filter_v1", {
         credentials: "same-origin",
         cache: "no-cache"
       });
@@ -117,11 +118,14 @@
       ROOT.replaceChildren(clone);
       addFleetControls(clone);
       addObservationSection(clone);
-      window.CSVB_SIRE_QUESTIONS_VIEWER_CONFIG = { collapseSupportingSections: true };
+      window.CSVB_SIRE_QUESTIONS_VIEWER_CONFIG = {
+        collapseSupportingSections: true,
+        filterQuestionsWithObservations: true
+      };
       state.shellReady = true;
 
       const viewer = document.createElement("script");
-      viewer.src = "./q-sire-questions-viewer.js?v=20261026_fleet_experience_v1";
+      viewer.src = "./q-sire-questions-viewer.js?v=20261026_observation_filter_v1";
       viewer.async = true;
       viewer.onerror = () => showFatal("The shared SIRE question viewer could not be loaded.");
       document.body.appendChild(viewer);
@@ -156,6 +160,14 @@
       <div id="fleetDataStatus" class="fleet-data-status" aria-live="polite"></div>
     `;
     page.insertBefore(panel, layout);
+    const fullQuestionRow = page.querySelector("#showFullQuestionToggle")?.closest(".row");
+    if (fullQuestionRow) {
+      const observationToggle = document.createElement("label");
+      observationToggle.className = "fleet-observation-filter";
+      observationToggle.htmlFor = "fleetOnlyObservedToggle";
+      observationToggle.innerHTML = `<input id="fleetOnlyObservedToggle" type="checkbox"><span>Show only questions with recorded observations</span>`;
+      fullQuestionRow.insertAdjacentElement("afterend", observationToggle);
+    }
     $("fleetCompany").addEventListener("change", onCompanyChanged);
     $("fleetRange").addEventListener("change", onRangeChanged);
     $("fleetFrom").addEventListener("change", onCustomDateChanged);
@@ -262,7 +274,9 @@
   function onFilterChanged() {
     state.page = 0;
     invalidateFleetRequests();
+    setMessage($("fleetDataStatus"), "Updating question counts for the selected filters…");
     state.countBadges = {};
+    state.countsReady = false;
     applyBadges();
     state.rows = [];
     state.total = 0;
@@ -296,12 +310,19 @@
     state.historyLoadingKey = "";
   }
 
+  function cancelHistoryRequest() {
+    state.requestToken += 1;
+    state.historyLoadingKey = "";
+    state.historyLoadedKey = "";
+  }
+
   function clearCompanyRecords() {
     state.contextToken += 1;
     state.filtersReady = false;
     invalidateFleetRequests();
     state.historyLoadedKey = "";
     state.countBadges = {};
+    state.countsReady = false;
     state.total = 0;
     state.last12 = 0;
     state.rows = [];
@@ -349,6 +370,7 @@
       if (token !== state.contextToken) return;
       state.filtersReady = false;
       state.countBadges = {};
+      state.countsReady = false;
       applyBadges();
       state.rows = [];
       state.total = 0;
@@ -405,11 +427,13 @@
         if (key && Number.isFinite(count) && count > 0) counts[key] = count;
       });
       state.countBadges = counts;
+      state.countsReady = true;
       applyBadges();
       setMessage($("fleetDataStatus"), "Filters applied. Counts reflect negative records only.");
     } catch (error) {
       if (token !== state.countsToken) return;
       state.countBadges = {};
+      state.countsReady = true;
       applyBadges();
       setMessage($("fleetDataStatus"), `Question counts could not be loaded. ${asText(error?.message || error)}`, "error");
       appendRetry($("fleetDataStatus"), "Retry filters", () => refreshFilterContext());
@@ -426,7 +450,7 @@
 
   function applyBadges() {
     const api = window.CSVB_SIRE_QUESTIONS_VIEWER;
-    if (api?.setQuestionBadges) api.setQuestionBadges(state.countBadges);
+    if (api?.setQuestionBadges) api.setQuestionBadges(state.countBadges, state.countsReady);
   }
 
   function appendRecordValue(card, label, value, className = "") {
@@ -466,6 +490,10 @@
 
   async function requestHistory() {
     if (!state.filtersReady || !state.selectedCompanyId || !state.selectedQuestion) return;
+    // A list reconciliation may still be loading the newly selected question.
+    // Its selection event will request history once; do not reload the old one.
+    const viewerSelection = window.CSVB_SIRE_QUESTIONS_VIEWER?.getSelected?.();
+    if (viewerSelection?.id !== state.selectedQuestion.question?.id) return;
     const questionNo = selectedQuestionNo();
     if (!questionNo) return;
     const filter = currentFilters();
@@ -548,7 +576,21 @@
     state.selectedQuestion = event.detail || null;
     state.page = 0;
     state.historyLoadedKey = "";
-    if (state.filtersReady) requestHistory();
+    if (state.selectedQuestion && state.filtersReady) {
+      requestHistory();
+      return;
+    }
+    cancelHistoryRequest();
+    state.rows = [];
+    state.total = 0;
+    state.last12 = 0;
+    $("fleetResultCount").textContent = "0 records";
+    $("fleetRecurrence").hidden = true;
+    $("fleetPagination").hidden = true;
+    setMessage(
+      $("fleetRecords"),
+      "No question with recorded observations is selected. Adjust the question search or filters to see matching observations."
+    );
   });
   document.addEventListener("csvb:sire-viewer-list-rendered", applyBadges);
   document.addEventListener("DOMContentLoaded", () => {
