@@ -4,6 +4,8 @@
 
 (function () {
   "use strict";
+  const observationWeight = row => window.CSVB_OBSERVATION_COUNTS.weight(row);
+  const observationTotal = rows => window.CSVB_OBSERVATION_COUNTS.sum(rows);
 
   const BUILD = "POST-STATS-CAUSE-CATEGORY-ANALYSIS-V11-MSCAT-DRILLDOWN-20260813";
   window.CSVB_POST_STATS_CAUSE_CATEGORY_BUILD = BUILD;
@@ -289,6 +291,7 @@
 
       const selectedSourcesSet = selectedSources();
       const mapped = (Array.isArray(data) ? data : [])
+        .map(window.CSVB_OBSERVATION_COUNTS.attach)
         .map(mapMscatRecord)
         .filter((row) => selectedSourcesSet.has(sourceKey(row)));
 
@@ -437,14 +440,14 @@
       }
 
       const item = map.get(value);
-      item.observations += 1;
+      item.observations += observationWeight(row);
       item.reports.add(reportKey(row));
 
       if (vesselKey(row)) item.vessels.add(vesselKey(row));
       if (qno(row)) item.questions.add(qno(row));
 
       const s = sourceKey(row);
-      item.sources.set(s, (item.sources.get(s) || 0) + 1);
+      item.sources.set(s, (item.sources.get(s) || 0) + observationWeight(row));
 
       const d = eventDate(row);
       if (d && (!item.last_seen || d > item.last_seen)) item.last_seen = d;
@@ -485,7 +488,7 @@
       if (!map.has(key)) continue;
 
       const item = map.get(key);
-      item.observations += 1;
+      item.observations += observationWeight(row);
       item.reports.add(reportKey(row));
       if (vesselKey(row)) item.vessels.add(vesselKey(row));
       item.values.add(dimensionValue(row));
@@ -1286,9 +1289,9 @@
   function renderKpis(rows, groups) {
     const reportSet = new Set(rows.map(reportKey).filter(Boolean));
 
-    setText("csvbCauseCatKpiObs", rows.length);
+    setText("csvbCauseCatKpiObs", observationTotal(rows));
     setText("csvbCauseCatKpiReports", reportSet.size);
-    setText("csvbCauseCatKpiAvg", avg(rows.length, reportSet.size));
+    setText("csvbCauseCatKpiAvg", avg(observationTotal(rows), reportSet.size));
     setText("csvbCauseCatKpiDistinct", groups.length);
     setText("csvbCauseCatKpiTop", groups[0]?.label || "—");
   }
@@ -1468,6 +1471,7 @@
       `).join("") || `<tr><td colspan="10">No records.</td></tr>`;
     }
 
+    window.CSVB_OBSERVATION_COUNTS.decorateFindingTable(tbody, rows);
     modal.showModal();
   }
 
@@ -1582,7 +1586,7 @@
       const key = `${b}::${s}`;
 
       if (!map.has(key)) map.set(key, { bucket: b, source: s, count: 0 });
-      map.get(key).count += 1;
+      map.get(key).count += observationWeight(row);
     }
 
     const buckets = [...new Set([...map.values()].map((x) => x.bucket))].sort();

@@ -68,8 +68,8 @@ async function loadAllObservationsForReports(supabase, reportIds) {
   const all = [];
   for (const chunk of chunks) {
     const { data, error } = await supabase
-      .from("post_inspection_observations")
-      .select("report_id, observation_type, designation, pgno_selected")
+      .from("csvb_counted_post_inspection_legacy")
+      .select("report_id, observation_type, designation, pgno_selected, retained_pifs, human_pif_count, effective_observation_count, human_counting_mode, policy_revision")
       .in("report_id", chunk);
 
     if (error) throw error;
@@ -119,23 +119,24 @@ function computeKPIs(reports, observations, groupBy, categoryFilter) {
     const set = inspectionsSetByPeriod.get(period);
     set.add(ob.report_id);
 
-    itemsTotal++;
-    row.items++;
+    const weight = window.CSVB_OBSERVATION_COUNTS.weight(ob);
+    itemsTotal += weight;
+    row.items += weight;
 
     const ot = String(ob.observation_type || "");
     if (ot === "negative_observation") {
-      neg++; row.neg++;
-      if (pgnoMissing(ob.pgno_selected)) { negMissingPgno++; row.negMissingPgno++; }
+      neg += weight; row.neg += weight;
+      if (pgnoMissing(ob.pgno_selected)) { negMissingPgno += weight; row.negMissingPgno += weight; }
     } else if (ot === "positive_observation") {
-      pos++; row.pos++;
+      pos += weight; row.pos += weight;
     } else {
-      lae++; row.lae++;
+      lae += weight; row.lae += weight;
     }
 
-    if (designation === "Human") human++;
-    if (designation === "Process") process++;
-    if (designation === "Hardware") hardware++;
-    if (designation === "Photo") photo++;
+    if (designation === "Human") human += weight;
+    if (designation === "Process") process += weight;
+    if (designation === "Hardware") hardware += weight;
+    if (designation === "Photo") photo += weight;
   }
 
   // inspections per period = distinct report_ids in that period
@@ -188,7 +189,7 @@ function renderTable(rows) {
   `).join("");
 }
 
-function exportCSV(headline, rows) {
+function exportCSV(headline, rows, observations = []) {
   const lines = [];
   lines.push(["Section","Metric","Value"].join(","));
   lines.push(["Headline","Inspections",headline.inspectionsTotal].join(","));
@@ -208,6 +209,14 @@ function exportCSV(headline, rows) {
     lines.push([r.period,r.inspections,r.items,r.neg,r.negMissingPgno,r.pos,r.lae].join(","));
   }
 
+  lines.push("", "Finding records (legacy KPI source; never duplicated)");
+  lines.push(["report_id","observation_type","designation","retained_pifs","human_pif_count","effective_observation_count","human_counting_mode","policy_revision"].join(","));
+  for (const item of observations) {
+    lines.push([item.report_id,item.observation_type,item.designation,
+      (item.retained_pifs || []).join(" | "),item.human_pif_count || 0,
+      window.CSVB_OBSERVATION_COUNTS.weight(item),item.human_counting_mode || "per_finding",
+      item.policy_revision || 0].map(value=>`"${String(value ?? "").replaceAll('"','""')}"`).join(","));
+  }
   const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -268,7 +277,8 @@ async function init() {
       renderTable(periodRows);
 
       // store for export
-      window.__KPI_EXPORT__ = { headline, periodRows };
+      window.__KPI_EXPORT__ = { headline, periodRows,
+        observations: observations.filter(item => !categoryFilter || item.designation === categoryFilter) };
       setStatus("Loaded");
     } catch (e) {
       console.error(e);
@@ -281,7 +291,7 @@ async function init() {
   el("exportCsvBtn").addEventListener("click", () => {
     const x = window.__KPI_EXPORT__;
     if (!x) { alert("Nothing to export yet. Click Refresh first."); return; }
-    exportCSV(x.headline, x.periodRows);
+    exportCSV(x.headline, x.periodRows, x.observations);
   });
 
   await refresh();

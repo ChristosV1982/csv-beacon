@@ -4,6 +4,8 @@
 
 (function () {
   "use strict";
+  const observationWeight = row => window.CSVB_OBSERVATION_COUNTS.weight(row);
+  const observationTotal = rows => window.CSVB_OBSERVATION_COUNTS.sum(rows);
 
   const BUILD = "POST-STATS-QUESTION-CHAPTER-PERFORMANCE-V03-LEGACY-CLEANUP-20260811";
   window.CSVB_POST_STATS_QCP_BUILD = BUILD;
@@ -284,12 +286,12 @@
       }
 
       const item = map.get(q);
-      item.observations += 1;
+      item.observations += observationWeight(row);
       item.reports.add(reportKey(row));
       if (vesselKey(row)) item.vessels.add(vesselKey(row));
 
       const s = sourceKey(row);
-      item.sources.set(s, (item.sources.get(s) || 0) + 1);
+      item.sources.set(s, (item.sources.get(s) || 0) + observationWeight(row));
 
       const d = eventDate(row);
       if (d && (!item.last_seen || d > item.last_seen)) item.last_seen = d;
@@ -329,13 +331,13 @@
       }
 
       const item = map.get(ch);
-      item.observations += 1;
+      item.observations += observationWeight(row);
       item.reports.add(reportKey(row));
       if (vesselKey(row)) item.vessels.add(vesselKey(row));
       if (qno(row)) item.questions.add(qno(row));
 
       const s = sourceKey(row);
-      item.sources.set(s, (item.sources.get(s) || 0) + 1);
+      item.sources.set(s, (item.sources.get(s) || 0) + observationWeight(row));
 
       const d = eventDate(row);
       if (d && (!item.last_seen || d > item.last_seen)) item.last_seen = d;
@@ -788,9 +790,9 @@
     const reportSet = new Set(rows.map(reportKey).filter(Boolean));
     const questionSet = new Set(rows.map(qno).filter(Boolean));
 
-    setText("csvbQcpKpiObs", rows.length);
+    setText("csvbQcpKpiObs", observationTotal(rows));
     setText("csvbQcpKpiReports", reportSet.size);
-    setText("csvbQcpKpiAvg", avg(rows.length, reportSet.size));
+    setText("csvbQcpKpiAvg", avg(observationTotal(rows), reportSet.size));
     setText("csvbQcpKpiQuestions", questionSet.size);
     setText("csvbQcpKpiTopQ", questions[0]?.qno || "—");
     setText("csvbQcpKpiTopChapter", chapters[0]?.key && chapters[0].key !== "Unknown" ? `Ch. ${chapters[0].key}` : "—");
@@ -852,7 +854,7 @@
     const tbody = document.getElementById("csvbQcpModalTbody");
 
     document.getElementById("csvbQcpModalTitle").textContent = title;
-    document.getElementById("csvbQcpModalSub").textContent = `${rows.length} related observation(s).`;
+    document.getElementById("csvbQcpModalSub").textContent = `${observationTotal(rows)} effective observations • ${rows.length} finding records`;
 
     tbody.innerHTML = rows.map((row) => `
       <tr>
@@ -870,6 +872,7 @@
       </tr>
     `).join("") || `<tr><td colspan="11">No records.</td></tr>`;
 
+    window.CSVB_OBSERVATION_COUNTS.decorateFindingTable(tbody, rows);
     modal.showModal();
   }
 
@@ -1019,7 +1022,7 @@
       const s = sourceKey(row);
       const key = `${b}::${s}`;
       if (!map.has(key)) map.set(key, { bucket: b, source: s, count: 0 });
-      map.get(key).count += 1;
+      map.get(key).count += observationWeight(row);
     }
 
     const buckets = [...new Set([...map.values()].map((x) => x.bucket))].sort();

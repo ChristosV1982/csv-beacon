@@ -1,4 +1,5 @@
 import { loadLockedLibraryJson } from "./question_library_loader.js";
+import { markHumanPolicyStaleness } from "./csvb-human-policy-staleness.mjs?v=20261026_company_policy_v1";
 import { renderOcimfCommentRoundHistory } from "./post_inspection_comment_round_history.mjs?v=20261021_ocimf_rounds_v1";
 import {
   humanPifsFromItem as sharedHumanPifsFromItem,
@@ -717,7 +718,8 @@ async function loadSelectedObservationRisks() {
     return [];
   }
 
-  state.observationRisks = csvbFilterSelectedRiskRows(data || []);
+  state.observationRisks = await markHumanPolicyStaleness(state.supabase,
+    csvbFilterSelectedRiskRows(data || []), item.report_id);
   renderObservationRisk();
   return state.observationRisks;
 }
@@ -779,6 +781,9 @@ function csvbDisplayedObservationRisk(row) {
     It is not included in the inspection risk total unless the Entry page switch is used.
   */
   if (kind === "largely") {
+    const weighted = row?.human_pif_factors?.pif_weighted_noc_repetition_score;
+    if (weighted != null) return csvbLargelyAeDisplayFactor() *
+      Number(row.question_type_weight || 0) * Number(row.vessel_age_factor ?? 1) * Number(weighted);
     const qWeight = csvbRiskNumber(row?.question_type_weight);
     const nocScore = csvbRiskNumber(row?.noc_score);
     const ageFactor = csvbRiskNumber(row?.vessel_age_factor);
@@ -877,7 +882,7 @@ function renderObservationRisk() {
 
   const calculated = displayDateTime(risks[0]?.calculated_at);
 
-  line.textContent = `Selected risk profiles: ${risks.length} • Current snapshot • ${calculated}`;
+  line.textContent = `Selected risk profiles: ${risks.length} • ${risks.some(row => row.human_policy_stale) ? "Stale company counting policy — Refresh Risk" : "Current snapshot"} • ${calculated}`;
 
   const header = `
     <div class="csvb-obs-risk-table-head">
@@ -1701,6 +1706,9 @@ async function init() {
     if (k === "positive") return null;
 
     if (k === "largely") {
+      const weighted = row?.human_pif_factors?.pif_weighted_noc_repetition_score;
+      if (weighted != null) return csvbLargelyAeDisplayFactor() *
+        Number(row.question_type_weight || 0) * Number(row.vessel_age_factor ?? 1) * Number(weighted);
       const qWeight = num(row?.question_type_weight);
       const nocScore = num(row?.noc_score);
       const ageFactor = num(row?.vessel_age_factor);
@@ -1809,7 +1817,8 @@ async function init() {
       ? String(rows[0].calculated_at).replace("T", " ").slice(0, 19)
       : "—";
 
-    line.textContent = "Selected risk profiles: " + rows.length + " • Current snapshot • " + calculated;
+    line.textContent = "Selected risk profiles: " + rows.length + " • " +
+      (rows.some(row => row.human_policy_stale) ? "Stale company counting policy — Refresh Risk" : "Current snapshot") + " • " + calculated;
 
     if (!rows.length) {
       area.innerHTML = '<div class="csvb-obs-risk-empty">No stored observation risk score yet. Use Bulk Risk Refresh if needed.</div>';
@@ -1861,7 +1870,8 @@ async function init() {
       const btn = q("csvbObservationRiskMiniRefresh");
       if (btn) btn.disabled = true;
 
-      const rows = await fetchRows();
+      const rows = await markHumanPolicyStaleness(state.supabase,
+        await fetchRows(), state?.item?.report_id);
       renderRows(rows);
       renderedForItem = String(state?.item?.id || "");
     } finally {

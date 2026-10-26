@@ -603,9 +603,11 @@ async function loadVessels() {
     }));
 }
 
+const observationWeight = row => window.CSVB_OBSERVATION_COUNTS.weight(row);
+const observationTotal = rows => window.CSVB_OBSERVATION_COUNTS.sum(rows);
 async function loadPostObservationRows() {
   const { data, error } = await state.supabase
-    .rpc("post_insp_export_observations", {
+    .rpc("post_insp_export_observations_v2", {
       p_vessel_id: null,
       p_from: null,
       p_to: null,
@@ -649,8 +651,9 @@ async function loadPostReportRows() {
 }
 
 async function loadCombinedObservationRows() {
+  await window.CSVB_OBSERVATION_COUNTS.load(state.supabase, true);
   const { data, error } = await state.supabase
-    .rpc("fleet_obs_analytics_export", {
+    .rpc("fleet_obs_analytics_export_v2", {
       p_vessel_id: null,
       p_from: null,
       p_to: null,
@@ -714,6 +717,11 @@ function normalizeCombinedRows(rows) {
       remarks: String(r.observation_text || "").trim(),
       pgno_selected: Array.isArray(r.pgno_selected) ? r.pgno_selected : [],
       pgno_count: Array.isArray(r.pgno_selected) ? r.pgno_selected.length : 0,
+      retained_pifs: r.retained_pifs || [],
+      human_pif_count: r.human_pif_count || 0,
+      effective_observation_count: r.effective_observation_count || 1,
+      human_counting_mode: r.human_counting_mode || "per_finding",
+      policy_revision: r.policy_revision || 0,
     };
   });
 }
@@ -859,7 +867,7 @@ function groupObjectiveRows(rows, keyFn) {
     }
 
     const item = map.get(key);
-    item.observation_count += 1;
+    item.observation_count += observationWeight(row);
     item.reports.add(reportKey(row));
 
     const date = String(row.inspection_date || "").trim();
@@ -888,9 +896,9 @@ function typeCountsFromRows(rows) {
 
   for (const row of rows || []) {
     const t = normalizeType(row.observation_type);
-    if (t === "negative") negative += 1;
-    if (t === "largely") largely += 1;
-    if (t === "positive") positive += 1;
+    if (t === "negative") negative += observationWeight(row);
+    if (t === "largely") largely += observationWeight(row);
+    if (t === "positive") positive += observationWeight(row);
   }
 
   return {
@@ -920,9 +928,9 @@ function groupTypeSplitRows(rows, keyFn, reportCountFn = null) {
     item.reports.add(reportKey(row));
 
     const t = normalizeType(row.observation_type);
-    if (t === "negative") item.negative += 1;
-    if (t === "largely") item.largely += 1;
-    if (t === "positive") item.positive += 1;
+    if (t === "negative") item.negative += observationWeight(row);
+    if (t === "largely") item.largely += observationWeight(row);
+    if (t === "positive") item.positive += observationWeight(row);
   }
 
   return [...map.values()].map((x) => {
@@ -999,10 +1007,10 @@ function openDrilldown(title, rows, reportRows = null, sub = "") {
   const reports = uniqueReportCount(state.currentDrillRows, reportRows);
   const questions = new Set(state.currentDrillRows.map((r) => String(r.question_no || "").trim()).filter(Boolean)).size;
 
-  setText("drillCountObs", String(state.currentDrillRows.length));
+  setText("drillCountObs", String(observationTotal(state.currentDrillRows)));
   setText("drillCountReports", String(reports));
   setText("drillCountQuestions", String(questions));
-  setText("drillAvg", avg(state.currentDrillRows.length, reports));
+  setText("drillAvg", avg(observationTotal(state.currentDrillRows), reports));
 
   const tbody = safeTbody("drillTbody");
   if (!tbody) return;
@@ -1024,6 +1032,7 @@ function openDrilldown(title, rows, reportRows = null, sub = "") {
         <td>${esc(r.designation || "")}</td>
         <td>${esc(r.soc || "")}</td>
         <td>${esc(r.noc || "")}</td>
+        <td>${esc(observationWeight(r))}</td>
         <td>${esc(r.ocimf_inspecting_company || "")}</td>
         <td>${esc(r.inspector_name || "")}</td>
         <td>${esc(r.inspector_company || "")}</td>
@@ -1057,7 +1066,7 @@ function exportDrillCsv() {
     "inspector_or_auditor_company",
     "pgno_selected",
     "remarks",
-    "updated_at",
+    "updated_at", "retained_pifs", "human_pif_count", "effective_observation_count", "human_counting_mode", "policy_revision",
   ];
 
   const csv = [header.join(",")];
@@ -1080,6 +1089,8 @@ function exportDrillCsv() {
       pgnoExportText(r.pgno_selected),
       r.remarks || r.observation_text || "",
       r.updated_at || "",
+      (r.retained_pifs || []).join(" | "), r.human_pif_count || 0,
+      observationWeight(r), r.human_counting_mode || "per_finding", r.policy_revision || 0,
     ].map((v) => `"${String(v).replaceAll('"', '""')}"`).join(",");
 
     csv.push(line);
@@ -1162,13 +1173,13 @@ function buildMonthlyRows(rows, reportRows, yearFilter = "") {
     if (!map.has(key)) continue;
 
     const item = map.get(key);
-    item.observations += 1;
+    item.observations += observationWeight(row);
     item.rows.push(row);
 
     const t = normalizeType(row.observation_type);
-    if (t === "negative") item.negative += 1;
-    if (t === "positive") item.positive += 1;
-    if (t === "largely") item.largely += 1;
+    if (t === "negative") item.negative += observationWeight(row);
+    if (t === "positive") item.positive += observationWeight(row);
+    if (t === "largely") item.largely += observationWeight(row);
   }
 
   return [...map.values()].sort((a, b) => String(a.month).localeCompare(String(b.month)));
@@ -1209,7 +1220,7 @@ function buildPeriodRows(rows, reportRows, keyFn) {
     }
 
     const item = map.get(key);
-    item.observations += 1;
+    item.observations += observationWeight(row);
     item.rows.push(row);
     item.reportKeys.add(reportKey(row));
   }
@@ -1693,8 +1704,8 @@ function renderByType(rowsIgnoreTypeFilter, reportRows) {
     tr.innerHTML = `
       <td>${esc(t.label)}</td>
       <td>${esc(reports.size)}</td>
-      <td>${esc(rows.length)}</td>
-      <td>${esc(avg(rows.length, reportRows.length))}</td>
+      <td>${esc(observationTotal(rows))}</td>
+      <td>${esc(avg(observationTotal(rows), reportRows.length))}</td>
       <td>${buttonHtml(drillId)}</td>
     `;
     tbody.appendChild(tr);
@@ -2296,7 +2307,7 @@ function recordsToMscatItemRows(records) {
   }
 
   return [...map.values()].map((item) => {
-    item.observation_count = item.observation_keys.size;
+    item.observation_count = window.CSVB_OBSERVATION_COUNTS.keyTotal(item.observation_keys);
     item.report_count = item.report_keys.size;
     item.vessel_count = item.vessel_ids.size;
 
@@ -2342,7 +2353,7 @@ function mscatSummaryFromRecords(records) {
 
   return [{
     selection_count: rows.length,
-    observation_count: obs.size,
+    observation_count: window.CSVB_OBSERVATION_COUNTS.keyTotal(obs),
     report_count: reps.size,
     vessel_count: vessels.size,
     ai_count: ai,
@@ -2416,7 +2427,7 @@ function mscatTrendRowsFromRecords(records) {
     section_key: item.section_key,
     section_label: item.section_label,
     selection_count: item.selection_count,
-    observation_count: item.observation_keys.size,
+    observation_count: window.CSVB_OBSERVATION_COUNTS.keyTotal(item.observation_keys),
     report_count: item.report_keys.size,
     vessel_count: item.vessel_ids.size,
     ai_count: item.ai_count,
@@ -2460,10 +2471,10 @@ function buildMscatSourceMetricRows(records) {
       const reportCount = row.reports.size;
       return {
         ...row,
-        observation_count: row.observations.size,
+        observation_count: window.CSVB_OBSERVATION_COUNTS.keyTotal(row.observations),
         report_count: reportCount,
         vessel_count: row.vessels.size,
-        avg_observations_per_report: reportCount ? row.observations.size / reportCount : 0,
+        avg_observations_per_report: reportCount ? window.CSVB_OBSERVATION_COUNTS.keyTotal(row.observations) / reportCount : 0,
         avg_selections_per_report: reportCount ? row.selections / reportCount : 0,
       };
     });
@@ -2778,6 +2789,7 @@ function mapMscatRecordToDrillRow(row) {
     report_ref: row?.report_ref || "",
     title: row?.section_label || "M-SCAT",
     question_no: row?.question_no || row?.question_base || "",
+    ...window.CSVB_OBSERVATION_COUNTS.attach(row),
     observation_type: row?.obs_type || "",
     designation: row?.designation || "",
     soc: row?.soc || "",
@@ -3086,7 +3098,7 @@ async function renderMscatAnalyticsPanel() {
 
     if (recordsError) throw recordsError;
 
-    const records = filterMscatRecordsForUi(rawRecords || []);
+    const records = filterMscatRecordsForUi((rawRecords || []).map(window.CSVB_OBSERVATION_COUNTS.attach));
     state.currentMscatRecords = records;
 
     const items = recordsToMscatItemRows(records);
@@ -3251,7 +3263,7 @@ async function exportFilteredCsv() {
     "pgno_selected",
     "pgno_count",
     "remarks",
-    "updated_at",
+    "updated_at", "retained_pifs", "human_pif_count", "effective_observation_count", "human_counting_mode", "policy_revision",
   ];
 
   const csv = [header.join(",")];
@@ -3279,6 +3291,8 @@ async function exportFilteredCsv() {
       String(pgCount),
       r.remarks || "",
       r.updated_at || "",
+      (r.retained_pifs || []).join(" | "), r.human_pif_count || 0,
+      observationWeight(r), r.human_counting_mode || "per_finding", r.policy_revision || 0,
     ].map((v) => `"${String(v).replaceAll('"', '""')}"`).join(",");
 
     csv.push(line);

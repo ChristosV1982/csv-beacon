@@ -7,4 +7,4 @@ Retain all assigned Human PIFs on the same finding, preserving its identity and 
 
 **Why:** The user requires complete PIF retention with one-finding counting by default. Duplicating findings would also duplicate workflow, response, attachment and comment-history identities.
 
-**How to apply:** Treat a future Per-PIF mode as an explicit calculation policy, not row duplication. PIF-only corrections must preserve other finding data and must not refresh saved risk snapshots implicitly.
+**How to apply:** Per-PIF counting is an explicitly selected company-level policy, never a platform-global setting or row duplication. Per finding remains the default. Policy changes must not rewrite stored findings or historical risk snapshots; risk recalculation stays explicit. PIF-only corrections must preserve other finding data and must not refresh saved risk snapshots implicitly.

@@ -1,4 +1,5 @@
 import { loadLockedLibraryJson } from "./question_library_loader.js";
+import { markHumanPolicyStaleness } from "./csvb-human-policy-staleness.mjs?v=20261026_company_policy_v1";
 import { importOperatorCommentsFromPdf } from "./post_inspection_operator_comments.mjs?v=20261021_ocimf_rounds_v1";
 import { humanPifsFromItem as sharedHumanPifsFromItem, renderHumanPifList } from "./csvb-human-pifs.mjs?v=20261026_human_pifs_v1";
 import { refreshHumanPifsFromLinkedPdf } from "./post_inspection_human_pif_repair.mjs?v=20261026_human_pifs_v1";
@@ -610,6 +611,9 @@ function csvbDisplayedObservationRisk(row, item) {
     It is not included in the inspection risk total unless the Entry page switch is used.
   */
   if (kind === "largely") {
+    const weighted = row?.human_pif_factors?.pif_weighted_noc_repetition_score;
+    if (weighted != null) return csvbLargelyAeDisplayFactor() *
+      Number(row.question_type_weight || 0) * Number(row.vessel_age_factor ?? 1) * Number(weighted);
     const qWeight = csvbLocalRiskNumber(row?.question_type_weight);
     const nocScore = csvbLocalRiskNumber(row?.noc_score);
     const ageFactor = csvbLocalRiskNumber(row?.vessel_age_factor);
@@ -690,7 +694,8 @@ async function loadCurrentObservationRiskForActiveReport() {
 
   const grouped = new Map();
 
-  for (const row of data || []) {
+  const markedRows = await markHumanPolicyStaleness(state.supabase, data || [], state.activeReport.id);
+  for (const row of markedRows) {
     if (!row?.observation_item_id) continue;
     const key = String(row.observation_item_id);
     const arr = grouped.get(key) || [];
@@ -728,7 +733,7 @@ function renderRiskCard() {
   }
 
   const calculated = displayDateTime(risks[0]?.calculated_at);
-  setTextIfPresent("riskProfileLine", `Selected risk profiles: ${risks.length} • Current snapshot • ${calculated}`);
+  setTextIfPresent("riskProfileLine", `Selected risk profiles: ${risks.length} • ${risks.some(row => row.human_policy_stale) ? "Stale company counting policy — Refresh Risk" : "Current snapshot"} • ${calculated}`);
 
   strip.innerHTML = risks.map((risk) => {
     const profile = String(risk.profile_name || "Risk").trim();
@@ -762,7 +767,8 @@ async function loadCurrentRiskForActiveReport() {
     return null;
   }
 
-  state.currentRisks = csvbFilterSelectedRiskRows(data || []);
+  state.currentRisks = await markHumanPolicyStaleness(state.supabase,
+    csvbFilterSelectedRiskRows(data || []), state.activeReport.id);
   state.currentRisk = state.currentRisks[0] || null;
   renderRiskCard();
   return state.currentRisk;

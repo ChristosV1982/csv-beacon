@@ -1,3 +1,7 @@
+import { mountHumanCountingPanel } from "./csvb-human-counting-panel.mjs?v=20261026_company_policy_v1";
+const observationWeight = row => window.CSVB_OBSERVATION_COUNTS.weight(row);
+const observationTotal = rows => window.CSVB_OBSERVATION_COUNTS.sum(rows);
+
 const POST_INSPECTION_INDEX_BUILD =
   "post_inspection_index_v18_ddmmyyyy_display_2026-05-29";
 
@@ -322,7 +326,7 @@ function storedKpiUniqueCountMap(items, getter) {
   for (const it of items || []) {
     const val = String(getter(it) || "").trim();
     if (!val) continue;
-    map.set(val, (map.get(val) || 0) + 1);
+    map.set(val, (map.get(val) || 0) + observationWeight(it));
   }
   return [...map.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
 }
@@ -365,7 +369,7 @@ async function loadStoredKpiItems(reportId) {
   if (error) throw error;
 
   return (data || []).map((row) => ({
-    ...row,
+    ...window.CSVB_OBSERVATION_COUNTS.attach(row),
     qno: canonicalQno(row.question_no || row.question_base || ""),
     kind: storedKpiKind(row),
     designation: normDesignation(row.designation),
@@ -399,10 +403,10 @@ function renderStoredKpiDialog(report, items) {
   el("storedKpiSubtitle").textContent = `${vessel} • ${date} • ${company}`;
 
   storedKpiSetValue("storedKpiQuestionsExamined", storedKpiExaminedCount(report, items));
-  storedKpiSetValue("storedKpiTotal", items.length);
-  storedKpiSetValue("storedKpiNeg", byKind.negative.length);
-  storedKpiSetValue("storedKpiPos", byKind.positive.length);
-  storedKpiSetValue("storedKpiLae", byKind.largely.length);
+  storedKpiSetValue("storedKpiTotal", observationTotal(items));
+  storedKpiSetValue("storedKpiNeg", observationTotal(byKind.negative));
+  storedKpiSetValue("storedKpiPos", observationTotal(byKind.positive));
+  storedKpiSetValue("storedKpiLae", observationTotal(byKind.largely));
 
   storedKpiSetValue("storedKpiQuestionsPositive", storedKpiTopLines(byKind.positive, (x) => x.qno));
   storedKpiSetValue("storedKpiQuestionsLargely", storedKpiTopLines(byKind.largely, (x) => x.qno));
@@ -482,7 +486,8 @@ function riskMiniGaugeHtml(reportId) {
   return '<div class="csvb-risk-mini-stack">' + risks.map((r) => {
     const rawScore = riskScoreNumber(r);
     const score = fmtRiskScore(rawScore);
-    const profile = String(r.profile_name || "Risk").trim();
+    const profile = String(r.profile_name || "Risk").trim() +
+      (r.human_policy_stale ? " • Stale — Refresh Risk" : "");
 
     const profileKey = String(r.profile_id || r.profile_code || r.profile_name || "risk");
     const avg = state.riskAveragesByProfile?.get(profileKey)?.basisAverage ?? state.riskAverages?.basisAverage;
@@ -530,8 +535,12 @@ async function loadCurrentRiskScoresForStoredReports() {
     return;
   }
 
+  const {data: statuses, error: policyError} = await state.supabase.rpc("csvb_human_policy_snapshot_status_for_me");
+  if (policyError) throw policyError;
+  const staleIds = new Set((statuses || []).filter(row => row.is_stale).map(row => row.risk_snapshot_id));
   for (const row of data || []) {
     if (!row?.report_id) continue;
+    row.human_policy_stale = staleIds.has(row.risk_snapshot_id);
 
     const key = String(row.report_id);
     const arr = state.riskScoresByReport.get(key) || [];
@@ -1353,6 +1362,16 @@ async function init() {
   });
 
   state.reports = await loadReportsFromDb();
+  await window.CSVB_OBSERVATION_COUNTS.load(state.supabase);
+  const policyHost = el("humanCountingPolicyHost");
+  await mountHumanCountingPanel({
+    supabase: state.supabase, host: policyHost,
+    onSaved: async () => {
+      await window.CSVB_OBSERVATION_COUNTS.load(state.supabase, true);
+      await loadCurrentRiskScoresForStoredReports();
+      renderStoredTable();
+    },
+  });
 
   /*
     Risk display must never block the stored inspection list.

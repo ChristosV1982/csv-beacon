@@ -4,6 +4,8 @@
 
 (function () {
   "use strict";
+  const observationWeight = row => window.CSVB_OBSERVATION_COUNTS.weight(row);
+  const observationTotal = rows => window.CSVB_OBSERVATION_COUNTS.sum(rows);
 
   const BUILD = "POST-STATS-SECTOR-ANALYTICS-V02-COMPACT-COLLAPSE-AUDITFIX-20260630";
   window.CSVB_POST_STATS_SECTOR_ANALYTICS_BUILD = BUILD;
@@ -299,7 +301,7 @@
       if (!map.has(key)) continue;
 
       const item = map.get(key);
-      item.observations += 1;
+      item.observations += observationWeight(row);
       item.reports.add(reportKey(row));
       if (vesselKey(row)) item.vessels.add(vesselKey(row));
       item.rows.push(row);
@@ -330,7 +332,7 @@
       }
 
       const item = map.get(q);
-      item.observations += 1;
+      item.observations += observationWeight(row);
       item.reports.add(reportKey(row));
       if (vesselKey(row)) item.vessels.add(vesselKey(row));
       item.rows.push(row);
@@ -814,9 +816,9 @@
     const reportSet = new Set(rows.map(reportKey).filter(Boolean));
     const vesselSet = new Set(rows.map(vesselKey).filter(Boolean));
 
-    setText("csvbSectorKpiObs", rows.length);
+    setText("csvbSectorKpiObs", observationTotal(rows));
     setText("csvbSectorKpiReports", reportSet.size);
-    setText("csvbSectorKpiAvg", avg(rows.length, reportSet.size));
+    setText("csvbSectorKpiAvg", avg(observationTotal(rows), reportSet.size));
     setText("csvbSectorKpiVessels", vesselSet.size);
     setText("csvbSectorKpiTopQ", topQuestions[0]?.qno || "—");
   }
@@ -913,7 +915,7 @@
       const key = `${b}::${s}`;
 
       if (!map.has(key)) map.set(key, { bucket: b, source: s, count: 0 });
-      map.get(key).count += 1;
+      map.get(key).count += observationWeight(row);
     }
 
     const buckets = [...new Set([...map.values()].map((x) => x.bucket))].sort();
@@ -986,7 +988,7 @@
     const tbody = document.getElementById("csvbSectorModalTbody");
 
     document.getElementById("csvbSectorModalTitle").textContent = title;
-    document.getElementById("csvbSectorModalSub").textContent = `${rows.length} related observation(s).`;
+    document.getElementById("csvbSectorModalSub").textContent = `${observationTotal(rows)} effective observations • ${rows.length} finding records`;
 
     tbody.innerHTML = rows.map((row) => `
       <tr>
@@ -1002,6 +1004,7 @@
       </tr>
     `).join("") || `<tr><td colspan="9">No records.</td></tr>`;
 
+    window.CSVB_OBSERVATION_COUNTS.decorateFindingTable(tbody, rows);
     modal.showModal();
   }
 

@@ -4,6 +4,8 @@
 
 (function () {
   "use strict";
+  const observationWeight = row => window.CSVB_OBSERVATION_COUNTS.weight(row);
+  const observationTotal = rows => window.CSVB_OBSERVATION_COUNTS.sum(rows);
 
   const BUILD = "POST-STATS-PGNO-ANALYTICS-V07-SCHEDULE-FIX-20260811";
   window.CSVB_POST_STATS_PGNO_ANALYTICS_BUILD = BUILD;
@@ -312,7 +314,7 @@
       }
 
       const item = map.get(key);
-      item.observations += 1;
+      item.observations += observationWeight(row);
       item.reportKeys.add(reportKey(row));
       item.rows.push(row);
 
@@ -406,6 +408,7 @@
       </tr>
     `).join("") : `<tr><td colspan="8">No related records.</td></tr>`;
 
+    window.CSVB_OBSERVATION_COUNTS.decorateFindingTable(tbody, rows);
     modal.showModal();
   }
 
@@ -601,8 +604,8 @@
     const missingKpi = document.getElementById("csvbPgnoMissingKpi");
     const scopeKpi = document.getElementById("csvbPgnoScopeKpi");
 
-    if (assignedKpi) assignedKpi.textContent = String(assigned.length);
-    if (missingKpi) missingKpi.textContent = String(missing.length);
+    if (assignedKpi) assignedKpi.textContent = String(observationTotal(assigned));
+    if (missingKpi) missingKpi.textContent = String(observationTotal(missing));
     if (scopeKpi) scopeKpi.textContent = topPgno[0]?.pgno_no || "Vetting";
 
     card.dataset.csvbPgnoHelperBuild = BUILD;

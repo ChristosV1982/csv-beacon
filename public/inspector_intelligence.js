@@ -148,6 +148,7 @@ function enrichOwnRows(rows) {
   return (rows || []).map((r) => {
     const meta = state.reportMetaByKey.get(reportKey(r)) || {};
     return {
+      ...r,
       source_kind: "own",
       source_label: "Own Fleet Inspection",
       inspector_name: meta.inspector_name || "",
@@ -234,7 +235,7 @@ async function loadReports() {
 }
 
 async function loadOwnObservationRows() {
-  const { data, error } = await state.supabase.rpc("post_insp_export_observations", {
+  const { data, error } = await state.supabase.rpc("post_insp_export_observations_v2", {
     p_vessel_id: null,
     p_from: null,
     p_to: null,
@@ -280,6 +281,9 @@ async function loadThirdPartyRows() {
 
   return data || [];
 }
+
+const observationWeight = row => window.CSVB_OBSERVATION_COUNTS.weight(row);
+const observationTotal = rows => window.CSVB_OBSERVATION_COUNTS.sum(rows);
 
 function renderInspectorSelect() {
   const sel = el("inspectorSelect");
@@ -377,9 +381,9 @@ function filteredCombinedRows() {
 }
 
 function renderSummary(rows) {
-  const total = rows.length;
-  const own = rows.filter((r) => r.source_kind === "own").length;
-  const third = rows.filter((r) => r.source_kind === "third_party").length;
+  const total = observationTotal(rows);
+  const own = observationTotal(rows.filter((r) => r.source_kind === "own"));
+  const third = observationTotal(rows.filter((r) => r.source_kind === "third_party"));
   const qSet = new Set(rows.map((r) => String(r.question_no || "").trim()).filter(Boolean));
 
   el("sumTotal").textContent = String(total);
@@ -393,7 +397,7 @@ function renderRecordsTable(rows) {
   tbody.innerHTML = "";
 
   if (!rows.length) {
-    tbody.innerHTML = `<tr><td colspan="11" class="muted">No records found for the selected inspector/source/date filters.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="12" class="muted">No records found for the selected inspector/source/date filters.</td></tr>`;
     return;
   }
 
@@ -417,6 +421,7 @@ function renderRecordsTable(rows) {
       <td>${esc(r.designation || "—")}</td>
       <td>${esc(r.soc || "—")}</td>
       <td>${esc(r.noc || "—")}</td>
+      <td>${esc(observationWeight(r))}</td>
       <td>${esc(r.inspector_company || "—")}</td>
       <td class="remarksCell">${esc(r.remarks || r.observation_text || "—")}</td>
     `;
@@ -599,7 +604,7 @@ function exportCurrentViewCsv() {
     "inspector_name",
     "inspector_company",
     "pgno_selected",
-    "remarks",
+    "remarks", "retained_pifs", "human_pif_count", "effective_observation_count", "human_counting_mode", "policy_revision",
   ];
 
   const csv = [header.join(",")];
@@ -623,6 +628,8 @@ function exportCurrentViewCsv() {
       r.inspector_company || "",
       pgnoExportText(r.pgno_selected),
       r.remarks || r.observation_text || "",
+      (r.retained_pifs || []).join(" | "), r.human_pif_count || 0,
+      observationWeight(r), r.human_counting_mode || "per_finding", r.policy_revision || 0,
     ].map((v) => `"${String(v).replaceAll('"', '""')}"`).join(",");
 
     csv.push(line);
@@ -659,8 +666,8 @@ function exportCurrentViewPdf() {
     .map((type) => OBS_TYPES[type]);
   const from = String(el("dateFrom").value || "").trim() || "Any";
   const to = String(el("dateTo").value || "").trim() || "Any";
-  const ownCount = rows.filter((row) => row.source_kind === "own").length;
-  const thirdCount = rows.filter((row) => row.source_kind === "third_party").length;
+  const ownCount = observationTotal(rows.filter((row) => row.source_kind === "own"));
+  const thirdCount = observationTotal(rows.filter((row) => row.source_kind === "third_party"));
   const questionCount = new Set(
     rows.map((row) => String(row.question_no || "").trim()).filter(Boolean)
   ).size;
@@ -681,11 +688,12 @@ function exportCurrentViewPdf() {
           <td>${esc(row.designation || "—")}</td>
           <td>${esc(row.soc || "—")}</td>
           <td>${esc(row.noc || "—")}</td>
+          <td>${esc(observationWeight(row))}</td>
           <td>${esc(row.inspector_company || "—")}</td>
           <td>${esc(row.remarks || row.observation_text || "—")}</td>
         </tr>`;
       }).join("")
-    : `<tr><td colspan="11" class="empty">No records match the selected filters.</td></tr>`;
+    : `<tr><td colspan="12" class="empty">No records match the selected filters.</td></tr>`;
 
   const printWindow = window.open("", "_blank");
   if (!printWindow) {
@@ -730,7 +738,7 @@ function exportCurrentViewPdf() {
         <div><strong>Finding types:</strong> ${esc(typeLabels.length ? typeLabels.join(", ") : "None")}</div>
       </section>
       <section class="summary">
-        <span>Total records: ${rows.length}</span>
+        <span>Effective observations: ${observationTotal(rows)} • Finding records: ${rows.length}</span>
         <span>Own fleet: ${ownCount}</span>
         <span>Third-party: ${thirdCount}</span>
         <span>Unique questions: ${questionCount}</span>
@@ -739,7 +747,7 @@ function exportCurrentViewPdf() {
         <table>
           <thead><tr>
             <th>Source</th><th>Vessel</th><th>Date</th><th>Report / Reference</th>
-            <th>Question</th><th>Type</th><th>Designation</th><th>SOC</th><th>NOC</th>
+            <th>Question</th><th>Type</th><th>Designation</th><th>SOC</th><th>NOC</th><th>Effective count</th>
             <th>Inspector Company</th><th>Remarks / Observation text</th>
           </tr></thead>
           <tbody>${tableRows}</tbody>
