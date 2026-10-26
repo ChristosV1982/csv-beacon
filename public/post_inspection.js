@@ -1,4 +1,4 @@
-import { mountHumanCountingPanel } from "./csvb-human-counting-panel.mjs?v=20261026_company_policy_v1";
+import { mountHumanCountingPanel } from "./csvb-human-counting-panel.mjs?v=20261026_entry_integration_v2";
 const observationWeight = row => window.CSVB_OBSERVATION_COUNTS.weight(row);
 const observationTotal = rows => window.CSVB_OBSERVATION_COUNTS.sum(rows);
 
@@ -521,7 +521,7 @@ function riskMiniGaugeHtml(reportId) {
 }
 
 async function loadCurrentRiskScoresForStoredReports() {
-  state.riskScoresByReport = new Map();
+  const nextScores = new Map();
 
   state.includeLargelyInEntryRisk = localStorage.getItem(RISK_INCLUDE_LAE_KEY) === "1";
 
@@ -531,24 +531,49 @@ async function loadCurrentRiskScoresForStoredReports() {
   });
 
   if (error) {
-    console.warn("All-profile adjusted risk scores failed to load.", error);
-    return;
+    throw new Error("Stored risk scores could not be loaded: " + (error.message || String(error)));
   }
 
   const {data: statuses, error: policyError} = await state.supabase.rpc("csvb_human_policy_snapshot_status_for_me");
-  if (policyError) throw policyError;
+  if (policyError) throw new Error("Risk policy status could not be loaded: " + (policyError.message || String(policyError)));
   const staleIds = new Set((statuses || []).filter(row => row.is_stale).map(row => row.risk_snapshot_id));
   for (const row of data || []) {
     if (!row?.report_id) continue;
     row.human_policy_stale = staleIds.has(row.risk_snapshot_id);
 
     const key = String(row.report_id);
-    const arr = state.riskScoresByReport.get(key) || [];
+    const arr = nextScores.get(key) || [];
     arr.push(row);
-    state.riskScoresByReport.set(key, arr);
+    nextScores.set(key, arr);
   }
+  state.riskScoresByReport = nextScores;
+  el("riskDisplayError")?.remove();
 }
 
+function showRiskDisplayError(error) {
+  let notice = el("riskDisplayError");
+  if (!notice) {
+    notice = document.createElement("div");
+    notice.id = "riskDisplayError";
+    notice.className = "card";
+    notice.setAttribute("role", "alert");
+    el("humanCountingPolicyHost").after(notice);
+  }
+  notice.textContent = "Risk display unavailable: " + (error?.message || String(error)) +
+    ". Stored inspections are still available. Existing risk snapshots have not been removed.";
+}
+
+async function reloadRiskDisplayFromControls() {
+  try {
+    await loadCurrentRiskScoresForStoredReports();
+    computeRiskAverages();
+    renderRiskAveragePanel();
+    renderStoredTable();
+  } catch (error) {
+    console.error(error);
+    showRiskDisplayError(error);
+  }
+}
 
 
 
@@ -849,6 +874,9 @@ async function refreshAllRisksForStoredReports() {
 
   const btn = el("refreshAllRisksBtn");
   const oldText = btn ? btn.textContent : "";
+  let success = 0;
+  const errors = [];
+  let displayReload = false;
 
   try {
     if (btn) {
@@ -878,9 +906,6 @@ async function refreshAllRisksForStoredReports() {
       );
       return;
     }
-
-    let success = 0;
-    const errors = [];
 
     for (let i = 0; i < reports.length; i++) {
       const report = reports[i];
@@ -913,6 +938,7 @@ async function refreshAllRisksForStoredReports() {
     }
 
     if (btn) btn.textContent = "Updating displayed scores…";
+    displayReload = true;
     await loadCurrentRiskScoresForStoredReports();
     computeRiskAverages();
     renderRiskAveragePanel();
@@ -948,7 +974,12 @@ async function refreshAllRisksForStoredReports() {
     }
   } catch (err) {
     console.error(err);
-    alert("Refresh all risks failed: " + (err?.message || String(err)));
+    if (displayReload) showRiskDisplayError(err);
+    alert((displayReload
+      ? `Risk calculations finished: ${success} succeeded, ${errors.length} failed.\n\n` +
+        "Stored snapshots were not undone, but reloading the displayed risk scores failed. " +
+        "The screen may be out of date; this is not a calculation-success confirmation.\n\n"
+      : "Refresh all risks failed: ") + (err?.message || String(err)));
   } finally {
     if (btn) {
       btn.disabled = false;
@@ -1042,10 +1073,7 @@ function renderRiskAveragePanel() {
       pctInput.value = String(largelyAePercentValue());
 
       if (el("includeLargelyRiskSwitch")?.checked) {
-        await loadCurrentRiskScoresForStoredReports();
-        computeRiskAverages();
-        renderRiskAveragePanel();
-        renderStoredTable();
+        await reloadRiskDisplayFromControls();
       }
     };
   }
@@ -1056,10 +1084,7 @@ function renderRiskAveragePanel() {
       localStorage.setItem(RISK_INCLUDE_LAE_KEY, sw.checked ? "1" : "0");
       state.includeLargelyInEntryRisk = sw.checked;
 
-      await loadCurrentRiskScoresForStoredReports();
-      computeRiskAverages();
-      renderRiskAveragePanel();
-      renderStoredTable();
+      await reloadRiskDisplayFromControls();
     };
   }
 
@@ -1274,6 +1299,19 @@ function openStoredFilterForCol(col) {
   el("storedFilterDialog").showModal();
 }
 
+async function inheritedHumanPolicyCompany(bundle) {
+  // Wait for the existing guard; frontend context never substitutes for it.
+  const started = Date.now();
+  while (!window.CSVB_MODULE_GUARD) {
+    if (Date.now() - started > 15000) throw new Error("Module access check did not finish. Reload Post-Inspection Entry.");
+    await new Promise(resolve => setTimeout(resolve, 50));
+  }
+  if (window.CSVB_MODULE_GUARD.allowed !== true) throw new Error("Post-Inspection module access was not granted.");
+  if (!["super_admin", "platform_owner"].includes(bundle?.profile?.role)) return null;
+  try { return localStorage.getItem("csvb_superuser_company_view_id") || null; }
+  catch { return null; }
+}
+
 async function init() {
   el("buildPill").textContent = `build: ${POST_INSPECTION_INDEX_BUILD}`;
 
@@ -1285,6 +1323,7 @@ async function init() {
   const R = window.AUTH.ROLES;
   state.me = await window.AUTH.requireAuth([R.SUPER_ADMIN, R.COMPANY_ADMIN, R.COMPANY_SUPERINTENDENT].filter(Boolean));
   if (!state.me) return;
+  const initialPolicyCompanyId = await inheritedHumanPolicyCompany(state.me);
 
   window.AUTH.fillUserBadge(state.me, "userBadge");
   el("logoutBtn").addEventListener("click", window.AUTH.logoutAndGoLogin);
@@ -1366,6 +1405,7 @@ async function init() {
   const policyHost = el("humanCountingPolicyHost");
   await mountHumanCountingPanel({
     supabase: state.supabase, host: policyHost,
+    initialCompanyId: initialPolicyCompanyId,
     onSaved: async () => {
       await window.CSVB_OBSERVATION_COUNTS.load(state.supabase, true);
       await loadCurrentRiskScoresForStoredReports();
@@ -1384,6 +1424,7 @@ async function init() {
     renderRiskAveragePanel();
   } catch (riskErr) {
     console.warn("Risk average display failed; stored inspection list will still load.", riskErr);
+    showRiskDisplayError(riskErr);
     state.riskScoresByReport = new Map();
     state.riskAverages = {
       ytdAverage: null,

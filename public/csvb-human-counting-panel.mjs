@@ -29,7 +29,7 @@ function errorMessage(error, fallback) {
   return error?.message || error?.details || fallback;
 }
 
-export async function mountHumanCountingPanel({ supabase, host, onSaved } = {}) {
+export async function mountHumanCountingPanel({ supabase, host, onSaved, initialCompanyId = null } = {}) {
   if (!supabase?.rpc || !host?.appendChild) {
     throw new TypeError("mountHumanCountingPanel requires a Supabase client and a host element.");
   }
@@ -243,7 +243,8 @@ export async function mountHumanCountingPanel({ supabase, host, onSaved } = {}) 
   function onModeChange() {
     if (policy?.can_edit !== true) return;
     draftMode = [...radioInputs.values()].find(input => input.checked)?.value ?? null;
-    setStatus("");
+    setStatus(draftMode === policy.human_counting_mode
+      ? "This mode is already saved. Choose a different mode to enable Save." : "");
     refreshControls();
   }
 
@@ -291,6 +292,14 @@ export async function mountHumanCountingPanel({ supabase, host, onSaved } = {}) 
   for (const input of radioInputs.values()) input.addEventListener("change", onModeChange);
 
   await readPolicy(null);
+  const inheritedCompanyId = String(initialCompanyId || "").trim();
+  // Only the server-provided list establishes eligible company choices. An
+  // own-company response has no list, so stale simulation values are ignored.
+  if (inheritedCompanyId && availableCompanies.length) {
+    const inherited = availableCompanies.find(company => String(company.id) === inheritedCompanyId);
+    if (inherited) await readPolicy(inherited.id);
+    else setStatus("The dashboard company is not in the available company list. Select a company below.", "info");
+  }
 
   return {
     element: root,
