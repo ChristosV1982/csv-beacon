@@ -162,8 +162,9 @@
     page.insertBefore(panel, layout);
     const fullQuestionRow = page.querySelector("#showFullQuestionToggle")?.closest(".row");
     if (fullQuestionRow) {
+      fullQuestionRow.classList.add("fleet-list-control");
       const observationToggle = document.createElement("label");
-      observationToggle.className = "fleet-observation-filter";
+      observationToggle.className = "fleet-observation-filter fleet-list-control";
       observationToggle.htmlFor = "fleetOnlyObservedToggle";
       observationToggle.innerHTML = `<input id="fleetOnlyObservedToggle" type="checkbox"><span>Show only questions with recorded observations</span>`;
       fullQuestionRow.insertAdjacentElement("afterend", observationToggle);

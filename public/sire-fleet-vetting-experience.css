@@ -134,6 +134,68 @@ html[data-csvb-page="sire-fleet-vetting-experience.html"] .fleet-observation-fil
   accent-color: var(--fleet-ink);
 }
 
+html[data-csvb-page="sire-fleet-vetting-experience.html"] .fleet-list-control {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 8px !important;
+  margin: 8px 0 2px !important;
+  padding: 0 !important;
+  color: #385778 !important;
+  font-family: inherit !important;
+  font-size: 12px !important;
+  font-weight: 400 !important;
+  line-height: 1.4 !important;
+  text-align: left !important;
+}
+
+html[data-csvb-page="sire-fleet-vetting-experience.html"] .fleet-list-control > .muted.small {
+  order: 2;
+  margin: 0 !important;
+  color: #385778 !important;
+  font-family: inherit !important;
+  font-size: 12px !important;
+  font-weight: 400 !important;
+  line-height: 1.4 !important;
+}
+
+html[data-csvb-page="sire-fleet-vetting-experience.html"] .fleet-list-control > .muted.small *,
+html[data-csvb-page="sire-fleet-vetting-experience.html"] .fleet-list-control > span {
+  color: #385778 !important;
+  font-family: inherit !important;
+  font-size: 12px !important;
+  font-weight: 400 !important;
+  line-height: 1.4 !important;
+}
+
+html[data-csvb-page="sire-fleet-vetting-experience.html"] .fleet-list-control > .toggle {
+  display: contents !important;
+}
+
+html[data-csvb-page="sire-fleet-vetting-experience.html"] .fleet-list-control > .toggle > span {
+  display: none !important;
+}
+
+html[data-csvb-page="sire-fleet-vetting-experience.html"] .fleet-list-control > .toggle > input[type="checkbox"],
+html[data-csvb-page="sire-fleet-vetting-experience.html"] .fleet-list-control > input[type="checkbox"] {
+  order: 1;
+  flex: 0 0 16px !important;
+  width: 16px !important;
+  height: 16px !important;
+  margin: 0 !important;
+  accent-color: var(--fleet-ink);
+}
+
+html[data-csvb-page="sire-fleet-vetting-experience.html"] .fleet-observation-filter > span {
+  order: 2;
+  margin: 0 !important;
+  color: #385778 !important;
+  font-family: inherit !important;
+  font-size: 12px !important;
+  font-weight: 400 !important;
+  line-height: 1.4 !important;
+}
+
 html[data-csvb-page="sire-fleet-vetting-experience.html"] .qitem {
   border-bottom: 1px solid #E5EEF8;
   padding: 9px 8px;
