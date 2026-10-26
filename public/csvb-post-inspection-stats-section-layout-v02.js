@@ -3,6 +3,7 @@
 // Display-only helper. No stored data or calculations are changed.
 (() => {
   "use strict";
+  if (window.CSVB_POST_STATS_VIEW?.enabled) return;
 
   const BUILD = "POST-INSPECTION-STATS-SECTION-LAYOUT-V02-20260601";
   window.CSVB_POST_STATS_SECTION_LAYOUT_BUILD = BUILD;

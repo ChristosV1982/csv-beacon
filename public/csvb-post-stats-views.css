@@ -1,0 +1,247 @@
+/* C.S.V. Beacon — post-inspection analytics views
+   Companion styles for the landing grid and dedicated analytics view shell. */
+
+#csvbAnalyticsLanding {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 1650px;
+  margin: 0 auto;
+  padding: 14px;
+  color: #1a4170;
+  background: rgba(12, 33, 58, 0.68);
+  border: 1px solid rgba(213, 222, 239, 0.35);
+  border-radius: 18px;
+  box-shadow: 0 10px 46px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(3px);
+}
+
+#csvbAnalyticsLanding *,
+#csvbAnalyticsViewHeading * {
+  box-sizing: border-box;
+}
+
+#csvbAnalyticsLanding > h1 {
+  color: #ffffff;
+}
+
+.csvb-analytics-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  align-items: stretch;
+}
+
+.csvb-analytics-card {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  min-height: 160px;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 16px;
+  overflow: hidden;
+  color: #1a4170;
+  background: linear-gradient(145deg, #ffffff 0%, #f5f8fd 100%);
+  border: 1px solid #d5deef;
+  border-radius: 15px;
+  box-shadow: 0 4px 18px rgba(18, 44, 87, 0.14);
+  transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
+}
+
+.csvb-analytics-card::before {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 3px;
+  content: "";
+  background: linear-gradient(90deg, #295eb0 0%, #6b96d1 72%, #b9cceb 100%);
+}
+
+.csvb-analytics-card h2 {
+  margin: 1px 0 8px;
+  color: #123761;
+  font-size: 1.04rem;
+  font-weight: 900;
+  line-height: 1.3;
+  letter-spacing: 0.01em;
+}
+
+.csvb-analytics-card p {
+  margin: 0 0 14px;
+  color: #48628e;
+  font-size: 0.9rem;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.csvb-analytics-open {
+  display: inline-flex;
+  min-height: 34px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  margin-top: auto;
+  padding: 7px 11px;
+  color: #fff;
+  background: #295eb0;
+  border: 1px solid #295eb0;
+  border-radius: 9px;
+  font-size: 0.84rem;
+  font-weight: 900;
+  line-height: 1.2;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background-color 150ms ease, border-color 150ms ease, transform 150ms ease;
+}
+
+.csvb-analytics-open::after {
+  content: "→";
+  font-size: 1rem;
+  line-height: 0.8;
+}
+
+#csvbAnalyticsViewHeading {
+  display: flex;
+  width: 100%;
+  max-width: 1650px;
+  min-height: 64px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 auto 12px;
+  padding: 12px 14px;
+  color: #fff;
+  background: rgba(12, 33, 58, 0.78);
+  border: 1px solid rgba(213, 222, 239, 0.35);
+  border-radius: 15px;
+  box-shadow: 0 10px 36px rgba(0, 0, 0, 0.24);
+  backdrop-filter: blur(3px);
+}
+
+#csvbAnalyticsViewHeading h1,
+#csvbAnalyticsViewHeading h2 {
+  min-width: 0;
+  margin: 0;
+  color: #fff;
+  font-size: 1.12rem;
+  font-weight: 900;
+  line-height: 1.3;
+  letter-spacing: 0.02em;
+}
+
+#csvbBackToAnalytics {
+  display: inline-flex;
+  min-height: 36px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 8px 12px;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.58);
+  border-radius: 9px;
+  font-size: 0.86rem;
+  font-weight: 850;
+  line-height: 1.2;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 150ms ease, border-color 150ms ease, transform 150ms ease;
+}
+
+#csvbBackToAnalytics::before {
+  content: "←";
+  font-size: 1rem;
+  line-height: 0.8;
+}
+
+.csvb-analytics-open:hover {
+  background: #1a4170;
+  border-color: #1a4170;
+  transform: translateY(-1px);
+}
+
+#csvbBackToAnalytics:hover {
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.85);
+  transform: translateY(-1px);
+}
+
+.csvb-analytics-open:focus-visible,
+#csvbBackToAnalytics:focus-visible {
+  outline: 3px solid #a9c8f3;
+  outline-offset: 3px;
+}
+
+@media (max-width: 1120px) {
+  .csvb-analytics-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 780px) {
+  #csvbAnalyticsLanding {
+    padding: 11px;
+    border-radius: 15px;
+  }
+
+  .csvb-analytics-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .csvb-analytics-card {
+    min-height: 152px;
+    padding: 14px;
+  }
+}
+
+@media (max-width: 520px) {
+  #csvbAnalyticsLanding {
+    padding: 9px;
+  }
+
+  .csvb-analytics-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 9px;
+  }
+
+  .csvb-analytics-card {
+    min-height: 0;
+    padding: 14px;
+  }
+
+  .csvb-analytics-card h2 {
+    font-size: 1rem;
+  }
+
+  .csvb-analytics-card p {
+    margin-bottom: 12px;
+  }
+
+  #csvbAnalyticsViewHeading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 9px;
+    padding: 12px;
+  }
+
+  #csvbAnalyticsViewHeading h1,
+  #csvbAnalyticsViewHeading h2 {
+    font-size: 1.04rem;
+  }
+
+  #csvbBackToAnalytics {
+    min-height: 34px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .csvb-analytics-card,
+  .csvb-analytics-open,
+  #csvbBackToAnalytics {
+    transition: none;
+  }
+}

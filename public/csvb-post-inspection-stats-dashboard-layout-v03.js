@@ -3,6 +3,7 @@
 // It does not change stored data, calculations, filters, drilldowns, exports, auth, Supabase, device or offline logic.
 (() => {
   "use strict";
+  if (window.CSVB_POST_STATS_VIEW?.enabled) return;
 
   const BUILD = "POST-INSPECTION-STATS-DASHBOARD-LAYOUT-V06-HARD-LEFT-HEADERS-20260630";
   window.CSVB_POST_STATS_DASHBOARD_LAYOUT_BUILD = BUILD;

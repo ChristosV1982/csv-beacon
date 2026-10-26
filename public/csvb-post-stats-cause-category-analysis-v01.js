@@ -742,6 +742,7 @@
   }
 
   function ensureCauseDashboardGroup() {
+    if (window.CSVB_POST_STATS_VIEW?.enabled) return null;
     let group = document.getElementById("csvbDashboardGroup_cause");
     if (group) return group;
 
@@ -1940,6 +1941,13 @@
   }
 
   function start() {
+    if (window.CSVB_POST_STATS_VIEW?.enabled) {
+      render().catch(error => console.error("Cause / Category render failed:", error));
+      window.addEventListener("csvb:post-stats-snapshot", () => {
+        render().catch(error => console.error("Cause / Category render failed:", error));
+      });
+      return;
+    }
     ensureCauseDashboardGroup();
     bindCauseDocumentClickV09();
     forceCauseGroupDisplay();

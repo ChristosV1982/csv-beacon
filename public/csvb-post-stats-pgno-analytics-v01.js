@@ -131,6 +131,10 @@
 
 
   function findPgnoCard() {
+    // The dedicated view adds its own page heading; resolve the original source card directly.
+    if (window.CSVB_POST_STATS_VIEW?.enabled) {
+      return document.getElementById("pgnoTableTbody")?.closest(".card") || null;
+    }
     const headings = Array.from(document.querySelectorAll("h1,h2,h3,h4,.sectionTitle"));
     const heading = headings.find((node) => String(node.textContent || "").trim() === "PGNO Analytics");
     return heading ? heading.closest(".card") : null;

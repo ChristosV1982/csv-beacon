@@ -4,3 +4,4 @@
 - [C.S.V. Beacon Supabase environment](csvb-supabase-environment.md) — user confirmed the linked project is isolated development/testing; re-check before migrations.
 - [OCIMF comment history](ocimf-comment-history.md) — original responses and manual follow-up notes must stay separate from imported later rounds.
 - [Dashboard navigation](dashboard-navigation.md) — plain dashboard starts at authorized areas; navigation changes must preserve existing module access rules.
+- [Analytics view isolation](stats-view-isolation.md) — side-by-side analytics share existing calculations; hidden source DOM must not be removed without auditing chart dependencies.
