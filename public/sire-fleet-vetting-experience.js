@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "SIRE_FLEET_VETTING_EXPERIENCE-20261026_observation_filter_v1";
+  const BUILD = "SIRE_FLEET_VETTING_EXPERIENCE-20261028_prevention_actions_v1";
   const ROOT = document.getElementById("viewerRuntime");
   const MODULE_KEY = "sire_fleet_vetting_experience";
   const COMPANY_VIEW_ID_KEY = "csvb_superuser_company_view_id";
@@ -18,6 +18,7 @@
     rows: [],
     total: 0,
     last12: 0,
+    canEdit: false,
     countBadges: {},
     countsReady: false,
     requestToken: 0,
@@ -485,6 +486,20 @@
       appendRecordValue(metadata, "Category / Designation", row?.designation);
       card.appendChild(metadata);
       appendRecordValue(card, "Observation", row?.observation_text, "fleet-observation-text");
+      const prevention = window.CSVB_FVE_PREVENTION;
+      if (prevention?.attach) {
+        prevention.attach(card, row, {
+          companyId: state.selectedCompanyId,
+          canEdit: state.canEdit,
+          client: state.client,
+          onSaved: (change) => {
+            if (change?.reload) {
+              state.historyLoadedKey = "";
+              requestHistory();
+            }
+          }
+        });
+      }
       host.appendChild(card);
     });
   }
@@ -512,12 +527,13 @@
     setMessage($("fleetRecords"), "Loading recorded observations…");
     $("fleetResultCount").textContent = "Loading";
     try {
-      const { data, error } = await state.client.rpc("csvb_fleet_vetting_experience_history", params);
+      const { data, error } = await state.client.rpc("csvb_fve_prevention_history", params);
       if (error) throw error;
       if (token !== state.requestToken) return;
       state.historyLoadingKey = "";
       state.historyLoadedKey = historyKey;
       const result = Array.isArray(data) ? data[0] : data;
+      state.canEdit = result?.can_edit === true;
       state.rows = Array.isArray(result?.rows) ? result.rows : [];
       state.total = Math.max(0, Number(result?.total) || 0);
       state.last12 = Math.max(0, Number(result?.last_12_months) || 0);

@@ -1904,6 +1904,14 @@ async function inspectExistingObservationItemsForPdfReplacement(reportId) {
     },
   ];
   const dependentLabels = [];
+  const { data: preventionReferences, error: preventionReferencesError } = await state.supabase.rpc(
+    "csvb_fve_prevention_replacement_guard", { p_report_id: reportId });
+  if (preventionReferencesError) {
+    throw new Error(`Could not verify Fleet Vetting Experience prevention actions; PDF replacement was stopped. ${preventionReferencesError.message || preventionReferencesError}`);
+  }
+  if (Number(preventionReferences) > 0) {
+    dependentLabels.push("Fleet Vetting Experience prevention actions (source findings cannot be replaced without a remap workflow)");
+  }
   const { data: commentRounds, error: commentRoundsError } = await state.supabase.rpc(
     "csvb_post_inspection_comment_rounds_for_me", { p_report_id: reportId });
   if (commentRoundsError) {

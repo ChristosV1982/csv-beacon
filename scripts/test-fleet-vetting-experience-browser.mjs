@@ -25,6 +25,7 @@ assert.ok(profile);
 const allowedRpc = new Set([
   "csvb_fleet_vetting_experience_context", "csvb_fleet_vetting_experience_counts",
   "csvb_fleet_vetting_experience_history", "csvb_questions_master_for_me",
+  "csvb_fve_prevention_history", "csvb_fve_prevention_context",
   "csvb_pgno_master_for_question_for_me", "csvb_expected_evidence_for_question_for_me",
   "csvb_sire_question_references_for_question", "csvb_my_effective_app_permissions",
   "csvb_my_company_modules", "csvb_admin_list_company_modules", "csvb_admin_list_companies",
@@ -41,7 +42,7 @@ async function rpc(name, args = {}) {
     assert.match(key, /^p_[a-z_]+$/);
     return `${key} => ${quote(value)}`;
   }).join(",");
-  const jsonResult = name.startsWith("csvb_fleet_vetting_experience_");
+  const jsonResult = name.startsWith("csvb_fleet_vetting_experience_") || name.startsWith("csvb_fve_");
   const query = `begin read only;
     select set_config('request.jwt.claim.sub','${profile.id}',true);
     select set_config('request.jwt.claims','${JSON.stringify({sub:profile.id,role:"authenticated"})}',true);
