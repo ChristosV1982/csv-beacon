@@ -372,12 +372,12 @@
       }
 
       .csvb-platform-area-card {
-        min-height: 148px;
+        min-height: 156px;
         background: #ffffff;
         border: 1px solid #dbe6f6;
         border-radius: 14px;
         box-shadow: 0 10px 30px rgba(3,27,63,0.06);
-        padding: 14px;
+        padding: 16px !important;
         text-align: left;
         cursor: pointer;
         display: grid;
@@ -400,22 +400,22 @@
       }
 
       .csvb-platform-area-icon {
-        width: 44px;
-        height: 44px;
+        width: 48px;
+        height: 48px;
         border-radius: 14px;
         border: 1px solid #cbd8ea;
         background: #eaf1fb;
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        font-size: 1.55rem;
+        font-size: 1.65rem;
         line-height: 1;
       }
 
       .csvb-platform-area-title {
         color: #1a4170;
         font-weight: 700;
-        font-size: 1.02rem;
+        font-size: 1.06rem;
         line-height: 1.22;
       }
 

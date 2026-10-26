@@ -476,25 +476,25 @@
         border: 1px solid #dbe6f6;
         background: #ffffff;
         border-radius: 12px;
-        padding: 10px;
+        padding: 12px;
         display: grid;
-        grid-template-columns: 38px minmax(0, 1fr);
-        gap: 9px;
-        min-height: 128px;
+        grid-template-columns: 42px minmax(0, 1fr);
+        gap: 10px;
+        min-height: 136px;
         height: 100%;
         box-sizing: border-box;
       }
 
       .csvb-area-home-item-icon {
-        width: 34px;
-        height: 34px;
+        width: 38px;
+        height: 38px;
         border-radius: 11px;
         border: 1px solid #cbd8ea;
         background: #eaf1fb;
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        font-size: 1.18rem;
+        font-size: 1.28rem;
         line-height: 1;
       }
 
@@ -507,6 +507,7 @@
       .csvb-area-home-item-title {
         color: #062A5E;
         font-weight: 700;
+        font-size: 1.03rem;
         line-height: 1.25;
       }
 
@@ -529,9 +530,9 @@
         color: #062A5E;
         border: 1px solid #9fd8ec;
         border-radius: 9px;
-        padding: 6px 10px;
+        padding: 7px 11px;
         font-weight: 700;
-        font-size: .86rem;
+        font-size: .88rem;
         text-decoration: none;
       }
 
