@@ -33,6 +33,12 @@ Vessel responses belong to a specific vessel target, not just the source finding
 
 **How to apply:** Preserve prior submissions and files when adding revisions. Apply the five-file maximum and 10 MB **combined** limit per submission, not per file. Keep evidence private and downloads short-lived; onboard/disembarkation restrictions remain authoritative.
 
+Office may delete clean Draft or pristine pending Issued actions, including unsubmitted drafts/files. The initial issue event alone does not prohibit deletion; any submitted response, review/return/close history, or progressed target does. Vessels may delete only their own current unsubmitted draft, including a new draft after Return, without changing earlier submissions.
+
+**Why:** The user explicitly requested safe deletion without archival/cancellation of historical submitted actions or loss of audit history.
+
+**How to apply:** Keep deletion server-authorized and confirmed. Storage is outside the database transaction: freeze the scope, clean temporary objects, then finalize relational deletion atomically. A failed cleanup must remain resumable, not re-enable mutations or delete submitted history.
+
 Validate evidence authorization through the real Storage API as well as SQL tests.
 
 **Why:** Storage performs preliminary and completed-upload authorization with different metadata shapes; SQL-only object fixtures did not exercise that preliminary path.

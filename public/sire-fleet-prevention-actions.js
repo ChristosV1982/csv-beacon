@@ -272,11 +272,14 @@
   function editorForm(row, action, context) {
     const form = element("form", "fpa-editor");
     const issued = text(action?.status).toLowerCase() === "issued";
+    let deleteRetryAllowed = false;
+    let pendingActionDeletion = action?.delete_info?.pending === true;
     const instruction = document.createElement("textarea");
     instruction.required = true;
     instruction.rows = 5;
     instruction.maxLength = 10000;
     instruction.value = text(action?.preventative_actions_required_by_vessel);
+    instruction.disabled = pendingActionDeletion;
     instruction.id = "fpaInstruction";
     instruction.dataset.testid = "prevention-instruction";
     instruction.setAttribute("aria-label", "Preventative Actions Required by the Vessel");
@@ -295,7 +298,7 @@
     allRadio.id = "fpaTargetAll";
     allRadio.dataset.testid = "prevention-target-all";
     allRadio.checked = mode === "all";
-    allRadio.disabled = issued;
+    allRadio.disabled = issued || pendingActionDeletion;
     allLabel.append(allRadio, document.createTextNode(" All company vessels"));
     const selectedLabel = document.createElement("label");
     const selectedRadio = document.createElement("input");
@@ -305,7 +308,7 @@
     selectedRadio.id = "fpaTargetSelected";
     selectedRadio.dataset.testid = "prevention-target-selected";
     selectedRadio.checked = mode === "selected";
-    selectedRadio.disabled = issued;
+    selectedRadio.disabled = issued || pendingActionDeletion;
     selectedLabel.append(selectedRadio, document.createTextNode(" Selected vessels"));
     modeGroup.append(allLabel, selectedLabel);
     form.appendChild(modeGroup);
@@ -322,7 +325,7 @@
       checkbox.value = text(vessel.id);
       checkbox.dataset.testid = "prevention-vessel";
       checkbox.checked = existingTargets.has(text(vessel.id));
-      checkbox.disabled = issued;
+      checkbox.disabled = issued || pendingActionDeletion;
       label.append(checkbox, document.createTextNode(` ${text(vessel.name) || "Unnamed vessel"}`));
       vesselBox.appendChild(label);
     });
@@ -330,7 +333,7 @@
     const syncTargetMode = () => {
       const selected = selectedRadio.checked;
       vesselBox.hidden = !selected;
-      vesselBox.querySelectorAll("input").forEach((input) => { input.disabled = issued || !selected; });
+      vesselBox.querySelectorAll("input").forEach((input) => { input.disabled = issued || pendingActionDeletion || !selected; });
     };
     allRadio.addEventListener("change", syncTargetMode);
     selectedRadio.addEventListener("change", syncTargetMode);
@@ -339,6 +342,7 @@
     const dueDate = document.createElement("input");
     dueDate.type = "date";
     dueDate.value = text(action?.due_date).slice(0, 10);
+    dueDate.disabled = pendingActionDeletion;
     dueDate.id = "fpaDueDate";
     dueDate.dataset.testid = "prevention-due-date";
     form.appendChild(makeField("Optional due date", dueDate));
@@ -349,6 +353,42 @@
     message.setAttribute("role", "status");
     form.appendChild(message);
     const footer = element("div", "fpa-actions");
+    if (action?.id) {
+      const deleteInfo = action.delete_info && typeof action.delete_info === "object"
+        ? action.delete_info
+        : { can_delete: false, reason: "Deletion eligibility is unavailable.", pending: false };
+      const deleteButton = element("button", "fpa-button fpa-button-danger",
+        deleteRetryAllowed || deleteInfo.pending === true ? "Retry Delete" : "Delete Action");
+      deleteButton.type = "button";
+      deleteButton.dataset.testid = "prevention-delete";
+      deleteButton.dataset.fpaCanDelete = String(deleteInfo.can_delete === true);
+      deleteButton.disabled = deleteInfo.can_delete !== true && !deleteRetryAllowed;
+      deleteButton.addEventListener("click", () => {
+        if (busy) return;
+        const issuedConfirmation = "Delete this issued prevention action? Its issued tasks and targets will be removed, together with any unsubmitted draft responses and temporary evidence. The source observation remains unchanged. Submitted history cannot be deleted.";
+        const draftConfirmation = "Delete this draft prevention action? Its targets, unsubmitted drafts, and evidence will be removed. The source observation will remain unchanged.";
+        if (!window.confirm(issued ? issuedConfirmation : draftConfirmation)) return;
+        void deleteAction(row, action, current.options, deleteButton, () => {
+          deleteRetryAllowed = true;
+          pendingActionDeletion = true;
+          deleteButton.dataset.fpaRetryAllowed = "true";
+          form.querySelectorAll("input, textarea, select").forEach((control) => { control.disabled = true; });
+          form.querySelectorAll('[data-fpa-mutation="true"]').forEach((control) => {
+            control.dataset.fpaPending = "true";
+            control.disabled = true;
+          });
+        });
+      });
+      const deleteControls = element("div", "fpa-delete-controls");
+      deleteControls.appendChild(deleteButton);
+      if (deleteInfo.can_delete !== true && !deleteRetryAllowed) {
+        deleteControls.appendChild(element("p", "fpa-help fpa-delete-reason",
+          text(deleteInfo.reason) || "This action cannot be deleted."));
+      } else if (deleteRetryAllowed || deleteInfo.pending === true) {
+        deleteControls.appendChild(element("p", "fpa-help fpa-delete-reason", "Deletion is pending. Retry to finish cleanup."));
+      }
+      form.appendChild(deleteControls);
+    }
     const close = element("button", "fpa-button", "Close");
     close.type = "button";
     close.addEventListener("click", closeDialog);
@@ -356,8 +396,11 @@
       const save = element("button", "fpa-button fpa-button-primary", issued ? "Save Changes" : "Save Draft");
       save.type = "button";
       save.dataset.testid = issued ? "prevention-save-changes" : "prevention-save-draft";
+      save.dataset.fpaMutation = "true";
+      save.dataset.fpaPending = String(pendingActionDeletion);
+      save.disabled = pendingActionDeletion;
       save.addEventListener("click", async () => {
-        if (busy) return;
+        if (busy || pendingActionDeletion) return;
         if (!instruction.value.trim()) {
           setMessage("Enter the preventative action instruction before saving.", "error");
           instruction.focus();
@@ -374,8 +417,11 @@
       const issue = element("button", "fpa-button fpa-button-issue", "Issue to Vessels");
       issue.type = "button";
       issue.dataset.testid = "prevention-save-and-issue";
+      issue.dataset.fpaMutation = "true";
+      issue.dataset.fpaPending = String(pendingActionDeletion);
+      issue.disabled = pendingActionDeletion;
       issue.addEventListener("click", async () => {
-        if (busy) return;
+        if (busy || pendingActionDeletion) return;
         if (!instruction.value.trim()) {
           setMessage("Enter the preventative action instruction before issuing.", "error");
           instruction.focus();
@@ -400,7 +446,15 @@
 
   function setBusy(value) {
     busy = value;
-    dialog?.querySelectorAll("button").forEach((button) => { button.disabled = value; });
+    dialog?.querySelectorAll("button").forEach((button) => {
+      button.disabled = value;
+      if (!value && button.dataset.testid === "prevention-delete") {
+        button.disabled = button.dataset.fpaCanDelete !== "true" && button.dataset.fpaRetryAllowed !== "true";
+      }
+      if (!value && button.dataset.fpaMutation === "true" && button.dataset.fpaPending === "true") {
+        button.disabled = true;
+      }
+    });
   }
 
   async function saveAction({ row, action, options, instruction, allRadio, dueDate, vesselBox, issuedAfter }) {
@@ -466,6 +520,72 @@
           onSaved?.({ reload: true });
         });
         dialog?.querySelector("#fpaInlineMessage")?.insertAdjacentElement("afterend", reload);
+      }
+    }
+  }
+
+  async function deleteAction(row, action, options, button, markRetryable) {
+    if (busy) return;
+    setBusy(true);
+    setMessage("Preparing secure action cleanup…");
+    let operationPrepared = false;
+    try {
+      const issued = text(action.status).toLowerCase() === "issued";
+      const { data, error } = await options.client.rpc("csvb_fve_cleanup_prepare", {
+        p_company_id: options.companyId,
+        p_kind: "action",
+        p_object_id: action.id,
+        p_confirm_issued: issued,
+        p_expected_revision: action.revision
+      });
+      if (error) throw error;
+      operationPrepared = true;
+      markRetryable();
+      button.textContent = "Retry Delete";
+      const operation = first(data);
+      if (!operation || typeof operation !== "object" ||
+          text(operation.kind) !== "action" ||
+          text(operation.object_id) !== text(action.id) ||
+          !operation.id || !["pending", "completed"].includes(operation.status) ||
+          !Array.isArray(operation.storage_paths) ||
+          operation.storage_paths.some((path) => typeof path !== "string")) {
+        throw new Error("The cleanup service returned an invalid action operation.");
+      }
+      setMessage("Removing action evidence…");
+      if (operation.storage_paths.length) {
+        if (!options.client?.storage?.from) throw new Error("Secure evidence cleanup is unavailable.");
+        for (let offset = 0; offset < operation.storage_paths.length; offset += 100) {
+          const paths = operation.storage_paths.slice(offset, offset + 100);
+          const { error: storageError } = await options.client.storage.from("fve-response-evidence").remove(paths);
+          if (storageError) throw storageError;
+        }
+      }
+      setMessage("Finalizing action deletion…");
+      const { data: finishData, error: finishError } = await options.client.rpc("csvb_fve_cleanup_finish", {
+        p_company_id: options.companyId,
+        p_cleanup_id: operation.id
+      });
+      if (finishError) throw finishError;
+      const result = first(finishData);
+      if (!result || result.deleted !== true ||
+          text(result.kind) !== "action" ||
+          text(result.object_id) !== text(action.id)) {
+        throw new Error("The cleanup service did not confirm action deletion.");
+      }
+      const actions = Array.isArray(row.prevention_actions) ? row.prevention_actions : [];
+      row.prevention_actions = actions.filter((item) => text(item.id) !== text(action.id));
+      if (options.host) render(options.host, row, options);
+      setBusy(false);
+      closeDialog();
+      try { options.onSaved?.({ reload: true }); } catch (_) { /* deletion is already finalized */ }
+    } catch (error) {
+      setBusy(false);
+      if (operationPrepared) {
+        markRetryable();
+        button.textContent = "Retry Delete";
+        setMessage(`Action deletion could not be completed. A pending cleanup may be resumed here; retry Delete. ${text(error?.message || error)}`, "error");
+      } else {
+        setMessage(`Action deletion could not be prepared. No deletion was started; the editor remains available. ${text(error?.message || error)}`, "error");
       }
     }
   }

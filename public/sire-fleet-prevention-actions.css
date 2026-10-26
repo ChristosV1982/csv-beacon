@@ -143,6 +143,25 @@
   background: #1a6248;
 }
 
+.fpa-button-danger {
+  border-color: #dfb9b4;
+  color: #843b34;
+  background: #fff8f6;
+}
+
+.fpa-delete-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 9px;
+  padding-top: 3px;
+}
+
+.fpa-delete-reason {
+  margin: 0;
+  max-width: 100%;
+}
+
 .fpa-button:disabled {
   cursor: wait;
   opacity: .58;

@@ -30,7 +30,9 @@ export async function fixtures(){
   if(office){
    // Only this transaction bypasses immutability triggers to remove disposable
    // verification records; application sessions/triggers remain unchanged.
+   const cleanupTable=(await sql("select to_regclass('public.fve_cleanup_operations')::text relation"))[0].relation;
    try{await sql(`begin;set local session_replication_role='replica';
+    ${cleanupTable?`delete from fve_cleanup_operations where requested_by in(${actors.map(a=>quote(a.id)+"::uuid").join(",")});`:""}
     create temp table f3_cleanup_actions as select id from fve_prevention_actions where created_by=${quote(office.id)}::uuid;
     create temp table f3_cleanup_targets as select id from fve_prevention_action_targets where action_id in(select id from f3_cleanup_actions);
     delete from fve_target_events where action_target_id in(select id from f3_cleanup_targets);

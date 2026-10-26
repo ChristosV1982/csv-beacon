@@ -53,6 +53,7 @@
     let workflow = null;
     let busy = false;
     let composerOpen = false;
+    let draftDeletePending = false;
     let draftText = "";
     let savedDraftText = "";
 
@@ -163,7 +164,7 @@
 
     async function closeDialog() {
       if (!dialog || busy) return;
-      if (composerOpen) {
+      if (composerOpen && !draftDeletePending) {
         if (!window.confirm("Save your current response text and close? The draft and uploaded evidence will remain available.")) return;
         setBusy(true, "Saving response draft…");
         try {
@@ -213,8 +214,18 @@
         const needsResponse = node.dataset.fvrRequiresResponse === "true" && !draftText.trim();
         const commentField = dialog.querySelector('[data-testid="review-comment"]');
         const needsComment = node.dataset.fvrRequiresComment === "true" && !commentField?.value.trim();
-        node.disabled = busy || node.dataset.fvrDisabled === "true" || needsResponse || needsComment;
+        const frozenMutation = draftDeletePending && node.dataset.fvrMutation === "true";
+        node.disabled = busy || frozenMutation || node.dataset.fvrDisabled === "true" || needsResponse || needsComment;
       });
+    }
+
+    function currentUnsubmittedDraft() {
+      const draft = workflow?.draft;
+      const status = str(draft?.status).toLowerCase();
+      if (!draft?.id || draft.submitted_at || status === "response_submitted" || status === "submitted") return null;
+      const submittedIds = new Set((Array.isArray(workflow?.responses) ? workflow.responses : [])
+        .map((response) => str(response.id)));
+      return submittedIds.has(str(draft.id)) ? null : draft;
     }
 
     async function openWorkflow(target, source) {
@@ -236,6 +247,7 @@
           p_company_id: config.companyId, p_target_id: activeTargetId
         });
         if (activeTargetId !== target.id || shell.hidden) return;
+        if (!workflow.draft) draftDeletePending = false;
         draftText = str(workflow.draft?.response_text || "");
         savedDraftText = draftText;
         renderWorkflow();
@@ -266,14 +278,24 @@
       instruction.append(summaryNode, instructionText);
       content.appendChild(instruction);
       content.appendChild(renderHistory(workflow));
-      if (workflow.can_respond === true) {
-        if (composerOpen) content.appendChild(renderComposer());
-        else {
-          const compose = el("button", "fvr-button fvr-button-primary", workflow.draft ? "Continue response draft" : "Compose vessel response");
-          compose.type = "button";
-          compose.addEventListener("click", beginComposer);
-          content.appendChild(compose);
-        }
+      if (composerOpen) {
+        content.appendChild(renderComposer());
+      } else if (draftDeletePending && currentUnsubmittedDraft()) {
+        const resume = el("button", "fvr-button fvr-button-primary", "Resume draft deletion");
+        resume.type = "button";
+        resume.addEventListener("click", () => {
+          composerOpen = true;
+          draftText = str(workflow.draft?.response_text || "");
+          savedDraftText = draftText;
+          renderWorkflow();
+        });
+        content.appendChild(resume);
+      } else if (workflow.can_respond === true) {
+        const compose = el("button", "fvr-button fvr-button-primary", workflow.draft ? "Continue response draft" : "Compose vessel response");
+        compose.type = "button";
+        compose.disabled = draftDeletePending;
+        compose.addEventListener("click", beginComposer);
+        content.appendChild(compose);
       }
       if (workflow.can_review === true) content.appendChild(renderReviewControls());
       content.querySelector("textarea, button")?.focus();
@@ -350,7 +372,7 @@
     }
 
     async function beginComposer() {
-      if (busy) return;
+      if (busy || draftDeletePending) return;
       setBusy(true, "Opening response draft…");
       try {
         workflow = await rpc("csvb_fve_response_draft", {
@@ -379,6 +401,7 @@
       textarea.maxLength = 30000;
       textarea.value = draftText;
       textarea.dataset.testid = "response-text";
+      textarea.dataset.fvrMutation = "true";
       textarea.setAttribute("aria-label", "Vessel response");
       textarea.addEventListener("input", () => {
         draftText = textarea.value;
@@ -386,7 +409,8 @@
       });
       label.appendChild(textarea);
       form.appendChild(label);
-      const evidence = Array.isArray(workflow.draft?.evidence) ? workflow.draft.evidence : [];
+      const draft = currentUnsubmittedDraft();
+      const evidence = Array.isArray(draft?.evidence) ? draft.evidence : [];
       const total = fileBytes(evidence);
       form.appendChild(el("p", "fvr-quota", `${evidence.length} of ${MAX_FILES} files · ${formatBytes(total)} of 10 MB`));
       const list = el("div", "fvr-evidence-list");
@@ -396,6 +420,7 @@
         const remove = el("button", "fvr-button fvr-button-small", "Remove");
         remove.type = "button";
         remove.dataset.testid = "evidence-remove";
+        remove.dataset.fvrMutation = "true";
         remove.addEventListener("click", () => removeDraftEvidence(item));
         row.appendChild(remove);
         list.appendChild(row);
@@ -408,6 +433,7 @@
       input.multiple = true;
       input.accept = ".jpg,.jpeg,.png,.webp,.pdf,.docx,.xlsx,.pptx,.txt,.csv";
       input.dataset.testid = "evidence-file";
+      input.dataset.fvrMutation = "true";
       input.setAttribute("aria-label", "Add response evidence");
       input.addEventListener("change", () => uploadFiles(Array.from(input.files || []), input));
       inputLabel.appendChild(input);
@@ -416,21 +442,29 @@
       const close = el("button", "fvr-button", "Close and keep draft");
       close.type = "button";
       close.addEventListener("click", () => void closeComposer());
-      const discard = el("button", "fvr-button fvr-button-danger", "Discard draft");
-      discard.type = "button";
-      discard.addEventListener("click", discardDraft);
+      let deleteButton = null;
+      if (draft) {
+        deleteButton = el("button", "fvr-button fvr-button-danger", "Delete Draft Response");
+        deleteButton.type = "button";
+        deleteButton.dataset.testid = "response-delete-draft";
+        deleteButton.addEventListener("click", () => deleteDraftResponse());
+      }
       const submit = el("button", "fvr-button fvr-button-primary", "Submit Response");
       submit.type = "button";
       submit.dataset.testid = "response-submit";
       submit.dataset.fvrRequiresResponse = "true";
+      submit.dataset.fvrMutation = "true";
       submit.addEventListener("click", () => submitResponse(textarea.value));
-      actions.append(close, discard, submit);
+      actions.append(close);
+      if (deleteButton) actions.appendChild(deleteButton);
+      actions.appendChild(submit);
       form.appendChild(actions);
       syncControls();
       return form;
     }
 
     async function persistDraftText() {
+      if (draftDeletePending) throw new Error("The draft is locked while deletion cleanup is pending.");
       if (!workflow?.draft?.id) throw new Error("The editable response draft is unavailable.");
       if (draftText.length > 30000) throw new Error("Response text cannot exceed 30,000 characters.");
       if (draftText === savedDraftText) return;
@@ -444,6 +478,11 @@
 
     async function closeComposer() {
       if (busy) return;
+      if (draftDeletePending) {
+        composerOpen = false;
+        renderWorkflow();
+        return;
+      }
       setBusy(true, "Saving response draft…");
       try {
         await persistDraftText();
@@ -466,7 +505,7 @@
     }
 
     async function uploadFiles(files, input) {
-      if (!files.length || busy) return;
+      if (!files.length || busy || draftDeletePending) return;
       const currentFiles = Array.isArray(workflow.draft?.evidence) ? workflow.draft.evidence : [];
       try {
         if (currentFiles.length + files.length > MAX_FILES) throw new Error("A response can include no more than five evidence files.");
@@ -542,7 +581,7 @@
     }
 
     async function removeDraftEvidence(item) {
-      if (busy) return;
+      if (busy || draftDeletePending) return;
       setBusy(true, "Saving response text…");
       try {
         await persistDraftText();
@@ -557,27 +596,102 @@
       }
     }
 
-    async function discardDraft() {
-      if (busy || !window.confirm("Discard this response draft and all of its draft evidence? This cannot be undone.")) return;
-      setBusy(true, "Cleaning up draft evidence…");
+    async function deleteDraftResponse() {
+      const draft = currentUnsubmittedDraft();
+      if (busy || !draft || !window.confirm(
+        "Delete this unsubmitted response draft and its temporary evidence? Earlier submissions and office history will be preserved."
+      )) return;
+      setBusy(true, "Preparing secure draft cleanup…");
+      let deletionFinalized = false;
+      let operationPrepared = false;
+      let savedNotificationSent = false;
+      const notifyDeleteSaved = () => {
+        if (savedNotificationSent) return;
+        savedNotificationSent = true;
+        try { notifySaved(); } catch (_) { /* deletion is already finalized */ }
+      };
       try {
-        const evidence = Array.isArray(workflow.draft?.evidence) ? workflow.draft.evidence : [];
-        for (const item of evidence) await deleteEvidence(item);
-        await rpc("csvb_fve_response_discard", {
-          p_company_id: config.companyId, p_response_id: workflow.draft.id
+        const operation = await rpc("csvb_fve_cleanup_prepare", {
+          p_company_id: config.companyId,
+          p_kind: "draft",
+          p_object_id: draft.id
         });
-        workflow = await loadWorkflow(activeTargetId);
+        operationPrepared = true;
+        draftDeletePending = true;
+        syncControls();
+        if (str(operation.kind) !== "draft" ||
+            str(operation.object_id) !== str(draft.id) ||
+            !operation.id || !["pending", "completed"].includes(operation.status) ||
+            !Array.isArray(operation.storage_paths) ||
+            operation.storage_paths.some((path) => typeof path !== "string")) {
+          throw new Error("The cleanup service returned an invalid draft operation.");
+        }
+        setBusy(true, "Removing temporary draft evidence…");
+        if (operation.storage_paths.length) {
+          if (!config.client?.storage?.from) throw new Error("Secure evidence cleanup is unavailable.");
+          for (let offset = 0; offset < operation.storage_paths.length; offset += 100) {
+            const paths = operation.storage_paths.slice(offset, offset + 100);
+            const { error } = await config.client.storage.from(BUCKET).remove(paths);
+            if (error) throw error;
+          }
+        }
+        setBusy(true, "Finalizing draft deletion…");
+        const result = await rpc("csvb_fve_cleanup_finish", {
+          p_company_id: config.companyId,
+          p_cleanup_id: operation.id
+        });
+        if (result.deleted !== true ||
+            str(result.kind) !== "draft" ||
+            str(result.object_id) !== str(draft.id)) {
+          throw new Error("The cleanup service did not confirm draft deletion.");
+        }
+        deletionFinalized = true;
+        draftDeletePending = false;
         composerOpen = false;
-        renderWorkflow();
+        draftText = "";
+        savedDraftText = "";
+        workflow.draft = null;
+        setBusy(false);
+        try {
+          workflow = await loadWorkflow(activeTargetId);
+          renderWorkflow();
+          showMessage("Draft deleted. Earlier submissions and office history are unchanged.", "info");
+        } catch (error) {
+          renderWorkflow();
+          showMessage(`Draft was deleted, but the response workflow could not be refreshed. ${str(error?.message || error)}`);
+          const retry = el("button", "fvr-button", "Retry workflow");
+          retry.type = "button";
+          retry.addEventListener("click", async () => {
+            if (busy) return;
+            setBusy(true, "Refreshing response workflow…");
+            try {
+              workflow = await loadWorkflow(activeTargetId);
+              renderWorkflow();
+            } catch (refreshError) {
+              showMessage(`Response workflow could not be refreshed. ${str(refreshError?.message || refreshError)}`);
+            } finally {
+              setBusy(false);
+            }
+          });
+          dialog?.querySelector("#fvrDialogContent")?.appendChild(retry);
+        }
+        notifyDeleteSaved();
       } catch (error) {
-        showMessage(`Draft could not be discarded. ${str(error?.message || error)}`);
+        if (deletionFinalized) {
+          showMessage(`Draft was deleted, but response workflow finalization failed. ${str(error?.message || error)}`);
+          notifyDeleteSaved();
+        } else if (operationPrepared) {
+          showMessage(`Draft deletion could not be completed. Cleanup is pending; retry Delete Draft Response to resume. ${str(error?.message || error)}`);
+        } else {
+          showMessage(`Draft deletion could not be prepared. No deletion was started; the composer remains available. ${str(error?.message || error)}`);
+        }
       } finally {
         setBusy(false);
       }
     }
 
     async function submitResponse(responseText) {
-      if (busy || !str(responseText).trim()) return;
+      if (busy || draftDeletePending || !str(responseText).trim()) return;
       setBusy(true, "Submitting response…");
       try {
         workflow = await rpc("csvb_fve_response_submit", {
