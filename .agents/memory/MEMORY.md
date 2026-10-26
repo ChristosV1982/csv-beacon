@@ -5,3 +5,4 @@
 - [OCIMF comment history](ocimf-comment-history.md) — original responses and manual follow-up notes must stay separate from imported later rounds.
 - [Dashboard navigation](dashboard-navigation.md) — plain dashboard starts at authorized areas; navigation changes must preserve existing module access rules.
 - [Analytics view isolation](stats-view-isolation.md) — side-by-side analytics share existing calculations; hidden source DOM must not be removed without auditing chart dependencies.
+- [Human finding identity](human-finding-identity.md) — multiple PIFs belong to one finding; officer-context findings stay distinct, and alternate counting must not duplicate stored rows.

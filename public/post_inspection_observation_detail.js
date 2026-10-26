@@ -1,5 +1,10 @@
 import { loadLockedLibraryJson } from "./question_library_loader.js";
 import { renderOcimfCommentRoundHistory } from "./post_inspection_comment_round_history.mjs?v=20261021_ocimf_rounds_v1";
+import {
+  humanPifsFromItem as sharedHumanPifsFromItem,
+  renderHumanPifList,
+  uniquePifs,
+} from "./csvb-human-pifs.mjs?v=20261026_human_pifs_v1";
 
 const OBS_DETAIL_BUILD = "post_inspection_observation_detail_v36_ocimf_rounds_2026-10-21";
 
@@ -334,24 +339,8 @@ function humanSocFromItem(item) {
   return "";
 }
 
-function normalizeHumanPifText(value) {
-  return String(value || "")
-    .trim()
-    .replace(/\s+/g, " ")
-    .toLowerCase();
-}
-
 function humanPifsFromItem(item) {
-  const candidates = [];
-  const cc = String(item?.classification_coding || "").trim();
-  const noc = String(item?.nature_of_concern || "").trim();
-
-  if (cc) candidates.push(...cc.split("|").map((x) => x.trim()).filter(Boolean));
-  if (noc) candidates.push(...noc.split("|").map((x) => x.trim()).filter(Boolean));
-
-  const candidateSet = new Set(candidates.map(normalizeHumanPifText));
-
-  return HUMAN_PIF_OPTIONS.filter((opt) => candidateSet.has(normalizeHumanPifText(opt)));
+  return sharedHumanPifsFromItem(item);
 }
 
 function socDisplay(item) {
@@ -960,6 +949,10 @@ function csvbManualObsEnsureControls() {
     <select id="nocManualSelect" class="csvb-noc-manual-select" style="display:none;">
       <option value="">— Select NOC / PIF —</option>
     </select>
+    <fieldset id="humanPifEditor" class="csvb-human-pif-checklist" hidden>
+      <legend>Human performance influencing factors</legend>
+      <div id="humanPifCheckboxes"></div>
+    </fieldset>
     <div class="csvb-noc-manual-help">
       Dropdown is filtered by detected category: Human / Hardware / Process.
     </div>
@@ -978,6 +971,31 @@ async function csvbManualObsLoadNocOptions() {
   if (!select) return;
 
   select.innerHTML = '<option value="">— Select NOC / PIF —</option>';
+
+  if (designation === "Human") {
+    const editor = el("humanPifEditor");
+    const list = el("humanPifCheckboxes");
+    if (!editor || !list) return;
+
+    editor.hidden = false;
+    select.style.display = "none";
+    const existing = humanPifsFromItem(item);
+    const currentPifs = new Set(existing.map((pif) => pif.trim().toLowerCase()));
+    const options = uniquePifs([...existing, ...HUMAN_PIF_OPTIONS]);
+    list.innerHTML = options.map((pif, index) => {
+      const id = `humanPifOption${index}`;
+      const checked = currentPifs.has(pif.trim().toLowerCase()) ? " checked" : "";
+      return `<label class="csvb-human-pif-option" for="${id}">
+        <input id="${id}" type="checkbox" name="humanPif" value="${esc(pif)}"${checked}>
+        <span>${esc(pif)}</span>
+      </label>`;
+    }).join("");
+    list.onchange = () => setSaveStatus("Not saved");
+    return;
+  }
+
+  const editor = el("humanPifEditor");
+  if (editor) editor.hidden = true;
 
   let options = [];
 
@@ -1038,6 +1056,7 @@ function csvbManualObsSetup() {
   }
 
   csvbManualObsEnsureControls();
+  renderHumanPifDisplay(state.item);
 
   const toggle = el("nocManualToggle");
   const select = el("nocManualSelect");
@@ -1046,11 +1065,19 @@ function csvbManualObsSetup() {
 
   toggle.checked = false;
   select.style.display = "none";
+  const pifEditor = el("humanPifEditor");
+  if (pifEditor) pifEditor.hidden = true;
 
   toggle.onchange = async () => {
     const on = !!toggle.checked;
-    select.style.display = on ? "" : "none";
-    if (on) await csvbManualObsLoadNocOptions();
+    if (normDesignation(state.item?.designation) === "Human") {
+      select.style.display = "none";
+      if (pifEditor) pifEditor.hidden = !on;
+      if (on) await csvbManualObsLoadNocOptions();
+    } else {
+      select.style.display = on ? "" : "none";
+      if (on) await csvbManualObsLoadNocOptions();
+    }
   };
 
   select.onchange = () => {
@@ -1062,6 +1089,33 @@ function csvbManualObsSetup() {
   };
 }
 
+function renderHumanPifDisplay(item) {
+  const nocField = el("nocField");
+  if (!nocField) return;
+  const parent = nocField.closest(".pi-field") || nocField.parentElement;
+  if (!parent) return;
+
+  let display = el("humanPifDisplay");
+  if (!display) {
+    display = document.createElement("div");
+    display.id = "humanPifDisplay";
+    display.className = "csvb-human-pif-display";
+    nocField.insertAdjacentElement("afterend", display);
+  }
+
+  const isHuman = normDesignation(item?.designation) === "Human";
+  const manualBox = el("nocManualEditBox");
+  if (manualBox) manualBox.dataset.humanPifs = String(isHuman);
+  nocField.hidden = isHuman;
+  nocField.style.display = isHuman ? "none" : "";
+  display.hidden = !isHuman;
+  display.innerHTML = isHuman ? renderHumanPifList(item) : "";
+  const help = manualBox?.querySelector(".csvb-noc-manual-help");
+  if (help) help.textContent = isHuman
+    ? "Select one or more PIFs. Existing unrecognized entries are preserved and can be selected individually."
+    : "Dropdown is filtered by detected category: Human / Hardware / Process.";
+}
+
 function csvbManualObsCollectPayload() {
   const item = state.item || {};
   const designation = normDesignation(item.designation);
@@ -1071,18 +1125,28 @@ function csvbManualObsCollectPayload() {
   const observationText = String(el("supportingCommentField")?.value || "").trim() || null;
 
   const payload = {
-    nature_of_concern: noc,
     observation_text: observationText,
   };
 
   if (designation === "Human") {
+    const selectedPifs = csvbManualObsSelectedHumanPifs();
+    payload.nature_of_concern = item.nature_of_concern ?? null;
     payload.positive_rank = soc;
-    payload.classification_coding = noc;
+    payload.classification_coding = selectedPifs.join(" | ") || null;
   } else {
+    payload.nature_of_concern = noc;
     payload.classification_coding = soc;
   }
 
   return payload;
+}
+
+function csvbManualObsSelectedHumanPifs() {
+  const checkboxes = [...document.querySelectorAll('#humanPifCheckboxes input[name="humanPif"]:checked')];
+  if (checkboxes.length) return uniquePifs(checkboxes.map((input) => input.value));
+  const editor = el("humanPifEditor");
+  if (editor && !editor.hidden) return [];
+  return humanPifsFromItem(state.item || {});
 }
 
 async function csvbManualObsRefreshRisk() {
@@ -1116,6 +1180,7 @@ function renderObservation() {
 
   el("socField").value = socDisplay(item) || "";
   el("nocField").value = nocDisplay(item) || "";
+  renderHumanPifDisplay(item);
   el("questionFullField").value = String(item.question_full || "").trim() || "";
   el("supportingCommentField").value = supportingCommentDisplay(item) || "";
 
@@ -1925,30 +1990,7 @@ async function csvbManualObsSaveAndRefreshV30() {
 
     setSaveStatus("Saving manual fields…");
 
-    const select = document.getElementById("nocManualSelect");
-    const nocField = document.getElementById("nocField");
-
-    if (select && nocField && String(select.value || "").trim()) {
-      nocField.value = String(select.value || "").trim();
-    }
-
-    const designation = normDesignation(item.designation);
-
-    const soc = String(document.getElementById("socField")?.value || "").trim() || null;
-    const noc = String(document.getElementById("nocField")?.value || "").trim() || null;
-    const observationText = String(document.getElementById("supportingCommentField")?.value || "").trim() || null;
-
-    const payload = {
-      nature_of_concern: noc,
-      observation_text: observationText,
-    };
-
-    if (designation === "Human") {
-      payload.positive_rank = soc;
-      payload.classification_coding = noc;
-    } else {
-      payload.classification_coding = soc;
-    }
+    const payload = csvbManualObsCollectPayload();
 
     const { data, error } = await state.supabase
       .from("post_inspection_observation_items")
@@ -2078,30 +2120,7 @@ async function csvbObsManualSaveRefreshV31() {
 
     setSaveStatus("Saving manual fields…");
 
-    const select = document.getElementById("nocManualSelect");
-    const nocField = document.getElementById("nocField");
-
-    if (select && nocField && String(select.value || "").trim()) {
-      nocField.value = String(select.value || "").trim();
-    }
-
-    const designation = normDesignation(item.designation);
-
-    const soc = String(document.getElementById("socField")?.value || "").trim() || null;
-    const noc = String(document.getElementById("nocField")?.value || "").trim() || null;
-    const observationText = String(document.getElementById("supportingCommentField")?.value || "").trim() || null;
-
-    const payload = {
-      nature_of_concern: noc,
-      observation_text: observationText,
-    };
-
-    if (designation === "Human") {
-      payload.positive_rank = soc;
-      payload.classification_coding = noc;
-    } else {
-      payload.classification_coding = soc;
-    }
+    const payload = csvbManualObsCollectPayload();
 
     const { data, error } = await state.supabase
       .from("post_inspection_observation_items")

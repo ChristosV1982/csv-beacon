@@ -1,5 +1,7 @@
 import { loadLockedLibraryJson } from "./question_library_loader.js";
 import { importOperatorCommentsFromPdf } from "./post_inspection_operator_comments.mjs?v=20261021_ocimf_rounds_v1";
+import { humanPifsFromItem as sharedHumanPifsFromItem, renderHumanPifList } from "./csvb-human-pifs.mjs?v=20261026_human_pifs_v1";
+import { refreshHumanPifsFromLinkedPdf } from "./post_inspection_human_pif_repair.mjs?v=20261026_human_pifs_v1";
 
 const DETAIL_BUILD = "post_inspection_detail_v34_operator_comment_rounds_2026-10-21";
 const PDF_BUCKET_DEFAULT = "inspection-reports";
@@ -285,16 +287,7 @@ function normalizeHumanPifText(value) {
 }
 
 function humanPifsFromItem(item) {
-  const candidates = [];
-  const cc = String(item?.classification_coding || "").trim();
-  const noc = String(item?.nature_of_concern || "").trim();
-
-  if (cc) candidates.push(...cc.split("|").map((x) => x.trim()).filter(Boolean));
-  if (noc) candidates.push(...noc.split("|").map((x) => x.trim()).filter(Boolean));
-
-  const candidateSet = new Set(candidates.map(normalizeHumanPifText));
-
-  return HUMAN_PIF_OPTIONS.filter((opt) => candidateSet.has(normalizeHumanPifText(opt)));
+  return sharedHumanPifsFromItem(item);
 }
 
 function socDisplay(item) {
@@ -1014,9 +1007,11 @@ async function loadReportById(reportId) {
 
 function loadReportIntoHeader(r) {
   const reextractButton = el("reextractLinkedPdfBtn");
+  const pifRepairButton = el("repairHumanPifsBtn");
   const reimportButton = el("reimportFindingsPdfBtn");
   const commentsButton = el("importOperatorCommentsBtn");
   if (!r) {
+    if (pifRepairButton) pifRepairButton.disabled = true;
     if (reextractButton) reextractButton.disabled = true;
     if (reimportButton) reimportButton.disabled = true;
     if (commentsButton) commentsButton.disabled = true;
@@ -1065,6 +1060,7 @@ function loadReportIntoHeader(r) {
     reimportButton.disabled = !r.id;
   }
   if (commentsButton) commentsButton.disabled = !r.id;
+  if (pifRepairButton) pifRepairButton.disabled = !r.id || !String(r.pdf_storage_path || "").trim();
 }
 
 function headerInputs() {
@@ -1638,7 +1634,7 @@ function renderObsTable() {
         <td>${obsRowTypeLabel(it.kind)}</td>
         <td>${esc(normDesignation(it.designation) || "—")}</td>
         <td title="${esc(socDisplay(it))}">${esc(socDisplay(it) || "—")}</td>
-        <td title="${esc(nocDisplay(it))}">${esc(nocDisplay(it) || "—")}</td>
+        <td title="${esc(nocDisplay(it))}">${normDesignation(it.designation) === "Human" ? renderHumanPifList(it) : esc(nocDisplay(it) || "—")}</td>
         <td title="${esc(supportingCommentDisplay(it))}">${esc(supportingCommentDisplay(it))}</td>
         <td>${riskScoreCellHtml(it)}</td>
       </tr>
@@ -3766,6 +3762,30 @@ async function init() {
   el("reimportFindingsPdfBtn").addEventListener("click", () =>
     el("reimportFindingsPdfFile").click()
   );
+  el("repairHumanPifsBtn").addEventListener("click", async () => {
+    const button = el("repairHumanPifsBtn");
+    button.disabled = true;
+    try {
+      const summary = await refreshHumanPifsFromLinkedPdf({
+        supabase: state.supabase,
+        report: state.activeReport,
+        formatError: formatEdgeFunctionError,
+      });
+      if (summary) {
+        const freshItems = await loadObservationItemsForReport(state.activeReport.id);
+        state.observationItems = freshItems;
+        rebuildExtractedItems();
+        renderObsTable();
+        setSaveStatus(summary);
+        alert(summary);
+      }
+    } catch (error) {
+      alert("Human PIF repair failed: " + (error?.message || String(error)));
+      setSaveStatus("Human PIF repair failed");
+    } finally {
+      button.disabled = !state.activeReport?.pdf_storage_path;
+    }
+  });
   el("importOperatorCommentsBtn").addEventListener("click", () =>
     el("importOperatorCommentsFile").click()
   );

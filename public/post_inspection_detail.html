@@ -370,6 +370,7 @@
             <button class="btn btn-muted" id="importPdfBtn" type="button">Import PDF (AI)</button>
             <button class="btn btn-muted" id="reimportFindingsPdfBtn" type="button" disabled>Re-import PDF / Replace Findings</button>
             <button class="btn btn-muted" id="reextractLinkedPdfBtn" type="button" disabled>Re-extract Findings from Linked PDF</button>
+            <button class="btn btn-muted" id="repairHumanPifsBtn" type="button" disabled>Refresh / Repair Human PIFs from Linked PDF</button>
             <button class="btn btn-muted" id="importOperatorCommentsBtn" type="button" disabled>Import Operator Comments from PDF</button>
             <input id="importPdfFile" type="file" accept="application/pdf" style="display:none" />
             <input id="reimportFindingsPdfFile" type="file" accept="application/pdf" style="display:none" />
@@ -545,7 +546,8 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js" defer></script>
   <script src="./app-config.js" defer></script>
   <script src="./auth.js" defer></script>
-  <script type="module" src="./post_inspection_detail.js?v=20261021_ocimf_rounds_v1"></script>
+  <link rel="stylesheet" href="./csvb-human-pifs.css?v=20261026_human_pifs_v1" />
+  <script type="module" src="./post_inspection_detail.js?v=20261026_human_pifs_v1"></script>
   <script src="./csvb-ui-polish.js?v=20260430_1"></script>
   <script src="./csvb-help-tooltips.js?v=20260430_1"></script>
   <script src="./csvb-100pct-fit.js?v=20260430_1"></script>

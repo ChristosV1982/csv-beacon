@@ -2,6 +2,7 @@ export const config = {
   verify_jwt: false
 };
 const FUNCTION_VERSION = "cors-jwt-off-v47_hardware_pair_ownership_uploaded_findings_reimport";
+const HUMAN_PIF_VERSION = "human-multi-pifs-v1";
 import { createClient } from "npm:@supabase/supabase-js@2.45.4";
 import * as pdfjsLib from "npm:pdfjs-dist@4.2.67/legacy/build/pdf.mjs";
 import { extractEmbeddedPhotoMetadata } from "./photo_probe.ts";
@@ -746,6 +747,64 @@ function isOperatorCommentsStart(line) {
   if (/^\d{1,2}\s+[A-Za-z]{3}\s+\d{4}\s+\d{2}:\d{2}\s+uploaded by\b/i.test(t)) return true;
   return false;
 }
+// Canonical prefixes let wrapped taxonomy lines be joined without swallowing
+// supporting prose when a complete PIF precedes the observation text.
+const HUMAN_PIF_TEXTS = [
+  "Recognition of safety criticality of the task or associated steps",
+  "Custom and practice surrounding use of procedures",
+  "Procedures accessible, helpful, understood and accurate for task",
+  "Team dynamics, communications and coordination with others",
+  "Evidence of stress, workload, fatigue, time constraints",
+  "Factors such as morale, motivation, nervousness",
+  "Workplace ergonomics incl. signage, tools, layout, space, noise, light, heat, etc.",
+  "Human-Machine Interface (E.g.: Controls, Alarms, etc.)",
+  "Opportunity to learn or practice",
+  "Not Identified",
+];
+
+function humanPifComparable(value) {
+  return normSpaces(value).toLowerCase().replace(/[‐‑‒–—]/g, "-");
+}
+
+function isHumanPifBoundary(line) {
+  // Chapter titles have the same "7. ..." shape as PIFs but are not PIFs.
+  return parseResponseStart(line) || isQuestionHeaderStart(line) ||
+    isReportSectionHeading(line) || isOperatorCommentsStart(line) ||
+    /^\d{1,2}\.\s+(?:Vessel Particulars|General Information|Certification and Documentation|Crew Management|Navigation(?: and Communications)?|Safety Management|Pollution Prevention|Maritime Security|Cargo and Ballast Systems|Mooring and Anchoring|Machinery Spaces|General Appearance and Condition)\s*$/i.test(line);
+}
+
+function collectHumanPif(lines, start) {
+  let value = normSpaces(lines[start]);
+  let end = start;
+  const code = Number(value.match(/^(\d{1,2})\./)?.[1]);
+  const canonical = HUMAN_PIF_TEXTS[code - 1];
+  while (end + 1 < lines.length) {
+    const next = normSpaces(lines[end + 1]);
+    if (!next || isReportHeaderOrFooter(next)) {
+      end++;
+      continue;
+    }
+    if (isHumanPifBoundary(next) || isLikelyHumanPifLine(next) || isPhotoUploadHeading(next)) break;
+    const body = value.replace(/^\d{1,2}\.\s*/, "");
+    const joinedBody = `${body} ${next}`;
+    const knownContinuation = canonical &&
+      humanPifComparable(body) !== humanPifComparable(canonical) &&
+      humanPifComparable(canonical).startsWith(humanPifComparable(joinedBody));
+    // Retain unknown future labels too; join conservative fragment continuations,
+    // never a new sentence/observation after an already complete taxonomy label.
+    const knownPrefix = canonical &&
+      humanPifComparable(canonical).startsWith(humanPifComparable(body));
+    const unknownContinuation = !knownPrefix &&
+      !/[.!?]$/.test(value) &&
+      (/[,;:(\-–]$/.test(value) || /^[a-z(]/.test(next)) &&
+      !/^(?:it was\b|the\s|op\b|inspector\b)/i.test(next);
+    if (!knownContinuation && !unknownContinuation) break;
+    value = normSpaces(`${value} ${next}`);
+    end++;
+  }
+  return { value, end };
+}
+
 function parseResponseBlock(block, controlledNocs = {}) {
   if (!isExtractableResponseType(block.response_type)) return null;
 
@@ -775,6 +834,8 @@ function parseResponseBlock(block, controlledNocs = {}) {
     Number(controlledSocNoc?.consumed_line_count || 0);
 
   const commentParts = [];
+  const humanPifs = [];
+  const humanPifKeys = new Set();
 
   for (let lineIndex = 0; lineIndex < tailLines.length; lineIndex++) {
     if (lineIndex < consumedLineCount) continue;
@@ -786,6 +847,7 @@ function parseResponseBlock(block, controlledNocs = {}) {
     if (isReportSectionHeading(t)) break;
 
     if (isOperatorCommentsStart(t)) break;
+    if (block.designation === "Human" && isHumanPifBoundary(t)) break;
 
     if (
       block.designation === "Process" &&
@@ -799,7 +861,13 @@ function parseResponseBlock(block, controlledNocs = {}) {
       block.designation === "Human" &&
       isLikelyHumanPifLine(t)
     ) {
-      classification_coding = classification_coding ?? t;
+      const pif = collectHumanPif(tailLines, lineIndex);
+      const pifKey = humanPifComparable(pif.value);
+      if (!humanPifKeys.has(pifKey)) {
+        humanPifKeys.add(pifKey);
+        humanPifs.push(pif.value);
+      }
+      lineIndex = pif.end;
       continue;
     }
 
@@ -832,6 +900,9 @@ function parseResponseBlock(block, controlledNocs = {}) {
   const observation_text = cleanOcimfFooterFragments(
     commentParts.join(" ")
   );
+  if (block.designation === "Human" && humanPifs.length) {
+    classification_coding = humanPifs.join(" | ");
+  }
 
   const positive_rank =
     block.response_type === "positive" &&
@@ -1901,6 +1972,9 @@ Deno.serve(async (req)=>{
     const wantOperatorCommentsOnly =
       payload?.operator_comments_only === true ||
       payload?.operator_comments_only === "true";
+    const wantHumanPifRepair =
+      payload?.human_pif_repair_only === true ||
+      payload?.human_pif_repair_only === "true";
 
     const persistenceMode =
       photoPersistenceMode(
@@ -1910,6 +1984,11 @@ Deno.serve(async (req)=>{
     const wantPhotoPersistence =
       Boolean(persistenceMode);
 
+    if (wantHumanPifRepair && (wantOperatorCommentsOnly ||
+        wantLinkedPdfReextract || wantUploadedPdfFindingsReimport ||
+        wantPhotoProbe || wantPhotoPersistence)) {
+      return json(req, { ok: false, error: "Human PIF repair cannot be combined with other import modes" }, 400);
+    }
     if (
       wantOperatorCommentsOnly &&
       (wantLinkedPdfReextract || wantUploadedPdfFindingsReimport ||
@@ -2003,9 +2082,10 @@ Deno.serve(async (req)=>{
       wantPhotoPersistence ||
       wantLinkedPdfReextract ||
       wantUploadedPdfFindingsReimport ||
-      wantOperatorCommentsOnly
+      wantOperatorCommentsOnly ||
+      wantHumanPifRepair
     ) {
-      if (wantLinkedPdfReextract && (!reportId || reportId === "temp")) {
+      if ((wantLinkedPdfReextract || wantHumanPifRepair) && (!reportId || reportId === "temp")) {
         return json(req, {
           ok: false,
           error:
@@ -2016,7 +2096,7 @@ Deno.serve(async (req)=>{
       const requestApiKey = req.headers.get("apikey") || "";
       const accessApiKey =
         wantLinkedPdfReextract || wantUploadedPdfFindingsReimport ||
-          wantOperatorCommentsOnly
+          wantOperatorCommentsOnly || wantHumanPifRepair
         ? requestApiKey || SUPABASE_ANON_KEY || ""
         : SUPABASE_ANON_KEY || requestApiKey;
 
@@ -2096,6 +2176,23 @@ Deno.serve(async (req)=>{
       ? extractOperatorCommentsFromPages(pages, controlledNocs)
       : null;
 
+    if (wantHumanPifRepair) {
+      const referenceKey = (value) => String(value || "").replace(/\s+/g, "").toUpperCase();
+      if (!referenceKey(header?.report_reference) ||
+          referenceKey(header?.report_reference) !== referenceKey(persistenceReport?.report_ref)) {
+        throw new Error("Bad request: linked PDF report reference does not match this report");
+      }
+      // This mode is extraction-only. It never writes findings, photos or risk.
+      return json(req, {
+        ok: true,
+        function_version: FUNCTION_VERSION,
+        human_pif_version: HUMAN_PIF_VERSION,
+        extracted: {
+          header,
+          observations: observations.filter((observation) => observation.designation === "Human"),
+        },
+      });
+    }
     if (
       wantOperatorCommentsOnly &&
       (!header?.report_reference ||
