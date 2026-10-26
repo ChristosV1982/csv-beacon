@@ -337,7 +337,7 @@
 
     function eventTitle(event) {
       const labels = {
-        issued: "Prevention action issued",
+        issued: "Preventive action issued",
         response_submitted: "Response submitted",
         office_review: "Office review started",
         returned: "Returned to vessel",

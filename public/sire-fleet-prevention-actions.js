@@ -48,11 +48,11 @@
     host.hidden = !options.canEdit && !actions.length;
     if (host.hidden) return;
     const section = element("section", "fpa-section");
-    section.setAttribute("aria-label", "Office prevention actions");
+    section.setAttribute("aria-label", "Office preventive actions");
     const heading = element("div", "fpa-heading");
-    heading.append(element("span", "fpa-kicker", "OFFICE PREVENTION"));
+    heading.append(element("span", "fpa-kicker", "OFFICE PREVENTIVE"));
     if (options.canEdit && !actions.length) {
-      const create = element("button", "fpa-button fpa-button-primary", "Create Prevention Action");
+      const create = element("button", "fpa-button fpa-button-primary", "Create Preventive Action");
       create.type = "button";
       create.id = "fpaCreateAction";
       create.dataset.testid = "prevention-create";
@@ -60,11 +60,11 @@
       heading.appendChild(create);
     } else if (options.canEdit && actions.length) {
       const action = actions[0];
-      const view = element("button", "fpa-button", "View Prevention Action");
+      const view = element("button", "fpa-button", "View Preventive Action");
       view.type = "button";
       view.dataset.testid = "prevention-view";
       view.addEventListener("click", () => openEditor(row, options, action, view, true));
-      const edit = element("button", "fpa-button fpa-button-primary", "Edit Prevention Action");
+      const edit = element("button", "fpa-button fpa-button-primary", "Edit Preventive Action");
       edit.type = "button";
       edit.dataset.testid = "prevention-edit";
       edit.addEventListener("click", () => openEditor(row, options, action, edit));
@@ -73,13 +73,13 @@
     section.appendChild(heading);
     if (!actions.length) {
       section.appendChild(element("p", "fpa-empty", options.canEdit
-        ? "No prevention action recorded for this observation."
-        : "No issued prevention action is available for this observation."));
+        ? "No preventive action recorded for this observation."
+        : "No issued preventive action is available for this observation."));
     }
     actions.forEach((action) => {
       const details = element("details", "fpa-summary");
       const summary = document.createElement("summary");
-      const name = element("span", "fpa-summary-title", `${actionStatus(action)} prevention action`);
+      const name = element("span", "fpa-summary-title", `${actionStatus(action)} preventive action`);
       const meta = element("span", "fpa-summary-meta", `${targetSummary(action)}${action?.due_date ? ` · Due ${text(action.due_date)}` : ""}`);
       summary.append(name, meta);
       details.appendChild(summary);
@@ -115,7 +115,7 @@
     panel.setAttribute("aria-labelledby", "fpaDialogTitle");
     panel.tabIndex = -1;
     const header = element("header", "fpa-dialog-header");
-    const title = element("h2", "", "Prevention action");
+    const title = element("h2", "", "Preventive action");
     title.id = "fpaDialogTitle";
     const close = element("button", "fpa-close", "Close");
     close.type = "button";
@@ -216,7 +216,7 @@
     content.replaceChildren();
     current = { row, options, action, readOnly: readOnly || !options.canEdit };
     const title = shell.querySelector("#fpaDialogTitle");
-    title.textContent = action ? `${actionStatus(action)} prevention action` : "Create Prevention Action";
+    title.textContent = action ? `${actionStatus(action)} preventive action` : "Create Preventive Action";
     shell.hidden = false;
     shell.setAttribute("aria-hidden", "false");
     document.body.classList.add("fpa-dialog-open");
@@ -253,7 +253,7 @@
   function readOnlyBody(action, context) {
     const body = element("div", "fpa-editor");
     if (!action) {
-      body.appendChild(element("p", "fpa-empty", "There is no issued prevention action to view."));
+      body.appendChild(element("p", "fpa-empty", "There is no issued preventive action to view."));
       return body;
     }
     body.append(
@@ -282,8 +282,8 @@
     instruction.disabled = pendingActionDeletion;
     instruction.id = "fpaInstruction";
     instruction.dataset.testid = "prevention-instruction";
-    instruction.setAttribute("aria-label", "Preventative Actions Required by the Vessel");
-    form.appendChild(makeField("Preventative Actions Required by the Vessel", instruction));
+    instruction.setAttribute("aria-label", "Preventive Actions Required by the Vessel");
+    form.appendChild(makeField("Preventive Actions Required by the Vessel", instruction));
 
     const mode = action?.target_mode === "selected" ? "selected" : "all";
     const modeGroup = element("fieldset", "fpa-target-mode");
@@ -365,8 +365,8 @@
       deleteButton.disabled = deleteInfo.can_delete !== true && !deleteRetryAllowed;
       deleteButton.addEventListener("click", () => {
         if (busy) return;
-        const issuedConfirmation = "Delete this issued prevention action? Its issued tasks and targets will be removed, together with any unsubmitted draft responses and temporary evidence. The source observation remains unchanged. Submitted history cannot be deleted.";
-        const draftConfirmation = "Delete this draft prevention action? Its targets, unsubmitted drafts, and evidence will be removed. The source observation will remain unchanged.";
+        const issuedConfirmation = "Delete this issued preventive action? Its issued tasks and targets will be removed, together with any unsubmitted draft responses and temporary evidence. The source observation remains unchanged. Submitted history cannot be deleted.";
+        const draftConfirmation = "Delete this draft preventive action? Its targets, unsubmitted drafts, and evidence will be removed. The source observation will remain unchanged.";
         if (!window.confirm(issued ? issuedConfirmation : draftConfirmation)) return;
         void deleteAction(row, action, current.options, deleteButton, () => {
           deleteRetryAllowed = true;
@@ -402,7 +402,7 @@
       save.addEventListener("click", async () => {
         if (busy || pendingActionDeletion) return;
         if (!instruction.value.trim()) {
-          setMessage("Enter the preventative action instruction before saving.", "error");
+          setMessage("Enter the preventive action instruction before saving.", "error");
           instruction.focus();
           return;
         }
@@ -423,7 +423,7 @@
       issue.addEventListener("click", async () => {
         if (busy || pendingActionDeletion) return;
         if (!instruction.value.trim()) {
-          setMessage("Enter the preventative action instruction before issuing.", "error");
+          setMessage("Enter the preventive action instruction before issuing.", "error");
           instruction.focus();
           return;
         }
@@ -432,8 +432,8 @@
           return;
         }
         const prompt = action?.id
-          ? "Save these changes and issue this prevention action to its selected vessels? Issued targets cannot be changed."
-          : "Save and issue this prevention action to the selected vessels? This cannot be undone.";
+          ? "Save these changes and issue this preventive action to its selected vessels? Issued targets cannot be changed."
+          : "Save and issue this preventive action to the selected vessels? This cannot be undone.";
         if (!window.confirm(prompt)) return;
         await saveAction({ row, action, options: current.options, instruction, allRadio, dueDate, vesselBox, issuedAfter: true });
       });
@@ -459,7 +459,7 @@
 
   async function saveAction({ row, action, options, instruction, allRadio, dueDate, vesselBox, issuedAfter }) {
     setBusy(true);
-    setMessage(issuedAfter ? "Saving the draft before issue…" : "Saving prevention action…");
+    setMessage(issuedAfter ? "Saving the draft before issue…" : "Saving preventive action…");
     try {
       const params = {
         p_company_id: options.companyId,
