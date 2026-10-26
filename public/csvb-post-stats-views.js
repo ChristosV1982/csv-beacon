@@ -2,17 +2,17 @@
 (() => {
   "use strict";
   const views = [
-    ["overview", "Overview / Summary", "Report and observation totals, missing PGNOs, unique questions and observation-type counts."],
-    ["visual", "Visual Overview", "Negative, Largely as Expected and Positive observation charts by category and period."],
-    ["comparison", "Independent Comparison Charts", "Three independent comparisons across years, quarters, months and existing observation metrics."],
-    ["fleet", "Fleet / Vessel Performance", "Vessel performance, selected-scope averages and vessel observation bars."],
-    ["question-chapter", "Question / Chapter Performance", "Recurring questions, chapter distribution and question/chapter trends."],
-    ["cause-category", "Cause / Category Analysis", "Designation, SOC, NOC and M-SCAT cause/category rankings and trends."],
-    ["party", "Inspection Party Analysis", "Inspecting company, inspector/auditor and inspector-company counts and averages."],
-    ["trend", "Trend Analysis", "Monthly observation counts, report counts and averages for the selected year."],
-    ["pgno", "PGNO Analytics", "Assigned PGNOs, question associations, trends and missing-PGNO review."],
-    ["mscat", "M-SCAT Analytics", "Cause and control-area selections, source comparisons, rankings and trends."],
-    ["sector", "Sector Analytics", "Navigation, Cargo and Mooring source comparisons, trends and recurring questions."]
+    ["overview", "Overview / Summary", "Review report and observation totals alongside missing PGNOs, unique questions and observation-type counts. Use this summary to orient the selected inspection scope.", "📊"],
+    ["visual", "Visual Overview", "Compare Negative, Largely as Expected and Positive observations by category and period. See how each observation type is distributed over time.", "📉"],
+    ["comparison", "Independent Comparison Charts", "Build three independent comparisons across years, quarters or months using existing observation metrics. Keep each comparison focused on a different interval or measure.", "⚖️"],
+    ["fleet", "Fleet / Vessel Performance", "Review vessel performance, selected-scope averages and observation bars by vessel. Compare counts and averages within the current selection.", "🚢"],
+    ["question-chapter", "Question / Chapter Performance", "Find recurring questions, review chapter distribution and follow question or chapter trends. See repeated findings and where they are concentrated.", "🔎"],
+    ["cause-category", "Cause / Category Analysis", "Review rankings and trends for designation, SOC, NOC and M-SCAT categories. Use these breakdowns to examine how recorded causes are represented.", "🧩"],
+    ["party", "Inspection Party Analysis", "Compare inspecting-company, inspector/auditor and inspector-company counts and averages. Review the available breakdowns together to see how inspection parties are represented.", "🧭"],
+    ["trend", "Trend Analysis", "Review monthly observation counts, report counts and averages for the selected year. Compare quieter and busier months across the year.", "📈"],
+    ["pgno", "PGNO Analytics", "Review assigned PGNOs, their question associations and trends, alongside missing-PGNO records. Focus follow-up on codes and questions represented in the analytics.", "🏷️"],
+    ["mscat", "M-SCAT Analytics", "Explore cause and control-area selections, compare available sources, and review rankings and trends. Examine recorded M-SCAT patterns across the existing breakdowns.", "🧠"],
+    ["sector", "Sector Analytics", "Compare Navigation, Cargo and Mooring across available sources, then review trends and recurring questions. Use the sector breakdowns to focus on recurring patterns.", "⚓"]
   ];
   const requested = new URLSearchParams(location.search).get("view");
   const current = views.find(([key]) => key === requested);
@@ -44,11 +44,18 @@
     landing.appendChild(heading);
     const grid = document.createElement("div");
     grid.className = "csvb-analytics-grid";
-    views.forEach(([key, title, description]) => {
+    views.forEach(([key, title, description, icon]) => {
       const card = document.createElement("article");
       card.className = "csvb-analytics-card";
+      const heading = document.createElement("div");
+      heading.className = "csvb-analytics-card-heading";
+      const iconContainer = document.createElement("span");
+      iconContainer.className = "csvb-analytics-card-icon";
+      iconContainer.setAttribute("aria-hidden", "true");
+      iconContainer.textContent = icon;
       const name = document.createElement("h2");
       name.textContent = title;
+      heading.append(iconContainer, name);
       const text = document.createElement("p");
       text.textContent = description;
       const link = document.createElement("a");
@@ -58,7 +65,7 @@
       link.rel = "noopener noreferrer";
       link.textContent = "Open";
       link.setAttribute("aria-label", `Open ${title} in a new tab`);
-      card.append(name, text, link);
+      card.append(heading, text, link);
       grid.appendChild(card);
     });
     landing.appendChild(grid);
