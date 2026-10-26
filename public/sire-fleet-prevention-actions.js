@@ -93,6 +93,13 @@
       body.appendChild(element("p", "fpa-instruction", text(action?.preventative_actions_required_by_vessel) || "No instruction supplied."));
       details.appendChild(body);
       section.appendChild(details);
+      if (text(action?.status).toLowerCase() === "issued") {
+        window.CSVB_FVE_RESPONSES?.attach(section, action, {
+          companyId: options.companyId,
+          client: options.client,
+          onSaved: options.onSaved
+        });
+      }
     });
     host.appendChild(section);
   }

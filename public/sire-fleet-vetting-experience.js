@@ -1,7 +1,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "SIRE_FLEET_VETTING_EXPERIENCE-20261028_prevention_actions_v1";
+  const BUILD = "SIRE_FLEET_VETTING_EXPERIENCE-20261029_vessel_responses_v1";
   const ROOT = document.getElementById("viewerRuntime");
   const MODULE_KEY = "sire_fleet_vetting_experience";
   const COMPANY_VIEW_ID_KEY = "csvb_superuser_company_view_id";

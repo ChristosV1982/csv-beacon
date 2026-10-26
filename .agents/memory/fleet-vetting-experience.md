@@ -1,6 +1,6 @@
 ---
 name: Fleet Vetting Experience boundaries
-description: Deliberate vessel fleet-awareness exception, limited fields, and physical-finding display semantics.
+description: Limited fleet awareness, separate prevention workflows, and immutable target-specific vessel response/evidence boundaries.
 ---
 
 SIRE 2.0 – Fleet Vetting Experience permits authorized vessel users to read their company's fleet-wide historical negative findings, not just their own vessel's findings. This is a deliberately limited awareness projection, not permission to open another vessel's full Post-Inspection report.
@@ -26,3 +26,15 @@ Vessel-facing awareness payloads must not expose the underlying Post-Inspection 
 **Why:** Limited fleet awareness is not permission to navigate into other vessels' full inspection records; identifiers must not become an unintended route into those records.
 
 **How to apply:** Return only targeted Issued action content to vessels. Drafts, untargeted actions and office editing remain server-enforced restrictions. Preserve source snapshots and block destructive replacement while an action references a finding.
+
+Vessel responses belong to a specific vessel target, not just the source finding. Submitted text and its evidence are immutable; a return permits a new response version. Office return/review messages stay separate. Parent Draft/Issued status is independent from target workflow status.
+
+**Why:** The user requires chronological, auditable submissions without rewriting the original inspection or previous responses.
+
+**How to apply:** Preserve prior submissions and files when adding revisions. Apply the five-file maximum and 10 MB **combined** limit per submission, not per file. Keep evidence private and downloads short-lived; onboard/disembarkation restrictions remain authoritative.
+
+Validate evidence authorization through the real Storage API as well as SQL tests.
+
+**Why:** Storage performs preliminary and completed-upload authorization with different metadata shapes; SQL-only object fixtures did not exercise that preliminary path.
+
+**How to apply:** Retain real authenticated upload/download and concurrent-quota tests when changing evidence policies; never bypass final actual-size validation to make an upload preflight pass.
