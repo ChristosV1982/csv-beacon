@@ -6,7 +6,6 @@
   "use strict";
 
   const BUILD = "PA6J-2026-05-20-RISQ-VIEWER";
-  const SELECTED_KEY = "csvb_dashboard_selected_platform_area_v6";
 
   const SIRE_VIEWER_CARD_KEY = "sire_questions_viewer";
   const RISQ_VIEWER_CARD_KEY = "risq_questions_viewer";
@@ -87,6 +86,7 @@
   let platformAreaSource = "fallback";
   let observer = null;
   let refreshQueued = false;
+  let navigationReady = false;
 
   function safeText(value) {
     return String(value ?? "");
@@ -273,6 +273,12 @@
   }
 
   function isCardAvailable(cardKey) {
+    const rank = window.CSVB_DASHBOARD_RANK_ACCESS;
+    if (rank?.error) return false;
+    if (rank?.blocked && cardKey !== SIRE_VIEWER_CARD_KEY && cardKey !== RISQ_VIEWER_CARD_KEY) return false;
+    const moduleCode = window.CSVB_DASHBOARD_RANK_CARD_CODES?.[cardKey];
+    if (moduleCode && Array.isArray(rank?.allowedViewModules) &&
+        !rank.allowedViewModules.includes(moduleCode)) return false;
     if (cardKey === SIRE_VIEWER_CARD_KEY) {
       return dashboardModuleAllows("sire_questions_viewer");
     }
@@ -291,6 +297,8 @@
   }
 
   function availableCardCount(area) {
+    const home = window.CSVB_DASHBOARD_AREA_HOME;
+    if (home?.getVisibleItems) return home.getVisibleItems(area.key).length;
     return (area.cards || []).reduce((count, cardKey) => {
       return count + (isCardAvailable(cardKey) ? 1 : 0);
     }, 0);
@@ -302,36 +310,17 @@
     return raw;
   }
 
-  function loadSelectedKey() {
-    try {
-      const raw = localStorage.getItem(SELECTED_KEY) || "";
-      const normalized = normalizeAreaKey(raw);
-
-      if (raw && normalized !== raw) {
-        localStorage.setItem(SELECTED_KEY, normalized);
-      }
-
-      return normalized;
-    } catch (_) {
-      return "";
-    }
-  }
-
-  function saveSelectedKey(key) {
-    try {
-      localStorage.setItem(SELECTED_KEY, normalizeAreaKey(key) || "");
-    } catch (_) {}
-  }
-
   function selectedAreaKey() {
-    const saved = loadSelectedKey();
+    return new URL(window.location.href).searchParams.get("area") || "";
+  }
 
-    if (platformAreas.some((area) => area.key === saved)) {
-      return saved;
-    }
-
-    const defaultArea = platformAreas.find((area) => area.defaultSelected === true);
-    return defaultArea?.key || platformAreas[0]?.key || "";
+  function navigateToArea(key, replace = false) {
+    const url = new URL(window.location.href);
+    if (key) url.searchParams.set("area", key);
+    else url.searchParams.delete("area");
+    window.history[replace ? "replaceState" : "pushState"]({}, "", url);
+    refreshDisplay();
+    document.getElementById("csvbPlatformNavigationTitle")?.focus();
   }
 
   function injectStyles() {
@@ -383,7 +372,7 @@
       }
 
       .csvb-platform-area-card {
-        min-height: 172px;
+        min-height: 148px;
         background: #ffffff;
         border: 1px solid #dbe6f6;
         border-radius: 14px;
@@ -578,7 +567,8 @@
 
     root.innerHTML = `
       <div class="csvb-platform-area-headline">
-        <div class="csvb-platform-area-headline-title">Platform Areas</div>
+        <button type="button" id="csvbBackToPlatformAreas" class="btn2" data-navigation-hidden="true">Back to Platform Areas</button>
+        <div id="csvbPlatformNavigationTitle" tabindex="-1" class="csvb-platform-area-headline-title">Platform Areas</div>
         <div class="csvb-platform-area-headline-text">
           Modules are grouped by major operational area. Module permissions and company enablement continue to control what each user can see.
         </div>
@@ -601,9 +591,10 @@
       const key = btn.getAttribute("data-platform-area-card") || "";
       if (!key) return;
 
-      saveSelectedKey(key);
-      refreshDisplay();
+      navigateToArea(key);
     });
+    root.querySelector("#csvbBackToPlatformAreas").addEventListener("click", () => navigateToArea(""));
+    window.addEventListener("popstate", refreshDisplay);
 
     renderStaticShell();
     moveCardsOnce();
@@ -666,7 +657,7 @@
       const countText = count === 1 ? "1 module" : `${count} modules`;
       const countEl = document.querySelector(`[data-platform-area-count="${area.key}"]`);
 
-      if (countEl) {
+      if (countEl && countEl.textContent !== countText) {
         countEl.textContent = countText;
       }
     });
@@ -677,6 +668,10 @@
 
     document.querySelectorAll("[data-platform-area-card]").forEach((btn) => {
       btn.classList.toggle("active", btn.getAttribute("data-platform-area-card") === key);
+      const area = platformAreas.find((entry) => entry.key === btn.getAttribute("data-platform-area-card"));
+      const hidden = !area || availableCardCount(area) === 0;
+      if (btn.hidden !== hidden) btn.hidden = hidden;
+      btn.setAttribute("data-navigation-hidden", String(hidden));
     });
   }
 
@@ -690,31 +685,32 @@
       panel.classList.toggle("hidden", panelKey !== key);
     });
 
-    platformAreas.forEach((area) => {
-      const grid = document.querySelector(`[data-platform-area-grid="${area.key}"]`);
-      if (!grid) return;
-
-      grid.querySelectorAll(".csvb-platform-area-placeholder").forEach((el) => el.remove());
-
-      const count = availableCardCount(area);
-
-      if (count === 0) {
-        const placeholder = document.createElement("div");
-        placeholder.className = "csvb-platform-area-placeholder";
-        placeholder.textContent =
-          area.placeholder || "No modules are currently available in this platform area.";
-        grid.appendChild(placeholder);
-      }
-    });
   }
 
   function refreshDisplay() {
     retireLegacyReadOnlyLibrary();
     createRoot();
     moveCardsOnce();
+    if (!navigationReady) return;
+    let key = selectedAreaKey();
+    const area = platformAreas.find((entry) => entry.key === key && availableCardCount(entry) > 0);
+    if (key && !area) {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("area");
+      window.history.replaceState({}, "", url);
+      key = "";
+    }
+    window.CSVB_DASHBOARD_AREA_HOME?.render();
     updateAreaCounts();
     updateSelectedTile();
     updatePanels();
+    document.getElementById("csvbPlatformAreaTiles")?.setAttribute("data-navigation-hidden", String(!!key));
+    document.getElementById("csvbPlatformAreaPanels")?.setAttribute("data-navigation-hidden", String(!key));
+    document.getElementById("csvbBackToPlatformAreas")?.setAttribute("data-navigation-hidden", String(!key));
+    const title = document.getElementById("csvbPlatformNavigationTitle");
+    const titleText = key ? area.title : "Platform Areas";
+    if (title && title.textContent !== titleText) title.textContent = titleText;
+    document.getElementById("csvbPlatformAreaRoot")?.setAttribute("data-navigation-ready", "true");
   }
 
   function scheduleRefresh() {
@@ -731,43 +727,75 @@
   function startObserver() {
     if (observer) return;
 
-    observer = new MutationObserver(() => {
-      scheduleRefresh();
+    observer = new MutationObserver((records) => {
+      if (records.some((record) =>
+        (record.type === "attributes" && record.target.matches?.("[data-card]")) ||
+        (record.type === "childList" && [...record.addedNodes, ...record.removedNodes].some((node) =>
+          node.nodeType === 1 && (node.matches?.("[data-card]") || node.querySelector?.("[data-card]"))))
+      )) scheduleRefresh();
     });
 
     observer.observe(document.body, {
       childList: true,
       subtree: true,
       attributes: true,
-      attributeFilter: ["style", "class"],
+      attributeFilter: ["style"],
     });
   }
 
   async function init() {
     await loadPlatformAreas();
 
-    refreshDisplay();
-    startObserver();
-
-    setTimeout(refreshDisplay, 400);
-    setTimeout(refreshDisplay, 1000);
-    setTimeout(refreshDisplay, 1800);
-
     window.CSVB_DASHBOARD_PLATFORM_AREAS = {
       build: BUILD,
       source: platformAreaSource,
       areas: platformAreas,
+      isCardAvailable,
       refresh: refreshDisplay,
       reload: async () => {
         await loadPlatformAreas();
         location.reload();
       },
     };
+    refreshDisplay();
+    startObserver();
+    await window.CSVB_DASHBOARD_BASE_READY;
+    await window.CSVB_DASHBOARD_RANK_READY;
+    if (window.CSVB_DASHBOARD_BASE_ERROR || window.CSVB_DASHBOARD_RANK_ACCESS?.error) {
+      throw new Error("Dashboard permissions could not be loaded. Refresh to try again.");
+    }
+    // Compatibility helpers are asynchronous; never reveal an intermediate
+    // permission/count state while they are still initializing.
+    await new Promise((resolve, reject) => {
+      const deadline = Date.now() + 15000;
+      const check = () => {
+        if (window.CSVB_DASHBOARD_AREA_HOME?.getVisibleItems &&
+            window.CSVB_DASHBOARD_ASSURANCE_EXTENSION_STATE &&
+            window.CSVB_DASHBOARD_RISQ_VIEWER_CARD) {
+          resolve();
+        } else if (Date.now() >= deadline) {
+          reject(new Error("Dashboard navigation could not finish loading. Refresh to try again."));
+        } else setTimeout(check, 50);
+      };
+      check();
+    });
+    window.CSVB_DASHBOARD_RISQ_VIEWER_CARD.apply();
+    navigationReady = true;
+    refreshDisplay();
+    window.dispatchEvent(new Event("csvb-dashboard-navigation-ready"));
   }
 
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", init);
+    document.addEventListener("DOMContentLoaded", () => init().catch(showNavigationError));
   } else {
-    setTimeout(init, 0);
+    setTimeout(() => init().catch(showNavigationError), 0);
+  }
+  function showNavigationError(error) {
+    console.error(error);
+    const box = document.getElementById("warnBox");
+    if (box) {
+      box.textContent = error.message || String(error);
+      box.style.display = "block";
+    }
   }
 })();

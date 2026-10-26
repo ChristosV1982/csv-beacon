@@ -3,3 +3,4 @@
 - [Post-inspection officer field read-back](post-inspection-officer-field-readback.md) — verify access-controlled report RPC outputs as well as table columns when saved Master/Chief Engineer values appear blank.
 - [C.S.V. Beacon Supabase environment](csvb-supabase-environment.md) — user confirmed the linked project is isolated development/testing; re-check before migrations.
 - [OCIMF comment history](ocimf-comment-history.md) — original responses and manual follow-up notes must stay separate from imported later rounds.
+- [Dashboard navigation](dashboard-navigation.md) — plain dashboard starts at authorized areas; navigation changes must preserve existing module access rules.

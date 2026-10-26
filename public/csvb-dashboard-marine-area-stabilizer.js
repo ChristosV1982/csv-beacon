@@ -16,7 +16,7 @@
     if (old) old.remove();
 
     const script = document.createElement("script");
-    script.src = "./csvb-dashboard-risq-viewer-card.js?v=20260520_2";
+    script.src = "./csvb-dashboard-risq-viewer-card.js?v=20261026_two_level_v1";
     script.defer = true;
     script.dataset.csvbRisqViewerCardLoader = "2";
     document.body.appendChild(script);

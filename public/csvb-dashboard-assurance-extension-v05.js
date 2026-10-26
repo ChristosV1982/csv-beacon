@@ -257,7 +257,12 @@
     if (observerStarted) return;
     observerStarted = true;
 
-    const mo = new MutationObserver(scheduleUpdate);
+    const mo = new MutationObserver((records) => {
+      if (records.some((record) => record.type === "attributes"
+        ? record.target.matches?.("[data-card]")
+        : [...record.addedNodes].some((node) => node.nodeType === 1 &&
+          (node.matches?.("[data-card]") || node.querySelector?.("[data-card]"))))) scheduleUpdate();
+    });
     mo.observe(document.body, {
       childList: true,
       subtree: true,
@@ -277,7 +282,8 @@
 
     const allowed = ALLOWED_ROLES.has(role);
 
-    if (card) card.style.display = allowed ? "block" : "none";
+    const display = allowed ? "block" : "none";
+    if (card && card.style.display !== display) card.style.display = display;
 
     const platformInjected = allowed ? injectIntoPlatformAreaSource() : false;
     const areaInjected = allowed ? injectIntoAreaHomeConfig() : false;

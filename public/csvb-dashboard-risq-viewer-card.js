@@ -89,6 +89,12 @@
 
   function ensureAreaHomeItem(allowed) {
     const existing = document.querySelector('[data-csvb-risq-viewer-area-home="1"]');
+    // The canonical area renderer now owns this shortcut and its count.
+    if (window.CSVB_DASHBOARD_AREA_HOME?.getVisibleItems) {
+      existing?.remove();
+      window.CSVB_DASHBOARD_AREA_HOME.render();
+      return;
+    }
 
     if (!allowed) {
       existing?.remove();
@@ -114,7 +120,8 @@
     const allowed = isAllowed();
 
     const card = ensureCard();
-    if (card) card.style.display = allowed ? "block" : "none";
+    const display = allowed ? "block" : "none";
+    if (card && card.style.display !== display) card.style.display = display;
 
     ensureAreaHomeItem(allowed);
 
@@ -134,8 +141,13 @@
     setTimeout(apply, 5000);
     setTimeout(apply, 8000);
 
-    const observer = new MutationObserver(() => {
-      window.requestAnimationFrame(apply);
+    const observer = new MutationObserver((records) => {
+      if (records.some((record) => record.type === "attributes"
+        ? record.target.matches?.("[data-card]")
+        : [...record.addedNodes].some((node) => node.nodeType === 1 &&
+          (node.matches?.("[data-card]") || node.querySelector?.("[data-card]"))))) {
+        window.requestAnimationFrame(apply);
+      }
     });
     observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["style", "class"] });
 

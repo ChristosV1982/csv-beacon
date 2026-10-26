@@ -31,6 +31,7 @@
     portable_lifting_appliances_wires: "PORTABLE_LIFTING_APPLIANCES_WIRES",
     suadmin: "SU_ADMIN"
   };
+  window.CSVB_DASHBOARD_RANK_CARD_CODES = CARD_TO_APP_MODULE_CODE;
 
   function warn(message) {
     const box = document.getElementById("warnBox");
@@ -87,6 +88,7 @@
   }
 
   async function run() {
+    await window.CSVB_DASHBOARD_BASE_READY;
     window.CSVB_DASHBOARD_RANK_ACCESS_BUILD = BUILD;
 
     if (!window.AUTH?.getSessionUserProfile) return;
@@ -155,11 +157,15 @@
   }
 
   function start() {
-    window.setTimeout(() => run().catch(console.error), 900);
-    window.setTimeout(() => run().catch(console.error), 1800);
-    window.setTimeout(() => run().catch(console.error), 3200);
+    run().then(resolveReady).catch((error) => {
+      window.CSVB_DASHBOARD_RANK_ACCESS = { error: error.message || String(error) };
+      resolveReady();
+      console.error(error);
+    });
   }
 
+  let resolveReady;
+  window.CSVB_DASHBOARD_RANK_READY = new Promise((resolve) => { resolveReady = resolve; });
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", start);
   } else {

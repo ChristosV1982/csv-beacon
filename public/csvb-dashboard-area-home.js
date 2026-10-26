@@ -5,7 +5,7 @@
 (() => {
   "use strict";
 
-  const BUILD = "PA7L-2026-05-19-NO-READ-ONLY-LIBRARY-FALLBACK";
+  const BUILD = "PA7L-2026-06-STRICT-TWO-LEVEL-NAV";
 
   const AREA_HOME = {
     company_policy: {
@@ -286,9 +286,27 @@
     if (!cardKey) return true;
     if (cardKey === "library") return false;
 
-    if (cardKey === "sire_questions_viewer") {
-      return dashboardModuleAllows("sire_questions_viewer");
+    const platform = window.CSVB_DASHBOARD_PLATFORM_AREAS;
+    let platformAvailabilityKnown = false;
+    let platformAvailable = false;
+    if (typeof platform?.isCardAvailable === "function") {
+      try {
+        const result = platform.isCardAvailable(cardKey);
+        if (typeof result === "boolean") {
+          platformAvailable = result;
+          platformAvailabilityKnown = true;
+        }
+      } catch {
+        // Keep the established DOM-based fallback available during controller boot.
+      }
     }
+
+    if (cardKey === "sire_questions_viewer") {
+      return dashboardModuleAllows(cardKey) &&
+        (!platformAvailabilityKnown || platformAvailable);
+    }
+
+    if (platformAvailabilityKnown) return platformAvailable;
 
     const card = document.querySelector(`[data-card="${cardKey}"]`);
     if (!card) return false;
@@ -296,24 +314,52 @@
     return card.style.display !== "none";
   }
 
-  function visibleItemsForGroup(group) {
-    return (group.items || []).filter((item) => {
-      if (item.disabled) return true;
-      return isModuleAvailable(item.cardKey);
-    });
-  }
+  function getVisibleItems(areaKey) {
+    const home = AREA_HOME[areaKey];
+    if (!home) return [];
 
-  function homeSignature(areaKey, home) {
-    const parts = [areaKey];
+    const areas = window.CSVB_DASHBOARD_PLATFORM_AREAS?.areas;
+    const area = Array.isArray(areas) ? areas.find((entry) => entry?.key === areaKey) : null;
+    const mappedCards = Array.isArray(area?.cards) ? new Set(area.cards) : null;
+    const seen = new Set();
+    const visible = [];
 
     (home.groups || []).forEach((group) => {
-      parts.push(group.title || "");
-      visibleItemsForGroup(group).forEach((item) => {
-        parts.push(`${item.label}:${item.cardKey}:${item.disabled ? "disabled" : "active"}`);
+      (group.items || []).forEach((item) => {
+        const cardKey = item?.cardKey;
+        if (item?.disabled || !cardKey || seen.has(cardKey)) return;
+        if (mappedCards && !mappedCards.has(cardKey)) return;
+        if (!isModuleAvailable(cardKey)) return;
+
+        seen.add(cardKey);
+        visible.push(item);
       });
     });
 
-    return parts.join("|");
+    return visible;
+  }
+
+  function visibleItemsForGroup(group, visibleItems) {
+    const visible = new Set(visibleItems);
+    return (group.items || []).filter((item) => visible.has(item));
+  }
+
+  function homeSignature(areaKey, home, visibleItems) {
+    return JSON.stringify({
+      areaKey,
+      title: home.title || "",
+      text: home.text || "",
+      groups: (home.groups || []).map((group) => ({
+        title: group.title || "",
+        items: visibleItemsForGroup(group, visibleItems).map((item) => ({
+          label: item.label || "",
+          text: item.text || "",
+          href: item.href || "",
+          cardKey: item.cardKey || "",
+          icon: item.icon || "",
+        })),
+      })),
+    });
   }
 
   function renderItem(item) {
@@ -323,7 +369,7 @@
       : `<a class="csvb-area-home-action" href="${esc(item.href)}">Open</a>`;
 
     return `
-      <div class="csvb-area-home-item">
+      <div class="csvb-area-home-item" data-area-module-card="${esc(item.cardKey || "")}">
         <div class="csvb-area-home-item-icon">${esc(item.icon || "▣")}</div>
         <div class="csvb-area-home-item-main">
           <div class="csvb-area-home-item-title">${esc(item.label || "")}</div>
@@ -349,9 +395,10 @@
       };
     }
 
+    const visibleItems = getVisibleItems(areaKey);
     const groups = (home.groups || [])
       .map((group) => {
-        const items = visibleItemsForGroup(group);
+        const items = visibleItemsForGroup(group, visibleItems);
 
         if (!items.length) return "";
 
@@ -368,7 +415,7 @@
       .join("");
 
     return {
-      signature: homeSignature(areaKey, home),
+      signature: homeSignature(areaKey, home, visibleItems),
       html: `
         <div class="csvb-area-home">
           <div class="csvb-area-home-title">${esc(home.title || "Area Home")}</div>
@@ -566,7 +613,10 @@
     }
   }
 
+  let renderQueued = false;
+
   function renderAllHomes() {
+    renderQueued = false;
     injectStyles();
 
     document.querySelectorAll("[data-platform-area-panel]").forEach((panel) => {
@@ -574,24 +624,43 @@
     });
   }
 
+  function scheduleRender() {
+    if (renderQueued) return;
+    renderQueued = true;
+    window.requestAnimationFrame(renderAllHomes);
+  }
+
+  function mutationIsRelevant(mutation) {
+    if (mutation.type === "attributes") {
+      return mutation.target instanceof Element && mutation.target.matches("[data-card]");
+    }
+
+    return Array.from(mutation.addedNodes || []).some((node) => {
+      if (!(node instanceof Element)) return false;
+      return node.matches("[data-card], [data-platform-area-panel]") ||
+        !!node.querySelector("[data-card], [data-platform-area-panel]");
+    });
+  }
+
   function init() {
     renderAllHomes();
 
-    const observer = new MutationObserver(() => {
-      window.requestAnimationFrame(renderAllHomes);
+    const observer = new MutationObserver((mutations) => {
+      if (mutations.some(mutationIsRelevant)) scheduleRender();
     });
 
     observer.observe(document.body, {
       childList: true,
       subtree: true,
       attributes: true,
-      attributeFilter: ["style", "class"],
+      attributeFilter: ["style"],
     });
 
     window.CSVB_DASHBOARD_AREA_HOME = {
       build: BUILD,
       render: renderAllHomes,
       config: AREA_HOME,
+      getVisibleItems,
     };
   }
 
