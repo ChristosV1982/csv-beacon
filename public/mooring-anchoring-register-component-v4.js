@@ -309,8 +309,8 @@
     state.statuses = statusesRes.data || [];
     state.locations = locationsRes.data || [];
 
-    if (state.profile?.role === "vessel" && state.profile?.vessel_id) {
-      state.vessels = state.vessels.filter((v) => String(v.id) === String(state.profile.vessel_id));
+    if (state.profile?.role === "vessel") {
+      state.vessels = state.vessels.filter((v) => v.id === state.profile?.vessel_id);
     }
   }
 
@@ -645,6 +645,11 @@
     if (state.profile?.role === "vessel" && state.profile?.vessel_id) {
       $("maiRegVessel").value = state.profile.vessel_id;
       $("maiRegVessel").disabled = true;
+    } else if (isOfficeRole(state.profile?.role) || isPlatformRole(state.profile?.role)) {
+      const contextId = window.CSVB_MAI_INVENTORY_CONTEXT?.selectedVesselId?.();
+      if (contextId && state.vessels.some((vessel) => vessel.id === contextId)) {
+        $("maiRegVessel").value = contextId;
+      }
     }
 
     renderLocationControls();

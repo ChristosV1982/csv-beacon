@@ -5,11 +5,11 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-  <title>C.S.V. BEACON – Mooring & Anchoring Inventory List</title>
+  <title>C.S.V. BEACON | Mooring &amp; Anchoring</title>
 
   <link rel="stylesheet" href="./csv-beacon-theme.css?v=20260428_3" />
   <link rel="stylesheet" href="./style.css?v=20260428_3" />
-  <link rel="stylesheet" href="./mooring-anchoring-inventories-v4.css?v=20260512_1" />
+  <link rel="stylesheet" href="./mooring-anchoring-inventories-v4.css?v=20261027_tasks_v2" />
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="./auth.js"></script>
@@ -38,156 +38,192 @@
     </div>
   </div>
 
-  <main class="wrap mai-inventory-page">
+  <main class="wrap mai-inventory-page" data-task-screen-version="20261027_tasks_v1">
     <div id="warnBox" class="warn"></div>
     <div id="okBox" class="ok"></div>
 
-    <section class="page-head">
-      <div class="page-head-main">
-        <div class="page-kicker">Marine Applications & Vessel Interaction</div>
-        <h1>Mooring and Anchoring Inventories</h1>
-        <div class="subtitle">
-          Controlled inventory, lifecycle status, working-hours overview and component access for mooring and anchoring equipment.
-        </div>
-        <div class="page-tags" aria-label="Module scope">
-          <span class="module-chip">Inventory Control</span>
-          <span class="module-chip">Lifecycle Monitoring</span>
-          <span class="module-chip">MSMP Records</span>
-        </div>
-      </div>
+    <div class="mai-viewer-context" aria-label="Current access context">
+      <span class="mai-context-label">Viewer mode</span>
+      <strong id="viewerMode">Loading...</strong>
+      <span id="viewerHint" class="viewer-hint"></span>
+    </div>
 
-      <div class="page-actions">
-        <button id="reloadBtn" class="btn2" type="button">↻ Reload</button>
-        <button id="recordOperationBtn" class="btn" type="button">+ Record Vessel Operation</button>
-        <button id="registerComponentBtn" class="btn2" type="button">+ Register Component</button>
-      </div>
-    </section>
+    <section id="maiTaskLanding" class="mai-task-landing" aria-labelledby="maiTaskTitle">
+      <header class="mai-landing-heading">
+        <p class="mai-eyebrow">Mooring &amp; Anchoring</p>
+        <h1 id="maiTaskTitle">What do you want to do today?</h1>
+        <p>Choose a task. Equipment particulars remain controlled in the inventory record.</p>
+      </header>
 
-    <section class="viewer-panel">
-      <div>
-        <div class="section-label">Viewer Mode</div>
-        <div id="viewerMode" class="viewer-mode">Loading...</div>
-      </div>
-      <div id="viewerHint" class="viewer-hint"></div>
-    </section>
-
-    <section class="stats-grid">
-      <div class="stat-card">
-        <div class="stat-label">Visible Components</div>
-        <div id="statTotal" class="stat-value">0</div>
-      </div>
-
-      <div class="stat-card">
-        <div class="stat-label">Active / In Service</div>
-        <div id="statActive" class="stat-value">0</div>
-      </div>
-
-      <div class="stat-card">
-        <div class="stat-label">Due / Overdue Action</div>
-        <div id="statDue" class="stat-value">0</div>
-      </div>
-
-      <div class="stat-card">
-        <div class="stat-label">Locked Particulars</div>
-        <div id="statLocked" class="stat-value">0</div>
-      </div>
-    </section>
-
-    <section class="filter-bar" aria-label="Inventory filters">
-      <div class="filter-bar-title">
-        <span>Filter Controls</span>
-      </div>
-
-      <div class="dropdown-filter" id="vesselDropdown">
-        <button class="dropdown-toggle" type="button" data-dropdown-toggle="vessel">
-          <span>Vessels</span>
-          <strong id="vesselSummary">All</strong>
-          <span>▾</span>
+      <div class="mai-task-list" aria-label="Mooring and anchoring tasks">
+        <button id="viewInventoryBtn" class="mai-task-button mai-task-primary" type="button" disabled>
+          <span class="mai-task-index" aria-hidden="true">01</span>
+          <span class="mai-task-copy">
+            <strong>View / Edit Mooring Components</strong>
+            <span>Find equipment, check lifecycle status, and review trusted particulars.</span>
+          </span>
+          <span class="mai-task-arrow" aria-hidden="true">→</span>
         </button>
-        <div class="dropdown-panel" id="vesselPanel">
-          <div class="dropdown-actions">
-            <button id="selectAllVesselsBtn" class="btn2 compact" type="button">All</button>
-            <button id="clearVesselsBtn" class="btn2 compact" type="button">None</button>
-          </div>
-          <div id="vesselChecks" class="checks-list"></div>
-        </div>
-      </div>
 
-      <div class="dropdown-filter" id="typeDropdown">
-        <button class="dropdown-toggle" type="button" data-dropdown-toggle="type">
-          <span>Component Types</span>
-          <strong id="typeSummary">All</strong>
-          <span>▾</span>
+        <button id="registerComponentBtn" class="mai-task-button" type="button">
+          <span class="mai-task-index" aria-hidden="true">02</span>
+          <span class="mai-task-copy">
+            <strong>Register New Mooring Component</strong>
+            <span>Add a newly commissioned component to the vessel inventory.</span>
+          </span>
+          <span class="mai-task-arrow" aria-hidden="true">→</span>
         </button>
-        <div class="dropdown-panel" id="typePanel">
-          <div class="dropdown-actions">
-            <button id="selectAllTypesBtn" class="btn2 compact" type="button">All</button>
-            <button id="clearTypesBtn" class="btn2 compact" type="button">None</button>
-          </div>
-          <div id="typeChecks" class="checks-list"></div>
-        </div>
-      </div>
 
-      <div class="dropdown-filter" id="statusDropdown">
-        <button class="dropdown-toggle" type="button" data-dropdown-toggle="status">
-          <span>Status</span>
-          <strong id="statusSummary">All</strong>
-          <span>▾</span>
+        <button id="recordOperationBtn" class="mai-task-button" type="button">
+          <span class="mai-task-index" aria-hidden="true">03</span>
+          <span class="mai-task-copy">
+            <strong>Record Mooring / Anchoring Use</strong>
+            <span>Enter a vessel operation and its equipment working hours.</span>
+          </span>
+          <span class="mai-task-arrow" aria-hidden="true">→</span>
         </button>
-        <div class="dropdown-panel" id="statusPanel">
-          <div class="dropdown-actions">
-            <button id="selectAllStatusesBtn" class="btn2 compact" type="button">All</button>
-            <button id="clearStatusesBtn" class="btn2 compact" type="button">None</button>
-          </div>
-          <div id="statusChecks" class="checks-list"></div>
-        </div>
+
+        <button id="reviewDueBtn" class="mai-task-button mai-task-secondary" type="button" disabled>
+          <span class="mai-task-index" aria-hidden="true">04</span>
+          <span class="mai-task-copy">
+            <strong>Review Due / Overdue Actions</strong>
+            <span>Focus on components that need lifecycle attention.</span>
+          </span>
+          <span class="mai-task-arrow" aria-hidden="true">→</span>
+        </button>
       </div>
-
-      <label class="search-field">
-        <span>Search</span>
-        <input id="searchInput" type="search" placeholder="Unique ID, vessel, order number, location..." />
-      </label>
-
-      <button id="clearSearchBtn" class="btn2 clear-filter-btn" type="button">Clear</button>
     </section>
 
-    <section class="panel inventory-list-panel">
-      <div class="panel-head">
+    <section id="maiInventoryWorkspace" class="mai-inventory-workspace" aria-labelledby="inventoryWorkspaceTitle" hidden>
+      <header class="mai-workspace-head">
         <div>
-          <h2>Inventory List</h2>
-          <div id="listMeta" class="meta">0 record(s).</div>
+          <p class="mai-eyebrow">Mooring &amp; Anchoring</p>
+          <h1 id="inventoryWorkspaceTitle">Component inventory</h1>
+          <p class="mai-workspace-intro">Search the fleet register and inspect component status and lifecycle actions.</p>
         </div>
+        <div class="mai-workspace-actions">
+          <button id="reloadBtn" class="btn2" type="button">Reload inventory</button>
+          <button id="backToTasksBtn" class="btn2 mai-back-button" type="button">Back to Tasks</button>
+        </div>
+      </header>
+
+      <section class="stats-grid" aria-label="Inventory summary">
+        <div class="stat-card">
+          <div class="stat-label">Visible components</div>
+          <div id="statTotal" class="stat-value">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Active / in service</div>
+          <div id="statActive" class="stat-value">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Due / overdue</div>
+          <div id="statDue" class="stat-value">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Locked particulars</div>
+          <div id="statLocked" class="stat-value">0</div>
+        </div>
+      </section>
+
+      <section class="mai-inventory-controls" aria-label="Search and filter inventory">
+        <div class="mai-primary-controls">
+          <label class="search-field">
+            <span>Search inventory</span>
+            <input id="searchInput" type="search" placeholder="Unique ID, vessel, order number, location..." />
+          </label>
+
+          <div class="dropdown-filter" id="vesselDropdown">
+            <button class="dropdown-toggle" type="button" data-dropdown-toggle="vessel" aria-controls="vesselPanel" aria-expanded="false">
+              <span>Vessel</span>
+              <strong id="vesselSummary">All</strong>
+              <span aria-hidden="true">▾</span>
+            </button>
+            <div class="dropdown-panel" id="vesselPanel">
+              <div class="dropdown-actions">
+                <button id="selectAllVesselsBtn" class="btn2 compact" type="button">All</button>
+                <button id="clearVesselsBtn" class="btn2 compact" type="button">None</button>
+              </div>
+              <div id="vesselChecks" class="checks-list"></div>
+            </div>
+          </div>
+        </div>
+
+        <details class="mai-filter-details">
+          <summary>Filters <span class="mai-filter-hint">Component type and status</span></summary>
+          <div class="mai-filter-content">
+            <div class="dropdown-filter" id="typeDropdown">
+              <button class="dropdown-toggle" type="button" data-dropdown-toggle="type" aria-controls="typePanel" aria-expanded="false">
+                <span>Component type</span>
+                <strong id="typeSummary">All</strong>
+                <span aria-hidden="true">▾</span>
+              </button>
+              <div class="dropdown-panel" id="typePanel">
+                <div class="dropdown-actions">
+                  <button id="selectAllTypesBtn" class="btn2 compact" type="button">All</button>
+                  <button id="clearTypesBtn" class="btn2 compact" type="button">None</button>
+                </div>
+                <div id="typeChecks" class="checks-list"></div>
+              </div>
+            </div>
+
+            <div class="dropdown-filter" id="statusDropdown">
+              <button class="dropdown-toggle" type="button" data-dropdown-toggle="status" aria-controls="statusPanel" aria-expanded="false">
+                <span>Status</span>
+                <strong id="statusSummary">All</strong>
+                <span aria-hidden="true">▾</span>
+              </button>
+              <div class="dropdown-panel" id="statusPanel">
+                <div class="dropdown-actions">
+                  <button id="selectAllStatusesBtn" class="btn2 compact" type="button">All</button>
+                  <button id="clearStatusesBtn" class="btn2 compact" type="button">None</button>
+                </div>
+                <div id="statusChecks" class="checks-list"></div>
+              </div>
+            </div>
+            <button id="clearSearchBtn" class="btn2 clear-filter-btn" type="button">Clear filters</button>
+          </div>
+        </details>
       </div>
 
-      <div class="table-wrap">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>Unique ID</th>
-              <th>Vessel</th>
-              <th>Type</th>
-              <th>Status</th>
-              <th>Particulars</th>
-              <th>Location</th>
-              <th>Total Hours</th>
-              <th>Next Lifecycle Action</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody id="componentsTbody">
-            <tr>
-              <td colspan="9" class="empty-cell">Loading...</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+      <section class="panel inventory-list-panel">
+        <div class="panel-head">
+          <div>
+            <h2>Inventory records</h2>
+            <div id="listMeta" class="meta">0 record(s).</div>
+          </div>
+        </div>
+
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Unique ID</th>
+                <th>Vessel</th>
+                <th>Type</th>
+                <th>Status</th>
+                <th>Particulars</th>
+                <th>Location</th>
+                <th>Total Hours</th>
+                <th>Next Lifecycle Action</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="componentsTbody">
+              <tr>
+                <td colspan="9" class="empty-cell">Loading...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
     </section>
   </main>
 
   <script src="./csvb-toast-messages.js?v=20260511_1"></script>
-  <script src="./mooring-anchoring-inventories-v4.js?v=20260511_2"></script>
+  <script src="./mooring-anchoring-inventories-v4.js?v=20261027_tasks_v2"></script>
   <script src="./mooring-anchoring-component-delete-extension.js?v=20260512_1"></script>
-  <script src="./mooring-anchoring-register-component-v4.js?v=20260512_1"></script>
+  <script src="./mooring-anchoring-register-component-v4.js?v=20261027_tasks_v2"></script>
   <script src="./mooring-anchoring-permissions-u10.js?v=20260512_1"></script>
   <script src="./mooring-anchoring-action-guard-u10.js?v=20260512_1"></script>
   <script src="./csvb-build-badge.js?v=20260528_01"></script>

@@ -21,7 +21,9 @@
     locks: [],
     selectedVessels: new Set(),
     selectedTypes: new Set(),
-    selectedStatuses: new Set()
+    selectedStatuses: new Set(),
+    selectionsInitialized: false,
+    dueOnly: false
   };
 
   const el = {};
@@ -41,7 +43,8 @@
       "selectAllTypesBtn", "clearTypesBtn",
       "selectAllStatusesBtn", "clearStatusesBtn",
       "searchInput", "clearSearchBtn",
-      "listMeta", "componentsTbody"
+      "listMeta", "componentsTbody", "maiTaskLanding", "maiInventoryWorkspace",
+      "viewInventoryBtn", "reviewDueBtn", "backToTasksBtn"
     ].forEach((id) => {
       el[id] = $(id);
     });
@@ -171,10 +174,14 @@
       usageRes,
       lockRes
     ] = await Promise.all([
-      state.sb.from("vessels").select("id, name, hull_number, imo_number, company_id, is_active").eq("is_active", true).order("name"),
+      (state.isVesselViewer
+        ? state.sb.from("vessels").select("id, name, hull_number, imo_number, company_id, is_active").eq("is_active", true).eq("id", state.profile?.vessel_id || "00000000-0000-0000-0000-000000000000")
+        : state.sb.from("vessels").select("id, name, hull_number, imo_number, company_id, is_active").eq("is_active", true)).order("name"),
       state.sb.from("mai_component_types").select("id, code, name, company_id, is_active, sort_order").eq("is_active", true).order("sort_order"),
       state.sb.from("mai_status_options").select("status_key, status_label, is_terminal, is_active, sort_order").eq("is_active", true).order("sort_order"),
-      state.sb.from("mai_v_components_list").select("*").order("updated_at", { ascending: false }),
+      (state.isVesselViewer
+        ? state.sb.from("mai_v_components_list").select("*").eq("vessel_id", state.profile?.vessel_id || "00000000-0000-0000-0000-000000000000")
+        : state.sb.from("mai_v_components_list").select("*")).order("updated_at", { ascending: false }),
       state.sb.from("mai_v_component_lifecycle_status").select("*").order("sort_order"),
       state.sb.from("mai_v_component_usage_summary").select("*"),
       state.sb.from("mai_v_component_particulars_lock_status").select("*")
@@ -187,7 +194,8 @@
     state.vessels = vesselRes.data || [];
     state.types = typeRes.data || [];
     state.statuses = statusRes.data || [];
-    state.components = componentRes.data || [];
+    state.components = (componentRes.data || []).filter((row) =>
+      !state.isVesselViewer || row.vessel_id === state.profile?.vessel_id);
     state.lifecycle = lifecycleRes.data || [];
     state.usage = usageRes.data || [];
     state.locks = lockRes.data || [];
@@ -208,17 +216,26 @@
   }
 
   function initializeSelections() {
-    if (!state.selectedVessels.size) {
-      visibleVesselIds().forEach((id) => state.selectedVessels.add(id));
-    }
+    if (state.selectionsInitialized) return;
+    visibleVesselIds().forEach((id) => state.selectedVessels.add(id));
+    visibleTypeIds().forEach((id) => state.selectedTypes.add(id));
+    visibleStatusKeys().forEach((key) => state.selectedStatuses.add(key));
+    state.selectionsInitialized = true;
+  }
 
-    if (!state.selectedTypes.size) {
-      visibleTypeIds().forEach((id) => state.selectedTypes.add(id));
-    }
+  function selectedContextVessel() {
+    if (state.isVesselViewer) return state.profile?.vessel_id || "";
+    if (!state.isOfficeViewer || state.selectedVessels.size !== 1) return "";
+    const [id] = state.selectedVessels;
+    return state.vessels.some((vessel) => vessel.id === id) ? id : "";
+  }
 
-    if (!state.selectedStatuses.size) {
-      visibleStatusKeys().forEach((key) => state.selectedStatuses.add(key));
-    }
+  function showInventory(dueOnly = false) {
+    state.dueOnly = dueOnly;
+    el.maiTaskLanding.hidden = true;
+    el.maiInventoryWorkspace.hidden = false;
+    renderTable();
+    el.backToTasksBtn.focus();
   }
 
   function renderViewerMode() {
@@ -369,6 +386,8 @@
       if (!state.selectedVessels.has(c.vessel_id)) return false;
       if (!state.selectedTypes.has(c.component_type_id)) return false;
       if (!state.selectedStatuses.has(c.current_status)) return false;
+      if (state.dueOnly && !["overdue", "retire_now", "action_required", "due_soon"]
+        .includes(nextLifecycle(c.id)?.lifecycle_status)) return false;
 
       if (q) {
         const next = nextLifecycle(c.id);
@@ -416,7 +435,7 @@
     renderStats(rows);
     updateSummaries();
 
-    el.listMeta.textContent = `${rows.length} record(s) shown from ${state.components.length} accessible record(s).`;
+    el.listMeta.textContent = `${rows.length} record(s) shown from ${state.components.length} accessible record(s).${state.dueOnly ? " Due / overdue actions only." : ""}`;
 
     if (!rows.length) {
       el.componentsTbody.innerHTML = `<tr><td colspan="9" class="empty-cell">No components match current filters.</td></tr>`;
@@ -478,6 +497,7 @@
     document.querySelectorAll(".dropdown-filter").forEach((box) => {
       if (except && box.id === except) return;
       box.classList.remove("open");
+      box.querySelector("[data-dropdown-toggle]")?.setAttribute("aria-expanded", "false");
     });
   }
 
@@ -494,6 +514,7 @@
         const wasOpen = box.classList.contains("open");
         closeAllDropdowns();
         box.classList.toggle("open", !wasOpen);
+        btn.setAttribute("aria-expanded", String(!wasOpen));
       });
     });
 
@@ -505,10 +526,19 @@
   }
 
   function bindEvents() {
+    el.viewInventoryBtn.addEventListener("click", () => showInventory());
+    el.reviewDueBtn.addEventListener("click", () => showInventory(true));
+    el.backToTasksBtn.addEventListener("click", () => {
+      el.maiInventoryWorkspace.hidden = true;
+      el.maiTaskLanding.hidden = false;
+      el.viewInventoryBtn.focus();
+    });
     el.reloadBtn.addEventListener("click", () => reload().catch(handleError));
 
     el.recordOperationBtn.addEventListener("click", () => {
-      location.href = "./mooring-anchoring-operations.html";
+      const vesselId = selectedContextVessel();
+      location.href = "./mooring-anchoring-operations.html" +
+        (vesselId ? `?vessel_id=${encodeURIComponent(vesselId)}` : "");
     });
 
     el.registerComponentBtn.addEventListener("click", () => {
@@ -556,6 +586,10 @@
     el.searchInput.addEventListener("input", renderTable);
 
     el.clearSearchBtn.addEventListener("click", () => {
+      state.dueOnly = false;
+      state.selectedVessels.clear();
+      state.selectedTypes.clear();
+      state.selectedStatuses.clear();
       visibleVesselIds().forEach((id) => state.selectedVessels.add(id));
       visibleTypeIds().forEach((id) => state.selectedTypes.add(id));
       visibleStatusKeys().forEach((key) => state.selectedStatuses.add(key));
@@ -581,6 +615,8 @@
     renderTypeChecks();
     renderStatusChecks();
     renderTable();
+    el.viewInventoryBtn.disabled = false;
+    el.reviewDueBtn.disabled = false;
     toast("ok", "Inventory list reloaded.");
   }
 
@@ -600,6 +636,8 @@
     });
 
     if (!bundle?.session?.user) {
+      el.viewerMode.textContent = "Signed out";
+      el.viewerHint.textContent = "Log in to access your authorized vessel inventory and tasks.";
       toast("warn", "You are logged out. Please login.");
       return;
     }
@@ -607,6 +645,10 @@
     state.profile = bundle.profile || {};
     state.isOfficeViewer = roleIsOffice(state.profile.role);
     state.isVesselViewer = roleIsVessel(state.profile.role);
+    $("vesselDropdown").hidden = !state.isOfficeViewer;
+    window.CSVB_MAI_INVENTORY_CONTEXT = Object.freeze({
+      selectedVesselId: selectedContextVessel
+    });
 
     await reload();
   }

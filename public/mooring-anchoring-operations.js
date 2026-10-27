@@ -237,6 +237,13 @@
     if (state.isVesselViewer && state.profile?.vessel_id) {
       el.operationVessel.value = state.profile.vessel_id;
       el.operationVessel.disabled = true;
+    } else if (state.isOfficeViewer) {
+      // Navigation context is a hint only: accept it only from the accessible
+      // active vessel list returned under the current user's authorization.
+      const contextId = new URLSearchParams(location.search).get("vessel_id");
+      if (contextId && state.vessels.some((vessel) => vessel.id === contextId)) {
+        el.operationVessel.value = contextId;
+      }
     }
   }
 
