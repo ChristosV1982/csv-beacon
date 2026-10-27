@@ -394,7 +394,7 @@
 
     el.usageHistory.innerHTML = state.usageRows.map((u) => `
       <div class="mini-item">
-        <div class="mini-title">${esc(u.manual_bulk_request_id ? "Manual usage" : (u.operation_type || "usage"))} — ${esc(asDate(u.operation_date))}</div>
+        <div class="mini-title">${esc(u.operation_type || "usage")} — ${esc(asDate(u.operation_date))}</div>
         <div class="mini-meta">Hours: ${esc(asNumber(u.hours_under_tension || 0, 1))} / Source: ${esc(u.source_type || "manual")}</div>
         <div class="mini-meta">Port / Berth: ${esc(u.port_name || "—")} / ${esc(u.berth_or_terminal || "—")}</div>
         ${u.is_initial_balance ? `<div class="mini-meta"><span class="pill pill-warn">Initial balance</span></div>` : ""}

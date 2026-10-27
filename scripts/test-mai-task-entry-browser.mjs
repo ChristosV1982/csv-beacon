@@ -56,8 +56,8 @@ function fixture(config) {
     current_status:"active",current_status_label:"Active",company_id:"company",location_mode:"fitted"}));
   if (config.multiType) components.push({...components[0],id:"55555555-5555-4555-8555-555555555555",
     unique_id:"ROPE-1",component_type_id:"type2",component_type_code:"ROPE",component_type_name:"Mooring Rope"});
-  if(config.manualUsage) for(let i=2;i<=4;i++) components.push({...components[0],
-    id:`66666666-6666-4666-8666-66666666666${i}`,unique_id:`WIRE-A${i}`});
+  if (config.operationCredits) components.push({...components[0],
+    id:"66666666-6666-4666-8666-666666666666",unique_id:"WIRE-A2"});
   if (config.emptyVessel) vessels.push({id:"44444444-4444-4444-8444-444444444444",name:"CHARLIE",company_id:"company",is_active:true});
   if (config.omitB) vessels = vessels.filter(v => v.id !== b);
   const tables={vessels,mai_component_types:[{id:"type",name:"Mooring Wire",code:"WIRE",is_active:true},
@@ -66,12 +66,11 @@ function fixture(config) {
     mai_v_components_list:components,mai_location_options:[],
     mai_v_component_lifecycle_status:components.map((c,i)=>({component_id:c.id,lifecycle_status:i?"ok":"overdue",rule_label:"Inspection",sort_order:1})),
     mai_v_component_usage_summary:[],mai_v_component_particulars_lock_status:[],
-    mai_v_operation_type_definitions:[],mai_v_vessel_operations_list:[]};
+    mai_v_operation_type_definitions:config.operationCredits?[{
+      operation_type_key:"standard_tanker_berth",operation_type_label:"Standard tanker berth",
+      counts_towards_lifecycle:true,is_active:true}]:[],mai_v_vessel_operations_list:[]};
   window.fixtureRequests=[];
-  window.fixtureUsageRecords=[];
-  window.confirm=()=>true;
-  const batches=new Map();
-  let networkFailure=!!config.uncertainUsage;
+  if (config.operationCredits) window.confirm=()=>true;
   function from(table) {
     const filters=[];
     const q={select(){return q},order(){return q},limit(){return q},
@@ -89,24 +88,7 @@ function fixture(config) {
       if(name==="csvb_my_effective_app_permissions") return {data:["view","edit"].filter(x=>!config.readOnly||x==="view")
         .map(permission_action=>({module_code:"MOORING_ANCHORING_INVENTORIES",permission_action,is_granted:true})),error:null};
       if(name==="csvb_my_company_modules") return {data:[{module_key:"mooring_anchoring_inventories",is_enabled:true}],error:null};
-      if(name==="mai_manual_usage_components") {
-        if(config.role==="vessel" && args.p_vessel_id!==a) return {data:null,error:{message:"Unauthorized vessel",code:"42501"}};
-        return {data:{vessel_id:args.p_vessel_id,vessel_name:vessels.find(v=>v.id===args.p_vessel_id)?.name,
-          can_edit:!config.readOnly,components:components.filter(c=>c.vessel_id===args.p_vessel_id)},error:null};
-      }
-      if(name==="mai_register_manual_usage_bulk") {
-        await new Promise(resolve=>setTimeout(resolve,100));
-        if(!batches.has(args.p_request_id)) {
-          batches.set(args.p_request_id,args);
-          for(const id of args.p_component_ids) {
-            window.fixtureUsageRecords.push({...args,component_id:id});
-            const row=tables.mai_v_component_usage_summary.find(r=>r.component_id===id);
-            if(row) row.total_lifecycle_hours+=args.p_hours;
-          }
-        }
-        if(networkFailure) {networkFailure=false;return {data:null,error:{message:"Simulated connection lost after commit"}};}
-        return {data:{component_count:args.p_component_ids.length,hours:args.p_hours},error:null};
-      }
+      if(name==="mai_record_vessel_operation") return {data:"77777777-7777-4777-8777-777777777777",error:null};
       return {data:[],error:null};
     }};
   window.AUTH={ensureSupabase:()=>sb,getSessionUserProfile:async()=>bundle,
@@ -134,6 +116,13 @@ try {
   await new Promise(r=>setTimeout(r,400));
   await evaluate(`sessionStorage.removeItem(${JSON.stringify(contextKey)})`);
   await load();
+  assert.equal(await evaluate(`document.getElementById("registerUsageHoursBtn")`),null);
+  assert.equal(await evaluate(`document.getElementById("maiUsageWorkspace")`),null);
+  assert.equal(await evaluate(`document.body.textContent.includes("Register Usage Hours")`),false);
+  assert.equal(await evaluate(`document.querySelectorAll(".mai-task-button").length`),4);
+  assert.deepEqual(await evaluate(`[...document.querySelectorAll(".mai-task-index")].map(e=>e.textContent)`),["01","02","03","04"]);
+  const detailHtml=await (await fetch(base+"/mooring-anchoring-component.html")).text();
+  assert.equal(/registerUsageBtn|manual-usage-entry|Register Usage/.test(detailHtml),false);
   assert.equal(await evaluate(`document.getElementById("maiSingleVesselDialog").parentElement.tagName`),"MAIN","Task dialog is outside hidden inventory workspace");
   assert.equal(await evaluate(`document.querySelector(".inventory-list-panel").parentElement.id`),"maiInventoryWorkspace");
   assert.equal(await evaluate(`document.getElementById("maiInventoryWorkspace").hidden`),true);
@@ -289,70 +278,25 @@ try {
   assert.equal(await evaluate(`document.getElementById("maiContextComponentType").value`),"");
   assert.equal(await evaluate(`document.getElementById("maiTaskLanding").hidden`),true,"Stale type never broadens to unrestricted inventory");
   console.log("PASS component-type fleet view, hard constraint, vessel/search/due filters, task gating, perspective restore and stale-type rejection");
-  await load("company_admin","/mooring-anchoring-inventories-v4.html",{manualUsage:true,multiType:true});
-  await click("maiPerspectiveVessel"); await select("maiContextMode","all");
-  await click("registerUsageHoursBtn");
-  await waitFor(`document.getElementById("maiSingleVesselDialog").open`);
-  await select("maiTaskVessel",A); await click("maiTaskVesselContinue");
-  await waitFor(`document.querySelectorAll("[data-usage-component]").length===5`);
-  assert.equal(await evaluate(`document.getElementById("maiOfficePerspective").hidden`),true);
-  await select("maiUsageType","type"); await click("maiUsageSelectAll");
-  assert.match(await evaluate(`document.getElementById("maiUsageSelected").textContent`),/^4 selected/);
-  for(const hours of ["0","-1"]) {
-    await select("maiUsageHours",hours);
-    assert.equal(await evaluate(`document.getElementById("maiUsageApply").disabled`),true);
+  await load("company_admin","/mooring-anchoring-operations.html?vessel_id="+A,{operationCredits:true});
+  await waitFor(`document.querySelectorAll("[data-component-check]").length===2`);
+  for (const selectedCount of [1,2]) {
+    await select("operationType","standard_tanker_berth");
+    await select("operationStart","2026-10-27T10:00");
+    await select("operationEnd","2026-10-27T11:30");
+    // Each change re-renders the picker; click fresh attached nodes, not stale ones.
+    for(let index=0;index<selectedCount;index++) {
+      await evaluate(`document.querySelectorAll("[data-component-check]")[${index}].click()`);
+    }
+    await click("recordOperationSubmitBtn");
+    await waitFor(`window.fixtureRequests.filter(r=>r.name==="mai_record_vessel_operation").length===${selectedCount}`);
+    const payload=await evaluate(`window.fixtureRequests.filter(r=>r.name==="mai_record_vessel_operation").at(-1).args`);
+    assert.equal(payload.p_vessel_id,A);
+    assert.equal(payload.p_component_ids.length,selectedCount);
+    assert.equal(new Date(payload.p_operation_end_at)-new Date(payload.p_operation_start_at),5400000);
+    await waitFor(`document.getElementById("componentSelectionMeta").textContent.startsWith("0 component")`);
   }
-  await select("maiUsageHours","6.5"); await select("maiUsageRemarks","Manual wire test");
-  assert.equal(await evaluate(`document.getElementById("maiUsageApply").disabled`),false);
-  for (const width of [1440,390]) {
-    await call("Emulation.setDeviceMetricsOverride",{width,height:900,deviceScaleFactor:1,mobile:width<600});
-    await evaluate(`new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))`);
-    assert.equal(await evaluate(`document.documentElement.scrollWidth<=innerWidth+1`),true,"Manual workspace stays within viewport");
-    const image=await call("Page.captureScreenshot",{format:"jpeg",quality:75});
-    const {writeFile}=await import("node:fs/promises");
-    await writeFile(`/tmp/mai-manual-usage-${width}.jpg`,Buffer.from(image.data,"base64"));
-  }
-  await click("maiUsageApply"); await click("maiUsageApply");
-  await waitFor(`document.getElementById("maiUsageMessage").textContent.includes("6.5 hours applied to 4 components")`);
-  assert.equal(await evaluate(`window.fixtureRequests.filter(r=>r.name==="mai_register_manual_usage_bulk").length`),1,"Double submit prevented");
-  assert.equal(await evaluate(`new Set(window.fixtureUsageRecords.map(r=>r.component_id)).size`),4);
-  assert.equal(await evaluate(`window.fixtureRequests.some(r=>r.name==="mai_record_vessel_operation")`),false);
-  await click("maiUsageMore");
-  await waitFor(`document.querySelectorAll("[data-usage-component]").length===5`);
-  await select("maiUsageHours","1.2");
-  assert.equal(await evaluate(`document.getElementById("maiUsageApply").disabled`),true,"Empty selection blocked");
-  await click("maiUsageSelectAll"); await click("maiUsageApply");
-  await waitFor(`document.getElementById("maiUsageMessage").textContent.includes("1.2 hours applied to 5 components")`);
-  await click("maiUsageInventory");
-  assert.equal(await evaluate(`document.getElementById("maiInventoryWorkspace").hidden`),false);
-  console.log("PASS manual office bulk: four wires, mixed types, invalid values, double-submit guard, separate ledger and post-submit navigation");
-  await load("vessel","/mooring-anchoring-inventories-v4.html?usage_component_id=33333333-3333-4333-8333-333333333330",{manualUsage:true,uncertainUsage:true});
-  await waitFor(`document.getElementById("maiUsageSelected").textContent.startsWith("1 selected")`);
-  assert.equal(await evaluate(`document.getElementById("maiOfficeContext").hidden`),true);
-  assert.equal(await evaluate(`document.getElementById("maiUsageVessel").textContent`),"Vessel: ALPHA");
-  assert.equal(await evaluate(`document.getElementById("maiUsageComponents").textContent.includes("BRAVO")`),false);
-  await select("maiUsageHours","2.5"); await click("maiUsageApply");
-  await waitFor(`document.getElementById("maiUsageApply").textContent.includes("Retry Same")`);
-  assert.equal(await evaluate(`document.getElementById("maiUsageHours").disabled`),true,"Unknown outcome freezes payload for safe retry");
-  await click("maiUsageApply");
-  await waitFor(`document.getElementById("maiUsageMessage").textContent.includes("2.5 hours applied to 1 components")`);
-  assert.equal(await evaluate(`window.fixtureUsageRecords.length`),1,"Same request retry does not double credit");
-  const retryIds=await evaluate(`window.fixtureRequests.filter(r=>r.name==="mai_register_manual_usage_bulk").map(r=>r.args.p_request_id)`);
-  assert.equal(new Set(retryIds).size,1);
-  await load("vessel","/mooring-anchoring-inventories-v4.html?usage_component_id=33333333-3333-4333-8333-333333333331",{manualUsage:true});
-  assert.equal(await evaluate(`document.getElementById("maiUsageWorkspace").hidden`),true,"Other-vessel deep link rejected");
-  await load("vessel","/mooring-anchoring-inventories-v4.html",{readOnly:true});
-  assert.equal(await evaluate(`getComputedStyle(document.getElementById("registerUsageHoursBtn")).display`),"none");
-  await load("company_admin","/mooring-anchoring-inventories-v4.html",{manualUsage:true,multiType:true});
-  await click("maiPerspectiveType"); await select("maiContextComponentType","type");
-  await click("registerUsageHoursBtn");
-  await waitFor(`document.getElementById("maiSingleVesselDialog").open`);
-  await select("maiTaskVessel",A); await click("maiTaskVesselContinue");
-  await waitFor(`document.querySelectorAll("[data-usage-component]").length===5`);
-  await click("maiUsageBack");
-  assert.equal(await evaluate(`document.getElementById("maiPerspectiveType").checked`),true);
-  assert.equal(await evaluate(`document.getElementById("maiContextMode").value`),"all","Manual entry preserves fleet type context on return");
-  console.log("PASS vessel single-component deep link, wrong-vessel rejection, read-only guard and idempotent retry after lost response");
+  console.log("PASS removed task/subview/detail action absent; existing operation form submits one or multiple selected components");
   await load();
   await click("maiPerspectiveVessel");
   await select("maiContextMode","all");
