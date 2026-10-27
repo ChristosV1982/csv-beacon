@@ -9,7 +9,7 @@
 
   <link rel="stylesheet" href="./csv-beacon-theme.css?v=20260428_3" />
   <link rel="stylesheet" href="./style.css?v=20260428_3" />
-  <link rel="stylesheet" href="./mooring-anchoring-inventories-v4.css?v=20261027_tasks_v2" />
+  <link rel="stylesheet" href="./mooring-anchoring-inventories-v4.css?v=20261028_perspective_v1" />
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="./auth.js"></script>
@@ -38,7 +38,7 @@
     </div>
   </div>
 
-  <main class="wrap mai-inventory-page" data-task-screen-version="20261027_tasks_v1">
+  <main class="wrap mai-inventory-page" data-task-screen-version="20261028_context_v1">
     <div id="warnBox" class="warn"></div>
     <div id="okBox" class="ok"></div>
 
@@ -48,7 +48,75 @@
       <span id="viewerHint" class="viewer-hint"></span>
     </div>
 
-    <section id="maiTaskLanding" class="mai-task-landing" aria-labelledby="maiTaskTitle">
+    <p id="maiCurrentContext" class="mai-current-context" aria-live="polite">Loading vessel context…</p>
+
+    <section id="maiOfficePerspective" class="mai-office-perspective" aria-labelledby="maiOfficePerspectiveTitle" hidden>
+      <div class="mai-perspective-heading">
+        <p class="mai-eyebrow">Inventory view</p>
+        <h2 id="maiOfficePerspectiveTitle">How do you want to view the inventory?</h2>
+      </div>
+      <fieldset class="mai-perspective-options">
+        <legend class="mai-visually-hidden">Choose an inventory perspective</legend>
+        <label class="mai-perspective-option" for="maiPerspectiveVessel">
+          <input id="maiPerspectiveVessel" type="radio" name="maiPerspective" value="vessel" />
+          <span>By Vessel</span>
+        </label>
+        <label class="mai-perspective-option" for="maiPerspectiveType">
+          <input id="maiPerspectiveType" type="radio" name="maiPerspective" value="type" />
+          <span>By Component Type</span>
+        </label>
+      </fieldset>
+    </section>
+
+    <section id="maiTypeContext" class="mai-type-context" aria-labelledby="maiTypeContextTitle" hidden>
+      <div class="mai-type-context-heading">
+        <p class="mai-eyebrow">Component type view</p>
+        <h2 id="maiTypeContextTitle">Choose a component type</h2>
+      </div>
+      <label class="mai-context-field" for="maiContextComponentType">
+        <span>Component type</span>
+        <select id="maiContextComponentType"></select>
+      </label>
+      <p class="mai-type-context-help">Fleet review across accessible vessels.</p>
+    </section>
+
+    <section id="maiOfficeContext" class="mai-office-context" aria-labelledby="maiOfficeContextTitle" hidden>
+      <div class="mai-office-context-heading">
+        <p class="mai-eyebrow">Office task setup</p>
+        <h2 id="maiOfficeContextTitle">Vessel context</h2>
+      </div>
+      <label class="mai-context-field">
+        <span>Vessel context</span>
+        <select id="maiContextMode">
+          <option value="">Choose vessel context...</option>
+          <option value="all">All accessible vessels</option>
+          <option value="single">Single vessel</option>
+          <option value="multiple">Multiple vessels</option>
+        </select>
+      </label>
+      <div id="maiSingleContextWrap" class="mai-context-field" hidden>
+        <label for="maiContextSingleVessel">Vessel</label>
+        <select id="maiContextSingleVessel"></select>
+      </div>
+      <div id="maiMultiContextWrap" class="mai-multi-context" hidden>
+        <div class="dropdown-filter" id="vesselDropdown">
+          <button class="dropdown-toggle" type="button" data-dropdown-toggle="vessel" aria-controls="vesselPanel" aria-expanded="false">
+            <span>Vessels</span>
+            <strong id="vesselSummary">All</strong>
+            <span aria-hidden="true">▾</span>
+          </button>
+          <div class="dropdown-panel" id="vesselPanel">
+            <div class="dropdown-actions">
+              <button id="selectAllVesselsBtn" class="btn2 compact" type="button">All</button>
+              <button id="clearVesselsBtn" class="btn2 compact" type="button">None</button>
+            </div>
+            <div id="vesselChecks" class="checks-list"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="maiTaskLanding" class="mai-task-landing" aria-labelledby="maiTaskTitle" hidden>
       <header class="mai-landing-heading">
         <p class="mai-eyebrow">Mooring &amp; Anchoring</p>
         <h1 id="maiTaskTitle">What do you want to do today?</h1>
@@ -132,21 +200,6 @@
             <span>Search inventory</span>
             <input id="searchInput" type="search" placeholder="Unique ID, vessel, order number, location..." />
           </label>
-
-          <div class="dropdown-filter" id="vesselDropdown">
-            <button class="dropdown-toggle" type="button" data-dropdown-toggle="vessel" aria-controls="vesselPanel" aria-expanded="false">
-              <span>Vessel</span>
-              <strong id="vesselSummary">All</strong>
-              <span aria-hidden="true">▾</span>
-            </button>
-            <div class="dropdown-panel" id="vesselPanel">
-              <div class="dropdown-actions">
-                <button id="selectAllVesselsBtn" class="btn2 compact" type="button">All</button>
-                <button id="clearVesselsBtn" class="btn2 compact" type="button">None</button>
-              </div>
-              <div id="vesselChecks" class="checks-list"></div>
-            </div>
-          </div>
         </div>
 
         <details class="mai-filter-details">
@@ -184,7 +237,7 @@
             <button id="clearSearchBtn" class="btn2 clear-filter-btn" type="button">Clear filters</button>
           </div>
         </details>
-      </div>
+      </section>
 
       <section class="panel inventory-list-panel">
         <div class="panel-head">
@@ -218,12 +271,29 @@
         </div>
       </section>
     </section>
+
+    <dialog id="maiSingleVesselDialog" class="mai-single-vessel-dialog" aria-labelledby="maiSingleVesselDialogTitle">
+      <div class="mai-dialog-content">
+        <p class="mai-eyebrow">Task vessel</p>
+        <h2 id="maiSingleVesselDialogTitle">Select one vessel</h2>
+        <p id="maiSingleVesselReason">Choose the vessel this task applies to.</p>
+        <label class="mai-context-field" for="maiTaskVessel">
+          <span>Vessel</span>
+          <select id="maiTaskVessel"></select>
+        </label>
+        <div id="maiTaskVesselError" class="mai-task-vessel-error" role="alert"></div>
+        <div class="mai-dialog-actions">
+          <button id="maiTaskVesselCancel" class="btn2" type="button">Cancel</button>
+          <button id="maiTaskVesselContinue" class="btn" type="button">Continue</button>
+        </div>
+      </div>
+    </dialog>
   </main>
 
   <script src="./csvb-toast-messages.js?v=20260511_1"></script>
-  <script src="./mooring-anchoring-inventories-v4.js?v=20261027_tasks_v2"></script>
+  <script src="./mooring-anchoring-inventories-v4.js?v=20261028_perspective_v1"></script>
   <script src="./mooring-anchoring-component-delete-extension.js?v=20260512_1"></script>
-  <script src="./mooring-anchoring-register-component-v4.js?v=20261027_tasks_v2"></script>
+  <script src="./mooring-anchoring-register-component-v4.js?v=20261028_context_v1"></script>
   <script src="./mooring-anchoring-permissions-u10.js?v=20260512_1"></script>
   <script src="./mooring-anchoring-action-guard-u10.js?v=20260512_1"></script>
   <script src="./csvb-build-badge.js?v=20260528_01"></script>

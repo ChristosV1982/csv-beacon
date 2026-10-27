@@ -636,21 +636,26 @@
       return;
     }
 
+    const context = window.CSVB_MAI_INVENTORY_CONTEXT;
+    if (!context?.requireSingleVessel) {
+      toast("warn", "Vessel context is not ready. Please wait for the module to finish loading.");
+      return;
+    }
+    const contextId = await context.requireSingleVessel("Register New Mooring Component");
+    if (!contextId || $("maiRegisterBackdrop")) return;
     await loadBaseData();
+    if (!state.vessels.some((vessel) => vessel.id === contextId)) {
+      toast("warn", "The selected vessel is no longer accessible. Please choose an authorized vessel context.");
+      return;
+    }
 
     addStyles();
 
     document.body.insertAdjacentHTML("beforeend", modalHtml());
 
-    if (state.profile?.role === "vessel" && state.profile?.vessel_id) {
-      $("maiRegVessel").value = state.profile.vessel_id;
-      $("maiRegVessel").disabled = true;
-    } else if (isOfficeRole(state.profile?.role) || isPlatformRole(state.profile?.role)) {
-      const contextId = window.CSVB_MAI_INVENTORY_CONTEXT?.selectedVesselId?.();
-      if (contextId && state.vessels.some((vessel) => vessel.id === contextId)) {
-        $("maiRegVessel").value = contextId;
-      }
-    }
+    $("maiRegVessel").value = contextId;
+    $("maiRegVessel").disabled = true;
+    $("maiRegVessel").title = "Vessel is fixed by the current module context. Close this form to change context.";
 
     renderLocationControls();
     await loadDynamicFields();

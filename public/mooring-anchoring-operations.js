@@ -185,6 +185,10 @@
     state.vessels = vesselRes.data || [];
     state.operationTypes = typeRes.data || [];
     state.components = componentRes.data || [];
+    if (state.isVesselViewer) {
+      state.vessels = state.vessels.filter((vessel) => vessel.id === state.profile?.vessel_id);
+      state.components = state.components.filter((component) => component.vessel_id === state.profile?.vessel_id);
+    }
     state.portCountries = countryRows;
   }
 
@@ -237,7 +241,7 @@
     if (state.isVesselViewer && state.profile?.vessel_id) {
       el.operationVessel.value = state.profile.vessel_id;
       el.operationVessel.disabled = true;
-    } else if (state.isOfficeViewer) {
+    } else if (!state.isVesselViewer) {
       // Navigation context is a hint only: accept it only from the accessible
       // active vessel list returned under the current user's authorization.
       const contextId = new URLSearchParams(location.search).get("vessel_id");

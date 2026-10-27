@@ -23,7 +23,15 @@
     selectedTypes: new Set(),
     selectedStatuses: new Set(),
     selectionsInitialized: false,
-    dueOnly: false
+    dueOnly: false,
+    contextMode: "",
+    perspective: "",
+    contextTypeId: "",
+    byVesselContext: null,
+    byVesselTypes: null,
+    contextStorageKey: "",
+    loaded: false,
+    pendingVesselChoice: null
   };
 
   const el = {};
@@ -44,7 +52,13 @@
       "selectAllStatusesBtn", "clearStatusesBtn",
       "searchInput", "clearSearchBtn",
       "listMeta", "componentsTbody", "maiTaskLanding", "maiInventoryWorkspace",
-      "viewInventoryBtn", "reviewDueBtn", "backToTasksBtn"
+      "viewInventoryBtn", "reviewDueBtn", "backToTasksBtn",
+      "maiOfficeContext", "maiContextMode", "maiContextSingleVessel",
+      "maiSingleContextWrap", "maiMultiContextWrap", "maiCurrentContext",
+      "maiSingleVesselDialog", "maiSingleVesselReason", "maiTaskVessel",
+      "maiTaskVesselContinue", "maiTaskVesselCancel", "maiTaskVesselError",
+      "maiOfficePerspective", "maiPerspectiveVessel", "maiPerspectiveType",
+      "maiTypeContext", "maiContextComponentType"
     ].forEach((id) => {
       el[id] = $(id);
     });
@@ -204,7 +218,8 @@
   }
 
   function visibleVesselIds() {
-    return [...new Set(state.components.map((c) => c.vessel_id).filter(Boolean))];
+    // Include accessible active vessels even when no component is registered yet.
+    return state.vessels.map((vessel) => vessel.id);
   }
 
   function visibleTypeIds() {
@@ -216,21 +231,147 @@
   }
 
   function initializeSelections() {
-    if (state.selectionsInitialized) return;
-    visibleVesselIds().forEach((id) => state.selectedVessels.add(id));
-    visibleTypeIds().forEach((id) => state.selectedTypes.add(id));
-    visibleStatusKeys().forEach((key) => state.selectedStatuses.add(key));
-    state.selectionsInitialized = true;
+    const allowedIds = new Set(visibleVesselIds());
+    if (!state.selectionsInitialized) {
+      visibleTypeIds().forEach((id) => state.selectedTypes.add(id));
+      visibleStatusKeys().forEach((key) => state.selectedStatuses.add(key));
+      state.selectionsInitialized = true;
+      if (canChooseVesselContext()) {
+        try {
+          const saved = JSON.parse(sessionStorage.getItem(state.contextStorageKey) || "null");
+          if (saved && ["all", "single", "multiple"].includes(saved.mode) && Array.isArray(saved.ids)) {
+            state.contextMode = saved.mode;
+            state.selectedVessels = new Set(saved.ids.filter((id) => allowedIds.has(id)));
+            state.perspective = saved.perspective === "type" ? "type" : "vessel";
+            state.contextTypeId = typeof saved.typeId === "string" ? saved.typeId : "";
+            state.byVesselContext = saved.byVesselContext || null;
+            state.byVesselTypes = Array.isArray(saved.byVesselTypes) ? saved.byVesselTypes : null;
+          }
+        } catch (_) { /* Storage is optional; current server data remains authoritative. */ }
+      } else {
+        state.perspective = "vessel";
+        state.contextMode = state.isVesselViewer ? "single" : "all";
+      }
+    }
+    // Revalidate restored/current context against every fresh authorized lookup.
+    state.selectedVessels = new Set([...state.selectedVessels].filter((id) => allowedIds.has(id)));
+    if (state.contextMode === "all") state.selectedVessels = allowedIds;
+    if (state.isVesselViewer) {
+      state.perspective = "vessel";
+      state.contextTypeId = "";
+      state.selectedVessels = new Set(
+        allowedIds.has(state.profile?.vessel_id) ? [state.profile.vessel_id] : []);
+    }
+    if (state.perspective === "type") {
+      if (!state.types.some((type) => type.id === state.contextTypeId)) state.contextTypeId = "";
+      state.selectedTypes = new Set(state.contextTypeId ? [state.contextTypeId] : []);
+    }
+  }
+
+  function canChooseVesselContext() {
+    // Context selection is not an edit privilege. Non-onboard accounts still
+    // need the unchanged module/action guards and backend authorization.
+    return !!state.profile?.role && !state.isVesselViewer;
   }
 
   function selectedContextVessel() {
-    if (state.isVesselViewer) return state.profile?.vessel_id || "";
-    if (!state.isOfficeViewer || state.selectedVessels.size !== 1) return "";
+    if (!state.loaded) return "";
+    if (state.isVesselViewer) {
+      return state.vessels.some((vessel) => vessel.id === state.profile?.vessel_id)
+        ? state.profile.vessel_id : "";
+    }
+    if (!canChooseVesselContext() || state.selectedVessels.size !== 1) return "";
     const [id] = state.selectedVessels;
     return state.vessels.some((vessel) => vessel.id === id) ? id : "";
   }
 
+  function persistContext() {
+    if (!canChooseVesselContext() || !state.loaded) return;
+    try {
+      sessionStorage.setItem(state.contextStorageKey, JSON.stringify({
+        mode: state.contextMode, ids: [...state.selectedVessels],
+        perspective: state.perspective, typeId: state.contextTypeId,
+        byVesselContext: state.byVesselContext, byVesselTypes: state.byVesselTypes
+      }));
+    } catch (_) { /* Context still works for this page if browser storage is blocked. */ }
+  }
+
+  function renderContext() {
+    const office = canChooseVesselContext() && state.loaded;
+    const typeView = office && state.perspective === "type";
+    el.maiOfficePerspective.hidden = !office;
+    el.maiPerspectiveVessel.checked = state.perspective === "vessel";
+    el.maiPerspectiveType.checked = state.perspective === "type";
+    el.maiTypeContext.hidden = !typeView;
+    el.maiOfficeContext.hidden = !office || !state.perspective;
+    el.maiContextComponentType.innerHTML = '<option value="">Select component type...</option>' +
+      state.types.map((type) => `<option value="${esc(type.id)}">${esc(type.name || type.code || "Component type")}</option>`).join("");
+    el.maiContextComponentType.value = state.contextTypeId;
+    el.maiContextMode.value = state.contextMode;
+    el.maiSingleContextWrap.hidden = state.contextMode !== "single";
+    el.maiMultiContextWrap.hidden = state.contextMode !== "multiple";
+    $("vesselDropdown").hidden = !canChooseVesselContext();
+    const options = '<option value="">Select vessel...</option>' + state.vessels
+      .map((vessel) => `<option value="${esc(vessel.id)}">${esc(vessel.name || "Unnamed vessel")}</option>`).join("");
+    el.maiContextSingleVessel.innerHTML = options;
+    el.maiContextSingleVessel.value = selectedContextVessel();
+    const names = state.vessels.filter((vessel) => state.selectedVessels.has(vessel.id))
+      .map((vessel) => vessel.name || "Unnamed vessel");
+    const selectedType = state.types.find((type) => type.id === state.contextTypeId);
+    const ready = state.loaded && state.perspective !== "" &&
+      (!typeView || !!selectedType) && state.contextMode !== "" && names.length > 0;
+    const scope = !names.length ? "No accessible vessels selected"
+      : state.contextMode === "all" ? "All accessible vessels"
+      : names.length === 1 ? names[0] : `${names.length} vessels — ${names.join(", ")}`;
+    el.maiCurrentContext.textContent = !state.loaded ? "Loading vessel context…"
+      : !state.perspective ? "Choose how you want to view the inventory."
+      : typeView ? `Current view: By Component Type — ${selectedType?.name || selectedType?.code || "Choose component type"} — ${scope}`
+      : `Current view: By Vessel — ${state.contextMode ? scope : "Choose vessel context"}`;
+    if (el.maiInventoryWorkspace.hidden) el.maiTaskLanding.hidden = !ready;
+    el.viewInventoryBtn.disabled = !ready;
+    el.reviewDueBtn.disabled = !ready;
+    el.selectAllTypesBtn.disabled = typeView;
+    el.clearTypesBtn.disabled = typeView;
+  }
+
+  function contextChanged() {
+    persistContext();
+    renderContext();
+    renderVesselChecks();
+    renderTypeChecks();
+    renderTable();
+  }
+
+  function finishVesselChoice(vesselId = "") {
+    const resolve = state.pendingVesselChoice;
+    state.pendingVesselChoice = null;
+    el.maiSingleVesselDialog.close();
+    resolve?.(vesselId);
+  }
+
+  async function requireSingleVessel(taskLabel) {
+    const current = selectedContextVessel();
+    if (current && (!canChooseVesselContext() ||
+      (state.perspective === "vessel" && state.contextMode === "single"))) return current;
+    if (!state.loaded || !canChooseVesselContext() || !state.vessels.length) {
+      toast("warn", "No authorized vessel context is available for this task.");
+      return "";
+    }
+    if (state.pendingVesselChoice) return "";
+    el.maiSingleVesselReason.textContent = `${taskLabel} requires exactly one vessel. Choose a vessel to continue.`;
+    el.maiTaskVessel.innerHTML = '<option value="">Select vessel...</option>' + state.vessels
+      .map((vessel) => `<option value="${esc(vessel.id)}">${esc(vessel.name || "Unnamed vessel")}</option>`).join("");
+    el.maiTaskVesselError.textContent = "";
+    return new Promise((resolve) => {
+      state.pendingVesselChoice = resolve;
+      el.maiSingleVesselDialog.showModal();
+      el.maiTaskVessel.focus();
+    });
+  }
+
   function showInventory(dueOnly = false) {
+    if (!state.loaded || !state.perspective || !state.selectedVessels.size ||
+      (state.perspective === "type" && !state.contextTypeId)) return;
     state.dueOnly = dueOnly;
     el.maiTaskLanding.hidden = true;
     el.maiInventoryWorkspace.hidden = false;
@@ -267,6 +408,9 @@
   function updateSummaries() {
     el.vesselSummary.textContent = summaryText(state.selectedVessels, visibleVesselIds().length, "All");
     el.typeSummary.textContent = summaryText(state.selectedTypes, visibleTypeIds().length, "All");
+    if (state.perspective === "type") {
+      el.typeSummary.textContent = state.types.find((type) => type.id === state.contextTypeId)?.name || "Select type";
+    }
     el.statusSummary.textContent = summaryText(state.selectedStatuses, visibleStatusKeys().length, "All");
   }
 
@@ -301,15 +445,15 @@
         const id = input.getAttribute("data-vessel-check");
         if (input.checked) state.selectedVessels.add(id);
         else state.selectedVessels.delete(id);
-        updateSummaries();
-        renderTable();
+        state.contextMode = "multiple";
+        contextChanged();
       });
     });
   }
 
   function renderTypeChecks() {
     const byId = new Map(state.types.map((t) => [t.id, t]));
-    const rows = visibleTypeIds()
+    const rows = (state.perspective === "type" ? [state.contextTypeId] : visibleTypeIds())
       .map((id) => byId.get(id))
       .filter(Boolean)
       .sort((a, b) => Number(a.sort_order || 0) - Number(b.sort_order || 0));
@@ -323,7 +467,7 @@
       const checked = state.selectedTypes.has(t.id) ? " checked" : "";
       return `
         <label class="check-line">
-          <input type="checkbox" data-type-check="${esc(t.id)}"${checked} />
+          <input type="checkbox" data-type-check="${esc(t.id)}"${checked}${state.perspective === "type" ? " disabled" : ""} />
           <span>
             <div class="check-title">${esc(t.code || "")}</div>
             <div class="check-sub">${esc(t.name || "")}</div>
@@ -334,6 +478,7 @@
 
     el.typeChecks.querySelectorAll("[data-type-check]").forEach((input) => {
       input.addEventListener("change", () => {
+        if (state.perspective === "type") return;
         const id = input.getAttribute("data-type-check");
         if (input.checked) state.selectedTypes.add(id);
         else state.selectedTypes.delete(id);
@@ -383,6 +528,7 @@
     const q = String(el.searchInput.value || "").trim().toLowerCase();
 
     return state.components.filter((c) => {
+      if (state.perspective === "type" && c.component_type_id !== state.contextTypeId) return false;
       if (!state.selectedVessels.has(c.vessel_id)) return false;
       if (!state.selectedTypes.has(c.component_type_id)) return false;
       if (!state.selectedStatuses.has(c.current_status)) return false;
@@ -530,42 +676,103 @@
     el.reviewDueBtn.addEventListener("click", () => showInventory(true));
     el.backToTasksBtn.addEventListener("click", () => {
       el.maiInventoryWorkspace.hidden = true;
-      el.maiTaskLanding.hidden = false;
-      el.viewInventoryBtn.focus();
+      renderContext();
+      if (!el.maiTaskLanding.hidden) el.viewInventoryBtn.focus();
+      else el.maiContextMode.focus();
     });
     el.reloadBtn.addEventListener("click", () => reload().catch(handleError));
 
-    el.recordOperationBtn.addEventListener("click", () => {
-      const vesselId = selectedContextVessel();
-      location.href = "./mooring-anchoring-operations.html" +
-        (vesselId ? `?vessel_id=${encodeURIComponent(vesselId)}` : "");
+    el.recordOperationBtn.addEventListener("click", async () => {
+      const vesselId = await requireSingleVessel("Record Mooring / Anchoring Use");
+      if (!vesselId) return;
+      location.href = `./mooring-anchoring-operations.html?vessel_id=${encodeURIComponent(vesselId)}`;
     });
 
-    el.registerComponentBtn.addEventListener("click", () => {
-      toast("info", "Component registration will be moved into v4 next. The old MAI page has been retired from navigation.");
+    function changePerspective(perspective) {
+      if (!canChooseVesselContext() || state.perspective === perspective) return;
+      if (perspective === "type") {
+        state.byVesselContext = {mode: state.contextMode, ids: [...state.selectedVessels]};
+        state.byVesselTypes = [...state.selectedTypes];
+        state.contextMode = "all";
+        state.selectedVessels = new Set(visibleVesselIds());
+        state.selectedTypes = new Set(state.contextTypeId ? [state.contextTypeId] : []);
+      } else {
+        const saved = state.byVesselContext;
+        state.contextMode = ["all", "single", "multiple"].includes(saved?.mode) ? saved.mode : "";
+        state.selectedVessels = new Set(Array.isArray(saved?.ids)
+          ? saved.ids.filter((id) => state.vessels.some((vessel) => vessel.id === id)) : []);
+        if (state.contextMode === "all") state.selectedVessels = new Set(visibleVesselIds());
+        state.selectedTypes = new Set((state.byVesselTypes || visibleTypeIds())
+          .filter((id) => state.types.some((type) => type.id === id)));
+      }
+      state.perspective = perspective;
+      contextChanged();
+    }
+    el.maiPerspectiveVessel.addEventListener("change", () => changePerspective("vessel"));
+    el.maiPerspectiveType.addEventListener("change", () => changePerspective("type"));
+    el.maiContextComponentType.addEventListener("change", () => {
+      if (!canChooseVesselContext() || state.perspective !== "type") return;
+      const id = el.maiContextComponentType.value;
+      state.contextTypeId = state.types.some((type) => type.id === id) ? id : "";
+      state.selectedTypes = new Set(state.contextTypeId ? [state.contextTypeId] : []);
+      contextChanged();
+    });
+
+    el.maiContextMode.addEventListener("change", () => {
+      state.contextMode = el.maiContextMode.value;
+      if (state.contextMode === "all") state.selectedVessels = new Set(visibleVesselIds());
+      else if (state.contextMode === "" || (state.contextMode === "single" && state.selectedVessels.size !== 1)) {
+        state.selectedVessels.clear();
+      }
+      contextChanged();
+    });
+    el.maiContextSingleVessel.addEventListener("change", () => {
+      const id = el.maiContextSingleVessel.value;
+      state.selectedVessels = new Set(state.vessels.some((vessel) => vessel.id === id) ? [id] : []);
+      contextChanged();
+    });
+    el.maiTaskVesselCancel.addEventListener("click", () => finishVesselChoice());
+    el.maiSingleVesselDialog.addEventListener("cancel", (event) => {
+      event.preventDefault();
+      finishVesselChoice();
+    });
+    el.maiTaskVesselContinue.addEventListener("click", () => {
+      const id = el.maiTaskVessel.value;
+      if (!state.vessels.some((vessel) => vessel.id === id)) {
+        el.maiTaskVesselError.textContent = "Select one accessible vessel to continue.";
+        return;
+      }
+      if (state.perspective !== "type") {
+        state.contextMode = "single";
+        state.selectedVessels = new Set([id]);
+        contextChanged();
+      }
+      finishVesselChoice(id);
     });
 
     el.selectAllVesselsBtn.addEventListener("click", () => {
       if (state.isVesselViewer) return;
+      state.contextMode = "multiple";
       visibleVesselIds().forEach((id) => state.selectedVessels.add(id));
-      renderVesselChecks();
-      renderTable();
+      contextChanged();
     });
 
     el.clearVesselsBtn.addEventListener("click", () => {
       if (state.isVesselViewer) return;
+      state.contextMode = "multiple";
       state.selectedVessels.clear();
-      renderVesselChecks();
-      renderTable();
+      contextChanged();
     });
 
     el.selectAllTypesBtn.addEventListener("click", () => {
+      if (state.perspective === "type") return;
       visibleTypeIds().forEach((id) => state.selectedTypes.add(id));
       renderTypeChecks();
       renderTable();
     });
 
     el.clearTypesBtn.addEventListener("click", () => {
+      if (state.perspective === "type") return;
       state.selectedTypes.clear();
       renderTypeChecks();
       renderTable();
@@ -587,11 +794,10 @@
 
     el.clearSearchBtn.addEventListener("click", () => {
       state.dueOnly = false;
-      state.selectedVessels.clear();
       state.selectedTypes.clear();
       state.selectedStatuses.clear();
-      visibleVesselIds().forEach((id) => state.selectedVessels.add(id));
-      visibleTypeIds().forEach((id) => state.selectedTypes.add(id));
+      (state.perspective === "type" ? [state.contextTypeId] : visibleTypeIds())
+        .filter(Boolean).forEach((id) => state.selectedTypes.add(id));
       visibleStatusKeys().forEach((key) => state.selectedStatuses.add(key));
       el.searchInput.value = "";
       renderVesselChecks();
@@ -610,13 +816,14 @@
 
   async function reload() {
     await loadBaseData();
+    state.loaded = true;
+    renderContext();
+    persistContext();
     renderViewerMode();
     renderVesselChecks();
     renderTypeChecks();
     renderStatusChecks();
     renderTable();
-    el.viewInventoryBtn.disabled = false;
-    el.reviewDueBtn.disabled = false;
     toast("ok", "Inventory list reloaded.");
   }
 
@@ -638,6 +845,7 @@
     if (!bundle?.session?.user) {
       el.viewerMode.textContent = "Signed out";
       el.viewerHint.textContent = "Log in to access your authorized vessel inventory and tasks.";
+      el.maiCurrentContext.textContent = "Log in to resolve your vessel context.";
       toast("warn", "You are logged out. Please login.");
       return;
     }
@@ -645,9 +853,11 @@
     state.profile = bundle.profile || {};
     state.isOfficeViewer = roleIsOffice(state.profile.role);
     state.isVesselViewer = roleIsVessel(state.profile.role);
-    $("vesselDropdown").hidden = !state.isOfficeViewer;
+    state.contextStorageKey = `csvb_mai_context_v1:${bundle.session.user.id}:${state.profile.company_id || "platform"}`;
+    $("vesselDropdown").hidden = !canChooseVesselContext();
     window.CSVB_MAI_INVENTORY_CONTEXT = Object.freeze({
-      selectedVesselId: selectedContextVessel
+      selectedVesselId: selectedContextVessel,
+      requireSingleVessel
     });
 
     await reload();
