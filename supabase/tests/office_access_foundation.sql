@@ -3,8 +3,9 @@ do $$
 declare
   expected_modules integer;
 begin
-  if (select count(*) from public.csvb_office_access_profiles) <> 3 then
-    raise exception 'Expected three prepared reusable access profiles';
+  if (select count(*) from public.csvb_office_access_profiles
+      where code in ('company_administrator_access','standard_office_access','demo_view_only_access')) <> 3 then
+    raise exception 'Expected the three original prepared reusable access profiles';
   end if;
   if exists(select 1 from public.csvb_office_access_profiles where is_active) then
     raise exception 'Access profiles were activated before the resolver is ready';
