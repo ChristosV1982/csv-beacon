@@ -26,3 +26,9 @@ Demo User is intended as a normal assignable demonstration/training role, not De
 **Why:** The user explicitly distinguished Demo User from Demo Mode and required conservative defaults.
 
 **How to apply:** Implement future assignment through ordinary account/permission enforcement, not a mode switch.
+
+Prepared access-profile baselines must remain inactive and new Office-role assignment blocked until the backend's ordinary Office module paths use the same permission decision, including legacy role-only helpers. A front-end-only resolver is not sufficient.
+
+**Why:** Legacy Office role shortcuts can grant writes outside the Rights Matrix; mapping a new identity onto an old security role before those checks are aligned would let a view-only profile act with broader privileges.
+
+**How to apply:** Verify both direct-route visibility and backend RPC/write denial for newly assigned Office and Demo profiles before lifting the assignment gate; leave existing unassigned users on their legacy resolver until explicitly reassigned.
