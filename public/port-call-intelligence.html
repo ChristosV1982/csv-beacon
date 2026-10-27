@@ -9,25 +9,26 @@
   <link rel="stylesheet" href="./port-call-intelligence.css?v=20260909_compact_2" />
   <link rel="stylesheet" href="./csvb-mobile-polish.css?v=20260528_1" />
   <link rel="stylesheet" href="./csvb-mobile-fixes-20260528-2.css?v=20260528_2" />
+  <link rel="stylesheet" href="./csvb-module-header.css?v=20261027_rollout_2" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="./auth.js"></script>
   <script src="./csvb-module-guard.js?v=20260904_pci_1"></script>
 </head>
 <body>
-  <div class="topbar">
-    <div class="csvb-brand">
+  <div class="topbar csvb-module-header">
+    <div class="csvb-brand csvb-module-header-identity">
       <img class="csvb-brand-logo" src="./assets/csv-beacon-icon.png" alt="C.S.V. BEACON logo" />
       <div class="csvb-brand-text">
         <div class="csvb-brand-title">C.S.V. BEACON</div>
         <div class="csvb-brand-subtitle">Marine Assurance &amp; Compliance Platform</div>
       </div>
     </div>
-    <div class="topbar-actions">
-      <div id="userBadge" class="user-badge"></div>
-      <button class="btn2" id="loginBtn" type="button" style="display:none;">Login</button>
-      <button class="btn2" id="switchUserBtn" type="button">Switch User</button>
-      <button class="btn" id="logoutBtn" type="button" style="display:none;">Logout</button>
-      <button class="btn2" type="button" data-pci-tip="Return to the main C.S.V. BEACON dashboard." onclick="location.href='./q-dashboard.html'">Dashboard</button>
+    <div class="topbar-actions csvb-module-header-actions">
+      <div id="userBadge" class="user-badge csvb-module-header-meta"></div>
+      <button class="btn2 csvb-module-header-action" id="loginBtn" type="button" style="display:none;">Login</button>
+      <button class="btn2 csvb-module-header-action" id="switchUserBtn" type="button">Switch User</button>
+      <button class="btn csvb-module-header-action" id="logoutBtn" type="button" style="display:none;">Logout</button>
+      <button class="btn2 csvb-module-header-action" type="button" data-pci-tip="Return to the main C.S.V. BEACON dashboard." onclick="location.href='./q-dashboard.html'">Dashboard</button>
     </div>
   </div>
 

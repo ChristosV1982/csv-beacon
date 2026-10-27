@@ -122,17 +122,20 @@
   </style>
   <link rel="stylesheet" href="./csvb-mobile-polish.css?v=20260528_1" />
   <link rel="stylesheet" href="./csvb-mobile-fixes-20260528-2.css?v=20260528_2" />
+  <link rel="stylesheet" href="./csvb-module-header.css?v=20261027_rollout_2" />
 </head>
 
 <body>
-  <header class="topbar csvb-threads-topbar">
-    <div class="brand">🧵 C.S.V. BEACON — Threads</div>
+  <header class="topbar csvb-threads-topbar csvb-module-header">
+    <div class="brand csvb-module-header-identity">🧵 C.S.V. BEACON — Threads</div>
     <div class="topbar-spacer"></div>
-    <button class="secondary" id="notificationsBtn" type="button" data-csvb-help="View unread thread alerts.">Alerts: 0</button>
-    <span class="badge" id="userBadge">Loading…</span>
-    <button class="secondary csvb-dashboard-btn" id="dashboardBtn" type="button" data-csvb-help="Return to the dashboard.">⌂ Dashboard</button>
-    <button class="secondary" id="refreshBtn" type="button" data-csvb-help="Reload threads, participants and alerts.">Refresh</button>
-    <button id="logoutBtn" type="button" data-csvb-help="Sign out of the current session.">Logout</button>
+    <div class="csvb-module-header-actions">
+      <button class="secondary csvb-module-header-action" id="notificationsBtn" type="button" data-csvb-help="View unread thread alerts.">Alerts: 0</button>
+      <span class="badge csvb-module-header-meta" id="userBadge">Loading…</span>
+      <button class="secondary csvb-dashboard-btn csvb-module-header-action" id="dashboardBtn" type="button" data-csvb-help="Return to the dashboard.">⌂ Dashboard</button>
+      <button class="secondary csvb-module-header-action" id="refreshBtn" type="button" data-csvb-help="Reload threads, participants and alerts.">Refresh</button>
+      <button class="csvb-module-header-action" id="logoutBtn" type="button" data-csvb-help="Sign out of the current session.">Logout</button>
+    </div>
   </header>
 
   <main class="wrap csvb-threads-wrap">

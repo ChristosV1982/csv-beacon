@@ -8,6 +8,7 @@
   <link id="fleetModuleStyles" rel="stylesheet" href="./sire-fleet-vetting-experience.css?v=20261027_list_controls_refinement_v1">
   <link rel="stylesheet" href="./sire-fleet-prevention-actions.css?v=20261030_safe_delete_controls_v1">
   <link rel="stylesheet" href="./sire-fleet-vessel-responses.css?v=20261030_safe_delete_controls_v1">
+  <link rel="stylesheet" href="./csvb-module-header.css?v=20261027_rollout_2">
   <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script defer src="./theme.js?v=20260212_1"></script>
   <script defer src="./auth.js?v=20260130_1"></script>
@@ -16,23 +17,23 @@
   <script defer src="./sire-fleet-vessel-responses.js?v=20261030_preventive_wording_v1"></script>
 </head>
 <body>
-  <header class="topbar">
-    <div class="topbar-left">
+  <header class="topbar csvb-module-header">
+    <div class="topbar-left csvb-module-header-identity">
       <div class="brand">SIRE 2.0 – Fleet Vetting Experience</div>
       <div class="muted small" id="modeLine">Role: — • Mode: Read-only • Module: SIRE_FLEET_VETTING_EXPERIENCE</div>
     </div>
-    <div class="topbar-right">
+    <div class="topbar-right csvb-module-header-actions">
       <label class="themeCtl" for="themeSelect">
         <span class="themeCtl-label">Theme</span>
-        <select id="themeSelect" class="btn light themeCtl-select">
+      <select id="themeSelect" class="btn light themeCtl-select csvb-module-header-action">
           <option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option>
         </select>
       </label>
-      <button class="btn light" type="button" onclick="location.href='./q-dashboard.html'">Dashboard</button>
-      <div id="userBadge" class="badge">Not signed in</div>
-      <button id="loginBtn" class="btn primary" type="button">Login</button>
-      <button id="switchUserBtn" class="btn light" type="button">Switch user</button>
-      <button id="logoutBtn" class="btn" type="button">Logout</button>
+      <button class="btn light csvb-module-header-action" type="button" onclick="location.href='./q-dashboard.html'">Dashboard</button>
+      <div id="userBadge" class="badge csvb-module-header-meta">Not signed in</div>
+      <button id="loginBtn" class="btn primary csvb-module-header-action" type="button">Login</button>
+      <button id="switchUserBtn" class="btn light csvb-module-header-action" type="button">Switch user</button>
+      <button id="logoutBtn" class="btn csvb-module-header-action" type="button">Logout</button>
     </div>
   </header>
   <section class="fleet-intro" aria-labelledby="fleetTitle">

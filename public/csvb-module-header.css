@@ -54,6 +54,14 @@
   gap: 3px !important;
 }
 
+/* Plain title/subtitle groups stay stacked; branded logo+text groups keep
+   their existing horizontal structure. */
+.csvb-module-header > .csvb-module-header-identity:not(:has(img)) {
+  flex-direction: column;
+  align-items: flex-start !important;
+  gap: 3px !important;
+}
+
 .csvb-module-header .csvb-module-header-actions .csvb-module-header-action {
   display: inline-flex;
   align-items: center;
@@ -176,6 +184,50 @@ html[data-csvb-page="q-sire-questions-viewer.html"] .topbar.csvb-module-header::
   max-height: 36px !important;
 }
 
+/* Detail pages share the same legacy PI polish as Entry. Limit these
+   compatibility overrides to the newly opted-in detail ribbons. */
+html:is([data-csvb-page="post_inspection_detail.html"],
+  [data-csvb-page="post_inspection_observation_detail.html"])
+  .topbar.csvb-module-header .csvb-module-header-actions .csvb-module-header-action {
+  min-height: 36px !important;
+  padding: 7px 10px !important;
+  border-radius: 8px !important;
+  font-size: 14px !important;
+  font-weight: 700 !important;
+  line-height: 1.2 !important;
+}
+
+html:is([data-csvb-page="post_inspection_detail.html"],
+  [data-csvb-page="post_inspection_observation_detail.html"])
+  .topbar.csvb-module-header .csvb-module-header-actions {
+  gap: 6px 8px !important;
+}
+
+html:is([data-csvb-page="post_inspection_detail.html"],
+  [data-csvb-page="post_inspection_observation_detail.html"])
+  .topbar.csvb-module-header .csvb-module-header-meta,
+html:is([data-csvb-page="post_inspection_detail.html"],
+  [data-csvb-page="post_inspection_observation_detail.html"])
+  .topbar.csvb-module-header .themeCtl-label {
+  font-size: 14px !important;
+  line-height: 1.2 !important;
+}
+
+html:is([data-csvb-page="post_inspection_detail.html"],
+  [data-csvb-page="post_inspection_observation_detail.html"])
+  .topbar.csvb-module-header .csvb-module-header-identity {
+  min-width: 0 !important;
+  text-align: left !important;
+}
+
+html:is([data-csvb-page="post_inspection_detail.html"],
+  [data-csvb-page="post_inspection_observation_detail.html"])
+  .topbar.csvb-module-header::before {
+  width: 36px !important;
+  height: 36px !important;
+  min-width: 36px !important;
+}
+
 @media (max-width: 900px) {
   .csvb-module-header {
     align-items: flex-start !important;
@@ -210,6 +262,22 @@ html[data-csvb-page="q-sire-questions-viewer.html"] .topbar.csvb-module-header::
 
   html[data-csvb-page="post_inspection.html"] .topbar.csvb-module-header #userBadge {
     min-height: 44px !important;
+  }
+}
+
+@media (max-width: 900px), (pointer: coarse) {
+  html:is([data-csvb-page="post_inspection_detail.html"],
+    [data-csvb-page="post_inspection_observation_detail.html"])
+    .topbar.csvb-module-header .csvb-module-header-actions .csvb-module-header-action {
+    min-height: 44px !important;
+  }
+}
+
+@media (max-width: 900px) {
+  html:is([data-csvb-page="post_inspection_detail.html"],
+    [data-csvb-page="post_inspection_observation_detail.html"])
+    .topbar.csvb-module-header .csvb-module-header-actions {
+    justify-content: flex-start !important;
   }
 }
 

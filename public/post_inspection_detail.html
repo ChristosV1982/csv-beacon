@@ -215,30 +215,30 @@
 
 <body>
   <div class="pi-wrap">
-  <header class="topbar csvb-pi-topbar">
-    <div class="topbar-left">
+  <header class="topbar csvb-pi-topbar csvb-module-header">
+    <div class="topbar-left csvb-module-header-identity">
       <div class="brand">Post-Inspection Detail</div>
       <div class="muted small csvb-pi-mode-line">Role: — • Mode: Post-inspection • Module: POST_INSPECTION_DETAIL</div>
     </div>
 
-    <div class="topbar-right csvb-pi-actions">
+    <div class="topbar-right csvb-pi-actions csvb-module-header-actions">
       <label class="themeCtl csvb-pi-themeCtl" for="themeSelect" title="Theme">
         <span class="themeCtl-label">Theme</span>
-        <select id="themeSelect" class="btn light themeCtl-select">
+        <select id="themeSelect" class="btn light themeCtl-select csvb-module-header-action">
           <option value="system">System</option>
           <option value="light">Light</option>
           <option value="dark">Dark</option>
         </select>
       </label>
-      <span class="pi-pill" id="userBadge">Not signed in</span>
-        <button class="btn light" id="backToListBtn" type="button">Back to Stored Inspections</button>
-        <button class="btn light" id="dashboardBtn" type="button">Dashboard</button>
-        <button class="btn light" id="modeSelectBtn" type="button">Mode Selection</button>
-        <button class="btn primary" id="logoutBtn" type="button">Logout</button>
+      <span class="pi-pill csvb-module-header-meta" id="userBadge">Not signed in</span>
+        <button class="btn light csvb-module-header-action" id="backToListBtn" type="button">Back to Stored Inspections</button>
+        <button class="btn light csvb-module-header-action" id="dashboardBtn" type="button">Dashboard</button>
+        <button class="btn light csvb-module-header-action" id="modeSelectBtn" type="button">Mode Selection</button>
+        <button class="btn primary csvb-module-header-action" id="logoutBtn" type="button">Logout</button>
 
-        <span class="pi-pill" id="activeReportPill">No active report</span>
-        <span class="pi-pill" id="saveStatus">Not saved</span>
-        <span class="pi-pill" id="buildPill">build: —</span>
+        <span class="pi-pill csvb-module-header-meta" id="activeReportPill">No active report</span>
+        <span class="pi-pill csvb-module-header-meta" id="saveStatus">Not saved</span>
+        <span class="pi-pill csvb-module-header-meta" id="buildPill">build: —</span>
     </div>
   </header>
 
@@ -547,6 +547,7 @@
   <script src="./app-config.js" defer></script>
   <script src="./auth.js" defer></script>
   <link rel="stylesheet" href="./csvb-human-pifs.css?v=20261026_human_pifs_v1" />
+  <link rel="stylesheet" href="./csvb-module-header.css?v=20261027_rollout_2" />
   <script type="module" src="./post_inspection_detail.js?v=20261027_fve_prevention_guard_v1"></script>
   <script src="./csvb-ui-polish.js?v=20260430_1"></script>
   <script src="./csvb-help-tooltips.js?v=20260430_1"></script>

@@ -417,21 +417,22 @@
   <link rel="stylesheet" href="./csvb-post-inspection-mobile-tables-v3.css?v=20260529_1" />
   <link rel="stylesheet" href="./csvb-post-inspection-stats-colours-v01.css?v=20260529_1" />
   <link rel="stylesheet" href="./csvb-post-inspection-stats-chapter-share-fonts-v01.css?v=20260531_1" />
+  <link rel="stylesheet" href="./csvb-module-header.css?v=20261027_rollout_2" />
 </head>
 
 <body>
   <div class="wrap">
-    <div class="topbar">
+    <div class="topbar csvb-module-header">
       <div>
         <div class="title">Observation Statistics (Fleet / Vessel)</div>
         <div class="sub">DB-driven statistics and exports. Statistics are grouped by measurement objective.</div>
       </div>
-      <div class="actions">
-        <div id="userBadge" style="font-weight:900; opacity:0.95;"></div>
-        <a class="btn btn-outline" href="./q-dashboard.html">Dashboard</a>
-        <a class="btn btn-outline" href="./post_inspection.html">Post-Inspection</a>
-        <a class="btn btn-outline" href="./audit_observations.html">Audit Observations</a>
-        <button class="btn" id="logoutBtn">Logout</button>
+      <div class="actions csvb-module-header-actions">
+        <div id="userBadge" class="csvb-module-header-meta" style="font-weight:900; opacity:0.95;"></div>
+        <a class="btn btn-outline csvb-module-header-action" href="./q-dashboard.html">Dashboard</a>
+        <a class="btn btn-outline csvb-module-header-action" href="./post_inspection.html">Post-Inspection</a>
+        <a class="btn btn-outline csvb-module-header-action" href="./audit_observations.html">Audit Observations</a>
+        <button class="btn csvb-module-header-action" id="logoutBtn">Logout</button>
       </div>
     </div>
 

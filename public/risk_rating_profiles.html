@@ -384,11 +384,12 @@
   <link rel="stylesheet" href="./csvb-100pct-fit.css?v=20260430_1" />
   <link rel="stylesheet" href="./csvb-mobile-polish.css?v=20260528_1" />
   <link rel="stylesheet" href="./csvb-mobile-fixes-20260528-2.css?v=20260528_2" />
+  <link rel="stylesheet" href="./csvb-module-header.css?v=20261027_rollout_2" />
 </head>
 
 <body>
-  <header class="topbar">
-    <div class="brand-wrap">
+  <header class="topbar csvb-module-header">
+    <div class="brand-wrap csvb-module-header-identity">
       <img class="brand-logo" src="./assets/csv-beacon-icon.png" alt="C.S.V. BEACON" />
       <div>
         <div class="brand-title">Risk Rating Profiles</div>
@@ -396,12 +397,12 @@
       </div>
     </div>
 
-    <div class="top-actions">
-      <span class="pill" id="userBadge">Not signed in</span>
-      <button class="btn dark" id="dashboardBtn" type="button">Dashboard</button>
-      <button class="btn dark" id="modeBtn" type="button">Mode Selection</button>
-      <button class="btn primary" id="logoutBtn" type="button">Logout</button>
-      <span class="pill" id="buildPill">build: risk_rating_profiles_v1_2026-05-21</span>
+    <div class="top-actions csvb-module-header-actions">
+      <span class="pill csvb-module-header-meta" id="userBadge">Not signed in</span>
+      <button class="btn dark csvb-module-header-action" id="dashboardBtn" type="button">Dashboard</button>
+      <button class="btn dark csvb-module-header-action" id="modeBtn" type="button">Mode Selection</button>
+      <button class="btn primary csvb-module-header-action" id="logoutBtn" type="button">Logout</button>
+      <span class="pill csvb-module-header-meta" id="buildPill">build: risk_rating_profiles_v1_2026-05-21</span>
     </div>
   </header>
 

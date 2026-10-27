@@ -117,21 +117,24 @@
   <link rel="stylesheet" href="./csvb-post-inspection-mobile-v2.css?v=20260528_1" />
   <link rel="stylesheet" href="./csvb-mobile-fixes-20260528-2.css?v=20260528_2" />
   <link rel="stylesheet" href="./csvb-post-inspection-mobile-tables-v3.css?v=20260529_1" />
+  <link rel="stylesheet" href="./csvb-module-header.css?v=20261027_rollout_2" />
 </head>
 
 <body>
   <div class="wrap">
-    <div class="hero">
-      <h1>Post-Inspection KPI Dashboard</h1>
-      <p>Live KPIs computed from saved inspections and observations. Filterable. Exportable.</p>
+    <div class="hero csvb-module-header">
+      <div class="csvb-module-header-identity">
+        <h1>Post-Inspection KPI Dashboard</h1>
+        <p>Live KPIs computed from saved inspections and observations. Filterable. Exportable.</p>
+      </div>
 
-      <div class="toprow">
-        <span class="pill" id="userBadge">Not signed in</span>
-        <button class="btn light" id="dashboardBtn" type="button">Dashboard</button>
-        <button class="btn light" id="postInspBtn" type="button">Post-Inspection</button>
-        <button class="btn primary" id="logoutBtn" type="button">Logout</button>
-        <span class="pill" id="buildPill">build: —</span>
-        <span class="pill" id="statusPill">Loading…</span>
+      <div class="toprow csvb-module-header-actions">
+        <span class="pill csvb-module-header-meta" id="userBadge">Not signed in</span>
+        <button class="btn light csvb-module-header-action" id="dashboardBtn" type="button">Dashboard</button>
+        <button class="btn light csvb-module-header-action" id="postInspBtn" type="button">Post-Inspection</button>
+        <button class="btn primary csvb-module-header-action" id="logoutBtn" type="button">Logout</button>
+        <span class="pill csvb-module-header-meta" id="buildPill">build: —</span>
+        <span class="pill csvb-module-header-meta" id="statusPill">Loading…</span>
       </div>
     </div>
 
