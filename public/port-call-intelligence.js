@@ -631,7 +631,7 @@
     if (canAuthorEdit(call) && call.status === "draft") {
       out.push(button("Edit Draft", "btn", "Edit and save this Draft report.", "edit-call"));
       out.push(button("Submit", "btn", "Validate the core fields and all section confirmations, then submit this report to the office.", "submit-call"));
-      out.push(button("Delete Draft", "pci-danger", "Permanently delete this Draft report after confirmation. Finalised reports cannot be deleted.", "delete-call"));
+      if (!state.permissions.vesselRole) out.push(button("Delete Draft", "pci-danger", "Permanently delete this Draft report after confirmation. Finalised reports cannot be deleted.", "delete-call"));
     } else if (canAuthorEdit(call) && call.status === "submitted" && !call.review_started_at) {
       out.push(button("Return to Draft", "btn2", "Withdraw this unreviewed submission back to Draft for further editing.", "retract-call"));
     }

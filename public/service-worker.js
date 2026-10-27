@@ -13,7 +13,7 @@
 // - No module business logic.
 
 const CACHE_PREFIX = "sire-test-";
-const CACHE_VERSION = "v128-cache-supabase-cdn-20260526";
+const CACHE_VERSION = "v130-vessel-access-policy-20261028";
 const CACHE_NAME = `${CACHE_PREFIX}${CACHE_VERSION}`;
 const OFFLINE_FALLBACK_URL = "./offline.html";
 

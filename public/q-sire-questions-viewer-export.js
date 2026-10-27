@@ -351,7 +351,11 @@
     ok("Selected question exported to JSON.");
   }
 
-  function init() {
+  async function init() {
+    try {
+      const context = await window.AUTH?.getSessionUserProfile?.();
+      if (!context?.profile || context.profile.role === "vessel") return;
+    } catch (_) { return; }
     injectScreenStyles();
     injectButtons();
 

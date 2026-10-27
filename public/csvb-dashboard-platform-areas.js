@@ -276,8 +276,10 @@
   function isCardAvailable(cardKey) {
     const rank = window.CSVB_DASHBOARD_RANK_ACCESS;
     if (rank?.error) return false;
-    if (rank?.blocked && cardKey !== SIRE_VIEWER_CARD_KEY && cardKey !== RISQ_VIEWER_CARD_KEY) return false;
+    if (rank?.blocked) return false;
     const moduleCode = window.CSVB_DASHBOARD_RANK_CARD_CODES?.[cardKey];
+    if (window.CSVB_CONTEXT?.profile?.role === "vessel" &&
+        (!moduleCode || !rank?.allowedViewModules?.includes(moduleCode))) return false;
     if (moduleCode && Array.isArray(rank?.allowedViewModules) &&
         !rank.allowedViewModules.includes(moduleCode)) return false;
     if (cardKey === SIRE_VIEWER_CARD_KEY) {

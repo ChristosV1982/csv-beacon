@@ -622,7 +622,7 @@
         <div class="pla-action-group pla-action-danger">
           <div class="pla-action-group-title">Discarded Component</div>
           <span class="pill pill-danger">Component discarded. Editing and new actions are blocked until restored.</span>
-          <button id="restoreComponentBtn" class="btn" type="button">Restore / Reactivate</button>
+          ${state.profile?.role !== "vessel" ? `<button id="restoreComponentBtn" class="btn" type="button">Restore / Reactivate</button>` : ""}
           ${state.canAdmin ? `<button id="advancedSnapshotBtn" class="btn2" type="button">Advanced Snapshot</button>` : ""}
         </div>
       `;
@@ -649,7 +649,7 @@
 
       <div class="pla-action-group pla-action-danger">
         <div class="pla-action-group-title">Lifecycle</div>
-        <button id="discardBtn" class="btn" type="button">Discard Component</button>
+        ${state.profile?.role !== "vessel" ? `<button id="discardBtn" class="btn" type="button">Discard Component</button>` : ""}
         ${state.canAdmin ? `<button id="advancedSnapshotBtn" class="btn2" type="button">Advanced Snapshot</button>` : ""}
       </div>
     `;

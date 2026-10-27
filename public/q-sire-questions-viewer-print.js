@@ -370,7 +370,11 @@
     printWindow("SIRE 2.0 Filtered Question List", body);
   }
 
-  function init() {
+  async function init() {
+    try {
+      const context = await window.AUTH?.getSessionUserProfile?.();
+      if (!context?.profile || context.profile.role === "vessel") return;
+    } catch (_) { return; }
     injectScreenStyles();
     injectButtons();
 

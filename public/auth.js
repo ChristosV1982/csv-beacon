@@ -128,14 +128,6 @@
     return client;
   }
 
-  function deriveVesselPosition(username) {
-    const u = String(username || "").trim().toLowerCase();
-    if (u.startsWith("master_")) return "master";
-    if (u.startsWith("chiefofficer_")) return "chief_officer";
-    if (u.startsWith("chiefengineer_")) return "chief_engineer";
-    return null;
-  }
-
   function companyLabel(company) {
     if (!company) return "";
     return company.short_name || company.company_name || company.company_code || "";
@@ -199,12 +191,72 @@
       company_id: enrichedProfile.company_id || null,
       isPlatformAdmin: isPlatformAdminRole(enrichedProfile.role),
       uiRole: roleToUi(enrichedProfile.role),
-      vesselPosition: deriveVesselPosition(enrichedProfile.username),
+      vesselPosition: enrichedProfile.role === "vessel"
+        ? await resolveCanonicalVesselPosition(sb, enrichedProfile) : null,
     };
 
     window.CSVB_CONTEXT = out;
 
+    await enforceVesselRoute(sb, out);
     return out;
+  }
+
+  const vesselRanks = new Map();
+  // Kept as a public compatibility helper, but accepts rank identity only.
+  // Username prefixes are deliberately not an authorization source.
+  function deriveVesselPosition(rank) {
+    const key = String(rank || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+    return ({master:"master",chiefofficer:"chief_officer",chiefengineer:"chief_engineer",
+      secondengineer:"second_engineer","2ndengineer":"second_engineer"})[key] || key || null;
+  }
+  async function resolveCanonicalVesselPosition(sb, profile) {
+    if (!profile.onboard_rank_id) {
+      return deriveVesselPosition(profile.position);
+    }
+    if (!vesselRanks.has(profile.onboard_rank_id)) {
+      vesselRanks.set(profile.onboard_rank_id, sb.from("onboard_ranks")
+        .select("rank_code,rank_name,is_active").eq("id", profile.onboard_rank_id).maybeSingle()
+        .then(({data,error}) => {
+          if (error || !data?.is_active) return null;
+          const code = deriveVesselPosition(data.rank_code);
+          const name = deriveVesselPosition(data.rank_name);
+          const officers = ["master","chief_officer","chief_engineer","second_engineer"];
+          return officers.includes(code) ? code : officers.includes(name) ? name : code;
+        }));
+    }
+    return vesselRanks.get(profile.onboard_rank_id);
+  }
+
+  // Every authenticated module using AUTH gets the same fail-closed route gate.
+  // This is UI protection only; RPCs/RLS remain authoritative.
+  let vesselRouteAccess;
+  async function enforceVesselRoute(sb, context) {
+    if (context.profile?.role !== "vessel") return;
+    const page = location.pathname.split("/").pop() || "index.html";
+    if (["index.html","login.html","q-dashboard.html","mode-selection.html"].includes(page)) return;
+    const routes = {
+      "q-sire-questions-viewer.html": "SIRE_QUESTIONS_VIEWER",
+      "sire-fleet-vetting-experience.html": "SIRE_FLEET_VETTING_EXPERIENCE",
+      "mooring-anchoring-inventories-v4.html": "MOORING_ANCHORING_INVENTORIES",
+      "mooring-anchoring-component.html": "MOORING_ANCHORING_INVENTORIES",
+      "mooring-anchoring-operations.html": "MOORING_ANCHORING_INVENTORIES",
+      "port-call-intelligence.html": "PORT_CALL_INTELLIGENCE",
+      "portable-lifting-appliances-wires.html": "PORTABLE_LIFTING_APPLIANCES_WIRES",
+      "portable-lifting-appliances-wire-component.html": "PORTABLE_LIFTING_APPLIANCES_WIRES"
+    };
+    const moduleCode = routes[page];
+    if (!vesselRouteAccess) vesselRouteAccess = sb.rpc("csvb_my_effective_app_permissions")
+      .then(({data,error}) => { if (error) throw error; return data || []; });
+    let allowed = false;
+    try {
+      const rows = await vesselRouteAccess;
+      allowed = !!moduleCode && rows.some(r => r.module_code === moduleCode &&
+        r.permission_action === "view" && r.is_granted === true);
+    } catch (_) { /* fail closed */ }
+    if (!allowed) {
+      location.replace("./q-dashboard.html");
+      throw new Error("Vessel access denied by module/rank policy.");
+    }
   }
 
   async function requireAuth(allowedRoles = null, opts = {}) {

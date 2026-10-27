@@ -29,6 +29,7 @@
     threads: "THREADS",
     company_policy: "COMPANY_POLICY",
     mooring_anchoring_inventories: "MOORING_ANCHORING_INVENTORIES",
+    port_call_intelligence: "PORT_CALL_INTELLIGENCE",
     portable_lifting_appliances_wires: "PORTABLE_LIFTING_APPLIANCES_WIRES",
     suadmin: "SU_ADMIN"
   };
@@ -70,17 +71,19 @@
   function hideAllNonPublicCards() {
     document.querySelectorAll("[data-card]").forEach((card) => {
       const key = card.getAttribute("data-card");
-      const keep = key === "sire_questions_viewer" || key === "risq_questions_viewer";
-      card.style.display = keep ? "block" : "none";
+      card.style.display = "none";
     });
   }
 
-  function applyPermissionFilter(allowedViewModules) {
+  function applyPermissionFilter(allowedViewModules, denyUnknown = false) {
     document.querySelectorAll("[data-card]").forEach((card) => {
       const key = card.getAttribute("data-card");
       const moduleCode = CARD_TO_APP_MODULE_CODE[key];
 
-      if (!moduleCode) return;
+      if (!moduleCode) {
+        if (denyUnknown) card.style.display = "none";
+        return;
+      }
 
       if (!allowedViewModules.has(moduleCode)) {
         card.style.display = "none";
@@ -138,7 +141,7 @@
         .map((row) => row.module_code)
     );
 
-    applyPermissionFilter(allowedViewModules);
+    applyPermissionFilter(allowedViewModules, profile.role === "vessel");
 
     window.CSVB_DASHBOARD_RANK_ACCESS = {
       build: BUILD,

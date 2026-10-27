@@ -10,4 +10,4 @@
 - [Fleet Vetting Experience](fleet-vetting-experience.md) — limited fleet awareness; physical findings count once; separate prevention actions and immutable target-specific vessel responses.
 - [Module header standard](module-header-standard.md) — opt-in ribbon styling only; preserve page controls and check legacy polish specificity at desktop/mobile widths.
 - [Mooring task context](mai-task-context.md) — task entry preserves existing workflows; vessel context is a validated hint, and empty selections must survive refresh.
-- [Vessel/account governance](vessel-account-governance.md) — Active/Inactive only; reasons stay restricted; lifecycle Step 1 must not change accounts or historical data.
+- [Vessel/account governance](vessel-account-governance.md) — Active/Inactive, restricted reasons, staged account changes and the approved vessel-rank module allowlist.

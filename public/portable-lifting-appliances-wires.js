@@ -429,7 +429,8 @@
     renderTable();
 
     el.registerBtn.style.display = state.canEdit ? "" : "none";
-    el.exportBtn.style.display = state.canExport || state.canEdit ? "" : "none";
+    el.exportBtn.style.display = state.canExport ||
+      (state.profile?.role !== "vessel" && state.canEdit) ? "" : "none";
   }
 
   function clearFilters() {
@@ -452,6 +453,7 @@
   }
 
   function exportCsv() {
+    if (!state.canExport && (state.profile?.role === "vessel" || !state.canEdit)) return;
     const rows = state.filtered;
 
     const headers = [
