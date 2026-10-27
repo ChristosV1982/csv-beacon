@@ -17,30 +17,31 @@
   <link rel="stylesheet" href="./csvb-mobile-polish.css?v=20260528_1" />
   <link rel="stylesheet" href="./csvb-mobile-fixes-20260528-2.css?v=20260528_2" />
   <link rel="stylesheet" href="./csvb-sire-viewer-mobile-filters-v3.css?v=20260529_1" />
+  <link rel="stylesheet" href="./csvb-module-header.css?v=20261027_1" />
 </head>
 
 <body>
-  <header class="topbar">
-    <div class="topbar-left">
+  <header class="topbar csvb-module-header">
+    <div class="topbar-left csvb-module-header-identity">
       <div class="brand">SIRE 2.0 – Questions Viewer</div>
       <div class="muted small" id="modeLine">Role: — • Mode: Read-only • Module: SIRE_QUESTIONS_VIEWER</div>
     </div>
 
-    <div class="topbar-right">
+    <div class="topbar-right csvb-module-header-actions">
       <label class="themeCtl" for="themeSelect" title="Theme">
         <span class="themeCtl-label">Theme</span>
-        <select id="themeSelect" class="btn light themeCtl-select">
+        <select id="themeSelect" class="btn light themeCtl-select csvb-module-header-action">
           <option value="system">System</option>
           <option value="light">Light</option>
           <option value="dark">Dark</option>
         </select>
       </label>
 
-      <button class="btn light" type="button" onclick="location.href='./q-dashboard.html'">Dashboard</button>
-      <div id="userBadge" class="badge">Not signed in</div>
-      <button id="loginBtn" class="btn primary" type="button">Login</button>
-      <button id="switchUserBtn" class="btn light" type="button">Switch user</button>
-      <button id="logoutBtn" class="btn" type="button">Logout</button>
+      <button class="btn light csvb-module-header-action" type="button" onclick="location.href='./q-dashboard.html'">Dashboard</button>
+      <div id="userBadge" class="badge csvb-module-header-meta">Not signed in</div>
+      <button id="loginBtn" class="btn primary csvb-module-header-action" type="button">Login</button>
+      <button id="switchUserBtn" class="btn light csvb-module-header-action" type="button">Switch user</button>
+      <button id="logoutBtn" class="btn csvb-module-header-action" type="button">Logout</button>
     </div>
   </header>
 

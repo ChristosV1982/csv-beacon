@@ -8,3 +8,4 @@
 - [Human finding identity](human-finding-identity.md) — multiple PIFs belong to one finding; officer-context findings stay distinct, and alternate counting must not duplicate stored rows.
 - [Supabase function migrations](supabase-function-migrations.md) — normalize retrieved SQL line endings and execute changed RPCs; successful DDL alone does not validate embedded queries.
 - [Fleet Vetting Experience](fleet-vetting-experience.md) — limited fleet awareness; physical findings count once; separate prevention actions and immutable target-specific vessel responses.
+- [Module header standard](module-header-standard.md) — opt-in ribbon styling only; preserve page controls and check legacy polish specificity at desktop/mobile widths.

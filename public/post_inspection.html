@@ -339,27 +339,27 @@
 
 <body class="post-inspection-entry-page">
   <div class="wrap">
-  <header class="topbar csvb-pi-topbar">
-    <div class="topbar-left">
+  <header class="topbar csvb-pi-topbar csvb-module-header">
+    <div class="topbar-left csvb-module-header-identity">
       <div class="brand">Post-Inspection Entry</div>
       <div class="muted small csvb-pi-mode-line">Role: — • Mode: Post-inspection • Module: POST_INSPECTION_ENTRY</div>
     </div>
 
-    <div class="topbar-right csvb-pi-actions">
+    <div class="topbar-right csvb-pi-actions csvb-module-header-actions">
       <label class="themeCtl csvb-pi-themeCtl" for="themeSelect" title="Theme">
         <span class="themeCtl-label">Theme</span>
-        <select id="themeSelect" class="btn light themeCtl-select">
+        <select id="themeSelect" class="btn light themeCtl-select csvb-module-header-action">
           <option value="system">System</option>
           <option value="light">Light</option>
           <option value="dark">Dark</option>
         </select>
       </label>
-      <span class="pill" id="userBadge">Not signed in</span>
-        <button class="btn light" id="dashboardBtn" type="button" title="Return to the main dashboard." data-csvb-help="Return to the main dashboard.">Dashboard</button>
-        <button class="btn light" id="modeSelectBtn" type="button" title="Return to mode selection." data-csvb-help="Return to mode selection.">Mode Selection</button>
-        <button class="btn primary" id="newReportBtn" type="button" title="Create a new stored post-inspection report record." data-csvb-help="Create a new stored post-inspection report record.">New Post-Inspection Report</button>
-        <button class="btn primary" id="logoutBtn" type="button" title="Sign out of the current session." data-csvb-help="Sign out of the current session.">Logout</button>
-        <span class="pill" id="buildPill">build: —</span>
+      <span class="pill csvb-module-header-meta" id="userBadge">Not signed in</span>
+        <button class="btn light csvb-module-header-action" id="dashboardBtn" type="button" title="Return to the main dashboard." data-csvb-help="Return to the main dashboard.">Dashboard</button>
+        <button class="btn light csvb-module-header-action" id="modeSelectBtn" type="button" title="Return to mode selection." data-csvb-help="Return to mode selection.">Mode Selection</button>
+        <button class="btn primary csvb-module-header-action" id="newReportBtn" type="button" title="Create a new stored post-inspection report record." data-csvb-help="Create a new stored post-inspection report record.">New Post-Inspection Report</button>
+        <button class="btn primary csvb-module-header-action" id="logoutBtn" type="button" title="Sign out of the current session." data-csvb-help="Sign out of the current session.">Logout</button>
+        <span class="pill csvb-module-header-meta" id="buildPill">build: —</span>
     </div>
   </header>
 
@@ -534,6 +534,7 @@
   <script src="./app-config.js" defer></script>
   <script src="./auth.js" defer></script>
   <link rel="stylesheet" href="./csvb-human-counting-panel.css?v=20261026_entry_integration_v2" />
+  <link rel="stylesheet" href="./csvb-module-header.css?v=20261027_1" />
   <script src="./csvb-observation-counts.js?v=20261026_entry_integration_v2"></script>
   <script type="module" src="./post_inspection.js?v=20261026_entry_integration_v2"></script>
   <script src="./csvb-ui-polish.js?v=20260430_1"></script>

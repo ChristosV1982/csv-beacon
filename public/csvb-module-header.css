@@ -1,0 +1,230 @@
+/* C.S.V. BEACON — shared, opt-in module-header control standard.
+   Scope is deliberately limited to elements carrying these module-header
+   classes; page controls below the header are never selected.
+
+   A few narrowly scoped !important declarations are intentional: legacy
+   100%-fit rules and Post-Inspection polish use important sizing on headers
+   and controls. This stylesheet loads after those module styles so the shared
+   header contract wins without changing unrelated page controls.
+*/
+
+.csvb-module-header {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  flex-wrap: wrap !important;
+  gap: 8px !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  box-sizing: border-box !important;
+  padding: 8px 12px !important;
+  min-height: 60px !important;
+  font-family: var(--font-sans, system-ui, "Segoe UI", Arial, sans-serif);
+}
+
+.csvb-module-header-identity {
+  display: flex;
+  align-items: center;
+  flex: 1 1 auto;
+  gap: 8px;
+  min-width: 0 !important;
+  text-align: left !important;
+}
+
+.csvb-module-header .csvb-module-header-identity > .brand,
+.csvb-module-header .csvb-module-header-identity > .planner-title {
+  text-align: left !important;
+}
+
+.csvb-module-header .csvb-module-header-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex: 0 1 auto;
+  flex-wrap: wrap;
+  gap: 6px 8px !important;
+  min-width: 0;
+  margin-left: auto;
+}
+
+.csvb-module-header .topbar-left.csvb-module-header-identity,
+.planner-topbar.csvb-module-header > .csvb-module-header-identity {
+  flex-direction: column;
+  align-items: flex-start !important;
+  gap: 3px !important;
+}
+
+.csvb-module-header .csvb-module-header-actions .csvb-module-header-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex: 0 0 auto !important;
+  width: auto !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  min-height: 36px !important;
+  box-sizing: border-box !important;
+  padding: 7px 10px !important;
+  border-radius: 8px !important;
+  font-size: 14px !important;
+  font-family: var(--font-sans, system-ui, "Segoe UI", Arial, sans-serif) !important;
+  font-weight: 700 !important;
+  line-height: 1.2 !important;
+  white-space: normal;
+  text-align: center;
+}
+
+.csvb-module-header .csvb-module-header-meta {
+  display: inline-flex;
+  align-items: center;
+  box-sizing: border-box;
+  min-height: 36px;
+  max-width: 100%;
+  font-family: inherit;
+  font-size: 14px !important;
+  line-height: 1.2 !important;
+  overflow-wrap: anywhere;
+}
+
+.csvb-module-header-action img,
+.csvb-module-header-action svg {
+  display: block;
+  flex: 0 0 auto;
+}
+
+.csvb-module-header-identity img,
+.csvb-module-header::before {
+  width: 36px !important;
+  height: 36px !important;
+  min-width: 36px !important;
+  max-height: 36px !important;
+  flex: 0 0 auto !important;
+  object-fit: contain;
+}
+
+.csvb-module-header .themeCtl {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.csvb-module-header .themeCtl-label {
+  font-size: 14px;
+  line-height: 1.2;
+}
+
+.csvb-module-header .csvb-module-header-actions .themeCtl-select {
+  width: auto !important;
+  min-width: 0 !important;
+  min-height: 36px !important;
+  padding: 7px 26px 7px 10px !important;
+  border-radius: 8px !important;
+  font-size: 14px !important;
+  line-height: 1.2 !important;
+}
+
+/* Post-Inspection's module polish includes higher-specificity important
+   control rules. Keep the override exact to its opted-in header. */
+html[data-csvb-page="post_inspection.html"] .topbar.csvb-module-header .csvb-module-header-action {
+  min-height: 36px !important;
+  padding: 7px 10px !important;
+  border-radius: 8px !important;
+  font-size: 14px !important;
+  font-weight: 700 !important;
+  line-height: 1.2 !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .topbar.csvb-module-header .csvb-module-header-actions {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  flex-wrap: wrap !important;
+  gap: 6px 8px !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .topbar.csvb-module-header .csvb-module-header-identity {
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+  text-align: left !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .topbar.csvb-module-header::before {
+  width: 36px !important;
+  height: 36px !important;
+  min-width: 36px !important;
+  max-height: 36px !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .topbar.csvb-module-header .themeCtl-select {
+  min-height: 36px !important;
+  padding: 7px 26px 7px 10px !important;
+  font-size: 14px !important;
+  line-height: 1.2 !important;
+}
+
+html[data-csvb-page="post_inspection.html"] .topbar.csvb-module-header .csvb-pi-themeCtl .themeCtl-label {
+  font-size: 14px !important;
+  line-height: 1.2 !important;
+}
+
+html[data-csvb-page="q-sire-questions-viewer.html"] .topbar.csvb-module-header::before {
+  width: 36px !important;
+  height: 36px !important;
+  min-width: 36px !important;
+  max-height: 36px !important;
+}
+
+@media (max-width: 900px) {
+  .csvb-module-header {
+    align-items: flex-start !important;
+    padding: 8px !important;
+  }
+
+  .csvb-module-header-identity {
+    flex: 1 1 100%;
+  }
+
+  .topbar.csvb-module-header:not(:has(.csvb-brand)) > .csvb-module-header-identity {
+    flex: 1 1 calc(100% - 44px) !important;
+    width: auto !important;
+    max-width: calc(100% - 44px) !important;
+  }
+
+  .csvb-module-header .csvb-module-header-actions {
+    width: 100%;
+    margin-left: 0;
+    justify-content: flex-start !important;
+  }
+
+  .csvb-module-header .csvb-module-header-actions .csvb-module-header-action,
+  .csvb-module-header .csvb-module-header-actions .themeCtl-select {
+    min-height: 44px !important;
+  }
+
+  html[data-csvb-page="post_inspection.html"] .topbar.csvb-module-header .csvb-module-header-action,
+  html[data-csvb-page="post_inspection.html"] .topbar.csvb-module-header .themeCtl-select {
+    min-height: 44px !important;
+  }
+
+  html[data-csvb-page="post_inspection.html"] .topbar.csvb-module-header #userBadge {
+    min-height: 44px !important;
+  }
+}
+
+@media (pointer: coarse) {
+  .csvb-module-header .csvb-module-header-actions .csvb-module-header-action,
+  .csvb-module-header .csvb-module-header-actions .themeCtl-select {
+    min-height: 44px !important;
+  }
+
+  html[data-csvb-page="post_inspection.html"] .topbar.csvb-module-header .csvb-module-header-action,
+  html[data-csvb-page="post_inspection.html"] .topbar.csvb-module-header .themeCtl-select {
+    min-height: 44px !important;
+  }
+
+  html[data-csvb-page="post_inspection.html"] .topbar.csvb-module-header #userBadge {
+    min-height: 44px !important;
+  }
+}

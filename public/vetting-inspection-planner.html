@@ -182,19 +182,20 @@
       .planner-vessel-table { min-width: 1100px; }
     }
   </style>
+  <link rel="stylesheet" href="./csvb-module-header.css?v=20261027_1" />
 </head>
 <body>
   <main class="planner-wrap">
-    <header class="planner-topbar">
-      <div>
+    <header class="planner-topbar csvb-module-header">
+      <div class="csvb-module-header-identity">
         <h1 class="planner-title">Vetting Inspection Planner</h1>
         <div class="planner-subtitle">Inspection Libraries &amp; Vetting</div>
       </div>
-      <div class="planner-actions">
-        <span class="planner-badge" id="userBadge">Loading account…</span>
-        <a class="planner-btn" href="./q-dashboard.html">Dashboard</a>
-        <button class="planner-btn" id="refreshPlannerBtn" type="button">Refresh</button>
-        <button class="planner-btn primary" id="logoutBtn" type="button">Logout</button>
+      <div class="planner-actions csvb-module-header-actions">
+        <span class="planner-badge csvb-module-header-meta" id="userBadge">Loading account…</span>
+        <a class="planner-btn csvb-module-header-action" href="./q-dashboard.html">Dashboard</a>
+        <button class="planner-btn csvb-module-header-action" id="refreshPlannerBtn" type="button">Refresh</button>
+        <button class="planner-btn primary csvb-module-header-action" id="logoutBtn" type="button">Logout</button>
       </div>
     </header>
 
