@@ -47,10 +47,10 @@ begin
         where c.code='office_draft_'||md5('csvb:prepared-role:'||k)
           and c.default_access_profile_code='standard_office_view_only'
           and c.proposed_access_profile_code='standard_office_view_only'
-          and not c.is_assignable
+          and c.is_assignable=(to_regprocedure('public.csvb_admin_office_user_options(uuid)') is not null)
       )
     ) then
-    raise exception 'Expected exactly the nine requested unassignable role mappings, including Demo User.';
+    raise exception 'Expected the nine requested mappings and correct manual-assignment readiness, including Demo User.';
   end if;
   if not exists(select 1 from public.csvb_office_role_catalogue
       where code='office_draft_'||md5('csvb:prepared-role:technical_manager')

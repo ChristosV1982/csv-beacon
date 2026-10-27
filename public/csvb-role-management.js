@@ -60,7 +60,7 @@
       '    <div>',
       '      <div class="csvb-role-eyebrow">C.S.V. BEACON <span>/</span> SUPERUSER CONTROLS</div>',
       '      <h1>Role catalogue</h1>',
-      '      <p>Review role identities separately from proposed Access Profiles. Catalogue preparation does not grant access. Demo User is a role, not Demo Mode.</p>',
+      '      <p>Review role identities separately from prepared Access Profiles. Manual Office assignments are made in Users → Edit. Demo User is a role, not Demo Mode.</p>',
       '    </div>',
       '    <div class="csvb-role-intro-actions">',
       '      <button class="csvb-role-button csvb-role-button-secondary" type="button" data-action="refresh">Refresh</button>',
@@ -69,7 +69,7 @@
       '  </header>',
       '  <div class="csvb-role-boundary" role="note">',
       '    <span class="csvb-role-boundary-mark" aria-hidden="true">i</span>',
-      '    <div><strong>Catalogue maintenance only</strong><span>Office roles created here remain nonassignable, even when active. No authorization, permissions, or user assignments are changed.</span></div>',
+      '    <div><strong>Assignment and authorization are separate</strong><span>Approved roles can be assigned manually in Users → Edit. New catalogue entries remain draft until enabled. Prepared profiles do not yet change legacy effective access.</span></div>',
       '  </div>',
       '  <div class="csvb-role-feedback" data-role-feedback role="status" aria-live="polite"></div>',
       '  <section class="csvb-role-section" aria-labelledby="csvbRoleTableHeading">',
@@ -228,7 +228,7 @@
       const labels = {
         delete: ["Delete office role?", "This permanently removes the catalogue record. The action is available only when no users or permission references remain.", "Delete role"],
         deactivate: ["Deactivate office role?", "This changes the catalogue active state only. It does not alter authorization or assigned users.", "Deactivate role"],
-        activate: ["Activate office role?", "An active office role remains nonassignable and receives no permissions through this action.", "Activate role"]
+        activate: ["Activate office role?", "Activation restores catalogue availability. Assignment eligibility is managed separately; activation never grants permissions.", "Activate role"]
       };
       const copy = labels[action];
       dialog.innerHTML = [

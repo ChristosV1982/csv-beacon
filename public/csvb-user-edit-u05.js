@@ -414,6 +414,20 @@
   function openEditModal(profile) {
     closeEditModal();
 
+    if (["company_admin", "company_superintendent"].includes(profile.role)) {
+      if (!window.CSVBOfficeUserAssignment) {
+        throw new Error("Office assignment editor is unavailable. Refresh the administration page.");
+      }
+      return window.CSVBOfficeUserAssignment.open(profile, {
+        sb: sb(),
+        onSaved: async message => {
+          showOkSafe(message);
+          if (typeof refreshUsers === "function") await refreshUsers();
+          addEditButtons();
+        }
+      });
+    }
+
     const isVessel = profile.role === "vessel";
 
     const backdrop = document.createElement("div");
@@ -618,7 +632,7 @@
         try {
           await loadSupportData();
           const profile = await loadProfile(profileId);
-          openEditModal(profile);
+          await openEditModal(profile);
         } catch (error) {
           console.error(error);
           showWarnSafe(String(error?.message || error || "Could not open user editor."));

@@ -10,7 +10,8 @@ begin
   if exists(select 1 from public.csvb_office_access_profiles where is_active) then
     raise exception 'Access profiles were activated before the resolver is ready';
   end if;
-  if exists(select 1 from public.csvb_office_role_catalogue where is_assignable) then
+  if to_regprocedure('public.csvb_admin_office_user_options(uuid)') is null
+    and exists(select 1 from public.csvb_office_role_catalogue where is_assignable) then
     raise exception 'Office role assignment was enabled prematurely';
   end if;
   if exists(select 1 from public.profiles

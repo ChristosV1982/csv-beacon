@@ -20,8 +20,9 @@ begin
   ) x(label,category) loop
     assert (select count(*)=1 from public.csvb_office_role_catalogue
       where display_name=row_value.label and organizational_classification=row_value.category
-        and not is_assignable and proposed_access_profile_code is not null),
-      'Expected one unassignable, classified catalogue entry with a separate Access Profile proposal';
+        and is_assignable=(to_regprocedure('public.csvb_admin_office_user_options(uuid)') is not null)
+        and proposed_access_profile_code is not null),
+      'Expected one classified catalogue entry with separate Access Profile proposal and correct assignment readiness';
   end loop;
   select proposed_permissions into configured from public.csvb_prepared_access_profiles
     where code='demo_view_only' and not default_allow and status='draft';
@@ -43,7 +44,8 @@ begin
     where (r->>'is_protected')::boolean)=5;
   assert exists(select 1 from jsonb_array_elements(configured->'roles') r
     where r->>'display_name'='Demo User' and r->>'classification'='Demo'
-      and r->>'status'='Draft / Not yet assignable');
+      and (r->>'is_assignable')::boolean=
+        (to_regprocedure('public.csvb_admin_office_user_options(uuid)') is not null));
   assert not exists(select 1 from jsonb_array_elements(configured->'roles') r
     where r->>'code'='platform_owner');
 end;

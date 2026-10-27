@@ -1,13 +1,13 @@
 ---
 name: Office role catalogue governance
-description: Preparation-only Office categories must not change live authorization or assignment before a separately approved resolver phase.
+description: Manual Office identity assignment is separate from pending access-profile enforcement; protected security identities remain unchanged.
 ---
 
-Role catalogue work is preparation only. New Office categories remain draft and unassignable until the user separately approves the future Office permission/resolver implementation.
+Office role identity and prepared Access Profile references may now be assigned manually to existing Office accounts by Super Admin. This does not itself activate Access Profile permission enforcement.
 
-**Why:** The user wants to review and prepare categories before rebuilding Office permissions, without changing current effective access.
+**Why:** The user explicitly requested assignment to existing users without recreating Auth accounts. The broader authorization resolver/backend migration is still incomplete.
 
-**How to apply:** Do not activate a new authorization identity, grant rights, or add categories to account-assignment lists merely because their catalogue entry is marked Active.
+**How to apply:** Preserve legacy security roles, Auth identity, company/vessel context and audited manual assignment. Keep an explicit access-enforcement-pending warning and confirmation in the editor; never imply that storing a view-only profile has already restricted effective access. New arbitrary catalogue entries remain unassignable until explicitly enabled.
 
 The current Super Admin, Company Admin, Vessel and Inspector categories are protected system roles. Company Superintendent is a protected legacy operational role under review, not an unused role available for deletion.
 
@@ -21,17 +21,17 @@ Organizational role identity is separate from reusable Access Profiles. Fleet Ma
 
 **How to apply:** Keep classifications separate from profile bindings in future resolver and Rights Matrix work.
 
-Demo User is intended as a normal assignable demonstration/training role, not Demo Mode. Until the resolver safely supports it, retain draft/unassignable status and conservative view-only proposals; do not introduce a demonstration bypass or infer edit/admin rights.
+Demo User is a normal organizational demonstration/training identity, not Demo Mode. Manual identity/profile assignment must not introduce a demonstration bypass or infer edit/admin rights.
 
 **Why:** The user explicitly distinguished Demo User from Demo Mode and required conservative defaults.
 
 **How to apply:** Implement future assignment through ordinary account/permission enforcement, not a mode switch.
 
-Prepared access-profile baselines must remain inactive and new Office-role assignment blocked until the backend's ordinary Office module paths use the same permission decision, including legacy role-only helpers. A front-end-only resolver is not sufficient.
+Prepared access-profile baselines must remain inactive until the backend's ordinary Office module paths use the same permission decision, including legacy role-only helpers. Manual identity/profile storage is permitted with clear legacy-access warnings; a front-end-only resolver is not sufficient for authorization.
 
 **Why:** Legacy Office role shortcuts can grant writes outside the Rights Matrix; mapping a new identity onto an old security role before those checks are aligned would let a view-only profile act with broader privileges.
 
-**How to apply:** Verify both direct-route visibility and backend RPC/write denial for newly assigned Office and Demo profiles before lifting the assignment gate; leave existing unassigned users on their legacy resolver until explicitly reassigned.
+**How to apply:** Verify both direct-route visibility and backend RPC/write denial before activating Office/Demo profile enforcement. Preserve the current legacy resolver for all users until that activation; storing role/profile references alone must not be mistaken for effective-access enforcement.
 
 The approved initial configuration for Marine Superintendent, Marine Superintendent - Port Captain, Technical Superintendent, Technical Superintendent - Port Engineer, HSQE Superintendent, DPA, Technical Manager and General Manager is a shared nine-module view-only profile, not the broader legacy Superintendent baseline.
 
