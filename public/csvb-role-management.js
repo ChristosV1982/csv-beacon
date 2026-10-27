@@ -44,7 +44,7 @@
   }
 
   function canManage(role) {
-    return role.classification === "Office" && !isProtected(role);
+    return ["Office", "Demo"].includes(role.classification) && !isProtected(role);
   }
 
   function init(options) {
@@ -60,7 +60,7 @@
       '    <div>',
       '      <div class="csvb-role-eyebrow">C.S.V. BEACON <span>/</span> SUPERUSER CONTROLS</div>',
       '      <h1>Role catalogue</h1>',
-      '      <p>Review role records and their operational references. This workspace does not grant or change authorization.</p>',
+      '      <p>Review role identities separately from proposed Access Profiles. Catalogue preparation does not grant access. Demo User is a role, not Demo Mode.</p>',
       '    </div>',
       '    <div class="csvb-role-intro-actions">',
       '      <button class="csvb-role-button csvb-role-button-secondary" type="button" data-action="refresh">Refresh</button>',
@@ -118,7 +118,11 @@
       rows.innerHTML = catalogue.map(function (role) {
         const code = escapeHtml(display(role.code, "—"));
         const name = escapeHtml(display(role.display_name, "Unnamed role"));
-        const classification = escapeHtml(display(role.classification, "—"));
+        const classification = escapeHtml(display(role.organizational_classification || role.classification, "—"));
+        const profile = role.proposed_access_profile_label
+          ? '<small class="csvb-role-protection" title="' + escapeHtml(role.profile_notes || "") +
+            '">Proposed access: ' + escapeHtml(role.proposed_access_profile_label) + '</small>'
+          : "";
         const active = role.is_active === true;
         const protectedRole = isProtected(role);
         const editable = canManage(role);
@@ -141,7 +145,7 @@
           "<tr>",
           '<th scope="row" class="csvb-role-name">' + name + "</th>",
           '<td><code class="csvb-role-code">' + code + "</code></td>",
-          '<td><span class="csvb-role-classification">' + classification + "</span></td>",
+          '<td><span class="csvb-role-classification">' + classification + "</span>" + profile + "</td>",
           '<td><span class="csvb-role-state ' + (active ? "is-active" : "is-inactive") + '">' + (active ? "Active" : "Inactive") + "</span></td>",
           '<td class="csvb-role-number">' + formatCount(role.assigned_user_count) + "</td>",
           '<td class="csvb-role-number">' + formatCount(role.permission_reference_count) + "</td>",

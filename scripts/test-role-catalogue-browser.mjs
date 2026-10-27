@@ -4,6 +4,8 @@ import assert from "node:assert/strict";
 import { readFileSync, writeFileSync } from "node:fs";
 import WebSocket from "ws";
 const fixture = JSON.parse(readFileSync(process.argv[2] || "/tmp/role-catalogue-fixture.json", "utf8"));
+const originalCount = fixture.roles.length;
+const draftCode = "office_draft_" + "a".repeat(32);
 const target = await (await fetch("http://127.0.0.1:9333/json/new?about:blank", { method: "PUT" })).json();
 const ws = new WebSocket(target.webSocketDebuggerUrl);
 await new Promise(resolve => ws.once("open", resolve));
@@ -43,6 +45,8 @@ const wait = () => new Promise(resolve => setTimeout(resolve, 160));
 try {
   await call("Page.enable");
   await call("Runtime.enable");
+  await call("Network.enable");
+  await call("Network.setCacheDisabled", {cacheDisabled:true});
   await call("Network.setBypassServiceWorker", {bypass:true});
   await call("Fetch.enable", {patterns:[{urlPattern:"*"}]});
   await call("Emulation.setDeviceMetricsOverride", {width:1440,height:1000,deviceScaleFactor:1,mobile:false});
@@ -77,17 +81,24 @@ try {
     window.CSVB_ROLE_MANAGEMENT.init({sb});
   })()`);
   await wait();
-  assert.equal(await evaluate('document.querySelectorAll("[data-role-rows] tr").length'),5);
-  assert.equal(await evaluate('document.querySelectorAll("[data-role-rows] [data-action]").length'),0);
+  assert.equal(await evaluate('document.querySelectorAll("[data-role-rows] tr").length'),originalCount);
+  assert.equal(await evaluate('Array.from(document.querySelectorAll("[data-role-rows] tr")).slice(0,5).every(r=>!r.querySelector("[data-action]"))'),true);
+  const demo = fixture.roles.find(r=>r.classification==="Demo");
+  if (demo) {
+    console.log("Browser script:",await evaluate('document.querySelector(\'script[src*=\"csvb-role-management.js\"]\')?.getAttribute(\"src\")'));
+    assert.equal(await evaluate(`document.querySelectorAll('[data-role-rows] [data-code="${demo.code}"]').length`),3);
+    assert.match(await evaluate('document.querySelector("[data-role-rows]").textContent'),/Demo \/ Training/);
+    assert.match(await evaluate('document.querySelector("[data-role-rows]").textContent'),/Management \/ Statutory/);
+  }
   assert.equal(await evaluate('window.__mutations.length'),0);
   await evaluate('document.querySelector("[data-action=create]").click()');
   await evaluate('document.querySelector("dialog input").value="QA <Office>";document.querySelector("dialog form").requestSubmit()');
   await wait();
-  assert.equal(await evaluate('document.querySelectorAll("[data-role-rows] tr").length'),6);
+  assert.equal(await evaluate('document.querySelectorAll("[data-role-rows] tr").length'),originalCount+1);
   assert.equal(await evaluate('!!document.querySelector("[data-role-rows] office")'),false);
   assert.match(await evaluate('document.querySelector("[data-role-rows]").textContent'),/QA <Office>/);
   for (const action of ["rename","deactivate","activate"]) {
-    await evaluate(`document.querySelector('[data-role-rows] [data-action="${action}"]').click()`);
+    await evaluate(`document.querySelector('[data-role-rows] [data-action="${action}"][data-code="${draftCode}"]').click()`);
     if (action==="rename") await evaluate('document.querySelector("dialog input").value="Vetting Coordinator — Draft"');
     await evaluate('document.querySelector("dialog form").requestSubmit()');
     await wait();
@@ -100,9 +111,9 @@ try {
   assert.equal(await evaluate('document.documentElement.scrollWidth <= innerWidth'),true);
   const tablet=await call("Page.captureScreenshot",{format:"png"});
   writeFileSync("/tmp/csvb-role-catalogue-tablet.png",Buffer.from(tablet.data,"base64"));
-  await evaluate('document.querySelector("[data-role-rows] [data-action=delete]").click();document.querySelector("dialog form").requestSubmit()');
+  await evaluate(`document.querySelector('[data-role-rows] [data-action=delete][data-code="${draftCode}"]').click();document.querySelector("dialog form").requestSubmit()`);
   await wait();
-  assert.equal(await evaluate('document.querySelectorAll("[data-role-rows] tr").length'),5);
+  assert.equal(await evaluate('document.querySelectorAll("[data-role-rows] tr").length'),originalCount);
   assert.deepEqual(await evaluate('window.__mutations.map(x=>x.p_action)'),["create","rename","deactivate","activate","delete"]);
   assert.equal(await evaluate('document.querySelectorAll("[data-role-audit] .csvb-role-audit-item").length') > 0 ||
     await evaluate('document.querySelector("[data-role-audit]").textContent.includes("superuser")'),true);

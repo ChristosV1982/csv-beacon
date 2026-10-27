@@ -14,3 +14,15 @@ The current Super Admin, Company Admin, Vessel and Inspector categories are prot
 **Why:** Existing users and backend checks depend on the current role identities.
 
 **How to apply:** Preserve stable codes and existing behavior until an explicitly approved migration replaces those dependencies.
+
+Organizational role identity is separate from reusable Access Profiles. Fleet Manager, DPA, General Manager and Technical Director must not be classified as Superintendent roles merely because permissions may be shared. Marine Coordinator remains a distinct Company Administration category.
+
+**Why:** The user explicitly requires organizational identity to survive shared initial permissions.
+
+**How to apply:** Keep classifications separate from profile bindings in future resolver and Rights Matrix work.
+
+Demo User is intended as a normal assignable demonstration/training role, not Demo Mode. Until the resolver safely supports it, retain draft/unassignable status and conservative view-only proposals; do not introduce a demonstration bypass or infer edit/admin rights.
+
+**Why:** The user explicitly distinguished Demo User from Demo Mode and required conservative defaults.
+
+**How to apply:** Implement future assignment through ordinary account/permission enforcement, not a mode switch.
