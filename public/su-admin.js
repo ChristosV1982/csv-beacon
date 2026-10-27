@@ -431,6 +431,8 @@ function initTabs() {
       btn.classList.add("active");
 
       const t = btn.getAttribute("data-tab");
+      const roleManagementTab = document.getElementById("tab-role-management");
+      if (roleManagementTab) roleManagementTab.style.display = t === "role-management" ? "" : "none";
       const companiesTab = document.getElementById("tab-companies");
       if (companiesTab) companiesTab.style.display = t === "companies" ? "" : "none";
       document.getElementById("tab-users").style.display = t === "users" ? "" : "none";
@@ -1474,6 +1476,7 @@ async function init() {
   });
   if (!me) return;
   currentAdminUser = me;
+  window.CSVB_ROLE_MANAGEMENT?.init({ sb });
   state.canDeleteUsers = (me.profile?.role || me.role) === "super_admin";
   const actorId = me.profile?.id || me.session?.user?.id || me.user?.id || me.id || null;
   window.SU_USER_CLEANUP?.init({
