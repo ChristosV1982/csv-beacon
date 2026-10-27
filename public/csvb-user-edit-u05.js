@@ -222,6 +222,10 @@
   }
 
   async function createUserU05() {
+    if (!isOnboardCreateMode()) {
+      if (!window.CSVBOfficeUserCreate) throw new Error("Office creation is unavailable. Refresh Administration.");
+      return window.CSVBOfficeUserCreate.create();
+    }
     const username = ($("cu_username")?.value || "").trim();
     const password = $("cu_password")?.value || "";
     const force = $("cu_force_reset")?.checked === true;
@@ -281,31 +285,6 @@
       await updateNamesAfterCreate(profileId);
 
       showOkSafe("Onboard personnel created.");
-    } else {
-      const role = $("cu_role")?.value || "";
-      if (!role) throw new Error("Role is required.");
-
-      const resp = await callSuAdmin({
-        action: "create_user",
-        username,
-        password,
-        role,
-        position: ($("cu_position")?.value || $("cu_position_pick")?.value || "").trim() || null,
-        company_id: $("cu_company")?.value || null,
-        vessel_id: $("cu_vessel")?.value || null,
-        force_password_reset: force
-      });
-
-      let profileId = typeof extractCreatedUserId === "function" ? extractCreatedUserId(resp) : null;
-
-      if (!profileId) {
-        const profile = await findProfileByUsernameOrDanaos(username);
-        profileId = profile?.id || null;
-      }
-
-      if (profileId) await updateNamesAfterCreate(profileId);
-
-      showOkSafe("User created.");
     }
 
     if ($("cu_username")) $("cu_username").value = "";

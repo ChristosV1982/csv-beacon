@@ -234,32 +234,8 @@
   }
 
   async function createOfficeUserPassthrough() {
-    if (typeof callSuAdmin !== "function") {
-      throw new Error("Superuser Edge Function call helper is not available.");
-    }
-
-    const username = ($("cu_username")?.value || "").trim();
-    const password = $("cu_password")?.value || "";
-    const role = $("cu_role")?.value || "";
-    const position = ($("cu_position")?.value || $("cu_position_pick")?.value || "").trim() || null;
-
-    if (!username) throw new Error("Username is required.");
-    if (!password) throw new Error("Password is required.");
-    if (!role) throw new Error("Role is required.");
-
-    await callSuAdmin({
-      action: "create_user",
-      username,
-      password,
-      role,
-      position,
-      company_id: $("cu_company")?.value || null,
-      vessel_id: $("cu_vessel")?.value || null,
-      force_password_reset: $("cu_force_reset")?.checked === true
-    });
-
-    showOkSafe("User created.");
-    await refreshUsersSafe();
+    if (!window.CSVBOfficeUserCreate) throw new Error("Office creation is unavailable. Refresh Administration.");
+    return window.CSVBOfficeUserCreate.create();
   }
 
   function takeOverCreateButton() {

@@ -44,3 +44,11 @@ Demo User also shares this same approved nine-module view-only profile, while re
 **Why:** The user explicitly extended the prepared profile to Demo User, denying Edit, Export, Admin, destructive/configuration rights and unlisted modules by default.
 
 **How to apply:** Do not restore the narrower original Demo mapping when operationalizing assignment. Keep the shared profile inactive until the same backend enforcement checks required for Office users pass.
+
+## New-account safety while enforcement is pending
+
+New Office accounts assigned a View-only profile must not become active through a broader legacy security class while that profile is unenforced. Keep login locked until enforcement is ready. Existing accounts retain their separately agreed legacy fallback.
+
+**Why:** A prepared role/profile label is not authorization. Activating a new Demo or View-only Office account through Superintendent permissions would contradict the agreed restrictions.
+
+**How to apply:** Show the inactive/prepared outcome before creation and require confirmation. Future activation must address both profile status and the Auth login lock only after permission enforcement is complete.

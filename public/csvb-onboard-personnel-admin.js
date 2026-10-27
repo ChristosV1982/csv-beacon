@@ -659,38 +659,8 @@
   }
 
   async function createOfficeOrPlatformUser() {
-    const username = ($("cu_username")?.value || "").trim();
-    const password = $("cu_password")?.value || "";
-    const role = $("cu_role")?.value || "";
-    const company = $("cu_company")?.value || null;
-    const vessel = $("cu_vessel")?.value || null;
-    const position = ($("cu_position")?.value || $("cu_position_pick")?.value || "").trim() || null;
-    const force = $("cu_force_reset")?.checked === true;
-
-    if (!username) throw new Error("Username is required.");
-    if (!password) throw new Error("Password is required.");
-    if (!role) throw new Error("Role is required.");
-
-    const payload = {
-      action: "create_user",
-      username,
-      password,
-      role,
-      position,
-      company_id: company,
-      vessel_id: vessel,
-      force_password_reset: force
-    };
-
-    if (typeof callSuAdmin !== "function") {
-      throw new Error("Superuser create-user function is not available on this page.");
-    }
-
-    await callSuAdmin(payload);
-
-    showOkSafe("User created.");
-    await safeRefreshUsers();
-    clearCreateFormAfterSuccess();
+    if (!window.CSVBOfficeUserCreate) throw new Error("Office creation is unavailable. Refresh Administration.");
+    return window.CSVBOfficeUserCreate.create();
   }
 
   async function createOnboardPersonnel() {

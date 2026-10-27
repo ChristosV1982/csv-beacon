@@ -317,7 +317,8 @@ async function callSuAdmin(body) {
     "get_user_deletion_job",
     "delete_user",
   ].includes(body?.action)
-    ? "su-admin-delete-user" : "su-admin";
+    ? "su-admin-delete-user" : body?.action === "create_office_user"
+      ? "su-admin-create-office-user" : "su-admin";
   const url = `${window.AUTH.SUPABASE_URL}/functions/v1/${endpoint}`;
 
   const safeBody = dbgRedact(body);
@@ -1155,6 +1156,10 @@ function initCreateUser() {
     clearOk();
 
     try {
+      if (document.getElementById("cu_creation_mode")?.value !== "onboard") {
+        if (!window.CSVBOfficeUserCreate) throw new Error("Office creation is unavailable. Refresh Administration.");
+        return await window.CSVBOfficeUserCreate.create();
+      }
       if (typeof ensureCompaniesLoaded === "function") {
         await ensureCompaniesLoaded();
       }
