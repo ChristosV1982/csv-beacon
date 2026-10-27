@@ -310,7 +310,13 @@ async function getAccessToken() {
 
 async function callSuAdmin(body) {
   const token = await getAccessToken();
-  const endpoint = ["prepare_user_deletion", "delete_user"].includes(body?.action)
+  const endpoint = [
+    "prepare_user_deletion",
+    "prepare_user_deletions",
+    "confirm_user_deletions",
+    "get_user_deletion_job",
+    "delete_user",
+  ].includes(body?.action)
     ? "su-admin-delete-user" : "su-admin";
   const url = `${window.AUTH.SUPABASE_URL}/functions/v1/${endpoint}`;
 
@@ -335,17 +341,19 @@ async function callSuAdmin(body) {
     throw new Error(`HTTP ${res.status} ${res.statusText}\n\n${text || "(empty response body)"}`);
   }
 
-  // parse JSON when possible
+  // Preserve per-user HTTP 200 results so a cleanup job can record the failure
+  // and continue to the next selected account.
+  let data;
   try {
-    const data = JSON.parse(text || "{}");
-    if (data?.error) {
-      dbgLog(`ERR ${safeBody?.action || "unknown"}\n${typeof data.error === "string" ? data.error : JSON.stringify(data.error)}`);
-      throw new Error(typeof data.error === "string" ? data.error : JSON.stringify(data.error));
-    }
-    return data;
+    data = JSON.parse(text || "{}");
   } catch {
     return { raw: text };
   }
+  if (data?.error && !["failed", "busy"].includes(String(data?.status || ""))) {
+    dbgLog(`ERR ${safeBody?.action || "unknown"}\n${typeof data.error === "string" ? data.error : JSON.stringify(data.error)}`);
+    throw new Error(typeof data.error === "string" ? data.error : JSON.stringify(data.error));
+  }
+  return data;
 }
 
 /* ======================== State ======================== */
@@ -373,6 +381,7 @@ const state = {
     grants: [],
   },
 };
+let currentAdminUser = null;
 
 
 /* ======================== MC-3B5B Repair: Vessel Company Dropdown ======================== */
@@ -710,8 +719,10 @@ function renderUsers() {
     return true;
   });
 
+  window.SU_USER_CLEANUP?.setVisibleUsers(filtered);
+
   if (!filtered.length) {
-    tbody.innerHTML = '<tr><td colspan="8" class="muted small">No users match the selected filters.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" class="muted small">No users match the selected filters.</td></tr>';
     return;
   }
 
@@ -763,6 +774,7 @@ function renderUsers() {
         '<td>' + statusPill + '</td>' +
         '<td>' + forceReset + '</td>' +
         '<td><div class="actions">' + actionBtns.join("") + '</div></td>' +
+        (window.SU_USER_CLEANUP?.rowCheckbox(u) || '<td class="su-user-cleanup-select-cell"><input type="checkbox" disabled aria-label="Vessel user selection unavailable"></td>') +
       '</tr>'
     );
   }
@@ -785,26 +797,8 @@ function renderUsers() {
           if (btn.disabled) return;
           btn.disabled = true;
           try {
-            const prepared = await callSuAdmin({ action: "prepare_user_deletion", user_id: id });
-            if (!prepared?.ok || prepared.user?.id !== id || !prepared.confirmation_token) {
-              throw new Error("Could not verify the selected account. No user was deleted.");
-            }
-            const user = prepared.user;
-            const label = `Username: ${user.username}\nRole: ${user.role}\nVessel: ${user.vessel_name || "None"}`;
-            if (!confirm(`Permanently delete ONLY this user account?\n\n${label}\n\nVessel records will NOT be deleted. Accounts with linked audit/business history are protected. This cannot be undone.`)) return;
-            const typed = prompt(`Confirm deletion of:\n${label}\n\nType the exact username to delete this account:`);
-            if (typed === null) return;
-            if (typed !== user.username) throw new Error("Username did not match. No account was deleted.");
-            const result = await callSuAdmin({ action: "delete_user", user_id: id,
-              confirmation_token: prepared.confirmation_token, confirm_username: typed });
-            if (!result?.ok || result.deleted_user_id !== id) throw new Error("Deletion result could not be verified. Reload the user list.");
-            showOk("Selected user account deleted. Vessel records were not changed.");
-            try {
-              await refreshUsers();
-            } catch (reloadError) {
-              showWarn("The user account was deleted, but the list could not be reloaded. Reload this page. " +
-                String(reloadError?.message || reloadError));
-            }
+            if (!window.SU_USER_CLEANUP?.deleteOne) throw new Error("Vessel-account cleanup is unavailable. Reload this page.");
+            await window.SU_USER_CLEANUP.deleteOne(id);
           } finally {
             if (btn.isConnected) btn.disabled = false;
           }
@@ -1545,7 +1539,16 @@ async function init() {
     unauthorizedRedirect: "./q-dashboard.html",
   });
   if (!me) return;
+  currentAdminUser = me;
   state.canDeleteUsers = (me.profile?.role || me.role) === "super_admin";
+  const actorId = me.profile?.id || me.session?.user?.id || me.user?.id || me.id || null;
+  window.SU_USER_CLEANUP?.init({
+    callApi: callSuAdmin,
+    refreshUsers,
+    getCurrentUser: () => currentAdminUser,
+    canDelete: () => state.canDeleteUsers,
+    actorId,
+  });
 
   const badge = document.getElementById("userBadge");
   if (badge) badge.textContent = `Logged in`;

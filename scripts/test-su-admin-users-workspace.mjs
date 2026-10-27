@@ -6,7 +6,8 @@ const base="http://127.0.0.1:3000";
 const tab=await(await fetch("http://127.0.0.1:9222/json/new?about:blank",{method:"PUT"})).json();
 const ws=new WebSocket(tab.webSocketDebuggerUrl);
 await new Promise(r=>ws.once("open",r));
-let seq=0;const pending=new Map(),writes=[],errors=[];
+let seq=0;const pending=new Map(),writes=[],errors=[],cleanupCalls=[],jobs=new Map();
+let nextJob=0,failOnce=true;
 function call(method,params={}){return new Promise((resolve,reject)=>{
   const id=++seq;pending.set(id,{resolve,reject});
   ws.send(JSON.stringify({id,method,params}));
@@ -49,18 +50,35 @@ ws.on("message",async raw=>{
   if(url.pathname.endsWith("/auth.js"))body=`(${fixture.toString()})();`;
   else if(url.hostname==="ui-fixture.supabase.co"){
     type="application/json";const posted=JSON.parse(request.postData||"{}"),action=posted.action;
-    if(action==="prepare_user_deletion"){
+    if(action==="prepare_user_deletion"||action==="prepare_user_deletions"){
       assert(url.pathname.endsWith("/su-admin-delete-user"));
-      body=JSON.stringify({ok:true,user:{id:posted.user_id,username:"example.user.01",
-        role:"company_admin",vessel_name:null},confirmation_token:"fixture-confirmation-only"});
+      const ids=posted.user_ids||[posted.user_id];
+      const users=await evaluate(`window.fixtureUsers.filter(u=>${JSON.stringify(ids)}.includes(u.id))`);
+      const job={id:`55555555-5555-4555-8555-${String(++nextJob).padStart(12,"0")}`,
+        confirmed_at:null,items:users.map(identity=>({user_id:identity.id,identity,status:"pending"}))};
+      jobs.set(job.id,job);
+      body=JSON.stringify({ok:true,job_id:job.id,users,confirmation_token:"fixture-confirmation-only"});
+    }else if(action==="confirm_user_deletions"){
+      assert.equal(posted.confirmation_token,"fixture-confirmation-only");
+      jobs.get(posted.job_id).confirmed_at="fixture";
+      body=JSON.stringify({ok:true});
+    }else if(action==="get_user_deletion_job"){
+      body=JSON.stringify({ok:true,job:jobs.get(posted.job_id),confirmation_token:"fixture-confirmation-only"});
     }else if(action==="delete_user"){
       assert(url.pathname.endsWith("/su-admin-delete-user"));
-      assert.equal(posted.user_id,"44444444-4444-4444-8444-000000000000");
-      assert.equal(posted.confirmation_token,"fixture-confirmation-only");
-      assert.equal(posted.confirm_username,"example.user.01");
-      writes.push("mocked_selected_user_delete");
-      await evaluate(`window.fixtureUsers=window.fixtureUsers.filter(u=>u.id!==${JSON.stringify(posted.user_id)})`);
-      body=JSON.stringify({ok:true,deleted_user_id:posted.user_id});
+      assert(!("confirm_username" in posted));
+      const job=jobs.get(posted.job_id),item=job.items.find(i=>i.user_id===posted.user_id);
+      assert(job.confirmed_at&&item,"Only confirmed selected users");
+      cleanupCalls.push(posted.user_id);
+      if(failOnce&&item.identity.username==="example.user.02"){
+        failOnce=false;item.status="failed";item.error_text="Simulated linked record";
+        body=JSON.stringify({ok:true,status:"failed",error:item.error_text});
+      }else{
+        assert.equal(item.status==="completed",false,"Completed users must be skipped");
+        item.status="completed";writes.push("mocked_selected_user_delete");
+        await evaluate(`window.fixtureUsers=window.fixtureUsers.filter(u=>u.id!==${JSON.stringify(posted.user_id)})`);
+        body=JSON.stringify({ok:true,status:"completed",user_id:posted.user_id});
+      }
     }else{
       if(action&&!["ping","list_users","list_vessels","list_modules_permissions","list_roles_positions","get_role_permissions"].includes(action))writes.push(action);
       body=JSON.stringify({ok:true,roles:["super_admin","company_admin","company_superintendent","vessel","inspector"],positions:[],modules:[],permissions:[],grants:[]});
@@ -119,18 +137,37 @@ try{
   await fs.writeFile("/tmp/csvb-users-workspace-desktop.png",Buffer.from(image.data,"base64"));
   // Confirm/cancel only through mocked endpoints; no live account deletion.
   assert.equal(await evaluate("document.querySelectorAll('#usersBody [data-act=delete_user]').length"),12);
-  await evaluate("window.deleteConfirmation='';window.confirm=text=>{window.deleteConfirmation=text;return false};document.querySelector('#usersBody [data-act=delete_user]').click()");
-  await waitFor("window.deleteConfirmation && !document.querySelector('#usersBody [data-act=delete_user]').disabled");
-  assert(await evaluate("deleteConfirmation.includes('Username: example.user.01') && deleteConfirmation.includes('Role: company_admin') && deleteConfirmation.includes('Vessel: None')"));
+  await evaluate("document.querySelector('#usersBody [data-act=delete_user]').click()");
+  await waitFor("!document.getElementById('suCleanupDialog').hidden");
+  assert(await evaluate("document.getElementById('suCleanupUserList').textContent.includes('example.user.01')"));
+  await evaluate("document.getElementById('suCleanupCancel').click()");
   assert.deepEqual(writes,[]);
-  await evaluate("window.confirm=()=>true;window.prompt=()=> 'wrong username';document.querySelector('#usersBody [data-act=delete_user]').click()");
-  await waitFor("document.getElementById('warnBox').textContent.includes('Username did not match')");
-  assert.deepEqual(writes,[]);
-  await evaluate("window.prompt=()=> 'example.user.01';document.querySelector('#usersBody [data-act=delete_user]').click()");
-  await waitFor("document.querySelectorAll('#usersBody > tr').length===11");
-  assert.deepEqual(writes,["mocked_selected_user_delete"]);
+  assert.equal(await evaluate("document.querySelectorAll('#usersBody input[data-su-cleanup-id]:not(:disabled)').length"),8);
+  assert(await evaluate("[...document.querySelectorAll('#usersBody tr')].every(r=>r.children[1].textContent.includes('example.user'))"),"Original cell indices preserved");
+  await evaluate("document.getElementById('suCleanupSelectVisible').click();document.getElementById('u_search').value='example.user.02';document.getElementById('u_search').dispatchEvent(new Event('input'))");
+  await waitFor("document.getElementById('suCleanupSelectionCount').textContent==='1 selected'");
+  await evaluate("document.getElementById('suCleanupClearSelection').click();document.getElementById('u_search').value='';document.getElementById('u_search').dispatchEvent(new Event('input'))");
+  await waitFor("document.querySelectorAll('#usersBody > tr').length===12");
+  await evaluate("[...document.querySelectorAll('#usersBody input[data-su-cleanup-id]:not(:disabled)')].slice(0,2).forEach(c=>c.click());document.getElementById('suCleanupDeleteSelected').click()");
+  await waitFor("!document.getElementById('suCleanupDialog').hidden");
+  assert.equal(await evaluate("document.querySelectorAll('#suCleanupUserList li').length"),2);
+  await fs.writeFile("/tmp/csvb-user-cleanup-review.png",Buffer.from((await call("Page.captureScreenshot",{format:"png"})).data,"base64"));
+  await evaluate("document.getElementById('suCleanupConfirm').click()");
+  await waitFor("document.querySelectorAll('#usersBody > tr').length===11&&!document.getElementById('suCleanupClose').disabled");
+  assert.equal(cleanupCalls.length,2);
+  assert.equal(writes.length,1,"Ordinary failure continued without an automatic retry");
+  await evaluate("document.getElementById('suCleanupClose').click();document.getElementById('suCleanupResume').click()");
+  await waitFor("document.getElementById('suCleanupConfirm').textContent==='Resume cleanup'");
+  await evaluate("document.getElementById('suCleanupConfirm').click()");
+  await waitFor("document.querySelectorAll('#usersBody > tr').length===10&&!document.getElementById('suCleanupClose').disabled");
+  assert.equal(cleanupCalls.length,3,"Resume skips the already completed row");
+  assert.equal(writes.length,2);
+  assert.equal(await evaluate("fixtureUsers.filter(u=>u.role==='company_admin').length"),4);
+  await evaluate("document.getElementById('suCleanupClose').click()");
   await evaluate("state.canDeleteUsers=false;renderUsers()");
   assert.equal(await evaluate("document.querySelectorAll('#usersBody [data-act=delete_user]').length"),0);
+  assert(await evaluate("document.getElementById('suUserCleanupToolbar').hidden"));
+  assert(await evaluate("[...document.querySelectorAll('.su-user-cleanup-select-cell')].every(cell=>cell.hidden)"));
   assert.deepEqual(errors,[]);
-  console.log("PASS: Users workspace regression and selected-user delete UI: cancel, identity confirmation, wrong username, exact selected-user mock deletion, refresh, role-hidden controls. Zero LIVE account writes; zero browser exceptions.");
+  console.log("PASS Users workspace: forms/other tabs/mobile, vessel-only selection, filter pruning, confirmation/cancel, continued failure, explicit resume skipping successes, original cell indices and Office accounts preserved. Zero live UI writes/browser exceptions.");
 }finally{await fetch(`http://127.0.0.1:9222/json/close/${tab.id}`);ws.close();}

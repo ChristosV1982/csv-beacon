@@ -3,11 +3,11 @@ name: Vessel and account governance
 description: Agreed vessel lifecycle boundaries, administrative reason privacy and staged account governance.
 ---
 
-User-account deletion must never delete vessel records. Delete only one explicitly selected account after confirmation showing username, role and vessel; never remove accounts automatically while implementing/testing controls.
+User-account deletion must never delete vessel records. Delete only explicitly selected accounts after confirmation showing usernames, roles, vessels and count. Bulk cleanup is vessel-role only; exclude Office/platform accounts and the signed-in administrator.
 
-**Why:** The user explicitly required account-only deletion and preservation of every vessel.
+**Why:** The user approved practical bulk vessel-account cleanup while preserving every vessel, Office account and business record.
 
-**How to apply:** Keep deletion within the Super Admin account-management boundary. Protect linked business/audit history rather than silently cascading, and use mocked deletion tests instead of removing real users.
+**How to apply:** Archive minimal identity and exact onboard-access history before Auth deletion. Only recipient-owned thread notifications are disposable; preserve messages and business actor UUIDs. Keep resumable results. Use dedicated temporary development-test accounts, not automatically selected legacy users, for destructive verification.
 
 Vessel lifecycle has only Active / Inactive. Commercial reasons and internal remarks belong only in restricted administration, never normal vessel selectors or vessel-facing modules.
 

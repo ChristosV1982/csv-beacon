@@ -173,7 +173,7 @@
   <link rel="stylesheet" href="./csvb-mobile-fixes-20260528-2.css?v=20260528_2" />
   <link rel="stylesheet" href="./csvb-module-header.css?v=20261027_rollout_2" />
   <link id="csvb-vessel-lifecycle-admin-style" rel="stylesheet" href="./csvb-vessel-lifecycle-admin.css?v=20261028_lifecycle_1" />
-  <link rel="stylesheet" href="./su-admin-users-workspace.css?v=20261029_users_workspace_2" />
+  <link rel="stylesheet" href="./su-admin-users-workspace.css?v=20261029_vessel_cleanup_3" />
 </head>
 
 <body class="csvb-su-admin-density-page">
@@ -588,6 +588,18 @@
             <span class="users-results-kicker">ACCOUNT DIRECTORY</span>
             <span id="usersResultCount" class="muted small" aria-live="polite">Loading accounts…</span>
           </div>
+          <div class="su-user-cleanup-toolbar" id="suUserCleanupToolbar" aria-label="Vessel account cleanup" hidden>
+            <div class="su-user-cleanup-selection-meta">
+              <span class="su-user-cleanup-label">VESSEL ACCOUNT CLEANUP</span>
+              <span id="suCleanupSelectionCount" class="muted small" aria-live="polite">0 selected</span>
+            </div>
+            <div class="su-user-cleanup-toolbar-actions">
+              <button class="btn2 btnSmall" type="button" id="suCleanupSelectVisible" title="Select visible vessel accounts only">Select all visible</button>
+              <button class="btn2 btnSmall" type="button" id="suCleanupClearSelection">Clear selection</button>
+              <button class="btnDanger btnSmall" type="button" id="suCleanupDeleteSelected" disabled>Delete selected users</button>
+              <button class="btn2 btnSmall" type="button" id="suCleanupResume" hidden>Resume cleanup</button>
+            </div>
+          </div>
           <div class="users-table-scroll" role="region" aria-label="User accounts" tabindex="0">
             <table>
               <thead>
@@ -600,10 +612,11 @@
                   <th>Status</th>
                   <th>Force reset</th>
                   <th>Actions</th>
+                  <th class="su-user-cleanup-select-heading" hidden>Select</th>
                 </tr>
               </thead>
               <tbody id="usersBody">
-                <tr><td colspan="8" class="muted small">Loading…</td></tr>
+                <tr><td colspan="9" class="muted small">Loading…</td></tr>
               </tbody>
             </table>
           </div>
@@ -626,6 +639,32 @@
           </header>
           <div id="usersModalFeedback" class="users-modal-feedback" aria-live="polite" role="status" hidden></div>
           <div id="usersCreateFormSlot" class="users-create-form-slot"></div>
+        </section>
+      </div>
+
+      <div class="su-cleanup-backdrop" id="suCleanupDialog" hidden>
+        <section class="su-cleanup-dialog" role="dialog" aria-modal="true" aria-labelledby="suCleanupTitle" tabindex="-1">
+          <header class="su-cleanup-dialog-header">
+            <div>
+              <div class="su-cleanup-eyebrow">ACCOUNT CLEANUP · VESSEL ACCESS ONLY</div>
+              <h2 id="suCleanupTitle">Review vessel accounts</h2>
+              <p id="suCleanupIntro">Only selected user accounts are in scope. Vessel and fleet records will not be changed.</p>
+            </div>
+            <button class="users-dialog-close" id="suCleanupClose" type="button">Close</button>
+          </header>
+          <div class="su-cleanup-summary" id="suCleanupSummary"></div>
+          <div class="su-cleanup-list-wrap">
+            <ul class="su-cleanup-list" id="suCleanupUserList"></ul>
+          </div>
+          <div class="su-cleanup-progress" id="suCleanupProgress" aria-live="polite"></div>
+          <ol class="su-cleanup-results" id="suCleanupResults" aria-live="polite"></ol>
+          <footer class="su-cleanup-footer">
+            <span class="muted small">This permanently removes user accounts. It does not delete vessel or fleet data.</span>
+            <div class="su-cleanup-footer-actions">
+              <button class="btn2" id="suCleanupCancel" type="button">Cancel</button>
+              <button class="btnDanger" id="suCleanupConfirm" type="button">Confirm deletion</button>
+            </div>
+          </footer>
         </section>
       </div>
     </div>
@@ -810,7 +849,8 @@
   </div>
 
   <script src="./csvb-vessel-lifecycle-admin.js?v=20261028_lifecycle_1"></script>
-  <script src="./su-admin.js?v=20261028_su_delete_user_2"></script>
+  <script src="./su-admin-user-cleanup.js?v=20261029_vessel_cleanup_3"></script>
+  <script src="./su-admin.js?v=20261029_vessel_cleanup_3"></script>
   <script src="./csvb-question-admin.js?v=20260430_1"></script>
   <script src="./csvb-question-overrides-admin.js?v=20260430_1"></script>
   <script src="./csvb-thread-admin-controls.js?v=20260505_1"></script>
