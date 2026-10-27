@@ -11,3 +11,4 @@
 - [Module header standard](module-header-standard.md) — opt-in ribbon styling only; preserve page controls and check legacy polish specificity at desktop/mobile widths.
 - [Mooring task context](mai-task-context.md) — task entry preserves existing workflows; vessel context is a validated hint, and empty selections must survive refresh.
 - [Vessel/account governance](vessel-account-governance.md) — Active/Inactive, restricted reasons, staged account changes and the approved vessel-rank module allowlist.
+- [Rights Matrix inheritance](rights-matrix-inheritance.md) — resetting a rank or position restores live role-default inheritance, never a frozen copy or implicit grant.

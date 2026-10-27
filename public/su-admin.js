@@ -1427,102 +1427,36 @@ function rmRenderTable() {
 }
 
 async function rmLoadMeta() {
-  rmSetStatus("Loading meta…");
-
-  const mp = await callSuAdmin({ action: "list_modules_permissions" });
-  state.rm.modules = mp.modules || [];
-  state.rm.permissions = mp.permissions || [];
-
-  const rp = await callSuAdmin({ action: "list_roles_positions" });
-  state.rm.roles = rp.roles || [];
-  state.rm.positions = rp.positions || [];
-
-  // Sync create-user role dropdown with DB roles when provided
-  if (state.rm.roles?.length) {
-    state.roles = state.rm.roles.slice();
-    renderRoleDropdown();
-  }
-
-  rmBuildRoleOptions();
-  rmBuildPositionOptions();
-
-  state.rm.loadedMeta = true;
-  rmSetStatus("Ready");
+  state.rm.loadedMeta = await rightsWorkspace().load() === true;
 }
 
 async function rmLoadGrants() {
-  const roleSel = document.getElementById("rmRole");
-  const posSel = document.getElementById("rmPosition");
-  if (!roleSel || !posSel) return;
-
-  const role = roleSel.value;
-  const position = posSel.value ? posSel.value : null;
-
-  rmSetStatus("Loading grants…");
-  const res = await callSuAdmin({ action: "get_role_permissions", role, position });
-  state.rm.grants = res.grants || [];
-
-  rmRenderTable();
-  rmSetStatus("Ready");
+  return rightsWorkspace().reload();
 }
 
 async function rmSaveGrants() {
-  const roleSel = document.getElementById("rmRole");
-  const posSel = document.getElementById("rmPosition");
-  const tbody = document.getElementById("rmTbody");
-  if (!roleSel || !posSel || !tbody) return;
-
-  const role = roleSel.value;
-  const position = posSel.value ? posSel.value : null;
-
-  const selects = tbody.querySelectorAll("select[data-permission-id]");
-  const grants = [];
-
-  selects.forEach((sel) => {
-    const permission_id = sel.dataset.permissionId;
-    const scope = sel.value;
-
-    if (!permission_id) return;
-
-    if (!scope) {
-      grants.push({ permission_id, scope: "global", is_granted: false });
-    } else {
-      grants.push({ permission_id, scope, is_granted: true });
-    }
-  });
-
-  rmSetStatus("Saving with audit trail…");
-
-  const { data, error } = await sb.rpc("csvb_set_role_permissions_audited", {
-    p_role: role,
-    p_position: position,
-    p_grants: grants
-  });
-
-  if (error) throw error;
-
-  const saved = data || {};
-  rmSetStatus(`Saved with audit trail (${saved.updated ?? 0} updated, ${saved.inserted ?? 0} inserted)`);
-  await rmLoadGrants();
+  return rightsWorkspace().save();
 }
 
-function initRightsMatrixHandlers() {
-  const reloadBtn = document.getElementById("rmReload");
-  const saveBtn = document.getElementById("rmSave");
-  const roleSel = document.getElementById("rmRole");
-  const posSel = document.getElementById("rmPosition");
-
-  if (reloadBtn) reloadBtn.addEventListener("click", rmLoadGrants);
-  if (saveBtn) saveBtn.addEventListener("click", rmSaveGrants);
-
-  if (roleSel) roleSel.addEventListener("change", rmLoadGrants);
-  if (posSel) posSel.addEventListener("change", rmLoadGrants);
+let rightsWorkspaceInstance;
+function rightsWorkspace() {
+  if (!rightsWorkspaceInstance) {
+    rightsWorkspaceInstance = window.CSVBRightsWorkspace.create({
+      getClient: () => sb,
+      callAdmin: callSuAdmin,
+      onRoles: (roles) => {
+        if (roles.length) { state.roles = roles.slice(); renderRoleDropdown(); }
+      }
+    });
+  }
+  return rightsWorkspaceInstance;
 }
+
+function initRightsMatrixHandlers() { rightsWorkspace().bind(); }
 
 async function ensureRightsMatrixLoaded() {
   if (!state.rm.loadedMeta) {
     await rmLoadMeta();
-    await rmLoadGrants();
   }
 }
 
