@@ -1,0 +1,163 @@
+.csvb-vl-list-controls { display:flex; flex-wrap:wrap; align-items:center; gap:8px; max-width:100%; min-width:0; }
+.csvb-vl-list-controls #v_status_filter { width:auto; min-width:100px; }
+.csvb-vl-list-controls #v_search { flex:1 1 180px; width:auto; min-width:0 !important; max-width:100%; }
+.csvb-vl-dialog {
+  width: min(620px, calc(100% - 28px));
+  max-width: 620px;
+  max-height: min(86dvh, 820px);
+  padding: 0;
+  overflow: hidden;
+  color: #14223a;
+  background: #f8fbff;
+  border: 1px solid #c9d9f3;
+  border-radius: 16px;
+  box-shadow: 0 22px 70px rgba(9, 30, 64, .28);
+  font: 500 15px/1.45 "Segoe UI", Arial, sans-serif;
+}
+.csvb-vl-dialog::backdrop {
+  background: rgba(13, 29, 52, .58);
+  backdrop-filter: blur(2px);
+}
+.csvb-vl-shell { display: flex; flex-direction: column; max-height: min(86dvh, 820px); }
+.csvb-vl-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 18px 20px 15px;
+  color: #fff;
+  background: #1a4170;
+}
+.csvb-vl-headcopy { min-width: 0; flex: 1; }
+.csvb-vl-eyebrow {
+  margin: 0 0 3px;
+  color: #c8daf3;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .11em;
+  text-transform: uppercase;
+}
+.csvb-vl-title { margin: 0; font-size: 19px; line-height: 1.25; font-weight: 900; }
+.csvb-vl-subtitle { margin: 5px 0 0; color: #e2ecf9; font-size: 13px; }
+.csvb-vl-x {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  place-items: center;
+  color: #fff;
+  background: rgba(255,255,255,.1);
+  border: 1px solid rgba(255,255,255,.35);
+  border-radius: 9px;
+  font-size: 21px;
+  line-height: 1;
+  cursor: pointer;
+}
+.csvb-vl-content { overflow: auto; padding: 18px 20px 20px; }
+.csvb-vl-vessel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 17px;
+  padding: 11px 13px;
+  background: #edf4fc;
+  border: 1px solid #d6e4f5;
+  border-radius: 11px;
+}
+.csvb-vl-vessel-name { color: #062a5e; font-size: 16px; font-weight: 900; overflow-wrap: anywhere; }
+.csvb-vl-company { margin-top: 2px; color: #5e6f86; font-size: 12px; font-weight: 700; }
+.csvb-vl-state {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  padding: 4px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 900;
+}
+.csvb-vl-state.is-active { color: #0d4f2a; background: #e9fff0; border: 1px solid #b8f0c9; }
+.csvb-vl-state.is-inactive { color: #8b1d1d; background: #ffeaea; border: 1px solid #ffc7c7; }
+.csvb-vl-field { display: flex; flex-direction: column; gap: 6px; margin-top: 14px; }
+.csvb-vl-field label { color: #1a4170; font-size: 13px; font-weight: 850; }
+.csvb-vl-field label .required { color: #a62323; }
+.csvb-vl-field textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 88px;
+  resize: vertical;
+  padding: 10px 12px;
+  color: #14223a;
+  background: #fff;
+  border: 1px solid #c9d9f3;
+  border-radius: 10px;
+  font: inherit;
+}
+.csvb-vl-field textarea:focus-visible,
+.csvb-vl-dialog button:focus-visible {
+  outline: 3px solid #0097a7;
+  outline-offset: 2px;
+}
+.csvb-vl-help { margin: 0; color: #5e6f86; font-size: 12px; }
+.csvb-vl-alert {
+  display: none;
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+  font-weight: 750;
+}
+.csvb-vl-alert.is-error { display: block; color: #8b1d1d; background: #fff0f0; border: 1px solid #efc2c2; }
+.csvb-vl-alert.is-success { display: block; color: #0d4f2a; background: #e9fff0; border: 1px solid #b8f0c9; }
+.csvb-vl-alert.is-info { display: block; color: #1a4170; background: #edf4fc; border: 1px solid #c9d9f3; }
+.csvb-vl-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+.csvb-vl-btn {
+  min-height: 38px;
+  padding: 8px 13px;
+  color: #1a4170;
+  background: #eaf1fb;
+  border: 1px solid #c9d9f3;
+  border-radius: 9px;
+  font: 850 13px/1.2 "Segoe UI", Arial, sans-serif;
+  cursor: pointer;
+}
+.csvb-vl-btn:hover:not(:disabled) { filter: brightness(.97); }
+.csvb-vl-btn:disabled { opacity: .58; cursor: wait; }
+.csvb-vl-btn-primary { color: #fff; background: #295eb0; border-color: #295eb0; }
+.csvb-vl-btn-danger { color: #fff; background: #a92c2c; border-color: #a92c2c; }
+.csvb-vl-note { margin: 11px 0 0; color: #35507b; font-size: 12px; }
+.csvb-vl-loading, .csvb-vl-empty {
+  padding: 18px 12px;
+  color: #4d6283;
+  background: #f1f6fc;
+  border: 1px dashed #c9d9f3;
+  border-radius: 11px;
+  text-align: center;
+  font-weight: 750;
+}
+.csvb-vl-history { display: grid; gap: 10px; }
+.csvb-vl-entry {
+  padding: 12px 13px;
+  background: #fff;
+  border: 1px solid #d6e4f5;
+  border-left: 3px solid #295eb0;
+  border-radius: 10px;
+}
+.csvb-vl-entry-top { display: flex; flex-wrap: wrap; align-items: center; gap: 7px 10px; }
+.csvb-vl-transition { color: #14223a; font-size: 13px; font-weight: 900; }
+.csvb-vl-date { margin-left: auto; color: #5e6f86; font-size: 11px; font-weight: 750; }
+.csvb-vl-actor { margin-top: 4px; color: #4d6283; font-size: 12px; }
+.csvb-vl-entry-label { margin: 10px 0 3px; color: #1a4170; font-size: 11px; font-weight: 900; letter-spacing: .04em; text-transform: uppercase; }
+.csvb-vl-entry-text { margin: 0; color: #263a56; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13px; }
+.csvb-vl-latest { margin: 0 0 13px; padding: 10px 12px; background: #edf4fc; border: 1px solid #d6e4f5; border-radius: 10px; }
+.csvb-vl-latest strong { display: block; margin-bottom: 4px; color: #1a4170; font-size: 11px; letter-spacing: .04em; text-transform: uppercase; }
+.csvb-vl-latest p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13px; }
+@media (max-width: 540px) {
+  .csvb-vl-dialog { width: calc(100% - 18px); max-height: 92dvh; border-radius: 13px; }
+  .csvb-vl-shell { max-height: 92dvh; }
+  .csvb-vl-head { padding: 15px 15px 13px; }
+  .csvb-vl-content { padding: 15px; }
+  .csvb-vl-actions { justify-content: stretch; }
+  .csvb-vl-actions .csvb-vl-btn { flex: 1 1 auto; }
+}

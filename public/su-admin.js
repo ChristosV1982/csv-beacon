@@ -806,6 +806,9 @@ function renderVessels() {
   const vessels = Array.isArray(state.vessels) ? state.vessels : [];
 
   const filtered = vessels.filter((v) => {
+    const status = document.getElementById("v_status_filter")?.value || "all";
+    if (status === "active" && v.is_active === false) return false;
+    if (status === "inactive" && v.is_active !== false) return false;
     if (!q) return true;
 
     const hay = [
@@ -843,6 +846,8 @@ function renderVessels() {
 
     const deleteBtn =
       '<button class="btnSmall btnDanger" data-act="delete" data-id="' + esc(v.id) + '" type="button">Delete</button>';
+    const historyBtn =
+      '<button class="btnSmall btn2" data-act="status_history" data-id="' + esc(v.id) + '" type="button">Status history</button>';
 
     rows.push(`
       <tr>
@@ -853,7 +858,7 @@ function renderVessels() {
         <td>${esc(v.call_sign || "")}</td>
         <td><input class="v-date-input" data-id="${esc(v.id)}" type="date" value="${esc(v.date_delivered || "")}" style="min-width:145px;" /></td>
         <td>${statusPill}</td>
-        <td><div class="actions">${saveDateBtn}${activeBtn}${deleteBtn}</div></td>
+        <td><div class="actions">${saveDateBtn}${activeBtn}${historyBtn}${deleteBtn}</div></td>
       </tr>
     `);
   }
@@ -871,6 +876,24 @@ function renderVessels() {
         const v = state.vessels.find((x) => String(x.id) === String(id));
 
         if (!v) throw new Error("Vessel not found in state.");
+
+        if (act === "status_history") {
+          window.CSVB_VESSEL_LIFECYCLE.openHistory({client: sb, vessel: v});
+          return;
+        }
+        if (act === "activate" || act === "deactivate") {
+          await window.CSVB_VESSEL_LIFECYCLE.openTransition({
+            client: sb,
+            vessel: v,
+            onSaved: async () => {
+              await refreshVessels();
+              if (typeof refreshSelectedCompanyDetails === "function") {
+                await refreshSelectedCompanyDetails();
+              }
+            }
+          });
+          return;
+        }
 
         if (act === "save_date") {
           const dateInput = document.querySelector('.v-date-input[data-id="' + id + '"]');
@@ -936,36 +959,6 @@ function renderVessels() {
           return;
         }
 
-        const nextActive = act === "activate";
-
-        setStatus(nextActive ? "Activating vessel…" : "Deactivating vessel…");
-
-        await csvbRpc("csvb_admin_upsert_vessel", {
-          p_vessel_id: v.id,
-          p_company_id: v.company_id || publicDefaultCompanyId(),
-          p_name: v.name || "",
-          p_hull_number: v.hull_number || null,
-          p_imo_number: v.imo_number ? String(v.imo_number) : null,
-          p_call_sign: v.call_sign || null,
-          p_is_active: nextActive,
-          p_move_related: false,
-          p_date_delivered: v.date_delivered || null
-        });
-
-        showOk(nextActive ? "Vessel activated." : "Vessel deactivated.");
-
-        await refreshVessels();
-        renderVesselDropdown();
-
-        if (typeof refreshCompanies === "function") {
-          await refreshCompanies();
-        }
-
-        if (typeof refreshSelectedCompanyDetails === "function") {
-          await refreshSelectedCompanyDetails();
-        }
-
-        setStatus("Ready");
       } catch (e) {
         setStatus("Ready");
         showWarn(String(e?.message || e));
@@ -1282,6 +1275,7 @@ function initSearch() {
 
   const v = document.getElementById("v_search");
   if (v) v.addEventListener("input", () => renderVessels());
+  document.getElementById("v_status_filter")?.addEventListener("change", renderVessels);
 }
 
 /* ======================== Rights Matrix ======================== */

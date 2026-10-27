@@ -172,6 +172,7 @@
   <link rel="stylesheet" href="./csvb-mobile-polish.css?v=20260528_1" />
   <link rel="stylesheet" href="./csvb-mobile-fixes-20260528-2.css?v=20260528_2" />
   <link rel="stylesheet" href="./csvb-module-header.css?v=20261027_rollout_2" />
+  <link id="csvb-vessel-lifecycle-admin-style" rel="stylesheet" href="./csvb-vessel-lifecycle-admin.css?v=20261028_lifecycle_1" />
 </head>
 
 <body class="csvb-su-admin-density-page">
@@ -671,7 +672,13 @@
         <div class="card" style="box-shadow:none;">
           <div class="row">
             <div style="font-weight:950;">Vessel list</div>
-            <div class="right">
+            <div class="right csvb-vl-list-controls">
+              <label for="v_status_filter" class="small">Vessel status</label>
+              <select id="v_status_filter" aria-label="Vessel status filter">
+                <option value="all">All</option>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+              </select>
               <input id="v_search" placeholder="Search name / IMO / hull…" style="min-width:320px;" />
             </div>
           </div>
@@ -699,7 +706,7 @@
           </div>
 
           <div class="muted small" style="margin-top:10px;">
-            Deactivation sets <span class="mono">is_active=false</span>. Existing questionnaires remain in DB.
+            Lifecycle status is Active or Inactive. Status changes preserve historical records and do not change linked user/account access in Step 1. Restricted reasons are available through Status history.
           </div>
         </div>
       </div>
@@ -778,7 +785,8 @@
 
   </div>
 
-  <script src="./su-admin.js?v=20260521_date_delivered_fix2"></script>
+  <script src="./csvb-vessel-lifecycle-admin.js?v=20261028_lifecycle_1"></script>
+  <script src="./su-admin.js?v=20261028_lifecycle_1"></script>
   <script src="./csvb-question-admin.js?v=20260430_1"></script>
   <script src="./csvb-question-overrides-admin.js?v=20260430_1"></script>
   <script src="./csvb-thread-admin-controls.js?v=20260505_1"></script>
