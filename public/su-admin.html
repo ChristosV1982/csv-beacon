@@ -173,6 +173,7 @@
   <link rel="stylesheet" href="./csvb-mobile-fixes-20260528-2.css?v=20260528_2" />
   <link rel="stylesheet" href="./csvb-module-header.css?v=20261027_rollout_2" />
   <link id="csvb-vessel-lifecycle-admin-style" rel="stylesheet" href="./csvb-vessel-lifecycle-admin.css?v=20261028_lifecycle_1" />
+  <link rel="stylesheet" href="./su-admin-users-workspace.css?v=20261029_users_workspace_2" />
 </head>
 
 <body class="csvb-su-admin-density-page">
@@ -479,8 +480,8 @@
 
       <div style="height:12px;"></div>
 
-      <div class="grid2">
-        <div class="card" style="box-shadow:none;">
+      <div class="users-workspace">
+        <div class="card users-create-card" id="userCreateCard" style="box-shadow:none;">
           <div style="font-weight:950;">Create user</div>
           <div style="height:10px;"></div>
 
@@ -570,16 +571,24 @@
           </div>
         </div>
 
-        <div class="card" style="box-shadow:none;">
-          <div class="row">
-            <div style="font-weight:950;">User list</div>
-            <div class="right">
-              <input id="u_search" placeholder="Search username / role / position / vessel…" style="min-width:320px;" />
+        <div class="card users-list-card" style="box-shadow:none;">
+          <div class="users-list-heading">
+            <div>
+              <div style="font-weight:950;">User directory</div>
+              <div class="muted small">Search accounts, narrow by company, role, status or vessel.</div>
             </div>
+            <button class="btn users-create-trigger" type="button" id="usersOpenCreate" aria-haspopup="dialog" aria-expanded="false" aria-controls="userCreateDialog">Create user</button>
           </div>
-          <div style="height:10px;"></div>
 
-          <div style="overflow:auto; max-height:520px;">
+          <div class="users-search-row">
+            <label for="u_search">Search accounts</label>
+            <input id="u_search" type="search" placeholder="Username, role, position, company or vessel…" />
+          </div>
+          <div class="users-results-meta">
+            <span class="users-results-kicker">ACCOUNT DIRECTORY</span>
+            <span id="usersResultCount" class="muted small" aria-live="polite">Loading accounts…</span>
+          </div>
+          <div class="users-table-scroll" role="region" aria-label="User accounts" tabindex="0">
             <table>
               <thead>
                 <tr>
@@ -603,6 +612,21 @@
             Disable will mark the profile as disabled/inactive. Password reset sets a new password and can optionally force change at next login.
           </div>
         </div>
+      </div>
+
+      <div class="users-dialog-backdrop" id="userCreateDialog" hidden>
+        <section class="users-dialog" role="dialog" aria-modal="true" aria-labelledby="userCreateTitle" aria-describedby="userCreateHelp" tabindex="-1">
+          <header class="users-dialog-header">
+            <div>
+              <div class="users-dialog-eyebrow">NEW ACCOUNT</div>
+              <h2 id="userCreateTitle">Create user</h2>
+              <p id="userCreateHelp">Set up an account and its starting access. Your entries remain here if you close this window.</p>
+            </div>
+            <button type="button" class="users-dialog-close" id="usersCloseCreate" aria-label="Close create user dialog">Close</button>
+          </header>
+          <div id="usersModalFeedback" class="users-modal-feedback" aria-live="polite" role="status" hidden></div>
+          <div id="usersCreateFormSlot" class="users-create-form-slot"></div>
+        </section>
       </div>
     </div>
 
@@ -807,5 +831,6 @@
   <script src="./csvb-registered-devices-action-menu.js?v=20260528_1"></script>
   <script src="./csvb-build-badge.js?v=20260528_01"></script>
   <script src="./csvb-global-busy.js?v=20260629_global_busy_v01"></script>
+  <script src="./su-admin-users-workspace.js?v=20261029_users_workspace_2"></script>
 </body>
 </html>
