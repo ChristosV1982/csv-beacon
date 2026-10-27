@@ -223,7 +223,7 @@
   function patchUserFilterLabels() {
     const roleFilter = $("u_filter_role");
     const roleLabel = roleFilter?.closest(".field")?.querySelector("label");
-    if (roleLabel) roleLabel.textContent = "User Type";
+    if (roleLabel && !roleFilter?.dataset.officeDirectory) roleLabel.textContent = "User Type";
 
     const vesselFilter = $("u_filter_vessel");
     const vesselLabel = vesselFilter?.closest(".field")?.querySelector("label");
@@ -267,7 +267,7 @@
         th.textContent = "User Type";
       }
 
-      if (text === "position" || text === "rank / position") {
+      if (!th.dataset.userColumn && (text === "position" || text === "rank / position")) {
         th.textContent = "Rank / Position";
       }
 

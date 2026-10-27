@@ -422,7 +422,18 @@
         sb: sb(),
         onSaved: async message => {
           showOkSafe(message);
-          if (typeof refreshUsers === "function") await refreshUsers();
+          try {
+            if (typeof window.CSVB_REFRESH_USER_DIRECTORY === "function") {
+              await window.CSVB_REFRESH_USER_DIRECTORY();
+            } else if (typeof refreshUsers === "function") {
+              await refreshUsers();
+            } else {
+              throw new Error("Directory refresh is unavailable.");
+            }
+          } catch (error) {
+            showWarnSafe("Assignment saved, but directory refresh failed: " +
+              String(error?.message || error) + ". Reload the Users tab.");
+          }
           addEditButtons();
         }
       });

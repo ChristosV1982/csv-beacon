@@ -841,7 +841,7 @@
         th.textContent = "DANAOS / Username";
       }
 
-      if (text === "position") {
+      if (text === "position" && !th.dataset.userColumn) {
         th.textContent = "Rank / Position";
       }
     });

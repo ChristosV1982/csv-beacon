@@ -508,7 +508,18 @@ function renderVesselDropdown() {
 /* ======================== MC-3B8 User List Filters ======================== */
 
 function userRoleValue(u) {
+  if (u?.office_role_code) return "office:" + u.office_role_code;
   return String(u?.role || u?.role_name || "");
+}
+
+function userDirectoryRoleLabel(u) {
+  if (u?.office_role_label) return u.office_role_label;
+  const role = String(u?.role || u?.role_name || "");
+  return ({
+    super_admin: "Super Admin", company_admin: "Company Admin (legacy)",
+    company_superintendent: "Company Superintendent (legacy)",
+    vessel: "Onboard Personnel", inspector: "Inspector / Third Party"
+  })[role] || role;
 }
 
 function userPositionValue(u) {
@@ -558,9 +569,10 @@ function ensureUserFiltersBar() {
 
   bar.innerHTML =
     '<div style="font-weight:950;color:#062A5E;margin-bottom:8px;">User filters</div>' +
-    '<div style="display:grid;grid-template-columns:repeat(5,minmax(130px,1fr));gap:8px;align-items:end;">' +
+    '<div style="display:grid;grid-template-columns:repeat(6,minmax(130px,1fr));gap:8px;align-items:end;">' +
       '<div class="field"><label>Company</label><select id="u_filter_company"><option value="">All companies</option></select></div>' +
-      '<div class="field"><label>Role</label><select id="u_filter_role"><option value="">All roles</option></select></div>' +
+      '<div class="field"><label>Office Role / User Type</label><select id="u_filter_role" data-office-directory="v2"><option value="">All roles</option></select></div>' +
+      '<div class="field"><label>Access Profile</label><select id="u_filter_profile"><option value="">All profiles</option></select></div>' +
       '<div class="field"><label>Status</label><select id="u_filter_status">' +
         '<option value="">All statuses</option>' +
         '<option value="active">Active</option>' +
@@ -572,7 +584,7 @@ function ensureUserFiltersBar() {
 
   hostRow.insertAdjacentElement("afterend", bar);
 
-  ["u_filter_company", "u_filter_role", "u_filter_status", "u_filter_vessel"].forEach((id) => {
+  ["u_filter_company", "u_filter_role", "u_filter_profile", "u_filter_status", "u_filter_vessel"].forEach((id) => {
     const el = document.getElementById(id);
     if (el) el.addEventListener("change", renderUsers);
   });
@@ -583,7 +595,7 @@ function ensureUserFiltersBar() {
       const q = document.getElementById("u_search");
       if (q) q.value = "";
 
-      ["u_filter_company", "u_filter_role", "u_filter_status", "u_filter_vessel"].forEach((id) => {
+      ["u_filter_company", "u_filter_role", "u_filter_profile", "u_filter_status", "u_filter_vessel"].forEach((id) => {
         const el = document.getElementById(id);
         if (el) el.value = "";
       });
@@ -625,13 +637,23 @@ function renderUserFilterDropdowns() {
 
   setSelectOptionsPreserve(companySel, companies, prevCompany);
 
-  const roles = uniqueSorted(users.map((u) => userRoleValue(u)));
+  const roles = [...new Map(users.map(u => [userRoleValue(u), userDirectoryRoleLabel(u)])).entries()]
+    .sort((a,b) => a[1].localeCompare(b[1]));
 
   setSelectOptionsPreserve(
     roleSel,
-    [{ value: "", label: "All roles" }, ...roles.map((r) => ({ value: r, label: r }))],
+    [{ value: "", label: "All roles" }, ...roles.map(([value,label]) => ({ value,label }))],
     prevRole
   );
+
+  const profileSel = document.getElementById("u_filter_profile");
+  const profiles = [...new Map(users.filter(u => u.office_access_profile_code)
+    .map(u => [u.office_access_profile_code, u.office_access_profile_label || u.office_access_profile_code])).entries()]
+    .sort((a,b) => a[1].localeCompare(b[1]));
+  setSelectOptionsPreserve(profileSel, [
+    {value:"",label:"All profiles"}, {value:"__legacy",label:"No prepared profile / legacy"},
+    ...profiles.map(([value,label]) => ({value,label}))
+  ], profileSel?.value || "");
 
   const vesselOptions = [{ value: "", label: "All vessels" }];
 
@@ -683,6 +705,7 @@ function renderUsers() {
 
   const fCompany = document.getElementById("u_filter_company")?.value || "";
   const fRole = document.getElementById("u_filter_role")?.value || "";
+  const fProfile = document.getElementById("u_filter_profile")?.value || "";
   const fStatus = document.getElementById("u_filter_status")?.value || "";
   const fVessel = document.getElementById("u_filter_vessel")?.value || "";
 
@@ -699,6 +722,7 @@ function renderUsers() {
 
     if (fCompany && companyValue !== fCompany) return false;
     if (fRole && roleName !== fRole) return false;
+    if (fProfile && (u.office_access_profile_code || "__legacy") !== fProfile) return false;
     if (fStatus && statusValue !== fStatus) return false;
     if (fVessel && vesselValue !== fVessel) return false;
 
@@ -707,6 +731,10 @@ function renderUsers() {
         u.company_name,
         u.username,
         roleName,
+        userDirectoryRoleLabel(u),
+        u.role || u.role_name,
+        u.office_access_profile_label,
+        u.office_access_profile_code,
         positionName,
         vesselNameById(u.vessel_id),
         u.vessel_name
@@ -724,7 +752,7 @@ function renderUsers() {
   window.SU_USER_CLEANUP?.setVisibleUsers(filtered);
 
   if (!filtered.length) {
-    tbody.innerHTML = '<tr><td colspan="9" class="muted small">No users match the selected filters.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="10" class="muted small">No users match the selected filters.</td></tr>';
     return;
   }
 
@@ -746,6 +774,18 @@ function renderUsers() {
     const uid = u.id;
     const roleName = u.role || u.role_name || "";
     const positionName = u.position || u.user_position || "";
+    const officeAssigned = !!u.office_role_code;
+    const roleDisplay = esc(userDirectoryRoleLabel(u)) + (officeAssigned
+      ? '<details class="users-security-detail"><summary>Security context</summary><span>Legacy security class: <code>' +
+        esc(roleName) + '</code></span></details>' : "");
+    const profileDisplay = u.office_access_profile_code
+      ? '<strong>' + esc(u.office_access_profile_label || u.office_access_profile_code) + '</strong>' +
+        '<div class="muted small">' + (u.office_profile_is_role_default === true ? "Role default" :
+          u.office_profile_is_role_default === false ? "Custom per-user profile" : "Default comparison unavailable") + '</div>' +
+        '<span class="pill">' + (u.office_permission_enforcement_active === true
+          ? "Enforced" : "Prepared / enforcement pending") + '</span>'
+      : '<span class="muted small">' + (["company_admin","company_superintendent"].includes(roleName)
+        ? "Legacy permissions — no Office assignment" : "—") + '</span>';
 
     const actionBtns = [];
 
@@ -770,8 +810,9 @@ function renderUsers() {
       '<tr>' +
         '<td>' + esc(u.company_name || "") + '</td>' +
         '<td class="mono">' + esc(u.username || "") + '</td>' +
-        '<td>' + esc(roleName) + '</td>' +
-        '<td>' + esc(positionName) + '</td>' +
+        '<td>' + roleDisplay + '</td>' +
+        '<td>' + profileDisplay + '</td>' +
+        '<td>' + (roleName === "vessel" && !positionName ? "Rank not set" : esc(positionName)) + '</td>' +
         '<td>' + esc(u.vessel_name || vesselNameById(u.vessel_id) || "") + '</td>' +
         '<td>' + statusPill + '</td>' +
         '<td>' + forceReset + '</td>' +
@@ -1015,7 +1056,7 @@ async function refreshUsers() {
     await ensureCompaniesLoaded();
   }
 
-  const rows = await csvbRpc("csvb_admin_list_users_by_company", {
+  const rows = await csvbRpc("csvb_admin_list_users_by_company_v2", {
     p_company_id: null
   });
 
@@ -1031,6 +1072,10 @@ async function refreshUsers() {
 
   setStatus("Ready");
 }
+
+// Explicit bridge used by the Office editor, including if su-admin.js is
+// isolated by a future script wrapper. Refresh failures must be reported.
+window.CSVB_REFRESH_USER_DIRECTORY = refreshUsers;
 
 async function refreshVessels() {
   setStatus("Loading vessels…");
