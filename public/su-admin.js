@@ -218,7 +218,7 @@ function dbgRedact(obj) {
     const out = {};
     for (const [k, v] of Object.entries(x)) {
       const lk = k.toLowerCase();
-      if (lk.includes("password")) {
+      if (lk.includes("password") || lk === "confirmation_token") {
         out[k] = "***REDACTED***";
       } else {
         out[k] = walk(v);
@@ -310,7 +310,9 @@ async function getAccessToken() {
 
 async function callSuAdmin(body) {
   const token = await getAccessToken();
-  const url = `${window.AUTH.SUPABASE_URL}/functions/v1/su-admin`;
+  const endpoint = ["prepare_user_deletion", "delete_user"].includes(body?.action)
+    ? "su-admin-delete-user" : "su-admin";
+  const url = `${window.AUTH.SUPABASE_URL}/functions/v1/${endpoint}`;
 
   const safeBody = dbgRedact(body);
   dbgLog(`REQ ${safeBody?.action || "unknown"}\nbody=${JSON.stringify(safeBody, null, 2)}`);
@@ -326,7 +328,8 @@ async function callSuAdmin(body) {
   });
 
   const text = await res.text();
-  dbgLog(`RES ${safeBody?.action || "unknown"}\nstatus=${res.status} ${res.statusText}\nraw=${text || "(empty)"}`);
+  const debugResponse = endpoint === "su-admin-delete-user" ? "[selected-user response omitted]" : text;
+  dbgLog(`RES ${safeBody?.action || "unknown"}\nstatus=${res.status} ${res.statusText}\nraw=${debugResponse || "(empty)"}`);
 
   if (!res.ok) {
     throw new Error(`HTTP ${res.status} ${res.statusText}\n\n${text || "(empty response body)"}`);
@@ -347,6 +350,7 @@ async function callSuAdmin(body) {
 
 /* ======================== State ======================== */
 const state = {
+  canDeleteUsers: false,
   companies: [],
   selectedCompanyId: null,
   companyModules: [],
@@ -745,6 +749,9 @@ function renderUsers() {
     actionBtns.push(
       '<button class="btnSmall btn2" data-act="reset_password" data-id="' + esc(uid) + '" type="button">Reset password</button>'
     );
+    if (state.canDeleteUsers) actionBtns.push(
+      '<button class="btnSmall btnDanger" data-act="delete_user" data-id="' + esc(uid) + '" type="button">Delete User</button>'
+    );
 
     rows.push(
       '<tr>' +
@@ -773,7 +780,35 @@ function renderUsers() {
       try {
         if (!id || !isUUID(id)) throw new Error("Invalid user id in row.");
 
-        if (act === "disable_user") {
+        if (act === "delete_user") {
+          if (!state.canDeleteUsers) throw new Error("Super Admin access required.");
+          if (btn.disabled) return;
+          btn.disabled = true;
+          try {
+            const prepared = await callSuAdmin({ action: "prepare_user_deletion", user_id: id });
+            if (!prepared?.ok || prepared.user?.id !== id || !prepared.confirmation_token) {
+              throw new Error("Could not verify the selected account. No user was deleted.");
+            }
+            const user = prepared.user;
+            const label = `Username: ${user.username}\nRole: ${user.role}\nVessel: ${user.vessel_name || "None"}`;
+            if (!confirm(`Permanently delete ONLY this user account?\n\n${label}\n\nVessel records will NOT be deleted. Accounts with linked audit/business history are protected. This cannot be undone.`)) return;
+            const typed = prompt(`Confirm deletion of:\n${label}\n\nType the exact username to delete this account:`);
+            if (typed === null) return;
+            if (typed !== user.username) throw new Error("Username did not match. No account was deleted.");
+            const result = await callSuAdmin({ action: "delete_user", user_id: id,
+              confirmation_token: prepared.confirmation_token, confirm_username: typed });
+            if (!result?.ok || result.deleted_user_id !== id) throw new Error("Deletion result could not be verified. Reload the user list.");
+            showOk("Selected user account deleted. Vessel records were not changed.");
+            try {
+              await refreshUsers();
+            } catch (reloadError) {
+              showWarn("The user account was deleted, but the list could not be reloaded. Reload this page. " +
+                String(reloadError?.message || reloadError));
+            }
+          } finally {
+            if (btn.isConnected) btn.disabled = false;
+          }
+        } else if (act === "disable_user") {
           const reason = prompt("Disable reason (optional):") || "";
           await callSuAdmin({ action: "disable_user", user_id: id, reason });
           showOk("User disabled.");
@@ -1510,6 +1545,7 @@ async function init() {
     unauthorizedRedirect: "./q-dashboard.html",
   });
   if (!me) return;
+  state.canDeleteUsers = (me.profile?.role || me.role) === "super_admin";
 
   const badge = document.getElementById("userBadge");
   if (badge) badge.textContent = `Logged in`;

@@ -26,9 +26,10 @@ function fixture(){
     company_id:company.id,company_name:company.company_name,
     vessel_id:i%3?vessel.id:null,vessel_name:i%3?vessel.name:"",is_active:i<8,is_disabled:i>=8
   }));
+  window.fixtureUsers=users;
   const sb={auth:{getSession:async()=>({data:{session}}),getUser:async()=>({data:{user:session.user}})},
     rpc:async(name)=>{
-      if(name.includes("list_users"))return{data:users};
+      if(name.includes("list_users"))return{data:window.fixtureUsers};
       if(name.includes("list_vessels"))return{data:[vessel]};
       if(name.includes("list_companies"))return{data:[company]};
       return{data:[],error:null};
@@ -47,9 +48,23 @@ ws.on("message",async raw=>{
   let body="",type="application/javascript";
   if(url.pathname.endsWith("/auth.js"))body=`(${fixture.toString()})();`;
   else if(url.hostname==="ui-fixture.supabase.co"){
-    type="application/json";const action=JSON.parse(request.postData||"{}").action;
-    if(action&&!["ping","list_users","list_vessels","list_modules_permissions","list_roles_positions","get_role_permissions"].includes(action))writes.push(action);
-    body=JSON.stringify({ok:true,roles:["super_admin","company_admin","company_superintendent","vessel","inspector"],positions:[],modules:[],permissions:[],grants:[]});
+    type="application/json";const posted=JSON.parse(request.postData||"{}"),action=posted.action;
+    if(action==="prepare_user_deletion"){
+      assert(url.pathname.endsWith("/su-admin-delete-user"));
+      body=JSON.stringify({ok:true,user:{id:posted.user_id,username:"example.user.01",
+        role:"company_admin",vessel_name:null},confirmation_token:"fixture-confirmation-only"});
+    }else if(action==="delete_user"){
+      assert(url.pathname.endsWith("/su-admin-delete-user"));
+      assert.equal(posted.user_id,"44444444-4444-4444-8444-000000000000");
+      assert.equal(posted.confirmation_token,"fixture-confirmation-only");
+      assert.equal(posted.confirm_username,"example.user.01");
+      writes.push("mocked_selected_user_delete");
+      await evaluate(`window.fixtureUsers=window.fixtureUsers.filter(u=>u.id!==${JSON.stringify(posted.user_id)})`);
+      body=JSON.stringify({ok:true,deleted_user_id:posted.user_id});
+    }else{
+      if(action&&!["ping","list_users","list_vessels","list_modules_permissions","list_roles_positions","get_role_permissions"].includes(action))writes.push(action);
+      body=JSON.stringify({ok:true,roles:["super_admin","company_admin","company_superintendent","vessel","inspector"],positions:[],modules:[],permissions:[],grants:[]});
+    }
   }
   await call("Fetch.fulfillRequest",{requestId,responseCode:200,responseHeaders:[
     {name:"Content-Type",value:type},{name:"Access-Control-Allow-Origin",value:"*"},
@@ -102,5 +117,20 @@ try{
   await evaluate("document.getElementById('usersCloseCreate').click();document.getElementById('u_filter_clear').click();window.scrollTo(0,400)");
   const image=await call("Page.captureScreenshot",{format:"png"});
   await fs.writeFile("/tmp/csvb-users-workspace-desktop.png",Buffer.from(image.data,"base64"));
-  console.log("PASS: full-width list, search/filters, original form IDs/listeners, Escape/focus, draft retention, validation feedback, unchanged other-tab wrapper, mobile fit. Zero account writes; zero browser exceptions.");
+  // Confirm/cancel only through mocked endpoints; no live account deletion.
+  assert.equal(await evaluate("document.querySelectorAll('#usersBody [data-act=delete_user]').length"),12);
+  await evaluate("window.deleteConfirmation='';window.confirm=text=>{window.deleteConfirmation=text;return false};document.querySelector('#usersBody [data-act=delete_user]').click()");
+  await waitFor("window.deleteConfirmation && !document.querySelector('#usersBody [data-act=delete_user]').disabled");
+  assert(await evaluate("deleteConfirmation.includes('Username: example.user.01') && deleteConfirmation.includes('Role: company_admin') && deleteConfirmation.includes('Vessel: None')"));
+  assert.deepEqual(writes,[]);
+  await evaluate("window.confirm=()=>true;window.prompt=()=> 'wrong username';document.querySelector('#usersBody [data-act=delete_user]').click()");
+  await waitFor("document.getElementById('warnBox').textContent.includes('Username did not match')");
+  assert.deepEqual(writes,[]);
+  await evaluate("window.prompt=()=> 'example.user.01';document.querySelector('#usersBody [data-act=delete_user]').click()");
+  await waitFor("document.querySelectorAll('#usersBody > tr').length===11");
+  assert.deepEqual(writes,["mocked_selected_user_delete"]);
+  await evaluate("state.canDeleteUsers=false;renderUsers()");
+  assert.equal(await evaluate("document.querySelectorAll('#usersBody [data-act=delete_user]').length"),0);
+  assert.deepEqual(errors,[]);
+  console.log("PASS: Users workspace regression and selected-user delete UI: cancel, identity confirmation, wrong username, exact selected-user mock deletion, refresh, role-hidden controls. Zero LIVE account writes; zero browser exceptions.");
 }finally{await fetch(`http://127.0.0.1:9222/json/close/${tab.id}`);ws.close();}
