@@ -8,6 +8,9 @@
 
   const EDIT_ACTION_BUTTON_IDS = new Set([
     "registerComponentBtn",
+    "registerUsageHoursBtn",
+    "registerUsageBtn",
+    "maiUsageApply",
     "recordOperationBtn",
     "recordOperationSubmitBtn",
     "selectAllComponentsBtn",
@@ -49,7 +52,11 @@
     const btn = document.getElementById(id);
     if (!btn) return;
 
-    btn.disabled = hidden;
+    // New manual-usage controls have their own context, validation and pending
+    // guards. Permission refreshes may disable them, never re-enable them.
+    if (hidden || !["registerUsageHoursBtn", "registerUsageBtn", "maiUsageApply"].includes(id)) {
+      btn.disabled = hidden;
+    }
     btn.style.display = hidden ? "none" : "";
   }
 

@@ -9,7 +9,8 @@
 
   <link rel="stylesheet" href="./csv-beacon-theme.css?v=20260428_3" />
   <link rel="stylesheet" href="./style.css?v=20260428_3" />
-  <link rel="stylesheet" href="./mooring-anchoring-inventories-v4.css?v=20261028_perspective_v1" />
+  <link rel="stylesheet" href="./mooring-anchoring-inventories-v4.css?v=20261028_manual_usage_v1" />
+  <link rel="stylesheet" href="./mooring-anchoring-manual-usage.css?v=20261028_manual_usage_v1" />
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="./auth.js"></script>
@@ -146,13 +147,22 @@
           <span class="mai-task-index" aria-hidden="true">03</span>
           <span class="mai-task-copy">
             <strong>Record Mooring / Anchoring Use</strong>
-            <span>Enter a vessel operation and its equipment working hours.</span>
+            <span>Record an actual vessel operation; its hours credit multiple selected components.</span>
+          </span>
+          <span class="mai-task-arrow" aria-hidden="true">→</span>
+        </button>
+
+        <button id="registerUsageHoursBtn" class="mai-task-button mai-task-primary" type="button">
+          <span class="mai-task-index" aria-hidden="true">04</span>
+          <span class="mai-task-copy">
+            <strong>Register Usage Hours</strong>
+            <span>Manual hours for selected components, without recording an operation.</span>
           </span>
           <span class="mai-task-arrow" aria-hidden="true">→</span>
         </button>
 
         <button id="reviewDueBtn" class="mai-task-button mai-task-secondary" type="button" disabled>
-          <span class="mai-task-index" aria-hidden="true">04</span>
+          <span class="mai-task-index" aria-hidden="true">05</span>
           <span class="mai-task-copy">
             <strong>Review Due / Overdue Actions</strong>
             <span>Focus on components that need lifecycle attention.</span>
@@ -272,6 +282,91 @@
       </section>
     </section>
 
+    <section id="maiUsageWorkspace" class="mai-usage-workspace" aria-labelledby="maiUsageTitle" hidden>
+      <header class="mai-usage-head">
+        <div>
+          <p class="mai-eyebrow">Mooring &amp; Anchoring</p>
+          <h1 id="maiUsageTitle">Register Usage Hours</h1>
+          <p id="maiUsageVessel" class="mai-usage-vessel">Vessel context loading…</p>
+        </div>
+        <div class="mai-usage-header-actions">
+          <button id="maiUsageBack" class="btn2 mai-usage-button" type="button">Back to Tasks</button>
+          <button id="maiUsageInventory" class="btn2 mai-usage-button" type="button">View Inventory</button>
+        </div>
+      </header>
+
+      <p class="mai-usage-context-hint" id="maiUsageContextHint">
+        Manual usage adds hours to selected components only. It does not create or credit an actual vessel operation.
+      </p>
+
+      <div class="mai-usage-layout">
+        <section class="mai-usage-card mai-usage-entry" aria-label="Usage details">
+          <div class="mai-usage-card-heading">
+            <p class="mai-usage-kicker">Usage record</p>
+            <h2>Enter the hours</h2>
+          </div>
+          <div class="mai-usage-fields">
+            <label class="mai-usage-field" for="maiUsageDate">
+              <span>Usage date</span>
+              <input id="maiUsageDate" type="date" />
+            </label>
+            <label class="mai-usage-field" for="maiUsageHours">
+              <span>Hours per component</span>
+              <input id="maiUsageHours" type="number" min="0.1" step="0.1" inputmode="decimal" placeholder="0.1" />
+            </label>
+            <label class="mai-usage-field mai-usage-field-wide" for="maiUsageType">
+              <span>Component type filter</span>
+              <select id="maiUsageType">
+                <option value="">All component types</option>
+              </select>
+            </label>
+            <label class="mai-usage-field mai-usage-field-wide" for="maiUsageRemarks">
+              <span>Reference / remarks <em>Optional</em></span>
+              <textarea id="maiUsageRemarks" rows="2" placeholder="Reference, log extract, or brief remarks"></textarea>
+            </label>
+          </div>
+        </section>
+
+        <section class="mai-usage-card mai-usage-picker" aria-label="Select components">
+          <div class="mai-usage-card-heading">
+            <p class="mai-usage-kicker">Component selection</p>
+            <h2>Choose components</h2>
+          </div>
+          <label class="mai-usage-search" for="maiUsageSearch">
+            <span>Search this vessel</span>
+            <input id="maiUsageSearch" type="search" placeholder="Component ID, type or status…" />
+          </label>
+          <div class="mai-usage-selection-actions">
+            <button id="maiUsageSelectAll" class="btn2 compact mai-usage-button" type="button">Select all</button>
+            <button id="maiUsageClear" class="btn2 compact mai-usage-button" type="button">Clear</button>
+            <p id="maiUsageSelected" class="mai-usage-selected" role="status" aria-live="polite">0 components selected</p>
+          </div>
+          <div id="maiUsageComponents" class="mai-usage-components" aria-label="Available components">
+            <p class="mai-usage-empty">Loading eligible components…</p>
+          </div>
+        </section>
+      </div>
+
+      <section class="mai-usage-review-card" aria-labelledby="maiUsageReviewTitle">
+        <div class="mai-usage-review-heading">
+          <div>
+            <p class="mai-usage-kicker">Before you apply</p>
+            <h2 id="maiUsageReviewTitle">Review usage entry</h2>
+          </div>
+          <div id="maiUsageReview" class="mai-usage-review" aria-live="polite">
+            Select components and enter an effective date and hours to review this entry.
+          </div>
+        </div>
+        <div class="mai-usage-submit-row">
+          <p id="maiUsageMessage" class="mai-usage-message" role="status" aria-live="polite"></p>
+          <div class="mai-usage-submit-actions">
+            <button id="maiUsageMore" class="btn2 mai-usage-button" type="button" hidden>Register More Usage</button>
+            <button id="maiUsageApply" class="btn mai-usage-apply" type="button" disabled>Apply Usage Hours to Selected Components</button>
+          </div>
+        </div>
+      </section>
+    </section>
+
     <dialog id="maiSingleVesselDialog" class="mai-single-vessel-dialog" aria-labelledby="maiSingleVesselDialogTitle">
       <div class="mai-dialog-content">
         <p class="mai-eyebrow">Task vessel</p>
@@ -291,11 +386,12 @@
   </main>
 
   <script src="./csvb-toast-messages.js?v=20260511_1"></script>
-  <script src="./mooring-anchoring-inventories-v4.js?v=20261028_perspective_v1"></script>
+  <script src="./mooring-anchoring-inventories-v4.js?v=20261028_manual_usage_v1"></script>
   <script src="./mooring-anchoring-component-delete-extension.js?v=20260512_1"></script>
   <script src="./mooring-anchoring-register-component-v4.js?v=20261028_context_v1"></script>
   <script src="./mooring-anchoring-permissions-u10.js?v=20260512_1"></script>
-  <script src="./mooring-anchoring-action-guard-u10.js?v=20260512_1"></script>
+  <script src="./mooring-anchoring-action-guard-u10.js?v=20261028_manual_usage_v1"></script>
+  <script src="./mooring-anchoring-manual-usage.js?v=20261028_manual_usage_v1"></script>
   <script src="./csvb-build-badge.js?v=20260528_01"></script>
   <script src="./csvb-global-busy.js?v=20260629_global_busy_v01"></script>
 </body>

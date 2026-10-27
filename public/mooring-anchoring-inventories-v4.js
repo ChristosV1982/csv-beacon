@@ -31,7 +31,8 @@
     byVesselTypes: null,
     contextStorageKey: "",
     loaded: false,
-    pendingVesselChoice: null
+    pendingVesselChoice: null,
+    usageVesselId: ""
   };
 
   const el = {};
@@ -58,7 +59,8 @@
       "maiSingleVesselDialog", "maiSingleVesselReason", "maiTaskVessel",
       "maiTaskVesselContinue", "maiTaskVesselCancel", "maiTaskVesselError",
       "maiOfficePerspective", "maiPerspectiveVessel", "maiPerspectiveType",
-      "maiTypeContext", "maiContextComponentType"
+      "maiTypeContext", "maiContextComponentType",
+      "registerUsageHoursBtn", "maiUsageWorkspace"
     ].forEach((id) => {
       el[id] = $(id);
     });
@@ -304,6 +306,9 @@
     el.maiPerspectiveType.checked = state.perspective === "type";
     el.maiTypeContext.hidden = !typeView;
     el.maiOfficeContext.hidden = !office || !state.perspective;
+    if (state.usageVesselId) {
+      el.maiOfficePerspective.hidden = el.maiTypeContext.hidden = el.maiOfficeContext.hidden = true;
+    }
     el.maiContextComponentType.innerHTML = '<option value="">Select component type...</option>' +
       state.types.map((type) => `<option value="${esc(type.id)}">${esc(type.name || type.code || "Component type")}</option>`).join("");
     el.maiContextComponentType.value = state.contextTypeId;
@@ -327,9 +332,13 @@
       : !state.perspective ? "Choose how you want to view the inventory."
       : typeView ? `Current view: By Component Type — ${selectedType?.name || selectedType?.code || "Choose component type"} — ${scope}`
       : `Current view: By Vessel — ${state.contextMode ? scope : "Choose vessel context"}`;
-    if (el.maiInventoryWorkspace.hidden) el.maiTaskLanding.hidden = !ready;
+    if (state.usageVesselId) {
+      el.maiCurrentContext.textContent = `Current task: Register Usage Hours — ${state.vessels.find(v => v.id===state.usageVesselId)?.name || "Selected vessel"}`;
+    }
+    if (el.maiInventoryWorkspace.hidden) el.maiTaskLanding.hidden = !ready || !!state.usageVesselId;
     el.viewInventoryBtn.disabled = !ready;
     el.reviewDueBtn.disabled = !ready;
+    el.registerUsageHoursBtn.disabled = !ready;
     el.selectAllTypesBtn.disabled = typeView;
     el.clearTypesBtn.disabled = typeView;
   }
@@ -377,6 +386,28 @@
     el.maiInventoryWorkspace.hidden = false;
     renderTable();
     el.backToTasksBtn.focus();
+  }
+
+  async function openManualUsage(options = {}) {
+    const vesselId = options.vesselId || await requireSingleVessel("Register Usage Hours");
+    if (!vesselId || !state.vessels.some(v => v.id===vesselId)) return;
+    if (!window.CSVB_MAI_MANUAL_USAGE) {
+      toast("warn", "Usage-hours workspace is not ready. Please reload the page.");
+      return;
+    }
+    state.usageVesselId = vesselId;
+    el.maiTaskLanding.hidden = el.maiInventoryWorkspace.hidden = true;
+    el.maiUsageWorkspace.hidden = false;
+    renderContext();
+    await window.CSVB_MAI_MANUAL_USAGE.open({vesselId,componentId:options.componentId || "",client:state.sb});
+  }
+
+  function closeManualUsage(inventory = false) {
+    state.usageVesselId = "";
+    el.maiUsageWorkspace.hidden = true;
+    renderContext();
+    if (inventory) showInventory();
+    else if (!el.maiTaskLanding.hidden) el.registerUsageHoursBtn.focus();
   }
 
   function renderViewerMode() {
@@ -687,6 +718,7 @@
       if (!vesselId) return;
       location.href = `./mooring-anchoring-operations.html?vessel_id=${encodeURIComponent(vesselId)}`;
     });
+    el.registerUsageHoursBtn.addEventListener("click", () => openManualUsage().catch(handleError));
 
     function changePerspective(perspective) {
       if (!canChooseVesselContext() || state.perspective === perspective) return;
@@ -857,10 +889,25 @@
     $("vesselDropdown").hidden = !canChooseVesselContext();
     window.CSVB_MAI_INVENTORY_CONTEXT = Object.freeze({
       selectedVesselId: selectedContextVessel,
-      requireSingleVessel
+      requireSingleVessel,
+      closeManualUsage,
+      refresh: reload
     });
 
     await reload();
+    const requested = new URLSearchParams(location.search).get("usage_component_id");
+    if (requested) {
+      const component = state.components.find(c => c.id===requested);
+      if (!component || !state.vessels.some(v => v.id===component.vessel_id)) {
+        toast("warn","That component is not available in your authorized inventory.");
+      } else {
+        if (!state.perspective || !state.selectedVessels.size) {
+          state.perspective="vessel"; state.contextMode="single";
+          state.selectedVessels=new Set([component.vessel_id]); contextChanged();
+        }
+        await openManualUsage({vesselId:component.vessel_id,componentId:requested});
+      }
+    }
   }
 
   if (document.readyState === "loading") {

@@ -21,6 +21,12 @@ By Component Type is a fleet-review perspective using existing component types, 
 
 **How to apply:** Keep type constraints distinct from optional filters, validate restored type IDs against current accessible definitions, and preserve the office perspective/context on return without treating saved state as authorization.
 
+Register Usage Hours is a distinct manual/non-operation workflow. Actual operational events must continue through Record Mooring / Anchoring Use; manual bulk crediting must remain all-or-nothing for one authorized vessel, with distinct component usage records and no operation record.
+
+**Why:** The user explicitly separates controlled manual/bulk hour registration from actual operations that credit multiple components, while requiring the existing ledger and lifecycle rules to remain intact.
+
+**How to apply:** Keep both tasks clearly labelled, preserve vessel-context gating, and reuse the manual workflow from component detail without conflating entry with Usage History or redesigning component-detail tabs.
+
 Task-dialog tests must verify rendered visibility and focus, not just an `open` flag or successful programmatic clicks.
 
 **Why:** An open native dialog can still be invisible under a hidden ancestor, including when the browser repairs mismatched HTML section tags. Programmatic interactions can conceal this failure.

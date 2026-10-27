@@ -1,0 +1,380 @@
+/* Compact manual-hours workspace; all styles stay within this subview. */
+#maiUsageWorkspace {
+  --mai-usage-ink: #12304c;
+  --mai-usage-muted: #536b80;
+  --mai-usage-border: #c8d9e9;
+  --mai-usage-line: #dce7f1;
+  --mai-usage-card: #fbfdff;
+  --mai-usage-accent: #087e8b;
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+  min-width: 0;
+  color: var(--mai-usage-ink);
+}
+
+#maiUsageWorkspace[hidden] {
+  display: none !important;
+}
+
+#maiUsageWorkspace *,
+#maiUsageWorkspace *::before,
+#maiUsageWorkspace *::after {
+  box-sizing: border-box;
+}
+
+#maiUsageWorkspace .mai-usage-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 19px 22px;
+  border: 1px solid var(--mai-usage-border);
+  border-left: 5px solid var(--mai-usage-accent);
+  border-radius: 12px;
+  background: var(--mai-usage-card);
+  box-shadow: 0 8px 24px rgba(5, 35, 69, .075);
+}
+
+#maiUsageWorkspace .mai-usage-head h1 {
+  margin: 0;
+  color: var(--mai-navy, #062a5e);
+  font-size: clamp(1.55rem, 3vw, 2.1rem);
+  font-weight: 850;
+  letter-spacing: -.04em;
+  line-height: 1.1;
+}
+
+#maiUsageWorkspace .mai-usage-vessel {
+  margin: 7px 0 0;
+  color: var(--mai-usage-muted);
+  font-size: .84rem;
+  font-weight: 750;
+}
+
+#maiUsageWorkspace .mai-usage-header-actions,
+#maiUsageWorkspace .mai-usage-selection-actions,
+#maiUsageWorkspace .mai-usage-submit-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+#maiUsageWorkspace .mai-usage-context-hint {
+  margin: 0;
+  padding: 10px 13px;
+  border: 1px solid #c5dce3;
+  border-radius: 8px;
+  background: #eaf4f5;
+  color: #234c5a;
+  font-size: .82rem;
+  line-height: 1.45;
+}
+
+#maiUsageWorkspace .mai-usage-layout {
+  display: grid;
+  grid-template-columns: minmax(260px, .78fr) minmax(0, 1.22fr);
+  align-items: start;
+  gap: 12px;
+}
+
+#maiUsageWorkspace .mai-usage-card,
+#maiUsageWorkspace .mai-usage-review-card {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--mai-usage-border);
+  border-radius: 11px;
+  background: var(--mai-usage-card);
+  box-shadow: 0 6px 18px rgba(5, 35, 69, .06);
+}
+
+#maiUsageWorkspace .mai-usage-card {
+  padding: 15px;
+}
+
+#maiUsageWorkspace .mai-usage-card-heading {
+  margin-bottom: 13px;
+}
+
+#maiUsageWorkspace .mai-usage-kicker {
+  margin: 0 0 4px;
+  color: var(--mai-usage-accent);
+  font-size: .63rem;
+  font-weight: 900;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+
+#maiUsageWorkspace .mai-usage-card h2,
+#maiUsageWorkspace .mai-usage-review-card h2 {
+  margin: 0;
+  color: var(--mai-navy, #062a5e);
+  font-size: 1.02rem;
+  font-weight: 850;
+  line-height: 1.25;
+}
+
+#maiUsageWorkspace .mai-usage-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 11px;
+}
+
+#maiUsageWorkspace .mai-usage-field,
+#maiUsageWorkspace .mai-usage-search {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+  color: var(--mai-navy, #062a5e);
+  font-size: .72rem;
+  font-weight: 850;
+}
+
+#maiUsageWorkspace .mai-usage-field-wide {
+  grid-column: 1 / -1;
+}
+
+#maiUsageWorkspace .mai-usage-field em {
+  margin-left: 4px;
+  color: var(--mai-usage-muted);
+  font-size: .68rem;
+  font-style: normal;
+  font-weight: 600;
+}
+
+#maiUsageWorkspace input,
+#maiUsageWorkspace select,
+#maiUsageWorkspace textarea {
+  width: 100%;
+  min-height: 38px;
+  padding: 8px 10px;
+  border: 1px solid #b8cde0;
+  border-radius: 7px;
+  background: #fff;
+  color: var(--mai-usage-ink);
+  font: inherit;
+  font-size: .84rem;
+}
+
+#maiUsageWorkspace textarea {
+  min-height: 62px;
+  resize: vertical;
+  line-height: 1.4;
+}
+
+#maiUsageWorkspace input:focus,
+#maiUsageWorkspace select:focus,
+#maiUsageWorkspace textarea:focus {
+  border-color: var(--mai-usage-accent);
+  outline: 2px solid rgba(8, 126, 139, .2);
+}
+
+#maiUsageWorkspace input:disabled,
+#maiUsageWorkspace select:disabled,
+#maiUsageWorkspace textarea:disabled,
+#maiUsageWorkspace input[readonly],
+#maiUsageWorkspace select:disabled {
+  background: #edf2f5;
+  color: #687b8b;
+  cursor: not-allowed;
+}
+
+#maiUsageWorkspace .mai-usage-search {
+  margin-bottom: 10px;
+}
+
+#maiUsageWorkspace .mai-usage-selection-actions {
+  justify-content: flex-start;
+  padding-bottom: 9px;
+  border-bottom: 1px solid var(--mai-usage-line);
+}
+
+#maiUsageWorkspace .mai-usage-selected {
+  margin: 0 0 0 auto;
+  color: var(--mai-usage-muted);
+  font-size: .76rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+#maiUsageWorkspace .mai-usage-components {
+  display: grid;
+  gap: 6px;
+  max-height: 310px;
+  margin-top: 9px;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+#maiUsageWorkspace .mai-usage-component-row {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  align-items: start;
+  gap: 9px;
+  padding: 9px 10px;
+  border: 1px solid var(--mai-usage-line);
+  border-radius: 8px;
+  background: #f8fbfd;
+  cursor: pointer;
+}
+
+#maiUsageWorkspace .mai-usage-component-row:hover {
+  border-color: #b7d1df;
+  background: #f0f7fa;
+}
+
+#maiUsageWorkspace .mai-usage-component-row:has(input:checked) {
+  border-color: #78adb5;
+  background: #edf7f7;
+}
+
+#maiUsageWorkspace .mai-usage-component-row input[type="checkbox"] {
+  width: 16px;
+  min-height: 0;
+  height: 16px;
+  margin: 2px 0 0;
+  padding: 0;
+  accent-color: var(--mai-usage-accent);
+}
+
+#maiUsageWorkspace .mai-usage-component-copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+#maiUsageWorkspace .mai-usage-component-copy strong {
+  overflow-wrap: anywhere;
+  color: var(--mai-navy, #062a5e);
+  font-size: .8rem;
+  font-weight: 850;
+}
+
+#maiUsageWorkspace .mai-usage-component-copy span {
+  color: var(--mai-usage-muted);
+  font-size: .72rem;
+  line-height: 1.35;
+}
+
+#maiUsageWorkspace .mai-usage-component-row.is-disabled {
+  background: #f0f2f3;
+  color: #6c7d8b;
+  cursor: not-allowed;
+  opacity: .72;
+}
+
+#maiUsageWorkspace .mai-usage-empty {
+  margin: 0;
+  padding: 16px 12px;
+  border: 1px dashed #bdcfdd;
+  border-radius: 8px;
+  color: var(--mai-usage-muted);
+  font-size: .8rem;
+  text-align: center;
+}
+
+#maiUsageWorkspace .mai-usage-review-card {
+  padding: 15px;
+}
+
+#maiUsageWorkspace .mai-usage-review-heading {
+  display: grid;
+  grid-template-columns: minmax(170px, .36fr) minmax(0, 1fr);
+  gap: 15px;
+}
+
+#maiUsageWorkspace .mai-usage-review {
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid var(--mai-usage-line);
+  border-radius: 8px;
+  background: #f5f9fc;
+  color: var(--mai-usage-muted);
+  font-size: .8rem;
+  line-height: 1.45;
+  white-space: pre-line;
+}
+
+#maiUsageWorkspace .mai-usage-submit-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 12px;
+  padding-top: 11px;
+  border-top: 1px solid var(--mai-usage-line);
+}
+
+#maiUsageWorkspace .mai-usage-message {
+  min-width: 0;
+  margin: 0;
+  color: var(--mai-usage-muted);
+  font-size: .78rem;
+  line-height: 1.4;
+}
+
+#maiUsageWorkspace .mai-usage-message:empty {
+  display: none;
+}
+
+#maiUsageWorkspace .mai-usage-apply {
+  min-height: 40px;
+  white-space: normal;
+}
+
+#maiUsageWorkspace button:disabled {
+  opacity: .55;
+  cursor: not-allowed;
+}
+
+#maiUsageWorkspace button:focus-visible,
+#maiUsageWorkspace input:focus-visible,
+#maiUsageWorkspace select:focus-visible,
+#maiUsageWorkspace textarea:focus-visible {
+  outline: 3px solid rgba(8, 126, 139, .28);
+  outline-offset: 2px;
+}
+
+@media (max-width: 760px) {
+  #maiUsageWorkspace .mai-usage-head,
+  #maiUsageWorkspace .mai-usage-submit-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  #maiUsageWorkspace .mai-usage-header-actions,
+  #maiUsageWorkspace .mai-usage-submit-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  #maiUsageWorkspace .mai-usage-layout,
+  #maiUsageWorkspace .mai-usage-review-heading {
+    grid-template-columns: 1fr;
+  }
+
+  #maiUsageWorkspace .mai-usage-components {
+    max-height: 260px;
+  }
+
+  #maiUsageWorkspace .mai-usage-apply {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 420px) {
+  #maiUsageWorkspace .mai-usage-fields {
+    grid-template-columns: 1fr;
+  }
+
+  #maiUsageWorkspace .mai-usage-field-wide {
+    grid-column: auto;
+  }
+
+  #maiUsageWorkspace .mai-usage-selected {
+    flex-basis: 100%;
+    margin-left: 0;
+  }
+}
