@@ -72,6 +72,7 @@
     document.querySelectorAll("[data-critical-response]").forEach((select) => {
       select.value = critical.find((item) => item.item_no === Number(select.dataset.criticalResponse))?.response || "";
     });
+    window.CSVB_M02_STRUCTURED_ITEMS.mountCritical();
     progress();
   }
   function renderRecords() {

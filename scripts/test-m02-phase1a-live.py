@@ -26,7 +26,7 @@ history_question = api.sql("""select q.id from public.questions_master q
 api.ACTOR = api.sql("select id from public.profiles where role::text='super_admin' and is_active and not is_disabled limit 1", True)[0]["id"]
 api.ROLE = api.sql("select code from public.csvb_office_role_catalogue where display_name='Technical Superintendent'", True)[0]["code"]
 snapshot = """select md5(string_agg(to_jsonb(t)::text,'' order by id)) hash from public.%s t"""
-protected = ["vessels","profiles","questions_master","post_inspection_reports","post_inspection_observation_items"]
+protected = ["vessels","profiles","questions_master","post_inspection_reports","post_inspection_observation_items","m02_inspection_reports"]
 before = {t: api.sql(snapshot % t, True)[0]["hash"] for t in protected}
 try:
     uid, session = api.make_fixture("standard_office_view_only")

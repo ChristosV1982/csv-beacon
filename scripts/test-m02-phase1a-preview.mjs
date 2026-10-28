@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import WebSocket from "ws";
 import {verifyAppendicesUI} from "./test-m02-appendices-preview.mjs";
+import {verifyStructuredItems} from "./test-m02-structured-items-preview.mjs";
 
 const chunks = []; for await (const c of process.stdin) chunks.push(c);
 const input = JSON.parse(Buffer.concat(chunks).toString());
@@ -163,6 +164,7 @@ try {
   await check("Fleet record visibly identifies its fixed 18-month window", `document.querySelector(${JSON.stringify(historySelector)}).textContent.includes("Last 18 months") && document.querySelector(${JSON.stringify(historySelector)}).textContent.includes("18-month window")`);
   await check("Reference RPC is lazy and coalesced", `true`);
   await verifyAppendicesUI({ev,wait,check,screenshot,call,sid});
+  await verifyStructuredItems({ev,wait,check,screenshot,call,sid});
   if(requests.filter(n=>n==="csvb_m02_reference").length!==1) throw Error("Reference not coalesced");
   await screenshot("editor-desktop");
   await call("Emulation.setDeviceMetricsOverride",{width:402,height:874,deviceScaleFactor:1,mobile:true},sid);
@@ -186,7 +188,7 @@ try {
   }
   await ev(`document.getElementById("markCompleted").click()`);
   await check("Incomplete completion is blocked with section summary and jump actions",
-    `document.getElementById("editorMessage").textContent.includes("Part 3: 50 remaining") && document.getElementById("editorMessage").textContent.includes("Part 4: 280 remaining") && document.getElementById("editorMessage").textContent.includes("Appendix 2: 28 remaining") && document.querySelectorAll(".m02-completion-jumps button").length===3 && !document.getElementById("saveDraft").disabled`);
+    `document.getElementById("editorMessage").textContent.includes("Part 3: 50 remaining") && document.getElementById("editorMessage").textContent.includes("Part 4: 280 remaining") && document.getElementById("editorMessage").textContent.includes("Appendix 2: 26 remaining") && document.querySelectorAll(".m02-completion-jumps button").length===3 && !document.getElementById("saveDraft").disabled`);
   await ev(`document.querySelector(".m02-completion-jumps button").click()`);
   await check("Completion jump opens the missing response section", `document.querySelector('[data-section="company"]').classList.contains("is-current")`);
   await ev(`{const s=document.querySelector("[data-response]");s.value="";s.dispatchEvent(new Event("change",{bubbles:true}));}`);
@@ -218,5 +220,5 @@ try {
   if(exceptions.length) throw Error(exceptions.join("\n"));
   console.log(JSON.stringify({passed:true,checks,reference_rpc_calls:requests.filter(n=>n==="csvb_m02_reference").length,qid,screenshots:"generated-artifacts/m02"}));
 } finally {
-  ws?.close(); chrome.kill("SIGTERM"); await new Promise(r=>chrome.once("exit",r)); await rm(dir,{recursive:true,force:true});
+  ws?.close(); chrome.kill("SIGTERM"); await new Promise(r=>chrome.once("exit",r)); await rm(dir,{recursive:true,force:true,maxRetries:5,retryDelay:150});
 }

@@ -1,0 +1,129 @@
+/* Additive supporting fields for structured M02 item records. */
+.m02-item-support {
+  min-width: 0;
+  margin: 13px 0 0 54px;
+  padding-top: 12px;
+  border-top: 1px solid #e3e9e5;
+}
+
+.m02-support-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 9px;
+}
+
+.m02-support-head > :first-child {
+  margin: 0;
+  color: #587178;
+  font: 700 11px/1.4 var(--font-sans);
+}
+
+.m02-support-head .m02-button {
+  flex: 0 0 auto;
+  min-height: 36px;
+  padding: 7px 11px;
+  font-size: 11px;
+}
+
+.m02-support-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  margin-top: 8px;
+  padding: 10px;
+  border: 1px solid #e2e8e3;
+  border-radius: 6px;
+}
+
+.m02-support-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 9px 11px;
+  min-width: 0;
+}
+
+.m02-support-fields label {
+  display: grid;
+  align-content: start;
+  gap: 5px;
+  min-width: 0;
+  color: #728487;
+  font: 10px/1.35 var(--font-mono);
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+
+.m02-support-fields input,
+.m02-support-fields textarea {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  min-height: 38px;
+  border: 1px solid var(--m02-line);
+  border-radius: 5px;
+  padding: 8px 9px;
+  background: var(--m02-panel);
+  color: var(--m02-ink);
+  font: 12px/1.45 var(--font-sans);
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+.m02-support-fields textarea {
+  min-height: 60px;
+  resize: vertical;
+}
+
+.m02-support-fields input:focus,
+.m02-support-fields textarea:focus {
+  border-color: #5a8d87;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(45, 112, 103, .12);
+}
+
+.m02-support-row > .m02-remove-row {
+  align-self: center;
+}
+
+.m02-orb-blocks {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  min-width: 0;
+  margin-top: 14px;
+}
+
+.m02-orb-block {
+  min-width: 0;
+  padding-top: 10px;
+  border-top: 1px solid #e3e9e5;
+}
+
+.m02-orb-block h4 {
+  margin: 0 0 9px;
+  color: var(--m02-deep);
+  font: 700 11px/1.4 var(--font-mono);
+  letter-spacing: .04em;
+}
+
+@media (max-width: 900px) {
+  .m02-item-support { margin-left: 0; }
+}
+
+@media (max-width: 767px) {
+  .m02-support-fields,
+  .m02-orb-blocks { grid-template-columns: minmax(0, 1fr); }
+
+  .m02-support-head { align-items: flex-start; }
+  .m02-support-head .m02-button { min-height: 44px; }
+  .m02-support-row { gap: 7px; padding: 9px; }
+  .m02-support-fields input,
+  .m02-support-fields textarea { min-height: 44px; font-size: 16px; }
+  .m02-support-fields textarea { min-height: 72px; }
+  .m02-support-row > .m02-remove-row { min-height: 44px; }
+}

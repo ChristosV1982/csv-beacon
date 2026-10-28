@@ -6,6 +6,7 @@
   const OPERATIONS = ["Loading", "Discharging", "Bunkering", "Deballasting", "Ballasting", "River transit", "IGS in operation", "Major repairs/Drydock", "COW in progress", "Repairs under way", "STS operations", "Idle", "At anchor", "At sea", "Other"];
   const el = (id) => document.getElementById(id);
   const appendices = window.CSVB_M02_APPENDICES;
+  const structuredItems = window.CSVB_M02_STRUCTURED_ITEMS;
   const state = {
     sb: null, bundle: null, context: null, companyId: null, canEdit: false,
     reports: [], report: null, answers: new Map(), questions: [], questionVersion: null,
@@ -373,6 +374,7 @@
       const commentLabel = document.createElement("label"); commentLabel.textContent = "Comments";
       const comment = document.createElement("textarea"); comment.dataset.companyComments = String(no); comment.maxLength = 4000; comment.placeholder = "Add comments…"; comment.value = answer.comments || ""; commentLabel.append(comment);
       controls.append(label, commentLabel); card.append(head, controls);
+      structuredItems.mountCompany(card, no);
       card.insertAdjacentHTML("beforeend", attachmentMarkup(null, no));
       host.append(card);
     });
@@ -648,6 +650,7 @@
     }
   }
   function fillDetails(details = {}) {
+    structuredItems.load(details);
     const fields = {
       deadweight: "deadweight", grossTonnage: "gross_tonnage", lastPscDate: "last_psc_date",
       lastPscPlace: "last_psc_place_authority", lastPscDetails: "last_psc_details", lastVettingDate: "last_vetting_date",
@@ -703,7 +706,9 @@
       inspection_to: el("inspectionTo").value || null,
       attending_superintendent: clean(el("attendingSuperintendent").value),
       status: current.status === "completed" ? "completed" : "draft",
-      details: { ...details, imo_override: vessel?.imo_number ? null : clean(el("imoOverride").value) || null },
+      details: { ...(current.details || {}), ...details, ...structuredItems.detailsPatch(),
+        chapter_scores: { ...(current.details?.chapter_scores || {}), ...details.chapter_scores },
+        imo_override: vessel?.imo_number ? null : clean(el("imoOverride").value) || null },
       executive_summary: el("executiveSummary").value,
       part2: {
         total_high: details.total_high, total_medium: details.total_medium, total_low: details.total_low,
@@ -954,6 +959,7 @@
     $all(".m02-section-nav button").forEach((button) => button.classList.toggle("is-current", button.dataset.section === name));
   }
   function bindEvents() {
+    structuredItems.init({ state, markDirty });
     appendices.init({ state, rpc, markDirty, progress, showEditorError, renderAttachments, attachmentMarkup });
     $all("[data-view]").forEach((button) => button.addEventListener("click", () => {
       const view = button.dataset.view;

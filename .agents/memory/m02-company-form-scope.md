@@ -50,3 +50,9 @@ Appendix 1 maintenance checks, Appendix 4 findings and Appendix 5 photos are opt
 **Why:** The user explicitly defined these Company-form sections and their optional-content/completion boundaries.
 
 **How to apply:** Keep maintenance A/B/C distinct. Use only existing due-date particulars (do not invent responsible-party/start/end fields). Keep photographic records separate from question/item evidence. Retain the system-derived Last Vetting source independently of editable M02 values, and never silently replace a saved manual override when reopening.
+
+The completed Olympic Luna M02 is the governing response model for structured supporting fields. Preserve the existing visual design and Yes/No/N/S or Yes/No/N/A response regime; supporting dates and repeatable details supplement the response, Comments and attachments, never replace them with generic boxes. ORB Part I and Part II must remain separate and allow month/year periods without inventing exact days.
+
+**Why:** The user explicitly corrected this: the electronic form must correspond to the actual completed sample's response pattern.
+
+**How to apply:** Add only the instructed supporting fields. Keep response rows authoritative for completion. Prefer versioned report-details JSON for supporting records without a migration, and preserve unrelated details on every save.
