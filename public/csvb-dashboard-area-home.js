@@ -208,6 +208,16 @@
           ],
         },
         {
+          title: "Ship inspections",
+          items: [{
+            label: "M02 – Ship Inspection Report",
+            text: "Electronic M02 inspection workspace using the existing Oil-applicable SIRE question library.",
+            href: "./m02-ship-inspection-report.html",
+            cardKey: "m02_ship_inspection_report",
+            icon: "M02",
+          }],
+        },
+        {
           title: "Portable lifting appliances and wires",
           items: [
             {

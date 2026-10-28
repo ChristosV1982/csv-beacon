@@ -32,3 +32,4 @@ _maintenance_archive*.tar.gz
 # Local source PDFs and generated extraction previews
 data/*.pdf
 tmp/
+/generated-artifacts/

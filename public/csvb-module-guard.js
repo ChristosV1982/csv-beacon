@@ -65,6 +65,7 @@
     "mooring-anchoring-operations.html": "mooring_anchoring_inventories",
 
     "port-call-intelligence.html": "port_call_intelligence",
+    "m02-ship-inspection-report.html": "m02_ship_inspection_report",
 
     "portable-lifting-appliances-wires.html": "portable_lifting_appliances_wires",
     "portable-lifting-appliances-wire-component.html": "portable_lifting_appliances_wires",
@@ -291,6 +292,7 @@
       company_policy: "COMPANY_POLICY",
       mooring_anchoring_inventories: "MOORING_ANCHORING_INVENTORIES",
       port_call_intelligence: "PORT_CALL_INTELLIGENCE",
+      m02_ship_inspection_report: "M02_SHIP_INSPECTION_REPORT",
       portable_lifting_appliances_wires: "PORTABLE_LIFTING_APPLIANCES_WIRES",
       platform_administration: "SU_ADMIN"
     };

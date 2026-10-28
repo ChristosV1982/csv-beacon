@@ -56,7 +56,7 @@
       icon: "⚓",
       description:
         "Future area for vessel-facing marine applications, operational interactions, vessel submissions and ship/office exchange workflows.",
-      cards: ["mooring_anchoring_inventories", "port_call_intelligence", "portable_lifting_appliances_wires"],
+      cards: ["mooring_anchoring_inventories", "port_call_intelligence", "portable_lifting_appliances_wires", "m02_ship_inspection_report"],
       placeholder:
         "No modules have been assigned to this area yet. This area is reserved for future marine applications and vessel interaction workflows.",
     },

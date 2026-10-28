@@ -30,6 +30,7 @@
     company_policy: "COMPANY_POLICY",
     mooring_anchoring_inventories: "MOORING_ANCHORING_INVENTORIES",
     port_call_intelligence: "PORT_CALL_INTELLIGENCE",
+    m02_ship_inspection_report: "M02_SHIP_INSPECTION_REPORT",
     portable_lifting_appliances_wires: "PORTABLE_LIFTING_APPLIANCES_WIRES",
     suadmin: "SU_ADMIN"
   };
