@@ -13,3 +13,4 @@
 - [Vessel/account governance](vessel-account-governance.md) — Active/Inactive, restricted reasons, staged account changes and the approved vessel-rank module allowlist.
 - [Rights Matrix inheritance](rights-matrix-inheritance.md) — resetting a rank or position restores live role-default inheritance, never a frozen copy or implicit grant.
 - [Office role governance](office-role-governance.md) — assigned profiles are authoritative; personal Deny/Allow, tenancy and protected identities must survive legacy migration.
+- [Port Call task navigation](port-call-task-navigation.md) — separate register filters from editor location; preserve return state and existing published-guidance read access.

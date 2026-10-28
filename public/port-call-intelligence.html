@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="./csvb-mobile-polish.css?v=20260528_1" />
   <link rel="stylesheet" href="./csvb-mobile-fixes-20260528-2.css?v=20260528_2" />
   <link rel="stylesheet" href="./csvb-module-header.css?v=20261027_rollout_2" />
+  <link rel="stylesheet" href="./port-call-intelligence-tasks.css?v=20261106_tasks_1" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="./auth.js?v=20261028_vessel_policy_2"></script>
   <script src="./csvb-module-guard.js?v=20260904_pci_1"></script>
@@ -50,7 +51,46 @@
       </div>
     </section>
 
-    <section class="pci-port-picker" aria-label="Port and terminal selection">
+    <section id="pciTaskLanding" class="pci-task-landing" aria-labelledby="pciTaskHeading">
+      <div class="pci-task-intro">
+        <span class="pci-task-eyebrow">Port Call Intelligence</span>
+        <h2 id="pciTaskHeading">What do you want to do today?</h2>
+        <p>Choose a workspace to continue. Vessel and office access is controlled by your assigned permissions.</p>
+      </div>
+      <div class="pci-task-grid">
+        <button class="pci-task-card" type="button" data-pci-task="new" hidden>
+          <span class="pci-task-number">01</span>
+          <strong>Record a New Port Call</strong>
+          <span>Capture a vessel call and its operational evidence.</span>
+          <span class="pci-task-arrow" aria-hidden="true">→</span>
+        </button>
+        <button class="pci-task-card" type="button" data-pci-task="calls" hidden>
+          <span class="pci-task-number">02</span>
+          <strong>Review / Manage Call Reports</strong>
+          <span>Find reports, check their status and review the record.</span>
+          <span class="pci-task-arrow" aria-hidden="true">→</span>
+        </button>
+        <button class="pci-task-card" type="button" data-pci-task="profile" hidden>
+          <span class="pci-task-number">03</span>
+          <strong>View Port / Terminal Intelligence</strong>
+          <span>Consult approved port intelligence with source and approval references.</span>
+          <span class="pci-task-arrow" aria-hidden="true">→</span>
+        </button>
+        <button class="pci-task-card" type="button" data-pci-task="office" hidden>
+          <span class="pci-task-number">04</span>
+          <strong>Office Information &amp; Review</strong>
+          <span>Manage controlled guidance and review submissions.</span>
+          <span class="pci-task-arrow" aria-hidden="true">→</span>
+        </button>
+      </div>
+    </section>
+
+    <nav id="pciWorkspaceNav" class="pci-workspace-nav" aria-label="Current workspace" hidden>
+      <button id="pciBackTasks" class="btn2" type="button">Back to Tasks</button>
+      <h2 id="pciTaskTitle"></h2>
+    </nav>
+
+    <section id="pciLocationPicker" class="pci-port-picker" aria-label="Port and terminal selection" hidden>
       <div class="pci-port-picker-title">Find a port or terminal</div>
       <div class="pci-directory-search">
         <form id="unlocodeSearchForm" class="pci-search-box">
@@ -96,7 +136,7 @@
       <button class="pci-tab" type="button" data-tab="office" data-pci-tip="View Company regulations, incidents, notes and guidance for this port.">Office Information <span id="officeCount" class="pci-count">0</span></button>
     </nav>
 
-    <section id="profilePanel" class="pci-panel" data-panel="profile">
+    <section id="profilePanel" class="pci-panel" data-panel="profile" hidden>
       <div class="pci-panel-head">
         <div><h2>Consolidated Port / Terminal / Berth Profile</h2><p>Only office-approved information is presented as the current Company profile.</p></div>
       </div>
@@ -113,41 +153,48 @@
       <div class="pci-panel-head">
         <div><h2>Company Call Report Register</h2><p>View and filter every call report available to your role. Office users can see all Company statuses; other users remain restricted by the existing Rights Matrix and database policies.</p></div>
       </div>
+      <div id="pciRegisterWorkspace" class="pci-register-workspace">
       <div class="pci-register-toolbar">
         <div class="pci-register-context">
           <strong id="callRegisterContext">Company-wide register</strong>
           <span id="callRegisterResult">0 visible reports</span>
         </div>
-        <div class="pci-register-filters">
+        <div class="pci-register-filters pci-primary-filters">
+          <div><label for="callVesselFilter">Vessel</label><input id="callVesselFilter" type="search" placeholder="Vessel name" /></div>
+          <div><label for="callStatusFilter">Status</label><select id="callStatusFilter"><option value="">All visible statuses</option><option value="finalised">Finalised</option><option value="draft">Draft</option><option value="submitted">Submitted</option><option value="under_review">Under review</option></select></div>
           <div><label for="callDateFrom">Call date from</label><input id="callDateFrom" type="date" /></div>
           <div><label for="callDateTo">Call date to</label><input id="callDateTo" type="date" /></div>
           <div><label for="callReferenceFilter">Call reference</label><input id="callReferenceFilter" type="search" placeholder="Call reference" /></div>
-          <div><label for="callVesselFilter">Vessel</label><input id="callVesselFilter" type="search" placeholder="Vessel name" /></div>
-          <div><label for="callCountryFilter">Country</label><select id="callCountryFilter"><option value="">All countries</option></select></div>
-          <div><label for="callUnlocodeFilter">UN/LOCODE</label><input id="callUnlocodeFilter" type="search" placeholder="Example: SGSIN" /></div>
-          <div><label for="callPortFilter">Port</label><input id="callPortFilter" type="search" placeholder="Port name" /></div>
-          <div><label for="callTerminalFilter">Terminal</label><input id="callTerminalFilter" type="search" placeholder="Terminal name" /></div>
-          <div><label for="callBerthFilter">Berth</label><input id="callBerthFilter" type="search" placeholder="Berth name" /></div>
-          <div><label for="callCargoFilter">Cargo operation</label><input id="callCargoFilter" type="search" placeholder="Cargo operation" /></div>
-          <div><label for="callStatusFilter">Status</label><select id="callStatusFilter"><option value="">All visible statuses</option><option value="finalised">Finalised</option><option value="draft">Draft</option><option value="submitted">Submitted</option><option value="under_review">Under review</option></select></div>
-          <div><label for="callOriginFilter">Report origin</label><select id="callOriginFilter"><option value="">All origins</option><option value="vessel_master">Vessel Master</option><option value="office">Office-entered</option></select></div>
         </div>
+        <details id="pciMoreFilters" class="pci-more-filters">
+          <summary>More filters</summary>
+          <div class="pci-register-filters pci-secondary-filters">
+            <div><label for="callCountryFilter">Country</label><select id="callCountryFilter"><option value="">All countries</option></select></div>
+            <div><label for="callUnlocodeFilter">UN/LOCODE</label><input id="callUnlocodeFilter" type="search" placeholder="Example: SGSIN" /></div>
+            <div><label for="callPortFilter">Port</label><input id="callPortFilter" type="search" placeholder="Port name" /></div>
+            <div><label for="callTerminalFilter">Terminal</label><input id="callTerminalFilter" type="search" placeholder="Terminal name" /></div>
+            <div><label for="callBerthFilter">Berth</label><input id="callBerthFilter" type="search" placeholder="Berth name" /></div>
+            <div><label for="callCargoFilter">Cargo operation</label><input id="callCargoFilter" type="search" placeholder="Cargo operation" /></div>
+            <div><label for="callOriginFilter">Report origin</label><select id="callOriginFilter"><option value="">All origins</option><option value="vessel_master">Vessel Master</option><option value="office">Office-entered</option></select></div>
+          </div>
+        </details>
         <div class="pci-register-actions">
           <button id="applyCallFiltersBtn" class="btn" type="button">Apply Filters</button>
           <button id="clearCallFiltersBtn" class="btn2" type="button">Clear Filters</button>
         </div>
       </div>
-      <div class="pci-master-detail">
-        <div>
-          <div id="callList" class="pci-list"><div class="pci-empty">Loading visible call reports…</div></div>
-          <div class="pci-pagination">
-            <button id="callPrevPageBtn" class="btn2" type="button">Previous</button>
-            <span id="callPageSummary">Page 1</span>
-            <button id="callNextPageBtn" class="btn2" type="button">Next</button>
-          </div>
-        </div>
-        <article id="callDetail" class="pci-detail"><div class="pci-empty">Select a call report to read it.</div></article>
+      <div id="callList" class="pci-list"><div class="pci-empty">Loading visible call reports…</div></div>
+      <div class="pci-pagination">
+        <button id="callPrevPageBtn" class="btn2" type="button">Previous</button>
+        <span id="callPageSummary">Page 1</span>
+        <button id="callNextPageBtn" class="btn2" type="button">Next</button>
       </div>
+      </div>
+    </section>
+
+    <section id="pciReportDetailWorkspace" class="pci-report-detail-workspace" hidden>
+      <button id="pciBackReports" class="btn2 pci-back-reports" type="button">Back to Call Reports</button>
+      <article id="callDetail" class="pci-detail"><div class="pci-empty">Select a call report to read it.</div></article>
     </section>
 
     <section id="officePanel" class="pci-panel" data-panel="office" hidden>
@@ -176,7 +223,7 @@
   <div id="pciBusy" class="pci-busy" hidden><div class="pci-spinner"></div><span>Working…</span></div>
 
   <script src="./port-call-intelligence-permissions-v1.js?v=20260907_4"></script>
-  <script src="./port-call-intelligence.js?v=20261028_vessel_policy_1"></script>
+  <script src="./port-call-intelligence.js?v=20261107_task_workspace_2"></script>
   <script src="./csvb-build-badge.js?v=20260528_01"></script>
 </body>
 </html>
