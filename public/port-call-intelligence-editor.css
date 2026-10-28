@@ -1,0 +1,250 @@
+/*
+ * C.S.V. BEACON — full-width call-report editing view.
+ * Load after port-call-intelligence.css. The drawer is still the shared
+ * application drawer; these rules activate only for the call editor state.
+ */
+
+body.pci-call-editing #pciDrawer.pci-call-editor {
+  position: relative;
+  inset: auto;
+  display: flex;
+  flex-direction: column;
+  width: calc(100% - clamp(20px, 5vw, 88px));
+  max-width: 1680px;
+  height: auto;
+  min-height: min(680px, calc(100dvh - 110px));
+  margin: 18px auto 40px;
+  overflow: visible;
+  border: 1px solid var(--pci-line, #d6e4f5);
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 8px 24px rgba(3, 27, 63, .08);
+}
+
+body.pci-call-editing #pciDrawer.pci-call-editor .pci-drawer-head {
+  position: relative;
+  align-items: center;
+  min-height: 70px;
+  padding: 13px clamp(16px, 2vw, 30px) !important;
+  border-bottom: 1px solid var(--pci-line, #d6e4f5);
+  background: #f7fafd;
+}
+
+body.pci-call-editing #pciDrawer.pci-call-editor #drawerTitle {
+  font-size: clamp(1.16rem, 1.7vw, 1.5rem);
+  line-height: 1.2;
+}
+
+body.pci-call-editing #pciDrawer.pci-call-editor #pciEditorBack {
+  flex: 0 0 auto;
+  min-height: 38px;
+  margin-right: 6px;
+  border: 1px solid #b8dce8;
+  border-radius: 8px;
+  padding: 7px 11px;
+  background: #eaf6fa;
+  color: var(--pci-navy, #062a5e);
+  font: inherit;
+  font-size: .86rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+body.pci-call-editing #pciDrawer.pci-call-editor #pciEditorBack:hover {
+  background: #ddf7fa;
+}
+
+body.pci-call-editing #pciDrawer.pci-call-editor #pciEditorBack:focus-visible {
+  outline: 3px solid rgba(0, 128, 145, .28);
+  outline-offset: 2px;
+}
+
+body.pci-call-editing #pciDrawer.pci-call-editor #closeDrawerBtn {
+  display: none;
+}
+
+body.pci-call-editing #pciDrawer.pci-call-editor #drawerBody {
+  flex: 1 0 auto;
+  min-width: 0;
+  padding: clamp(14px, 2vw, 28px) clamp(16px, 2.4vw, 38px) 28px !important;
+  overflow: visible;
+}
+
+body.pci-call-editing #pciDrawer.pci-call-editor .pci-form {
+  width: 100%;
+  max-width: 1540px;
+  margin: 0 auto;
+  gap: 16px !important;
+}
+
+body.pci-call-editing #pciDrawer.pci-call-editor .pci-form-section {
+  margin: 0 0 14px !important;
+  border-color: #d6e4f5;
+  border-radius: 10px;
+  background: #fff;
+}
+
+body.pci-call-editing #pciDrawer.pci-call-editor .pci-form-section > h3 {
+  padding: 11px 15px !important;
+  border-bottom: 1px solid #dce9f2;
+  background: #edf5fa;
+  color: var(--pci-navy, #062a5e);
+  font-size: .95rem !important;
+}
+
+body.pci-call-editing #pciDrawer.pci-call-editor .pci-form-section > .pci-form-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 15px 18px !important;
+  padding: 16px 18px !important;
+}
+
+body.pci-call-editing #pciDrawer.pci-call-editor .pci-form-grid > .is-wide,
+body.pci-call-editing #pciDrawer.pci-call-editor .pci-form-field.is-wide {
+  grid-column: 1 / -1;
+}
+
+body.pci-call-editing #pciDrawer.pci-call-editor .pci-form-field {
+  min-width: 0;
+  gap: 6px;
+}
+
+body.pci-call-editing #pciDrawer.pci-call-editor .pci-form-field > label,
+body.pci-call-editing #pciDrawer.pci-call-editor .pci-choice-group legend {
+  color: #31516c;
+  font-size: .81rem !important;
+  line-height: 1.35;
+}
+
+body.pci-call-editing #pciDrawer.pci-call-editor .pci-form input,
+body.pci-call-editing #pciDrawer.pci-call-editor .pci-form select,
+body.pci-call-editing #pciDrawer.pci-call-editor .pci-form textarea {
+  width: 100%;
+  min-width: 0;
+  min-height: 40px !important;
+  border-color: #b8d8ea;
+  border-radius: 8px;
+  padding: 9px 11px !important;
+  background-color: #fff;
+  color: var(--pci-ink, #17324d);
+  font: inherit;
+  font-size: .92rem;
+}
+
+body.pci-call-editing #pciDrawer.pci-call-editor .pci-form textarea {
+  min-height: 96px;
+  line-height: 1.5;
+}
+
+body.pci-call-editing #pciDrawer.pci-call-editor .pci-form input:focus,
+body.pci-call-editing #pciDrawer.pci-call-editor .pci-form select:focus,
+body.pci-call-editing #pciDrawer.pci-call-editor .pci-form textarea:focus {
+  outline: 3px solid rgba(0, 128, 145, .18);
+  outline-offset: 1px;
+  border-color: var(--pci-teal, #0097a7);
+}
+
+body.pci-call-editing #pciDrawer.pci-call-editor .pci-help {
+  font-size: .74rem !important;
+  line-height: 1.4 !important;
+}
+
+body.pci-call-editing #pciDrawer.pci-call-editor #drawerActions {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 9px;
+  min-height: 60px;
+  padding: 10px clamp(16px, 2.4vw, 38px) calc(10px + env(safe-area-inset-bottom)) !important;
+  border-top: 1px solid var(--pci-line, #d6e4f5);
+  background: rgba(247, 250, 253, .97);
+  box-shadow: 0 -5px 16px rgba(3, 27, 63, .05);
+}
+
+body.pci-call-editing #pciDrawer.pci-call-editor #drawerActions > * {
+  max-width: 100%;
+}
+
+body.pci-call-editing #pciDrawer.pci-call-editor #drawerActions button {
+  white-space: normal;
+}
+
+@media (max-width: 1180px) {
+  body.pci-call-editing #pciDrawer.pci-call-editor .pci-form-section > .pci-form-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 13px 15px !important;
+  }
+}
+
+@media (max-width: 760px) {
+  body.pci-call-editing #pciDrawer.pci-call-editor {
+    width: calc(100% - 20px);
+    min-height: calc(100dvh - 90px);
+    margin: 10px auto 24px;
+    border-radius: 10px;
+  }
+
+  body.pci-call-editing #pciDrawer.pci-call-editor .pci-drawer-head {
+    gap: 10px;
+    padding: 11px 13px !important;
+  }
+
+  body.pci-call-editing #pciDrawer.pci-call-editor #pciEditorBack {
+    padding: 7px 9px;
+    font-size: .8rem;
+  }
+
+  body.pci-call-editing #pciDrawer.pci-call-editor #drawerBody {
+    padding: 12px 11px 20px !important;
+  }
+
+  body.pci-call-editing #pciDrawer.pci-call-editor .pci-form-section > .pci-form-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px !important;
+    padding: 13px !important;
+  }
+
+  body.pci-call-editing #pciDrawer.pci-call-editor #drawerActions {
+    justify-content: stretch;
+    gap: 7px;
+    padding: 9px 11px calc(9px + env(safe-area-inset-bottom)) !important;
+  }
+
+  body.pci-call-editing #pciDrawer.pci-call-editor #drawerActions > button {
+    flex: 1 1 140px;
+  }
+}
+
+@media (max-width: 480px) {
+  body.pci-call-editing #pciDrawer.pci-call-editor .pci-drawer-head {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  body.pci-call-editing #pciDrawer.pci-call-editor .pci-drawer-head > div {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+
+  body.pci-call-editing #pciDrawer.pci-call-editor #drawerTitle {
+    font-size: 1.08rem;
+  }
+
+  body.pci-call-editing #pciDrawer.pci-call-editor .pci-form-pair,
+  body.pci-call-editing #pciDrawer.pci-call-editor .pci-form-triple,
+  body.pci-call-editing #pciDrawer.pci-call-editor .pci-coordinate-control,
+  body.pci-call-editing #pciDrawer.pci-call-editor .pci-inline-control,
+  body.pci-call-editing #pciDrawer.pci-call-editor .pci-status-number .pci-inline-control,
+  body.pci-call-editing #pciDrawer.pci-call-editor .pci-manifold-control,
+  body.pci-call-editing #pciDrawer.pci-call-editor .pci-tug-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  body.pci-call-editing #pciDrawer.pci-call-editor #drawerActions > button {
+    flex-basis: 100%;
+  }
+}

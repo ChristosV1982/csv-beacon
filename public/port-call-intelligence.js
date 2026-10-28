@@ -37,7 +37,8 @@
     directorySearchResults: [], reportRows: [], reportCount: 0, reportPage: 0,
     reportPageSize: 25, reportRequest: 0,
     taskView: "tasks", detailView: false, registerScope: null,
-    registerScroll: 0, registerHorizontalScroll: 0, registerReturnPage: null
+    registerScroll: 0, registerHorizontalScroll: 0, registerReturnPage: null,
+    callEditor: null, editorSaving: false
   };
 
   const $ = (id) => document.getElementById(id);
@@ -154,12 +155,82 @@
     $("drawerBody").innerHTML = bodyHtml; $("drawerActions").innerHTML = actionsHtml;
     $("pciDrawerBackdrop").hidden = false; $("pciDrawer").hidden = false;
     document.body.style.overflow = "hidden"; bindActionRoot($("pciDrawer"));
-    setTimeout(() => $("pciDrawer").querySelector("input,select,textarea,button")?.focus(), 20);
+    setTimeout(() => $("pciDrawer").querySelector("input,select,textarea,button:not([hidden])")?.focus(), 20);
   }
 
   function closeDrawer() {
+    const editor = state.callEditor;
+    state.callEditor = null;
     $("pciDrawerBackdrop").hidden = true; $("pciDrawer").hidden = true;
     document.body.style.overflow = "";
+    document.body.classList.remove("pci-call-editing");
+    $("pciDrawer").classList.remove("pci-call-editor");
+    $("pciDrawer").setAttribute("role", "dialog");
+    $("pciDrawer").setAttribute("aria-modal", "true");
+    if ($("pciEditorBack")) $("pciEditorBack").hidden = true;
+    if (editor) {
+      editor.notices.forEach(({ node, parent, next }) => parent.insertBefore(node, next?.parentNode === parent ? next : null));
+      document.querySelector("main.pci-page").hidden = false;
+      state.taskView = editor.task; state.detailView = editor.detail;
+      applyTaskLayout();
+      window.scrollTo(0, editor.scroll);
+    }
+  }
+
+  function callFormSignature() {
+    return JSON.stringify([...($("pciCallForm")?.querySelectorAll("input,select,textarea") || [])]
+      .filter((el) => el.type !== "file" && !el.id.startsWith("pciUpload"))
+      .map((el) => [el.id, el.name, el.type === "checkbox" || el.type === "radio" ? el.checked :
+        el.multiple ? [...el.selectedOptions].map((option) => option.value) : el.value]));
+  }
+
+  function callEditorDirty(includePendingUpload = true) {
+    return !!state.callEditor && (callFormSignature() !== state.callEditor.baseline ||
+      (includePendingUpload && !!$("pciUploadFile")?.files?.length));
+  }
+
+  async function requestCloseDrawer() {
+    const editor = state.callEditor;
+    if (state.editorSaving || (editor && (state.busy || editor.confirming))) return;
+    if (editor) editor.confirming = true;
+    try {
+      if (callEditorDirty() && !await confirmAction({
+        title: "Discard unsaved report changes?",
+        message: "Your unsaved changes to this call report will be lost. Saved report data and attachments will not be deleted.",
+        label: "Discard changes"
+      })) return;
+      closeDrawer();
+    } finally { if (editor) editor.confirming = false; }
+  }
+
+  function beginCallEditor(call) {
+    const drawer = $("pciDrawer");
+    if (!$("pciEditorBack")) {
+      const back = document.createElement("button");
+      back.id = "pciEditorBack"; back.type = "button"; back.onclick = requestCloseDrawer;
+      drawer.querySelector(".pci-drawer-head").prepend(back);
+      const feedback = document.createElement("div");
+      feedback.id = "pciEditorFeedback";
+      $("drawerBody").before(feedback);
+    }
+    const back = $("pciEditorBack");
+    back.textContent = call && state.detailView ? "Back to Report Detail" :
+      state.taskView === "calls" ? "Back to Call Reports" : "Back to New Port Call";
+    back.hidden = false;
+    const notices = ["okBox", "warnBox", "pciBusy"].map((id) => {
+      const node = $(id);
+      return { node, parent: node.parentNode, next: node.nextSibling };
+    });
+    state.callEditor = { task: state.taskView, detail: state.detailView, scroll: window.scrollY,
+      baseline: callFormSignature(), notices };
+    notices.forEach(({ node }) => $("pciEditorFeedback").append(node));
+    document.querySelector("main.pci-page").hidden = true;
+    document.body.classList.add("pci-call-editing");
+    document.body.style.overflow = "";
+    drawer.classList.add("pci-call-editor");
+    drawer.setAttribute("role", "region"); drawer.removeAttribute("aria-modal");
+    $("pciDrawerBackdrop").hidden = true;
+    window.scrollTo(0, 0);
   }
 
   function confirmAction({ title, message, label = "Delete", danger = true }) {
@@ -951,8 +1022,17 @@
     const hazards = renderHazardEditor(detail);
     const attachments = call ? renderAttachmentEditor(call, detail) : '<section class="pci-form-section"><h3>Attachments</h3><div class="pci-repeat-note">Save the Draft first, then reopen it to upload attachments securely.</div></section>';
     openDrawer(officeAuthored ? "Office-entered vessel call report" : "Vessel call report", call ? `Edit ${call.call_reference}` : `New Draft — ${selectedPort()?.port_name || "Port"}`, `<form id="pciCallForm" class="pci-form" novalidate>${core}${dynamic}${repeats}${confirmations}${hazards}${attachments}</form>`, `<button id="cancelCallBtn" class="btn2" type="button" data-pci-tip="Close without saving unsaved changes.">Cancel</button><button id="saveCallBtn" class="btn" type="button" data-pci-tip="Save all entered information as a Draft. You can continue later.">Save Draft</button>`);
-    $("cancelCallBtn").onclick = closeDrawer; $("saveCallBtn").onclick = () => saveCallEditor(call);
+    $("cancelCallBtn").onclick = requestCloseDrawer;
+    $("saveCallBtn").onclick = async () => {
+      if (state.editorSaving) return;
+      state.editorSaving = true;
+      const controls = [$("saveCallBtn"), $("cancelCallBtn"), $("pciEditorBack")].filter(Boolean);
+      controls.forEach((button) => { button.disabled = true; });
+      try { await saveCallEditor(call); }
+      finally { state.editorSaving = false; controls.forEach((button) => { button.disabled = false; }); }
+    };
     installCallEditorControls(); installRepeatAndHazardControls(); if (call) installUploadControl(call, detail);
+    beginCallEditor(call);
   }
 
   function renderRepeatEditor(detail, excluded = new Set()) {
@@ -1328,6 +1408,7 @@
   }
 
   async function uploadAttachment(call, detail) {
+    if (callEditorDirty(false)) return showMessage("warn", "Save Draft before uploading an attachment so your report edits are not lost when the editor reloads.");
     const file = $("pciUploadFile").files?.[0]; if (!file) return showMessage("warn", "Choose a file before uploading.");
     const allowed = ["image/jpeg", "image/png", "image/webp", "application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"];
     if (!allowed.includes(file.type)) return showMessage("warn", "This file type is not permitted. Use JPG, PNG, WebP, PDF, DOCX or XLSX.");
@@ -1349,6 +1430,7 @@
   }
 
   async function confirmDeleteAttachment(id) {
+    if (callEditorDirty()) return showMessage("warn", "Save Draft before deleting an attachment so your report edits are not lost when the report reloads.");
     const call = findCall(state.selectedCallId), detail = call ? await loadCallDetails(call.id) : null, a = detail?.attachments.find((x) => x.id === id); if (!a) return;
     if (!await confirmAction({ title: "Delete Draft attachment?", message: `${a.original_file_name} will be permanently removed from private Storage and this Draft.`, label: "Delete Attachment" })) return;
     await task("Deleting attachment…", async () => { const { error: storageError } = await state.sb.storage.from(BUCKET).remove([a.object_path]); dbError(storageError); const { error } = await state.sb.from("pci_call_attachments").delete().eq("id", id); dbError(error); state.callDetails.delete(call.id); closeDrawer(); showMessage("ok", "The Draft attachment was deleted."); await openCall(call.id); });
@@ -1606,8 +1688,24 @@
     $("callPrevPageBtn").onclick = async () => { if (state.reportPage === 0) return; state.reportPage -= 1; await task("Loading previous reports…", () => loadCallRegister(false)); };
     $("callNextPageBtn").onclick = async () => { if ((state.reportPage + 1) * state.reportPageSize >= state.reportCount) return; state.reportPage += 1; await task("Loading more reports…", () => loadCallRegister(false)); };
     $("officeCategoryFilter").onchange = renderOfficeInfo;
-    $("closeDrawerBtn").onclick = closeDrawer; $("pciDrawerBackdrop").onclick = closeDrawer;
-    document.addEventListener("keydown", (event) => { if (event.key === "Escape" && !$("confirmDialog").hidden) $("confirmCancelBtn").click(); else if (event.key === "Escape" && !$("pciDrawer").hidden) closeDrawer(); });
+    $("closeDrawerBtn").onclick = requestCloseDrawer; $("pciDrawerBackdrop").onclick = requestCloseDrawer;
+    document.addEventListener("keydown", (event) => { if (event.key === "Escape" && !$("confirmDialog").hidden) $("confirmCancelBtn").click(); else if (event.key === "Escape" && !$("pciDrawer").hidden) requestCloseDrawer(); });
+    window.addEventListener("beforeunload", (event) => {
+      if (callEditorDirty() || state.editorSaving) { event.preventDefault(); event.returnValue = ""; }
+    });
+    document.addEventListener("click", async (event) => {
+      const navigation = event.target.closest("header a[href],header button");
+      if (!navigation || !state.callEditor || $("pciDrawer").contains(navigation)) return;
+      if (state.editorSaving || state.busy || state.callEditor.confirming) { event.preventDefault(); event.stopImmediatePropagation(); return; }
+      if (!callEditorDirty()) return;
+      event.preventDefault(); event.stopImmediatePropagation();
+      const editor = state.callEditor; editor.confirming = true;
+      try {
+        if (await confirmAction({ title: "Leave the report editor?", message: "Unsaved report changes will be lost.", label: "Discard changes" })) {
+          closeDrawer(); navigation.click();
+        }
+      } finally { editor.confirming = false; }
+    }, true);
   }
 
   async function init() {
