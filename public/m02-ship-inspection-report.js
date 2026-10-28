@@ -1,6 +1,6 @@
 (() => {
   "use strict";
-  const BUILD = "M02_SHIP_INSPECTION_REPORT_PHASE1A_20261203_1";
+  const BUILD = "M02_SHIP_INSPECTION_REPORT_PHASE1B_20261209_1";
   const MODULE_KEY = "m02_ship_inspection_report";
   const COMPANY_VIEW_ID_KEY = "csvb_superuser_company_view_id";
   const OPERATIONS = ["Loading", "Discharging", "Bunkering", "Deballasting", "Ballasting", "River transit", "IGS in operation", "Major repairs/Drydock", "COW in progress", "Repairs under way", "STS operations", "Idle", "At anchor", "At sea", "Other"];
@@ -8,7 +8,8 @@
   const state = {
     sb: null, bundle: null, context: null, companyId: null, canEdit: false,
     reports: [], report: null, answers: new Map(), questions: [], questionVersion: null,
-    referenceCache: new Map(), referenceRequests: new Map(), mode: "home",
+    companyItems: [], companyAnswers: new Map(), attachments: [], workspace: {},
+    referenceCache: new Map(), referenceRequests: new Map(), mode: "home", attachmentBusy: false,
     registerMode: "all", dirty: false, saving: false, expectedRevision: null,
     questionsToken: 0, pendingNavigation: null, previousFocus: null,
     createRequestId: null,
@@ -111,11 +112,20 @@
     if (state.mode === "editor" && !state.report?.id) renderVesselSnapshot();
     return result;
   }
+  async function loadCompanyCatalogue() {
+    state.companyItems = asArray(await rpc("csvb_m02_company_items", {}))
+      .map((item) => ({ item_no: Number(item.item_no), item_text: text(item.item_text) }))
+      .sort((a, b) => a.item_no - b.item_no);
+    if (state.mode === "editor" && !state.report?.id) {
+      state.companyAnswers = new Map(state.companyItems.map((item) => [item.item_no, { response: null, comments: "" }]));
+      renderCompanyItems(); progress();
+    }
+  }
   async function loadReports() {
     if (!state.companyId) return;
     el("reportRows").innerHTML = '<tr><td colspan="7" class="m02-table-state">Loading Company reports…</td></tr>';
     try {
-      state.reports = asArray(await rpc("csvb_m02_reports", { p_company_id: state.companyId }));
+      state.reports = asArray(await rpc("csvb_m02_reports_v2", { p_company_id: state.companyId }));
       renderReports();
     } catch (error) {
       el("reportRows").innerHTML = "";
@@ -163,10 +173,11 @@
         escapeHtml(report.attending_superintendent || "—"),
         `<span class="m02-status ${report.status === "completed" ? "completed" : ""}">${escapeHtml(report.status || "draft")}</span>`,
         escapeHtml(dateTimeText(report.updated_at)),
-        `<span class="m02-progress"><span class="m02-progress-track"><span style="width:${percent}%"></span></span>${Number(report.checked_count || 0)}/${Number(report.total_count || 0)}</span>`,
+         `<span class="m02-progress"><span class="m02-progress-track"><span style="width:${percent}%"></span></span>SIRE ${Number(report.checked_count || 0)}/${Number(report.total_count || 0)} · Co. ${Number(report.company_checked_count || 0)}/${Number(report.company_total_count || 51)}</span>`,
         `<button type="button" class="m02-open-report" data-open-report="${escapeHtml(report.id)}">Open</button>`
       ];
-      values.forEach((value) => { const td = document.createElement("td"); td.innerHTML = value; tr.append(td); });
+      const labels = ["Vessel", "Inspection period", "Superintendent", "Status", "Updated", "Progress", "Action"];
+      values.forEach((value, index) => { const td = document.createElement("td"); td.dataset.label = labels[index]; td.innerHTML = value; tr.append(td); });
       el("reportRows").append(tr);
     });
   }
@@ -272,13 +283,53 @@
     return Array.isArray(value) ? value.map((item) => text(item)).join("\n") : text(value);
   }
   function answerFor(questionId) { return state.answers.get(questionId) || { response: null, comments: "" }; }
+  // Register future response-based sections here and in the server completion
+  // sections helper when their data model is implemented (not placeholder pages).
+  function responseSections() {
+    const section = (key, label, rows, response, allowed) => {
+      const answered = rows.filter((row) => allowed.includes(response(row))).length;
+      return { key, label, total: rows.length, answered, remaining: rows.length - answered };
+    };
+    return [
+      section("company", "Part 3", state.companyItems, (item) => companyAnswer(item.item_no).response, ["Yes", "No", "N/S"]),
+      section("questions", "Part 4", state.questions, (question) => answerFor(question.id).response, ["Yes", "No", "N/A", "N/S"])
+    ];
+  }
+  function progressText(section) {
+    return `Answered ${section.answered} / ${section.total} · Remaining ${section.remaining}`;
+  }
+  function validateCompletion() {
+    const sections = responseSections();
+    if (sections.some((section) => !section.total)) {
+      showEditorError("Required response sections are not available yet. Save Draft and retry after loading.");
+      el("editorMessage").scrollIntoView({ block: "nearest" });
+      return false;
+    }
+    const incomplete = sections.filter((section) => section.remaining > 0);
+    if (!incomplete.length) return true;
+    showEditorError(`Cannot mark Completed. ${incomplete.map((section) => `${section.label}: ${section.remaining} remaining`).join("; ")}. Save Draft is still available.`);
+    const actions = document.createElement("div"); actions.className = "m02-completion-jumps";
+    incomplete.forEach((section) => {
+      const button = document.createElement("button"); button.type = "button"; button.className = "m02-button m02-button-outline";
+      button.textContent = `Go to ${section.label}`;
+      button.addEventListener("click", () => navSection(section.key));
+      actions.append(button);
+    });
+    el("editorMessage").append(actions);
+    el("editorMessage").scrollIntoView({ block: "nearest" });
+    return false;
+  }
   function progress() {
-    const checked = state.questions.filter((question) => {
-      const response = answerFor(question.id).response;
-      return response !== null && response !== "";
-    }).length;
-    el("questionProgress").textContent = `${checked} checked`;
-    el("navProgress").textContent = `${checked}/${state.questions.length}`;
+    const [company, questions] = responseSections();
+    el("questionProgress").textContent = progressText(questions);
+    el("navProgress").textContent = progressText(questions);
+    el("companyProgress").textContent = progressText(company);
+    el("companyNavProgress").textContent = progressText(company);
+    $all(".m02-chapter").forEach((chapter) => {
+      const rows = state.questions.filter((question) => String(questionChapter(question)) === chapter.dataset.chapter);
+      const answered = rows.filter((question) => ["Yes", "No", "N/A", "N/S"].includes(answerFor(question.id).response)).length;
+      chapter.querySelector(".m02-chapter-count").textContent = progressText({ total: rows.length, answered, remaining: rows.length - answered });
+    });
     el("mobileSaveState").textContent = state.dirty ? "Unsaved changes" : "All changes saved";
     renderAppendix();
   }
@@ -287,13 +338,138 @@
     if (!state.questions.length) {
       const tr = document.createElement("tr"), td = document.createElement("td"); td.colSpan = 3; td.className = "m02-table-state"; td.textContent = "No eligible questions are available."; tr.append(td); host.append(tr); return;
     }
+    const notChecked = state.questions.filter((question) => !answerFor(question.id).response).length;
+    const notSeen = state.questions.filter((question) => answerFor(question.id).response === "N/S").length;
+    el("appendixCounts").textContent = `${notChecked} Not Checked · ${notSeen} Not Seen`;
     state.questions.filter((question) => !answerFor(question.id).response || answerFor(question.id).response === "N/S").forEach((question) => {
       const answer = answerFor(question.id), tr = document.createElement("tr");
-      [question.number_full || question.number_base || "—", questionTypeLabel(question), answer.response === "N/S" ? "Not seen" : answer.response || "Not checked"].forEach((value) => {
-        const td = document.createElement("td"); td.textContent = text(value); tr.append(td);
+      [["Number", question.number_full || question.number_base || "—"], ["Type", questionTypeLabel(question)], ["State", answer.response === "N/S" ? "Not seen" : answer.response || "Not checked"]].forEach(([label, value]) => {
+        const td = document.createElement("td"); td.dataset.label = label; td.textContent = text(value); tr.append(td);
       });
       host.append(tr);
     });
+  }
+  function companyAnswer(itemNo) { return state.companyAnswers.get(Number(itemNo)) || { response: null, comments: "" }; }
+  function renderCompanyItems() {
+    const host = el("companyItems"); host.replaceChildren();
+    if (!state.companyItems.length) {
+      const empty = document.createElement("div"); empty.className = "m02-empty"; empty.textContent = "Company attendance catalogue is not available."; host.append(empty); return;
+    }
+    state.companyItems.forEach((item) => {
+      const no = Number(item.item_no), answer = companyAnswer(no), card = document.createElement("article");
+      card.className = "m02-company-card"; card.dataset.companyCard = String(no);
+      const head = document.createElement("div"); head.className = "m02-company-head";
+      const number = document.createElement("span"); number.className = "m02-question-number"; number.textContent = String(no).padStart(2, "0");
+      const wording = document.createElement("p"); wording.className = "m02-company-text"; wording.textContent = text(item.item_text);
+      head.append(number, wording);
+      const controls = document.createElement("div"); controls.className = "m02-company-controls";
+      const label = document.createElement("label"); label.textContent = "Response";
+      const select = document.createElement("select"); select.dataset.companyResponse = String(no); select.setAttribute("aria-label", `Company check ${no} response`);
+      [["", "Not Checked"], ["Yes", "Yes"], ["No", "No"], ["N/S", "N/S"]].forEach(([v, t]) => select.add(new Option(t, v)));
+      select.value = answer.response || ""; label.append(select);
+      const commentLabel = document.createElement("label"); commentLabel.textContent = "Comments";
+      const comment = document.createElement("textarea"); comment.dataset.companyComments = String(no); comment.maxLength = 4000; comment.placeholder = "Add comments…"; comment.value = answer.comments || ""; commentLabel.append(comment);
+      controls.append(label, commentLabel); card.append(head, controls);
+      card.insertAdjacentHTML("beforeend", attachmentMarkup(null, no));
+      host.append(card);
+    });
+    renderAttachments();
+  }
+  function attachmentMarkup(questionId, companyNo) {
+    const key = questionId ? `q:${questionId}` : `c:${companyNo}`;
+    return `<details class="m02-attachments" data-attachment-group="${escapeHtml(key)}" ${questionId ? "open" : ""}><summary>Supporting attachments${questionId ? " — this SIRE question" : ""} <span>Optional · max 5 files / 10 MB combined</span></summary><span class="m02-attachment-quota"></span><div class="m02-attachment-list"></div><label class="m02-upload-button">Add attachment<input type="file" data-upload-file data-question-id="${escapeHtml(questionId || "")}" data-company-item-no="${companyNo || ""}" aria-label="Add supporting attachment for ${questionId ? "this SIRE question" : `Company item ${companyNo}`}" accept=".jpg,.jpeg,.png,.webp,.pdf,.doc,.docx,.xls,.xlsx" /></label><p class="m02-attachment-hint"></p><span class="m02-upload-status" aria-live="polite"></span></details>`;
+  }
+  function renderAttachments() {
+    el("saveDraft").disabled = !state.canEdit || state.saving || state.attachmentBusy;
+    el("markCompleted").disabled = !state.canEdit || state.saving || state.attachmentBusy;
+    $all("[data-save]").forEach((button) => { button.disabled = !state.canEdit || state.saving || state.attachmentBusy; });
+    $all(".m02-attachments").forEach((group) => {
+      const list = group.querySelector(".m02-attachment-list"); list.replaceChildren();
+      const [kind, id] = (group.dataset.attachmentGroup || "").split(":");
+      const items = state.attachments.filter((file) => kind === "q" ? file.question_id === id : Number(file.company_item_no) === Number(id));
+      const totalBytes = items.reduce((sum, file) => sum + Number(file.size_bytes || 0), 0);
+      const quotaReached = items.length >= 5 || totalBytes >= 10 * 1024 * 1024;
+      group.querySelector(".m02-attachment-quota").textContent = `${items.length}/5 files · ${totalBytes ? formatBytes(totalBytes) : "0 KB"} / 10 MB combined · ${kind === "q" ? "This question only" : "This Company item only"}`;
+      group.querySelector(".m02-attachment-hint").textContent = !state.report?.id
+        ? "Save Draft first to add supporting files."
+        : !state.canEdit || state.report.status !== "draft"
+          ? "Attachments are read-only. Available files can be downloaded."
+          : quotaReached ? "Attachment limit reached. Remove a file before adding another."
+            : "Allowed: JPG/JPEG, PNG, WebP, PDF, DOC/DOCX, XLS/XLSX.";
+      items.forEach((file) => {
+        const row = document.createElement("div"); row.className = "m02-attachment-row";
+        const details = document.createElement("span");
+        details.textContent = `${file.original_filename || "Attachment"} · ${formatBytes(file.size_bytes)} · ${file.mime_type || "file"} · ${file.uploaded_by_name || file.uploaded_by || "Unknown"} · ${dateTimeText(file.uploaded_at)}${file.state === "pending" ? " · Pending retry" : ""}`;
+        row.append(details);
+        if (state.canEdit && state.report?.status === "draft") {
+          const remove = document.createElement("button"); remove.type = "button"; remove.className = "m02-attachment-action"; remove.dataset.deleteAttachment = file.id; remove.textContent = "Remove"; row.append(remove);
+        }
+        if (file.state === "uploaded") {
+          const download = document.createElement("button"); download.type = "button"; download.className = "m02-attachment-action"; download.dataset.downloadAttachment = file.id; download.textContent = "Download"; row.append(download);
+        }
+        list.append(row);
+      });
+      const locked = !state.report?.id || !state.canEdit || state.report?.status === "completed" || state.saving || state.attachmentBusy;
+      group.querySelector("input[type=file]").disabled = locked || quotaReached;
+      group.querySelectorAll("[data-delete-attachment]").forEach((button) => { button.disabled = state.saving || state.attachmentBusy || !state.canEdit || state.report?.status === "completed"; });
+      group.querySelectorAll("[data-download-attachment]").forEach((button) => { button.disabled = state.saving || state.attachmentBusy; });
+    });
+  }
+  function formatBytes(value) {
+    const bytes = Number(value) || 0;
+    return bytes < 1024 * 1024 ? `${Math.max(1, Math.round(bytes / 1024))} KB` : `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  }
+  async function refreshAttachments() {
+    if (!state.report?.id) { state.attachments = []; renderAttachments(); return; }
+    state.attachments = asArray(await rpc("csvb_m02_attachments", { p_report_id: state.report.id }));
+    renderAttachments();
+  }
+  const ALLOWED_FILE = /\.(jpe?g|png|webp|pdf|docx?|xlsx?)$/i;
+  async function handleAttachmentUpload(input) {
+    const file = input.files?.[0]; if (!file) return;
+    const group = input.closest(".m02-attachments"), status = group.querySelector(".m02-upload-status");
+    try {
+      if (state.saving || state.attachmentBusy) return;
+      if (!state.report?.id) throw new Error("Save Draft first to attach files. A report will not be created by an upload.");
+      if (!state.canEdit || state.report.status === "completed") throw new Error("Attachments are read-only for this report.");
+      if (!ALLOWED_FILE.test(file.name)) throw new Error("Choose JPG, JPEG, PNG, WebP, PDF, DOC, DOCX, XLS, or XLSX.");
+      if (!file.size || file.size > 10 * 1024 * 1024) throw new Error("Choose a non-empty file; maximum 10 MB combined per question/item.");
+      const [kind, identity] = group.dataset.attachmentGroup.split(":");
+      const active = state.attachments.filter((item) => kind === "q" ? item.question_id === identity : Number(item.company_item_no) === Number(identity));
+      const total = active.reduce((sum, item) => sum + Number(item.size_bytes || 0), 0);
+      if (active.length >= 5) throw new Error("This question/item already has 5 active attachments.");
+      if (total + file.size > 10 * 1024 * 1024) throw new Error("Attachments for this question/item cannot exceed 10 MB combined.");
+      state.attachmentBusy = true; renderAttachments(); status.textContent = "Uploading…"; input.disabled = true;
+      const body = new FormData();
+      body.append("action", "upload"); body.append("report_id", state.report.id);
+      if (kind === "q") body.append("question_id", identity);
+      else body.append("company_item_no", identity);
+      body.append("file", file);
+      const { data, error } = await state.sb.functions.invoke("m02-attachments", { body });
+      if (error) throw error;
+      if (data?.attachment) state.attachments = [...state.attachments.filter((item) => item.id !== data.attachment.id), data.attachment];
+      await refreshAttachments(); status.textContent = "Attachment uploaded.";
+    } catch (error) {
+      status.textContent = error.message || "Upload failed.";
+      try { await refreshAttachments(); } catch (_) { /* keep upload error visible */ }
+    } finally { state.attachmentBusy = false; input.value = ""; renderAttachments(); }
+  }
+  async function handleAttachmentAction(button, action) {
+    if (state.saving || state.attachmentBusy) return;
+    try {
+      if (action === "delete" && (!state.canEdit || state.report?.status === "completed")) throw new Error("Only an editable Draft report can remove attachments.");
+      state.attachmentBusy = true; renderAttachments();
+      const id = button.dataset[action === "delete" ? "deleteAttachment" : "downloadAttachment"];
+      const { data, error } = await state.sb.functions.invoke("m02-attachments", {
+        body: JSON.stringify({ action, attachment_id: id }),
+        headers: { "Content-Type": "application/json" }
+      });
+      if (error) throw error;
+      if (action === "delete") await refreshAttachments();
+      else if (data?.url) window.open(data.url, "_blank", "noopener,noreferrer");
+      else throw new Error("The attachment service returned no download link.");
+    } catch (error) { showEditorError(error.message || "Attachment action failed."); }
+    finally { state.attachmentBusy = false; renderAttachments(); }
   }
   function questionHtml(question) {
     const id = escapeHtml(question.id), payload = question.payload || {};
@@ -305,8 +481,8 @@
     return `<article class="m02-question" data-question-card="${id}" data-search="${escapeHtml(`${question.number_full || ""} ${qText}`.toLowerCase())}">
       <div class="m02-question-top"><span class="m02-question-number">${escapeHtml(question.number_full || question.number_base || "—")}</span><p class="m02-question-text">${escapeHtml(qText || "Question text is not available in the library payload.")}</p><span class="m02-question-type">${escapeHtml(questionTypeLabel(question))}</span></div>
       <div class="m02-answer-row">
-        <label>Response<select data-response="${id}" aria-label="Response for question ${escapeHtml(question.number_full || "")}"><option value="">Not checked</option><option value="Yes" ${answer.response === "Yes" ? "selected" : ""}>Yes</option><option value="No" ${answer.response === "No" ? "selected" : ""}>No</option><option value="N/A" ${answer.response === "N/A" ? "selected" : ""}>N/A</option><option value="N/S" ${answer.response === "N/S" ? "selected" : ""}>N/S</option></select></label>
-        <label>M02 Comments<textarea data-comments="${id}" maxlength="4000" aria-label="M02 Comments for question ${escapeHtml(question.number_full || "")}" placeholder="Add inspection comments…">${escapeHtml(answer.comments || "")}</textarea></label>
+        <label>Response<select data-response="${id}" aria-label="Response for question ${escapeHtml(question.number_full || "")}" aria-describedby="m02-unanswered-${id}"><option value="" disabled hidden ${!answer.response ? "selected" : ""}>Select response…</option><option value="Yes" ${answer.response === "Yes" ? "selected" : ""}>Yes</option><option value="No" ${answer.response === "No" ? "selected" : ""}>No</option><option value="N/A" ${answer.response === "N/A" ? "selected" : ""}>Not Applicable</option><option value="N/S" ${answer.response === "N/S" ? "selected" : ""}>Not Seen</option></select><span id="m02-unanswered-${id}" class="m02-unanswered" ${answer.response ? "hidden" : ""}>Unanswered · Not checked</span></label>
+        <label>Question Remarks<textarea data-comments="${id}" maxlength="50000" aria-label="Question Remarks for question ${escapeHtml(question.number_full || "")}" placeholder="Add question remarks…">${escapeHtml(answer.comments || "")}</textarea></label>
       </div>
       <div class="m02-panels">
         <details><summary>Question Guidance</summary><div class="m02-panel-body">${escapeHtml(guidance || "No question guidance is provided.")}</div></details>
@@ -314,6 +490,7 @@
         <details data-reference-panel="evidence" data-question-id="${id}"><summary>Expected Evidence</summary><div class="m02-panel-body"><button type="button" class="m02-reference-trigger" data-reference="evidence" data-question-id="${id}">Load expected evidence</button><div class="m02-reference-content"><span class="m02-reference-status">Reference data loads when opened.</span></div></div></details>
         <details data-reference-panel="history" data-question-id="${id}"><summary>COMPANY FLEET RECORD — Recorded Vetting Observations</summary><div class="m02-panel-body"><button type="button" class="m02-reference-trigger" data-reference="history" data-question-id="${id}">Load Company fleet record</button><div class="m02-reference-content"><span class="m02-reference-status">Last 18 months of Company fleet history loads when opened. These observations are read-only.</span></div></div></details>
       </div>
+      ${attachmentMarkup(question.id, null)}
     </article>`;
   }
   async function loadQuestions(reportId = null, version = null) {
@@ -353,7 +530,14 @@
       title.textContent = chapter ? `Chapter ${chapter}` : "Other questions";
       count.className = "m02-chapter-count"; count.textContent = `${questions.length} question${questions.length === 1 ? "" : "s"}`;
       summary.append(title, count); details.append(summary);
-      questions.forEach((question) => { const wrapper = document.createElement("div"); wrapper.innerHTML = questionHtml(question); details.append(wrapper.firstElementChild); });
+      questions.forEach((question) => {
+        const wrapper = document.createElement("div"); wrapper.innerHTML = questionHtml(question);
+        const card = wrapper.firstElementChild;
+        // Assign the value directly: HTML parsing strips an initial newline in
+        // textarea contents, which must not alter saved Question Remarks.
+        card.querySelector("[data-comments]").value = answerFor(question.id).comments ?? "";
+        details.append(card);
+      });
       host.append(details);
     });
     progress();
@@ -370,6 +554,20 @@
     $all(".m02-chapter").forEach((chapter) => {
       const visibleCount = $all("[data-question-card]", chapter).filter((card) => !card.hidden).length;
       chapter.hidden = visibleCount === 0;
+    });
+    scheduleRemarksResize();
+  }
+  function resizeRemarks(field) {
+    if (!field.getClientRects().length) return;
+    field.style.height = "auto";
+    field.style.height = `${field.scrollHeight + field.offsetHeight - field.clientHeight}px`;
+  }
+  let remarksResizeFrame = null;
+  function scheduleRemarksResize() {
+    if (remarksResizeFrame !== null) return;
+    remarksResizeFrame = requestAnimationFrame(() => {
+      remarksResizeFrame = null;
+      $all("[data-comments]").forEach(resizeRemarks);
     });
   }
   function referenceKey(questionId) { return `${state.companyId || ""}|${state.report?.id || "new"}|${questionId}`; }
@@ -516,13 +714,13 @@
     if (report.details.open_items.length > 100 || report.details.inspection_places.length > 100) throw new Error("The repeatable item limit is 100 rows.");
   }
   async function fetchSavedReport(reportId) {
-    const result = await rpc("csvb_m02_get", { p_report_id: reportId });
+    const result = await rpc("csvb_m02_get_v2", { p_report_id: reportId });
     return result || {};
   }
   function setEditorReadonly() {
     const readonly = !state.canEdit;
     $all("#reportForm input, #reportForm select, #reportForm textarea, #reportForm button").forEach((control) => {
-      if (control.matches(".m02-reference-trigger, #questionSearch")) return;
+      if (control.matches(".m02-reference-trigger, .m02-attachment-action, [data-upload-file], #questionSearch")) return;
       control.disabled = readonly;
     });
     el("vesselId").disabled = readonly || Boolean(state.report?.id);
@@ -534,19 +732,25 @@
       el("saveState").textContent = "Read only";
       showEditorError("The M02 service has not granted edit permission for this Company. This report is read-only.");
     }
+    renderAttachments();
   }
   async function openNewReport() {
     try {
       requireEditorPermission();
       state.createRequestId = crypto.randomUUID();
       state.report = { id: null, company_id: state.companyId, status: "draft", library_version: asArray(state.context.library_versions)[0] || null, details: {}, part2: {}, create_request_id: state.createRequestId };
-      state.expectedRevision = null; state.answers = new Map(); state.dirty = false; state.referenceCache.clear(); state.referenceRequests.clear();
+      state.expectedRevision = null; state.answers = new Map(); state.companyAnswers = new Map(); state.attachments = []; state.workspace = {};
+      state.dirty = false; state.referenceCache.clear(); state.referenceRequests.clear();
       el("reportForm").reset();
       el("vesselId").disabled = false; el("reportDate").value = new Date().toISOString().slice(0, 10);
+      el("questionSearch").value = ""; el("appendixDetails").open = false;
       fillDetails({});
       el("editorStatus").textContent = "New report"; el("editorTitle").textContent = "Ship Inspection Report";
       message(el("editorMessage"), "");
       await loadQuestions(null, state.report.library_version);
+      state.companyAnswers = new Map(state.companyItems.map((item) => [Number(item.item_no), { response: null, comments: "" }]));
+      renderCompanyItems(); renderAttachments();
+      restoreWorkspace({});
       renderVesselSnapshot(); showView("editor"); updateSaveState();
     } catch (error) { showGlobal(error.message); }
   }
@@ -558,6 +762,14 @@
       if (!report) throw new Error("The M02 service returned no report record.");
       if (typeof result.can_edit === "boolean") state.canEdit = result.can_edit;
       state.report = report; state.expectedRevision = report.revision; state.answers = new Map();
+      state.workspace = result.workspace_state || report.workspace_state || {};
+      state.companyAnswers = new Map();
+      if (asArray(result.company_items).length) {
+        const savedByNo = new Map(asArray(result.company_items).map((item) => [Number(item.item_no), item]));
+        state.companyItems = state.companyItems.map((item) => ({ ...item, ...(savedByNo.get(item.item_no) || {}) }));
+      }
+      asArray(result.company_items).forEach((item) => state.companyAnswers.set(Number(item.item_no), { response: item.response || null, comments: item.comments || "" }));
+      state.attachments = asArray(result.attachments);
       state.createRequestId = report.create_request_id || null;
       asArray(result.answers).forEach((answer) => state.answers.set(answer.question_id, { response: answer.response, comments: answer.comments || "" }));
       state.dirty = false; state.referenceCache.clear(); state.referenceRequests.clear();
@@ -575,13 +787,15 @@
       el("editorTitle").textContent = report.vessel_snapshot?.name || "Ship Inspection Report";
       message(el("editorMessage"), "");
       await loadQuestions(id, report.library_version || null);
+      renderCompanyItems(); renderAttachments();
       renderVesselSnapshot();
       setEditorReadonly();
-      showView("editor"); updateSaveState();
+      showView("editor"); restoreWorkspace({ ...state.workspace, appendix_open: false }); updateSaveState();
     } catch (error) { showGlobal(error.message); }
   }
   function updateSaveState() {
-    const stateText = state.saving ? "Saving…" : state.dirty ? "Unsaved changes" : state.report?.id ? "Saved" : "Not saved";
+    const savedAt = state.report?.updated_at || state.report?.saved_at;
+    const stateText = state.saving ? "Saving…" : state.dirty ? "Unsaved changes" : state.report?.id ? `Saved${savedAt ? ` · ${dateTimeText(savedAt)}` : ""}` : "Not saved";
     el("saveState").textContent = stateText;
     el("mobileSaveState").textContent = state.dirty ? "Unsaved changes" : state.report?.id ? "All changes saved" : "Not saved";
   }
@@ -589,18 +803,47 @@
     if (state.mode !== "editor" || state.saving) return;
     state.dirty = true; updateSaveState();
   }
+  function workspaceState() {
+    return {
+      section: $all(".m02-section-nav button").find((button) => button.classList.contains("is-current"))?.dataset.section || "general",
+      question_search: el("questionSearch").value || "",
+      open_chapters: $all(".m02-chapter[open]").map((node) => node.dataset.chapter),
+      appendix_open: el("appendixDetails").open
+    };
+  }
+  function restoreWorkspace(workspace = {}) {
+    state.workspace = workspace || {};
+    el("questionSearch").value = text(state.workspace.question_search);
+    applyQuestionSearch();
+    const open = new Set(asArray(state.workspace.open_chapters).map(String));
+    $all(".m02-chapter").forEach((chapter) => { chapter.open = open.has(chapter.dataset.chapter); });
+    el("appendixDetails").open = state.workspace.appendix_open === true;
+    const section = ["general", "part1", "part2", "company", "questions", "appendix"].includes(state.workspace.section) ? state.workspace.section : "general";
+    $all(".m02-section-nav button").forEach((button) => button.classList.toggle("is-current", button.dataset.section === section));
+    if (section !== "general") window.setTimeout(() => el(`section-${section}`)?.scrollIntoView({ block: "start" }), 0);
+  }
+  function collectCompanyItems() {
+    return state.companyItems.map((item) => {
+      const answer = companyAnswer(item.item_no);
+      return { item_no: Number(item.item_no), response: answer.response || null, comments: answer.comments || "" };
+    });
+  }
   async function saveReport(targetStatus = "draft") {
-    if (state.saving) return;
+    if (state.saving || state.attachmentBusy) return;
     let savedAlready = false;
     try {
       requireEditorPermission();
       const report = reportObject();
       report.status = targetStatus === "completed" ? "completed" : "draft";
       validateReport(report);
+      if (report.status === "completed" && !validateCompletion()) return;
       state.saving = true; el("reportForm").inert = true; updateSaveState(); message(el("editorMessage"), "");
       el("saveDraft").disabled = true; el("markCompleted").disabled = true;
       const answers = collectAnswers();
-      const saved = await rpc("csvb_m02_save", { p_report: report, p_answers: answers });
+      const savedWorkspace = workspaceState();
+      const saved = await rpc("csvb_m02_save_v2", {
+        p_report: report, p_answers: answers, p_company_items: collectCompanyItems(), p_workspace: savedWorkspace
+      });
       if (!saved?.id) throw new Error("The M02 service did not return a saved report ID.");
       savedAlready = true;
       state.report = {
@@ -611,6 +854,7 @@
         create_request_id: report.create_request_id || saved.create_request_id || null
       };
       state.expectedRevision = state.report.revision;
+      state.workspace = savedWorkspace;
       state.dirty = false;
       el("vesselId").disabled = true;
       el("editorStatus").textContent = state.report.status === "completed" ? "Completed" : "Draft";
@@ -628,6 +872,10 @@
       state.expectedRevision = state.report.revision;
       state.answers = new Map();
       asArray(persisted.answers).forEach((answer) => state.answers.set(answer.question_id, { response: answer.response, comments: answer.comments || "" }));
+      state.companyAnswers = new Map();
+      asArray(persisted.company_items).forEach((item) => state.companyAnswers.set(Number(item.item_no), { response: item.response || null, comments: item.comments || "" }));
+      state.attachments = asArray(persisted.attachments);
+      state.workspace = persisted.workspace_state || state.workspace;
       state.referenceCache.clear(); state.referenceRequests.clear();
       el("vesselId").value = persisted.report.vessel_id || ""; el("vesselId").disabled = true;
       el("reportDate").value = persisted.report.report_date || "";
@@ -638,8 +886,10 @@
       el("editorTitle").textContent = persisted.report.vessel_snapshot?.name || "Ship Inspection Report";
       fillDetails(persisted.report.details || {});
       await loadQuestions(persisted.report.id, persisted.report.library_version || state.questionVersion);
+      renderCompanyItems(); renderAttachments();
+      restoreWorkspace(persisted.workspace_state || savedWorkspace);
       renderVesselSnapshot();
-      state.reports = asArray(await rpc("csvb_m02_reports", { p_company_id: state.companyId }));
+      state.reports = asArray(await rpc("csvb_m02_reports_v2", { p_company_id: state.companyId }));
       setEditorReadonly();
       showGlobal(`Report ${persisted.report.status === "completed" ? "marked completed" : "saved as Draft"}.`, "success");
       message(el("editorMessage"), persisted.report.status === "completed" ? "Report marked Completed. Completion did not add approval or signature states." : "Draft saved. The persisted vessel snapshot and answers are now loaded.", "success");
@@ -656,11 +906,12 @@
         const hint = document.createElement("p"); hint.textContent = "The report may have changed elsewhere. Reload the report to compare the latest revision before saving again."; el("editorMessage").append(hint);
       }
     } finally {
-      state.saving = false; el("reportForm").inert = false; el("saveDraft").disabled = !state.canEdit; el("markCompleted").disabled = !state.canEdit; updateSaveState();
+      state.saving = false; el("reportForm").inert = false; renderAttachments(); updateSaveState();
+      renderAttachments();
     }
   }
   function requestLeave(action) {
-    if (state.saving) return;
+    if (state.saving || state.attachmentBusy) return;
     if (!state.dirty) { action(); return; }
     state.pendingNavigation = action; state.previousFocus = document.activeElement;
     const dialog = el("leaveDialog");
@@ -704,7 +955,7 @@
       el("companySelect").value = state.companyId || "";
       requestLeave(async () => {
         try {
-          await loadContext(selected); state.reports = [];
+          await loadContext(selected); await loadCompanyCatalogue(); state.reports = [];
           state.referenceCache.clear(); await loadReports();
           state.report = null; state.answers.clear(); state.dirty = false;
           showView("home");
@@ -714,25 +965,44 @@
     el("vesselId").addEventListener("change", () => { renderVesselSnapshot(); markDirty(); });
     el("reportForm").addEventListener("input", markDirty);
     el("reportForm").addEventListener("change", (event) => {
+      const companyResponse = event.target.closest("[data-company-response]");
+      if (companyResponse) {
+        const no = Number(companyResponse.dataset.companyResponse), existing = companyAnswer(no);
+        state.companyAnswers.set(no, { ...existing, response: companyResponse.value || null }); markDirty(); progress();
+      }
       const select = event.target.closest("[data-response]");
       if (select) {
         const id = select.dataset.response, existing = answerFor(id);
         state.answers.set(id, { ...existing, response: select.value || null }); markDirty(); progress();
+        el(`m02-unanswered-${id}`).hidden = Boolean(select.value);
       }
       const comment = event.target.closest("[data-comments]");
       if (comment) {
         const existing = answerFor(comment.dataset.comments);
         state.answers.set(comment.dataset.comments, { ...existing, comments: comment.value }); markDirty();
+        resizeRemarks(comment);
+      }
+      const companyComment = event.target.closest("[data-company-comments]");
+      if (companyComment) {
+        const no = Number(companyComment.dataset.companyComments), existing = companyAnswer(no);
+        state.companyAnswers.set(no, { ...existing, comments: companyComment.value }); markDirty();
       }
     });
     el("reportForm").addEventListener("input", (event) => {
+      const companyComment = event.target.closest("[data-company-comments]");
+      if (companyComment) {
+        const no = Number(companyComment.dataset.companyComments), existing = companyAnswer(no);
+        state.companyAnswers.set(no, { ...existing, comments: companyComment.value }); markDirty();
+      }
       const comment = event.target.closest("[data-comments]");
       if (comment) {
         const existing = answerFor(comment.dataset.comments);
         state.answers.set(comment.dataset.comments, { ...existing, comments: comment.value }); markDirty();
+        resizeRemarks(comment);
       }
     });
     el("questionChapters").addEventListener("toggle", (event) => {
+      if (event.target.matches(".m02-chapter") && event.target.open) scheduleRemarksResize();
       if (event.target.matches("[data-reference-panel]") && event.target.open) {
         const button = event.target.querySelector(".m02-reference-trigger");
         if (button && !button.disabled) showReference(button);
@@ -742,7 +1012,18 @@
       const button = event.target.closest("[data-reference]");
       if (button) showReference(button);
     });
+    el("reportForm").addEventListener("change", (event) => {
+      const input = event.target.closest("[data-upload-file]");
+      if (input) handleAttachmentUpload(input);
+    });
+    el("reportForm").addEventListener("click", (event) => {
+      const remove = event.target.closest("[data-delete-attachment]");
+      const download = event.target.closest("[data-download-attachment]");
+      if (remove) handleAttachmentAction(remove, "delete");
+      if (download) handleAttachmentAction(download, "download");
+    });
     el("questionSearch").addEventListener("input", applyQuestionSearch);
+    window.addEventListener("resize", scheduleRemarksResize);
     el("libraryVersion").addEventListener("change", async () => {
       if (state.report?.id) { el("libraryVersion").value = state.report.library_version; return; }
       state.questionVersion = el("libraryVersion").value;
@@ -756,7 +1037,7 @@
     el("stayEditing").addEventListener("click", () => closeLeaveDialog(false));
     el("discardChanges").addEventListener("click", () => closeLeaveDialog(true));
     window.addEventListener("beforeunload", (event) => {
-      if (state.dirty || state.saving) { event.preventDefault(); event.returnValue = ""; }
+      if (state.dirty || state.saving || state.attachmentBusy) { event.preventDefault(); event.returnValue = ""; }
     });
     document.addEventListener("keydown", (event) => {
       if (event.key === "Escape" && el("leaveDialog").open) closeLeaveDialog(false);
@@ -790,6 +1071,7 @@
     }
     if (preferredCompany && preferredCompany === state.companyId) el("companyContextHint").textContent = `Inherited Company view: ${state.context.company_name}. Reports remain scoped to this Company.`;
     el("registerCompany").textContent = state.context.company_name || "";
+    await loadCompanyCatalogue();
     const vessels = asArray(state.context.vessels).filter((vessel) => vessel?.is_active !== false);
     vessels.forEach((vessel) => el("vesselId").add(new Option(vessel.name || "Unnamed vessel", vessel.id)));
     await loadReports();

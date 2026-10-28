@@ -11,7 +11,7 @@ assert api.PROJECT == "bdidrcyufazskpuwmfca"
 root = api.sql("select id from public.profiles where role::text='super_admin' and coalesce(is_active,true) and not coalesce(is_disabled,false) limit 1", True)[0]["id"]
 vessel = api.sql("""select v.id,v.company_id from public.vessels v join public.companies c on c.id=v.company_id
  where v.is_active and c.is_active order by (c.company_name ilike '%Internal%') desc,v.name limit 1""", True)[0]
-other = api.sql("select id from public.profiles where role::text<>'super_admin' and coalesce(is_active,true) and not coalesce(is_disabled,false) limit 1", True)[0]["id"]
+other = api.sql("select id from public.profiles where role::text in ('vessel','inspector') and coalesce(is_active,true) and not coalesce(is_disabled,false) union all select gen_random_uuid() limit 1", True)[0]["id"]
 eligible = api.sql("""select count(*) n,count(*) filter(where payload->>'Vessel Type'<>'Oil') mixed,
  count(distinct payload->>'Question Type') types from public.questions_master
  where source_type::text='SIRE' and status::text='active'
@@ -121,7 +121,20 @@ begin
  begin perform count(*) from public.m02_inspection_reports; exception when insufficient_privilege then rejected:=true; end;
  assert rejected,'Direct table access granted';
  report:=(public.csvb_m02_get(rid))->'report';
- saved:=public.csvb_m02_save(report||'{"status":"completed"}','[]');
+ rejected:=false;
+ begin
+   perform public.csvb_m02_save(report||'{"status":"completed"}','[]');
+   set constraints m02_required_response_completion immediate;
+ exception when check_violation then rejected:=true; end;
+ assert rejected,'Incomplete report marked Completed';
+ set constraints m02_required_response_completion deferred;
+ fresh:=public.csvb_m02_get_v2(rid);
+ saved:=public.csvb_m02_save_v2(report||'{"status":"completed"}',
+   (select jsonb_agg(x||jsonb_build_object('response',coalesce(x->>'response','N/S')))
+    from jsonb_array_elements(fresh->'answers') x),
+   (select jsonb_agg(x||jsonb_build_object('response',coalesce(x->>'response','N/S')))
+    from jsonb_array_elements(fresh->'company_items') x));
+ set constraints m02_required_response_completion immediate;
  assert saved->>'status'='completed','Completed organization state failed';
  perform set_config('request.jwt.claim.sub',OTHER,true);
  rejected:=false;

@@ -45,17 +45,19 @@ When one endpoint serves multiple modules, its permission gate must reuse the bu
 
 **How to apply:** Reuse the canonical normalizer and test aliases and conflicting selector fields, not only the usual module labels.
 
-The approved initial configuration for Marine Superintendent, Marine Superintendent - Port Captain, Technical Superintendent, Technical Superintendent - Port Engineer, HSQE Superintendent, DPA, Technical Manager and General Manager is a shared nine-module view-only profile, not the broader legacy Superintendent baseline.
+The approved initial configuration for Marine Superintendent, Marine Superintendent - Port Captain, Technical Superintendent, Technical Superintendent - Port Engineer, HSQE Superintendent, DPA, Technical Manager and General Manager is a shared view-only profile, not the broader legacy Superintendent baseline. It includes the original nine modules plus the subsequently approved M02 Office View default.
 
 **Why:** The user explicitly restricted these eight organizational roles to View only for SIRE Questions Viewer, Fleet Vetting Experience, Vetting Inspection Planner, Post-Inspection Entry, Post-Inspection Stats, Inspector Intelligence, Mooring & Anchoring, Port Call Intelligence and Portable Lifting. Other modules/actions remain denied unless separately granted later.
 
 **How to apply:** Keep identities distinct and respect later explicit overrides. Technical Manager is a separate Management role; never rename or replace Technical Director. Preparing the mapping does not authorize activation or automatic user reassignment.
 
-Demo User also shares this same approved nine-module view-only profile, while remaining a distinct Demo / Training identity. This replaces the earlier two-module initial Demo proposal as its default mapping.
+Demo User also shares this same approved view-only profile (original nine modules plus M02), while remaining a distinct Demo / Training identity. This replaces the earlier two-module initial Demo proposal as its default mapping.
 
 **Why:** The user explicitly extended the prepared profile to Demo User, denying Edit, Export, Admin, destructive/configuration rights and unlisted modules by default.
 
 **How to apply:** Do not restore the narrower original Demo mapping. Demo shares the same enforced profile and ordinary override rules as the approved view-only Office roles; it never receives an authorization bypass.
+
+The user later approved M02 View by default for all Office users, including Demo and unmigrated legacy users; see [M02 scope](m02-company-form-scope.md). This does not authorize broad M02 Edit/Export/Admin or changes to other modules.
 
 ## Account activation is separate from permission activation
 

@@ -2,6 +2,7 @@
 import importlib.util
 import json
 import subprocess
+import sys
 
 spec = importlib.util.spec_from_file_location("api", "scripts/test-office-authorization-live.py")
 api = importlib.util.module_from_spec(spec)
@@ -29,17 +30,21 @@ before = {t: api.sql(snapshot % t, True)[0]["hash"] for t in protected}
 try:
     uid, session = api.make_fixture("standard_office_view_only")
     status, _ = api.rpc("csvb_m02_context",{"p_company_id":api.COMPANY},session["access_token"])
-    assert status==403,"M02 was auto-granted to the nine-module Office profile"
+    assert status==200 and not _["can_edit"],"Office M02 default must be View-only"
     denied = subprocess.run(["node","scripts/test-m02-phase1a-preview.mjs"],
-        input=json.dumps({"session":session,"project":api.PROJECT,"company":api.COMPANY,"denied":True}),
+        input=json.dumps({"session":session,"project":api.PROJECT,"company":api.COMPANY,"readOnly":True}),
         text=True,capture_output=True,timeout=90)
     print(denied.stdout.strip())
     if denied.returncode:
         raise RuntimeError(denied.stderr.strip() or "Denied-route verification failed")
     api.actor_sql("update public.profiles set role='company_admin',office_role_code=null,office_access_profile_code=null where id="+api.literal(uid))
     status, _ = api.rpc("csvb_m02_context",{"p_company_id":api.COMPANY},session["access_token"])
-    assert status==403,"M02 was auto-granted through legacy Company Admin fallback"
+    assert status==200 and not _["can_edit"],"Legacy Office M02 default must be View-only"
     api.actor_sql("update public.profiles set role='super_admin',company_id="+api.literal(api.COMPANY)+" where id="+api.literal(uid)+";delete from public.profile_roles_cache where user_id="+api.literal(uid))
+    phase1b_spec=importlib.util.spec_from_file_location("phase1b","scripts/test-m02-phase1b-api.py")
+    phase1b=importlib.util.module_from_spec(phase1b_spec);phase1b_spec.loader.exec_module(phase1b)
+    if "--ui-only" not in sys.argv:
+        phase1b.exercise(api,uid,session,vessel["id"])
     result = subprocess.run(["node","scripts/test-m02-phase1a-preview.mjs"],
         input=json.dumps({"session":session,"project":api.PROJECT,"company":api.COMPANY,"vessel":vessel["id"],"historyQuestion":history_question}),
         text=True,capture_output=True,timeout=180)
@@ -48,6 +53,11 @@ try:
         raise RuntimeError(result.stderr.strip() or "M02 Preview verification failed")
 finally:
     for uid in api.CREATED:
+        paths=api.sql("select a.storage_path from public.m02_supporting_attachments a join public.m02_inspection_reports r on r.id=a.report_id where r.created_by="+api.literal(uid),True)
+        if paths:
+            status,_=api.http("/storage/v1/object/m02-supporting-evidence",{"prefixes":[x["storage_path"] for x in paths]},method="DELETE")
+            assert status==200,"Disposable browser evidence cleanup failed"
+        api.sql("delete from public.m02_supporting_attachments a using public.m02_inspection_reports r where r.id=a.report_id and r.created_by="+api.literal(uid))
         api.sql("delete from public.m02_inspection_reports where created_by="+api.literal(uid))
         api.sql("delete from public.csvb_office_authorization_test_subjects where profile_id="+api.literal(uid))
         api.actor_sql("update public.profiles set role='company_superintendent' where id="+api.literal(uid))

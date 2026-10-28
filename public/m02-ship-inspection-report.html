@@ -7,7 +7,7 @@
   <title>C.S.V. BEACON – M02 – Ship Inspection Report</title>
   <link rel="stylesheet" href="./csv-beacon-theme.css?v=20260907_contrast_1" />
   <link rel="stylesheet" href="./style.css?v=20260428_3" />
-  <link rel="stylesheet" href="./m02-ship-inspection-report.css?v=m02_phase1a_final_6" />
+  <link rel="stylesheet" href="./m02-ship-inspection-report.css?v=m02_completion_tracking_1" />
   <link rel="stylesheet" href="./csvb-module-header.css?v=20261027_rollout_2" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="./auth.js?v=20261028_vessel_policy_2"></script>
@@ -42,7 +42,7 @@
         <button class="m02-task" type="button" data-view="register"><span class="m02-task-number">02</span><span class="m02-task-title">Continue / Manage M02 Inspections</span><span class="m02-task-copy">Find drafts and completed reports in the fleet register.</span><span class="m02-task-arrow" aria-hidden="true">↗</span></button>
         <button class="m02-task" type="button" data-view="completed"><span class="m02-task-number">03</span><span class="m02-task-title">Review Completed M02 Inspections</span><span class="m02-task-copy">Read completed reports and their recorded responses.</span><span class="m02-task-arrow" aria-hidden="true">↗</span></button>
       </div>
-      <div class="m02-note"><span class="m02-note-mark">ACCESS</span><p>Phase 1A is available to Super Admin users. Editing is confirmed by the M02 service for the active Company.</p></div>
+      <div class="m02-note"><span class="m02-note-mark">ACCESS</span><p>Office users can view M02 within their authorized Company scope. Editing and other actions remain controlled by Rights Matrix, Access Profiles and personal overrides.</p></div>
     </section>
 
     <section id="registerView" class="m02-register" hidden>
@@ -71,15 +71,16 @@
       <div class="m02-editor-layout">
         <nav class="m02-section-nav" aria-label="Report sections">
           <span class="m02-nav-label">REPORT SECTIONS</span>
-          <button type="button" data-section="general" class="is-current"><i>01</i> General particulars</button>
-          <button type="button" data-section="part1"><i>02</i> Part 1 · Summary</button>
-          <button type="button" data-section="part2"><i>03</i> Part 2 · Assessment</button>
-          <button type="button" data-section="questions"><i>04</i> Part 4 · SIRE Checklist <span id="navProgress">0/0</span></button>
-          <button type="button" data-section="appendix"><i>05</i> Appendix 3</button>
+          <button type="button" data-section="general" class="is-current"><i>01</i> General Details</button>
+          <button type="button" data-section="part1"><i>02</i> Part1 Executive Summary</button>
+          <button type="button" data-section="part2"><i>03</i> Part2 Accumulated Comments</button>
+          <button type="button" data-section="company"><i>04</i> Part3 Company Attendance Checks <span id="companyNavProgress">Answered 0 / 51 · Remaining 51</span></button>
+          <button type="button" data-section="questions"><i>05</i> Part4 SIRE2 Checklist <span id="navProgress">Loading progress…</span></button>
+          <button type="button" data-section="appendix"><i>06</i> Appendix3 Not Checked/Not Seen</button>
         </nav>
         <form id="reportForm" class="m02-form" novalidate>
-          <section class="m02-section" id="section-general" data-title="General particulars">
-            <div class="m02-section-heading"><div><span class="m02-section-num">01</span><h3>General particulars</h3></div><p>Enter inspection particulars. Vessel identity is taken from the Company vessel register.</p></div>
+          <section class="m02-section" id="section-general" data-title="General Details">
+            <div class="m02-section-heading"><div><span class="m02-section-num">01</span><h3>General Details</h3></div><p>Enter inspection particulars. Vessel identity is taken from the Company vessel register.</p></div>
             <div class="m02-form-grid">
               <label class="m02-field m02-wide">Vessel<select id="vesselId" name="vessel_id" required><option value="">Select a Company vessel</option></select></label>
               <div class="m02-vessel-snapshot m02-wide" id="vesselSnapshot"><span>Select a vessel to display its registered particulars.</span></div>
@@ -120,8 +121,8 @@
             <label class="m02-field m02-field-large">Executive Summary<textarea id="executiveSummary" rows="12" maxlength="20000" placeholder="Record the overall inspection summary…"></textarea></label>
           </section>
 
-          <section class="m02-section" id="section-part2" data-title="Part 2 · Assessment">
-            <div class="m02-section-heading"><div><span class="m02-section-num">03</span><h3>Part 2 · Assessment</h3></div><p>Manual entries only. No scores or averages are calculated in Phase 1A.</p></div>
+          <section class="m02-section" id="section-part2" data-title="Part2 Accumulated Comments">
+            <div class="m02-section-heading"><div><span class="m02-section-num">03</span><h3>Part2 · Accumulated Comments</h3></div><p>Manual entries only. Existing assessment fields remain unchanged.</p></div>
             <div class="m02-subheading"><h4>Current inspection observation totals</h4><span>Enter values as recorded</span></div>
             <div class="m02-form-grid m02-three">
               <label class="m02-field">High<input id="totalHigh" type="number" min="0" step="1" /></label><label class="m02-field">Medium<input id="totalMedium" type="number" min="0" step="1" /></label><label class="m02-field">Low<input id="totalLow" type="number" min="0" step="1" /></label>
@@ -137,26 +138,36 @@
             <label class="m02-field m02-culture">Level of safety culture<select id="safetyCulture"><option value="">Select level</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>N/S</option></select></label>
           </section>
 
-          <section class="m02-section" id="section-questions" data-title="Part 4 · SIRE 2.0 Checklist">
-            <div class="m02-section-heading"><div><span class="m02-section-num">04</span><h3>Part 4 · SIRE 2.0 Checklist</h3></div><p>Only eligible Oil / non-Photo library questions are provided by the M02 service. A response is optional.</p></div>
-            <div class="m02-question-tools"><label>Find a question<input id="questionSearch" type="search" placeholder="Number or question text" /></label><label>Library version<select id="libraryVersion" aria-label="Question library version"></select></label><span id="questionProgress" class="m02-progress-summary">0 checked</span></div>
+          <section class="m02-section" id="section-company" data-title="Part3 Company Attendance Checks">
+            <div class="m02-section-heading"><div><span class="m02-section-num">04</span><h3>Part3 · Company Attendance Checks</h3></div><p>Company catalogue wording is shown verbatim. Blank means Not Checked; N/S means Not Seen.</p></div>
+            <div class="m02-question-tools"><span id="companyProgress" class="m02-progress-summary" role="status">Answered 0 / 51 · Remaining 51</span></div>
+            <div id="companyItems" class="m02-company-list"><div class="m02-loading-block"><span></span><span></span><b>Loading Company attendance checks</b></div></div>
+          </section>
+
+          <section class="m02-section" id="section-questions" data-title="Part4 SIRE2 Checklist">
+            <div class="m02-section-heading"><div><span class="m02-section-num">05</span><h3>Part4 · SIRE2 Checklist</h3></div><p>Only eligible Oil / non-Photo library questions are provided by the M02 service. Answer every question before marking Completed; incomplete reports can always be saved as Draft.</p></div>
+            <div class="m02-question-tools"><label>Find a question<input id="questionSearch" type="search" placeholder="Number or question text" /></label><label>Library version<select id="libraryVersion" aria-label="Question library version"></select></label><span id="questionProgress" class="m02-progress-summary" role="status">Loading progress…</span></div>
             <div id="libraryVersionWarning" class="m02-library-warning" role="status" hidden></div>
             <div id="questionChapters" class="m02-chapters"><div class="m02-loading-block"><span></span><span></span><span></span><b>Loading eligible questions</b></div></div>
           </section>
 
-          <section class="m02-section" id="section-appendix" data-title="Appendix 3">
-            <div class="m02-section-heading"><div><span class="m02-section-num">05</span><h3>Appendix 3 · Questions not checked / not seen</h3></div><p>Synchronized with the checklist. Unanswered questions are Not checked; N/S responses are Not seen.</p></div>
-            <div class="m02-table-wrap"><table class="m02-table m02-appendix"><thead><tr><th>Number</th><th>Type</th><th>State</th></tr></thead><tbody id="appendixRows"><tr><td colspan="3" class="m02-table-state">Questions are loading.</td></tr></tbody></table></div>
+          <section class="m02-section" id="section-appendix" data-title="Appendix3 Not Checked/Not Seen">
+            <details id="appendixDetails" class="m02-appendix-details">
+              <summary><span class="m02-appendix-title">Appendix3 · Not Checked / Not Seen</span><span id="appendixCounts">0 Not Checked · 0 Not Seen</span></summary>
+              <div class="m02-table-wrap"><table class="m02-table m02-appendix"><thead><tr><th>Number</th><th>Type</th><th>State</th></tr></thead><tbody id="appendixRows"><tr><td colspan="3" class="m02-table-state">Questions are loading.</td></tr></tbody></table></div>
+            </details>
           </section>
 
         </form>
       </div>
       <div class="m02-mobile-save"><span id="mobileSaveState">Unsaved changes</span><button class="m02-button m02-button-outline" type="button" data-save="draft">Save Draft</button><button class="m02-button" type="button" data-save="completed">Mark Completed</button></div>
     </section>
+    <footer class="m02-controlled-form" data-m02-form-reference aria-label="Controlled Company form reference"></footer>
   </main>
 
   <dialog id="leaveDialog" class="m02-dialog"><div class="m02-dialog-mark">UNSAVED REPORT</div><h2>Leave without saving?</h2><p>Your unsaved report changes will be discarded. Save a draft first if you need to keep this work.</p><div class="m02-dialog-actions"><button id="stayEditing" class="m02-button m02-button-outline" type="button">Keep editing</button><button id="discardChanges" class="m02-button m02-button-danger" type="button">Discard changes</button></div></dialog>
-  <script src="./m02-ship-inspection-report.js?v=m02_history_18_months_1"></script>
+  <script src="./m02-form-identity.js?v=m02_controlled_form_09_1"></script>
+  <script src="./m02-ship-inspection-report.js?v=m02_completion_tracking_1"></script>
   <script src="./csvb-build-badge.js?v=20260528_01"></script>
 </body>
 </html>

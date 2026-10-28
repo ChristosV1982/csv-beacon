@@ -137,9 +137,9 @@ def main():
             "SIRE_QUESTIONS_VIEWER", "SIRE_FLEET_VETTING_EXPERIENCE", "VETTING_INSPECTION_PLANNER",
             "POST_INSPECTION", "POST_INSPECTION_STATS", "INSPECTOR_INTELLIGENCE",
             "MOORING_ANCHORING_INVENTORIES", "PORT_CALL_INTELLIGENCE",
-            "PORTABLE_LIFTING_APPLIANCES_WIRES",
+            "PORTABLE_LIFTING_APPLIANCES_WIRES", "M02_SHIP_INSPECTION_REPORT",
         ])
-        check("Exactly nine business View modules", status == 200 and
+        check("Nine business View modules plus the approved M02 Office View baseline", status == 200 and
               {p["module_code"] for p in permissions if p["permission_action"] == "view" and
                p["module_code"] not in ("Q_DASHBOARD", "MODE_SELECTION")} == expected)
         check("No Edit/Export/Admin/review grants",
