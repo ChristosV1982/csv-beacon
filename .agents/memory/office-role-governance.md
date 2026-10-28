@@ -33,6 +33,12 @@ Prepared access-profile baselines must remain inactive until the backend's ordin
 
 **How to apply:** Verify both direct-route visibility and backend RPC/write denial before activating Office/Demo profile enforcement. Preserve the current legacy resolver for all users until that activation; storing role/profile references alone must not be mistaken for effective-access enforcement.
 
+Authorization coverage must use reviewed module/action contracts, not RPC-name heuristics. A reader-looking endpoint can create draft or derived records, and a SECURITY DEFINER or service-role path can bypass browser table policies.
+
+**Why:** A generic endpoint-name classifier can accidentally authorize a write as a View operation, defeating the agreed view-only profiles.
+
+**How to apply:** Verify actual backend effects and scope before admitting an endpoint. Unknown operations must fail closed; candidate decision-engine tests alone are not evidence of end-to-end enforcement.
+
 The approved initial configuration for Marine Superintendent, Marine Superintendent - Port Captain, Technical Superintendent, Technical Superintendent - Port Engineer, HSQE Superintendent, DPA, Technical Manager and General Manager is a shared nine-module view-only profile, not the broader legacy Superintendent baseline.
 
 **Why:** The user explicitly restricted these eight organizational roles to View only for SIRE Questions Viewer, Fleet Vetting Experience, Vetting Inspection Planner, Post-Inspection Entry, Post-Inspection Stats, Inspector Intelligence, Mooring & Anchoring, Port Call Intelligence and Portable Lifting. Other modules/actions remain denied unless separately granted later.
