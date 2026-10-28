@@ -1,0 +1,89 @@
+/* Company M02 appendices: additive styling, inheriting the established M02 palette. */
+.m02-appendix-card { padding: 14px; margin-bottom: 12px; border: 1px solid var(--m02-line); border-radius: 8px; background: var(--m02-panel); min-width: 0; }
+.m02-appendix-card h4 { margin: 0 0 12px; color: var(--m02-deep); font-size: 14px; }
+.m02-appendix-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; margin-bottom: 10px; }
+.m02-photo-preview img { display: block; width: 100%; max-width: 600px; max-height: 420px; object-fit: contain; border-radius: 6px; }
+@media (max-width: 767px) { .m02-appendix-grid { grid-template-columns: minmax(0,1fr); } }
+.m02-vetting-tools {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  padding: 11px 13px;
+  border: 1px solid var(--m02-line);
+  border-radius: 6px;
+  background: var(--surface-2);
+}
+.m02-vetting-source { flex: 1 1 180px; color: var(--m02-muted); font-size: 12px; }
+.m02-override-check, .m02-closed-confirmation {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  color: #536d73;
+  font-size: 12px;
+  line-height: 1.55;
+}
+.m02-override-check { align-items: center; }
+.m02-override-check input, .m02-closed-confirmation input { flex: 0 0 auto; margin: 2px 0 0; accent-color: var(--m02-green); }
+.m02-appendix-subsection + .m02-appendix-subsection { margin-top: 22px; }
+.m02-appendix-subsection .m02-subheading { margin-top: 0; }
+.m02-appendix-subsection + .m02-appendix-subsection .m02-subheading { padding-top: 17px; }
+.m02-appendix-rows { min-width: 0; }
+.m02-closed-confirmation {
+  margin-top: 20px;
+  padding: 14px 15px;
+  border: 1px solid #dce6df;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--surface-2) 72%, var(--m02-panel));
+}
+.m02-critical-meta, .m02-appendix-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin: 0 0 13px;
+  color: var(--m02-muted);
+  font-size: 12px;
+}
+.m02-critical-meta {
+  padding: 11px 13px;
+  border: 1px solid var(--m02-line);
+  border-radius: 6px;
+  background: var(--surface-2);
+}
+.m02-critical-meta strong { color: var(--m02-deep); font: 11px var(--font-mono); text-align: right; }
+.m02-appendix-card-list { display: grid; gap: 10px; min-width: 0; }
+.m02-appendix-toolbar {
+  padding-bottom: 12px;
+  border-bottom: 1px solid #e5eae5;
+}
+.m02-photo-hint {
+  margin: 0 0 16px;
+  padding: 11px 13px;
+  border-left: 3px solid var(--m02-accent);
+  background: var(--surface-2);
+  color: #536d73;
+  font-size: 12px;
+  line-height: 1.55;
+}
+.m02-appendix-card-list:empty::before {
+  content: "No records added.";
+  display: block;
+  padding: 22px 16px;
+  border: 1px dashed #cbd8d2;
+  border-radius: 6px;
+  color: #76898b;
+  font-size: 12px;
+  text-align: center;
+}
+.m02-appendix-card-list > * { min-width: 0; }
+#criticalItems { counter-reset: critical-item; }
+#criticalItems > * { counter-increment: critical-item; }
+@media (max-width: 767px) {
+  .m02-vetting-tools { align-items: stretch; flex-direction: column; }
+  .m02-vetting-tools .m02-small-button { width: 100%; min-height: 44px; }
+  .m02-override-check { min-height: 32px; }
+  .m02-critical-meta, .m02-appendix-toolbar { align-items: flex-start; flex-direction: column; }
+  .m02-appendix-toolbar .m02-small-button { width: 100%; min-height: 44px; }
+  .m02-critical-meta strong { text-align: left; }
+}

@@ -8,7 +8,8 @@ spec = importlib.util.spec_from_file_location("api", "scripts/test-office-author
 api = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(api)
 vessel = api.sql("""select v.id,v.company_id from public.vessels v join public.companies c on c.id=v.company_id
- where v.is_active and c.is_active order by (c.company_name ilike '%Internal%') desc,v.name limit 1""", True)[0]
+ where v.is_active and c.is_active order by (c.company_name ilike '%Internal%') desc,
+ exists(select 1 from public.post_inspection_reports r where r.vessel_id=v.id and r.inspection_date<=current_date) desc,v.name limit 1""", True)[0]
 api.COMPANY = vessel["company_id"]
 history_question = api.sql("""select q.id from public.questions_master q
  join public.post_inspection_observation_items i on
@@ -44,6 +45,9 @@ try:
     phase1b_spec=importlib.util.spec_from_file_location("phase1b","scripts/test-m02-phase1b-api.py")
     phase1b=importlib.util.module_from_spec(phase1b_spec);phase1b_spec.loader.exec_module(phase1b)
     if "--ui-only" not in sys.argv:
+        appendix_spec=importlib.util.spec_from_file_location("appendices","scripts/test-m02-appendices-api.py")
+        appendices_api=importlib.util.module_from_spec(appendix_spec);appendix_spec.loader.exec_module(appendices_api)
+        appendices_api.exercise(api,uid,session)
         phase1b.exercise(api,uid,session,vessel["id"])
     result = subprocess.run(["node","scripts/test-m02-phase1a-preview.mjs"],
         input=json.dumps({"session":session,"project":api.PROJECT,"company":api.COMPANY,"vessel":vessel["id"],"historyQuestion":history_question}),

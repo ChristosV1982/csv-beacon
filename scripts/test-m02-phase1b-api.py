@@ -111,7 +111,9 @@ def exercise(api, uid, session, vessel):
         status,error=api.rpc("csvb_m02_save",{"p_report":{**current,"status":"completed"},"p_answers":[]},token)
         assert status==400 and "Part 4" in error["message"] and "Part 3:" not in error["message"],"Legacy save bypassed required SIRE answers"
         completed_answers=[{"question_id":x["question_id"],"response":["Yes","No","N/A","N/S"][i%4],"comments":x["comments"]} for i,x in enumerate(full["answers"])]
-        result=rpc("csvb_m02_save_v2",{"p_report":{**current,"status":"completed"},"p_answers":completed_answers,"p_company_items":completed_company,"p_workspace":workspace})
+        critical=rpc("csvb_m02_critical_items",{"p_company_id":api.COMPANY})
+        result=rpc("csvb_m02_save_v3",{"p_report":{**current,"status":"completed"},"p_answers":completed_answers,"p_company_items":completed_company,"p_workspace":workspace,
+            "p_appendices":{"records":[],"critical_items":[{"item_no":x["item_no"],"response":"N/A"} for x in critical]}})
         assert result["status"]=="completed"
         print("PASS completion: Draft with blanks; atomic rejection with section counts; legacy save cannot bypass; Yes/No/N/A/N/S accepted; all answers saved and Completed in one transaction.")
         assert edge("delete",first["id"])[0]==400

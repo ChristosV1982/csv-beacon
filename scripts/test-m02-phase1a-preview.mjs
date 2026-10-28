@@ -3,6 +3,7 @@ import {mkdtemp, rm, mkdir, writeFile} from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import WebSocket from "ws";
+import {verifyAppendicesUI} from "./test-m02-appendices-preview.mjs";
 
 const chunks = []; for await (const c of process.stdin) chunks.push(c);
 const input = JSON.parse(Buffer.concat(chunks).toString());
@@ -80,7 +81,7 @@ try {
     `document.querySelectorAll("#taskLanding [data-view]").length===3 && !document.getElementById("taskLanding").hidden`);
   await screenshot("landing-desktop");
   await ev(`document.querySelector('[data-view="new"]').click()`);
-  await wait(`document.querySelectorAll("[data-question-card]").length===282`);
+  await wait(`document.querySelectorAll("[data-question-card]").length===282 && document.querySelectorAll("[data-critical-item]").length===29 && !document.getElementById("editorView").hidden`);
   await check("Full-width editor and Oil-only question set", `!document.getElementById("editorView").hidden && document.getElementById("editorView").getBoundingClientRect().width>1100`);
   await check("Controlled form footer uses the central Version 09 identity in the report workspace",
     `document.querySelector("[data-m02-form-reference]").textContent==="M02 · Ship Inspection Report · Version 09 · 23.06.2026" && window.CSVB_M02_FORM_IDENTITY.version==="09" && !document.querySelector("[data-m02-form-reference]").closest("section") && document.querySelector("[data-m02-form-reference]").getBoundingClientRect().width>0`);
@@ -93,6 +94,10 @@ try {
   await check("No per-question startup requests", `true`);
   if(requests.filter(n=>n==="csvb_m02_reference").length!==0) throw Error("Reference startup request storm");
   await inputValue("vesselId",input.vessel);
+  await wait(`document.getElementById("lastVettingSource").textContent.includes("Prefilled from Post-Inspection")`);
+  await check("Selecting a vessel prefills scoped Post-Inspection history", `!!document.getElementById("lastVettingDate").value && !document.getElementById("manualVettingOverride").checked`);
+  await inputValue("lastVettingCompany","Manual M02 attendance vetting");
+  await check("Last Vetting supports an explicit manual override", `document.getElementById("manualVettingOverride").checked`);
   await inputValue("attendingSuperintendent","M02 disposable verification");
   await inputValue("executiveSummary","Manually entered M02 verification summary");
   await inputValue("reportDate","2026-10-28");
@@ -120,6 +125,7 @@ try {
   await wait(`!document.getElementById("editorView").hidden && document.querySelector("[data-question-card] textarea")?.value==="M02 verification comment"`);
   await check("Reopen preserves manual summary, answer and comment",
     `document.getElementById("executiveSummary").value==="Manually entered M02 verification summary" && document.querySelector("[data-question-card] select").value==="N/S"`);
+  await check("Saved manual vetting override retains its source indicator", `document.getElementById("lastVettingCompany").value==="Manual M02 attendance vetting" && document.getElementById("manualVettingOverride").checked && document.getElementById("lastVettingSource").textContent.includes("Prefilled from Post-Inspection")`);
   await check("Company responses/comments persist and unanswered stay blank", `document.querySelector("[data-company-response='1']").value==="Yes" && document.querySelector("[data-company-comments='1']").value==="Minutes and crew discussion" && document.querySelector("[data-company-response='2']").value==="" && !document.getElementById("appendixDetails").open && document.getElementById("saveState").textContent.includes("Saved")`);
   await wait(`document.querySelectorAll("[data-comments]")[1].offsetHeight>1000`);
   await check("Long remarks persist exactly and grow after reopening", `document.querySelectorAll("[data-comments]")[1].value===${JSON.stringify(longRemarks)} && document.querySelectorAll("[data-comments]")[1].clientHeight>=document.querySelectorAll("[data-comments]")[1].scrollHeight-1 && document.querySelectorAll("[data-response]")[1].value===""`);
@@ -156,6 +162,7 @@ try {
   await check("Live negative fleet history loads for matching canonical question", `document.querySelector(${JSON.stringify(historySelector)}).querySelector(".m02-observation-list li").getBoundingClientRect().height>0`);
   await check("Fleet record visibly identifies its fixed 18-month window", `document.querySelector(${JSON.stringify(historySelector)}).textContent.includes("Last 18 months") && document.querySelector(${JSON.stringify(historySelector)}).textContent.includes("18-month window")`);
   await check("Reference RPC is lazy and coalesced", `true`);
+  await verifyAppendicesUI({ev,wait,check,screenshot,call,sid});
   if(requests.filter(n=>n==="csvb_m02_reference").length!==1) throw Error("Reference not coalesced");
   await screenshot("editor-desktop");
   await call("Emulation.setDeviceMetricsOverride",{width:402,height:874,deviceScaleFactor:1,mobile:true},sid);
@@ -179,7 +186,7 @@ try {
   }
   await ev(`document.getElementById("markCompleted").click()`);
   await check("Incomplete completion is blocked with section summary and jump actions",
-    `document.getElementById("editorMessage").textContent.includes("Part 3: 50 remaining") && document.getElementById("editorMessage").textContent.includes("Part 4: 280 remaining") && document.querySelectorAll(".m02-completion-jumps button").length===2 && !document.getElementById("saveDraft").disabled`);
+    `document.getElementById("editorMessage").textContent.includes("Part 3: 50 remaining") && document.getElementById("editorMessage").textContent.includes("Part 4: 280 remaining") && document.getElementById("editorMessage").textContent.includes("Appendix 2: 28 remaining") && document.querySelectorAll(".m02-completion-jumps button").length===3 && !document.getElementById("saveDraft").disabled`);
   await ev(`document.querySelector(".m02-completion-jumps button").click()`);
   await check("Completion jump opens the missing response section", `document.querySelector('[data-section="company"]').classList.contains("is-current")`);
   await ev(`{const s=document.querySelector("[data-response]");s.value="";s.dispatchEvent(new Event("change",{bubbles:true}));}`);
@@ -188,6 +195,7 @@ try {
   await ev(`{
     document.querySelectorAll("[data-company-response]").forEach((s,i)=>{s.value=["Yes","No","N/S"][i%3];s.dispatchEvent(new Event("change",{bubbles:true}));});
     document.querySelectorAll("[data-response]").forEach((s,i)=>{s.value=["Yes","No","N/A","N/S"][i%4];s.dispatchEvent(new Event("change",{bubbles:true}));});
+    document.querySelectorAll("[data-critical-response]").forEach((s,i)=>{s.value=["Yes","No","N/A"][i%3];s.dispatchEvent(new Event("change",{bubbles:true}));});
   }`);
   await check("All explicit answers including Not Seen/Not Applicable produce zero Remaining",
     `document.getElementById("companyProgress").textContent==="Answered 51 / 51 · Remaining 0" && document.getElementById("questionProgress").textContent==="Answered 282 / 282 · Remaining 0" && Array.from(document.querySelectorAll(".m02-chapter-count")).every(c=>c.textContent.endsWith("Remaining 0")) && !document.getElementById("appendixRows").textContent.includes("Not checked") && document.getElementById("appendixRows").textContent.includes("Not seen")`);

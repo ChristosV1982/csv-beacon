@@ -129,11 +129,13 @@ begin
  assert rejected,'Incomplete report marked Completed';
  set constraints m02_required_response_completion deferred;
  fresh:=public.csvb_m02_get_v2(rid);
- saved:=public.csvb_m02_save_v2(report||'{"status":"completed"}',
+ saved:=public.csvb_m02_save_v3(report||'{"status":"completed"}',
    (select jsonb_agg(x||jsonb_build_object('response',coalesce(x->>'response','N/S')))
     from jsonb_array_elements(fresh->'answers') x),
    (select jsonb_agg(x||jsonb_build_object('response',coalesce(x->>'response','N/S')))
-    from jsonb_array_elements(fresh->'company_items') x));
+    from jsonb_array_elements(fresh->'company_items') x),'{}',
+    jsonb_build_object('records','[]'::jsonb,'critical_items',
+     (select jsonb_agg(x||jsonb_build_object('response','N/A')) from jsonb_array_elements(public.csvb_m02_critical_items(c)) x)));
  set constraints m02_required_response_completion immediate;
  assert saved->>'status'='completed','Completed organization state failed';
  perform set_config('request.jwt.claim.sub',OTHER,true);

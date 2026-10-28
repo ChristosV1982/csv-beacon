@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="./csv-beacon-theme.css?v=20260907_contrast_1" />
   <link rel="stylesheet" href="./style.css?v=20260428_3" />
   <link rel="stylesheet" href="./m02-ship-inspection-report.css?v=m02_completion_tracking_1" />
+  <link rel="stylesheet" href="./m02-appendices.css?v=m02_appendices_20261028_2" />
   <link rel="stylesheet" href="./csvb-module-header.css?v=20261027_rollout_2" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="./auth.js?v=20261028_vessel_policy_2"></script>
@@ -77,6 +78,10 @@
           <button type="button" data-section="company"><i>04</i> Part3 Company Attendance Checks <span id="companyNavProgress">Answered 0 / 51 · Remaining 51</span></button>
           <button type="button" data-section="questions"><i>05</i> Part4 SIRE2 Checklist <span id="navProgress">Loading progress…</span></button>
           <button type="button" data-section="appendix"><i>06</i> Appendix3 Not Checked/Not Seen</button>
+          <button type="button" data-section="maintenance"><i>07</i> Appendix1 Maintenance</button>
+          <button type="button" data-section="critical"><i>08</i> Appendix2 Critical Equipment <span id="criticalNavProgress">Loading progress…</span></button>
+          <button type="button" data-section="findings"><i>09</i> Appendix4 Findings</button>
+          <button type="button" data-section="photos"><i>10</i> Appendix5 Photographic Records</button>
         </nav>
         <form id="reportForm" class="m02-form" novalidate>
           <section class="m02-section" id="section-general" data-title="General Details">
@@ -101,6 +106,11 @@
               <label class="m02-field">Oil Major / Company<input id="lastVettingCompany" type="text" maxlength="180" /></label>
               <label class="m02-field">Vetting place<input id="lastVettingPlace" type="text" maxlength="180" /></label>
               <label class="m02-field m02-wide">Vetting details<textarea id="lastVettingDetails" rows="3" maxlength="4000"></textarea></label>
+              <div class="m02-vetting-tools m02-wide" aria-label="Last Vetting source and override">
+                <span id="lastVettingSource" class="m02-vetting-source" role="status">Source: manual entry</span>
+                <button id="useVettingPrefill" class="m02-small-button" type="button">Use latest Post-Inspection</button>
+                <label class="m02-override-check"><input id="manualVettingOverride" type="checkbox" /> Manual override</label>
+              </div>
               <div class="m02-field m02-field-group"><span>PSC close-out</span><div class="m02-inline-fields"><select id="pscCloseout"><option value="">Select</option><option>Verified</option><option>N/A</option></select><input id="pscCloseoutNotes" type="text" maxlength="1000" placeholder="Notes" aria-label="PSC close-out notes" /></div></div>
               <div class="m02-field m02-field-group"><span>Vetting close-out</span><div class="m02-inline-fields"><select id="vettingCloseout"><option value="">Select</option><option>Verified</option><option>N/A</option></select><input id="vettingCloseoutNotes" type="text" maxlength="1000" placeholder="Notes" aria-label="Vetting close-out notes" /></div></div>
             </div>
@@ -123,9 +133,9 @@
 
           <section class="m02-section" id="section-part2" data-title="Part2 Accumulated Comments">
             <div class="m02-section-heading"><div><span class="m02-section-num">03</span><h3>Part2 · Accumulated Comments</h3></div><p>Manual entries only. Existing assessment fields remain unchanged.</p></div>
-            <div class="m02-subheading"><h4>Current inspection observation totals</h4><span>Enter values as recorded</span></div>
+              <div class="m02-subheading"><h4>Current inspection observation totals</h4><span>Totals derive from Appendix 4 findings.</span></div>
             <div class="m02-form-grid m02-three">
-              <label class="m02-field">High<input id="totalHigh" type="number" min="0" step="1" /></label><label class="m02-field">Medium<input id="totalMedium" type="number" min="0" step="1" /></label><label class="m02-field">Low<input id="totalLow" type="number" min="0" step="1" /></label>
+                <label class="m02-field">High<input id="totalHigh" type="number" min="0" step="1" readonly /></label><label class="m02-field">Medium<input id="totalMedium" type="number" min="0" step="1" readonly /></label><label class="m02-field">Low<input id="totalLow" type="number" min="0" step="1" readonly /></label>
             </div>
             <div class="m02-subheading"><h4>Last three inspections · averages</h4><span>N/A until comparable completed M02 history exists</span></div>
             <div class="m02-form-grid"><label class="m02-field">Last 3 inspections — same vessel<input value="N/A" readonly /></label><label class="m02-field">Last 3 fleet inspections — same Superintendent<input value="N/A" readonly /></label></div>
@@ -158,6 +168,42 @@
             </details>
           </section>
 
+          <section class="m02-section" id="section-maintenance" data-title="Appendix1 Verification of Maintenance">
+            <div class="m02-section-heading"><div><span class="m02-section-num">A1</span><h3>Appendix 1 · Verification of Maintenance</h3></div><p>Record maintenance evidence and outstanding work reviewed during this inspection.</p></div>
+            <div class="m02-appendix-subsection">
+              <div class="m02-subheading"><h4>A Planned Maintenance System Records</h4><button class="m02-small-button" type="button" data-add-maintenance="pms">Add record</button></div>
+              <div id="maintenancePmsRows" class="m02-repeat-list m02-appendix-rows"></div>
+            </div>
+            <div class="m02-appendix-subsection">
+              <div class="m02-subheading"><h4>B Outstandings Reporting / Unscheduled Maintenance Rectification System</h4><button class="m02-small-button" type="button" data-add-maintenance="unscheduled">Add record</button></div>
+              <div id="maintenanceUnscheduledRows" class="m02-repeat-list m02-appendix-rows"></div>
+            </div>
+            <div class="m02-appendix-subsection">
+              <div class="m02-subheading"><h4>C Pending Works &amp; Past Job Orders</h4><button class="m02-small-button" type="button" data-add-maintenance="jobs">Add record</button></div>
+              <div id="maintenanceJobsRows" class="m02-repeat-list m02-appendix-rows"></div>
+            </div>
+            <label class="m02-closed-confirmation"><input id="maintenanceClosed" type="checkbox" /> All items from previous reports not repeated in the present report have been verified as closed.</label>
+          </section>
+
+          <section class="m02-section" id="section-critical" data-title="Appendix2 Critical Equipment Tested">
+            <div class="m02-section-heading"><div><span class="m02-section-num">A2</span><h3>Appendix 2 · Critical Equipment Tested</h3></div><p>Record test results for the critical equipment catalogue.</p></div>
+            <div class="m02-critical-meta"><span>Equipment checks</span><strong id="criticalProgress" role="status">Loading progress…</strong></div>
+            <div id="criticalItems" class="m02-appendix-card-list" aria-live="polite"></div>
+          </section>
+
+          <section class="m02-section" id="section-findings" data-title="Appendix4 General Remarks / Non-Compliances">
+            <div class="m02-section-heading"><div><span class="m02-section-num">A4</span><h3>Appendix 4 · General Remarks / Non-Compliances – Corrective Actions to Be Planned</h3></div><p>Document findings and planned corrective actions. Entries are optional.</p></div>
+            <div class="m02-appendix-toolbar"><span>General remarks and non-compliances</span><button id="addM02Finding" class="m02-small-button" type="button">Add finding</button></div>
+            <div id="findingsRows" class="m02-appendix-card-list"></div>
+          </section>
+
+          <section class="m02-section" id="section-photos" data-title="Appendix5 Photographic Records">
+            <div class="m02-section-heading"><div><span class="m02-section-num">A5</span><h3>Appendix 5 · Photographic Records</h3></div><p>Images support the inspection record. Photographic records are optional.</p></div>
+            <div class="m02-photo-hint">Private, image-only uploads. One image per photo record; maximum 10 MB per image. Metadata and caption/reference are optional.</div>
+            <div class="m02-appendix-toolbar"><span>Photographic records</span><button id="addM02Photo" class="m02-small-button" type="button">Add photo</button></div>
+            <div id="photoRecords" class="m02-appendix-card-list"></div>
+          </section>
+
         </form>
       </div>
       <div class="m02-mobile-save"><span id="mobileSaveState">Unsaved changes</span><button class="m02-button m02-button-outline" type="button" data-save="draft">Save Draft</button><button class="m02-button" type="button" data-save="completed">Mark Completed</button></div>
@@ -167,7 +213,8 @@
 
   <dialog id="leaveDialog" class="m02-dialog"><div class="m02-dialog-mark">UNSAVED REPORT</div><h2>Leave without saving?</h2><p>Your unsaved report changes will be discarded. Save a draft first if you need to keep this work.</p><div class="m02-dialog-actions"><button id="stayEditing" class="m02-button m02-button-outline" type="button">Keep editing</button><button id="discardChanges" class="m02-button m02-button-danger" type="button">Discard changes</button></div></dialog>
   <script src="./m02-form-identity.js?v=m02_controlled_form_09_1"></script>
-  <script src="./m02-ship-inspection-report.js?v=m02_completion_tracking_1"></script>
+  <script src="./m02-appendices.js?v=m02_appendices_20261028_2"></script>
+  <script src="./m02-ship-inspection-report.js?v=m02_appendices_20261028_2"></script>
   <script src="./csvb-build-badge.js?v=20260528_01"></script>
 </body>
 </html>

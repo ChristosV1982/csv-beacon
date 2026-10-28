@@ -5,6 +5,7 @@
   const COMPANY_VIEW_ID_KEY = "csvb_superuser_company_view_id";
   const OPERATIONS = ["Loading", "Discharging", "Bunkering", "Deballasting", "Ballasting", "River transit", "IGS in operation", "Major repairs/Drydock", "COW in progress", "Repairs under way", "STS operations", "Idle", "At anchor", "At sea", "Other"];
   const el = (id) => document.getElementById(id);
+  const appendices = window.CSVB_M02_APPENDICES;
   const state = {
     sb: null, bundle: null, context: null, companyId: null, canEdit: false,
     reports: [], report: null, answers: new Map(), questions: [], questionVersion: null,
@@ -125,7 +126,7 @@
     if (!state.companyId) return;
     el("reportRows").innerHTML = '<tr><td colspan="7" class="m02-table-state">Loading Company reports…</td></tr>';
     try {
-      state.reports = asArray(await rpc("csvb_m02_reports_v2", { p_company_id: state.companyId }));
+      state.reports = asArray(await rpc("csvb_m02_reports_v3", { p_company_id: state.companyId }));
       renderReports();
     } catch (error) {
       el("reportRows").innerHTML = "";
@@ -292,7 +293,8 @@
     };
     return [
       section("company", "Part 3", state.companyItems, (item) => companyAnswer(item.item_no).response, ["Yes", "No", "N/S"]),
-      section("questions", "Part 4", state.questions, (question) => answerFor(question.id).response, ["Yes", "No", "N/A", "N/S"])
+      section("questions", "Part 4", state.questions, (question) => answerFor(question.id).response, ["Yes", "No", "N/A", "N/S"]),
+      appendices.counts()
     ];
   }
   function progressText(section) {
@@ -325,6 +327,7 @@
     el("navProgress").textContent = progressText(questions);
     el("companyProgress").textContent = progressText(company);
     el("companyNavProgress").textContent = progressText(company);
+    appendices.progress();
     $all(".m02-chapter").forEach((chapter) => {
       const rows = state.questions.filter((question) => String(questionChapter(question)) === chapter.dataset.chapter);
       const answered = rows.filter((question) => ["Yes", "No", "N/A", "N/S"].includes(answerFor(question.id).response)).length;
@@ -375,7 +378,8 @@
     });
     renderAttachments();
   }
-  function attachmentMarkup(questionId, companyNo) {
+  function attachmentMarkup(questionId, companyNo, appendixId = null, appendixKind = null) {
+    if (appendixId) return `<details class="m02-attachments" open data-attachment-group="a:${escapeHtml(appendixId)}" data-appendix-kind="${appendixKind}"><summary>${appendixKind === "photo" ? "Photographic record image" : "Supporting attachments"} <span>${appendixKind === "photo" ? "One image · max 10 MB" : "Optional · max 5 files / 10 MB combined"}</span></summary><span class="m02-attachment-quota"></span><div class="m02-attachment-list"></div><label class="m02-upload-button">${appendixKind === "photo" ? "Choose / take photo" : "Add attachment"}<input type="file" data-upload-file accept="${appendixKind === "photo" ? ".jpg,.jpeg,.png,.webp" : ".jpg,.jpeg,.png,.webp,.pdf,.doc,.docx,.xls,.xlsx"}" ${appendixKind === "photo" ? 'capture="environment"' : ""} aria-label="Add appendix attachment"></label><p class="m02-attachment-hint"></p><span class="m02-upload-status" aria-live="polite"></span></details>`;
     const key = questionId ? `q:${questionId}` : `c:${companyNo}`;
     return `<details class="m02-attachments" data-attachment-group="${escapeHtml(key)}" ${questionId ? "open" : ""}><summary>Supporting attachments${questionId ? " — this SIRE question" : ""} <span>Optional · max 5 files / 10 MB combined</span></summary><span class="m02-attachment-quota"></span><div class="m02-attachment-list"></div><label class="m02-upload-button">Add attachment<input type="file" data-upload-file data-question-id="${escapeHtml(questionId || "")}" data-company-item-no="${companyNo || ""}" aria-label="Add supporting attachment for ${questionId ? "this SIRE question" : `Company item ${companyNo}`}" accept=".jpg,.jpeg,.png,.webp,.pdf,.doc,.docx,.xls,.xlsx" /></label><p class="m02-attachment-hint"></p><span class="m02-upload-status" aria-live="polite"></span></details>`;
   }
@@ -386,11 +390,12 @@
     $all(".m02-attachments").forEach((group) => {
       const list = group.querySelector(".m02-attachment-list"); list.replaceChildren();
       const [kind, id] = (group.dataset.attachmentGroup || "").split(":");
-      const items = state.attachments.filter((file) => kind === "q" ? file.question_id === id : Number(file.company_item_no) === Number(id));
+      const items = state.attachments.filter((file) => kind === "a" ? file.appendix_record_id === id : kind === "q" ? file.question_id === id : Number(file.company_item_no) === Number(id));
+      const photo = group.dataset.appendixKind === "photo", limit = photo ? 1 : 5;
       const totalBytes = items.reduce((sum, file) => sum + Number(file.size_bytes || 0), 0);
-      const quotaReached = items.length >= 5 || totalBytes >= 10 * 1024 * 1024;
-      group.querySelector(".m02-attachment-quota").textContent = `${items.length}/5 files · ${totalBytes ? formatBytes(totalBytes) : "0 KB"} / 10 MB combined · ${kind === "q" ? "This question only" : "This Company item only"}`;
-      group.querySelector(".m02-attachment-hint").textContent = !state.report?.id
+      const quotaReached = items.length >= limit || totalBytes >= 10 * 1024 * 1024;
+      group.querySelector(".m02-attachment-quota").textContent = `${items.length}/${limit} files · ${totalBytes ? formatBytes(totalBytes) : "0 KB"} / 10 MB combined · ${kind === "a" ? "This appendix record only" : kind === "q" ? "This question only" : "This Company item only"}`;
+      group.querySelector(".m02-attachment-hint").textContent = !state.report?.id || (kind === "a" && !appendices.isPersisted(id))
         ? "Save Draft first to add supporting files."
         : !state.canEdit || state.report.status !== "draft"
           ? "Attachments are read-only. Available files can be downloaded."
@@ -406,10 +411,14 @@
         }
         if (file.state === "uploaded") {
           const download = document.createElement("button"); download.type = "button"; download.className = "m02-attachment-action"; download.dataset.downloadAttachment = file.id; download.textContent = "Download"; row.append(download);
+          if (photo) {
+            const preview = document.createElement("button"); preview.type = "button"; preview.className = "m02-attachment-action";
+            preview.dataset.downloadAttachment = file.id; preview.dataset.previewAttachment = "true"; preview.textContent = "View photo"; row.append(preview);
+          }
         }
         list.append(row);
       });
-      const locked = !state.report?.id || !state.canEdit || state.report?.status === "completed" || state.saving || state.attachmentBusy;
+      const locked = !state.report?.id || (kind === "a" && !appendices.isPersisted(id)) || !state.canEdit || state.report?.status === "completed" || state.saving || state.attachmentBusy;
       group.querySelector("input[type=file]").disabled = locked || quotaReached;
       group.querySelectorAll("[data-delete-attachment]").forEach((button) => { button.disabled = state.saving || state.attachmentBusy || !state.canEdit || state.report?.status === "completed"; });
       group.querySelectorAll("[data-download-attachment]").forEach((button) => { button.disabled = state.saving || state.attachmentBusy; });
@@ -435,14 +444,17 @@
       if (!ALLOWED_FILE.test(file.name)) throw new Error("Choose JPG, JPEG, PNG, WebP, PDF, DOC, DOCX, XLS, or XLSX.");
       if (!file.size || file.size > 10 * 1024 * 1024) throw new Error("Choose a non-empty file; maximum 10 MB combined per question/item.");
       const [kind, identity] = group.dataset.attachmentGroup.split(":");
-      const active = state.attachments.filter((item) => kind === "q" ? item.question_id === identity : Number(item.company_item_no) === Number(identity));
+      const active = state.attachments.filter((item) => kind === "a" ? item.appendix_record_id === identity : kind === "q" ? item.question_id === identity : Number(item.company_item_no) === Number(identity));
+      if (kind === "a" && !appendices.isPersisted(identity)) throw new Error("Save Draft first to save this appendix record.");
+      if (group.dataset.appendixKind === "photo" && !/\.(jpe?g|png|webp)$/i.test(file.name)) throw new Error("Choose a JPG, PNG or WebP photo.");
       const total = active.reduce((sum, item) => sum + Number(item.size_bytes || 0), 0);
-      if (active.length >= 5) throw new Error("This question/item already has 5 active attachments.");
+      if (active.length >= (group.dataset.appendixKind === "photo" ? 1 : 5)) throw new Error("This record has reached its attachment limit.");
       if (total + file.size > 10 * 1024 * 1024) throw new Error("Attachments for this question/item cannot exceed 10 MB combined.");
       state.attachmentBusy = true; renderAttachments(); status.textContent = "Uploading…"; input.disabled = true;
       const body = new FormData();
       body.append("action", "upload"); body.append("report_id", state.report.id);
       if (kind === "q") body.append("question_id", identity);
+      else if (kind === "a") body.append("appendix_record_id", identity);
       else body.append("company_item_no", identity);
       body.append("file", file);
       const { data, error } = await state.sb.functions.invoke("m02-attachments", { body });
@@ -456,6 +468,7 @@
   }
   async function handleAttachmentAction(button, action) {
     if (state.saving || state.attachmentBusy) return;
+    const previewHost = button.dataset.previewAttachment ? button.closest("[data-appendix-record]")?.querySelector("[data-photo-preview]") : null;
     try {
       if (action === "delete" && (!state.canEdit || state.report?.status === "completed")) throw new Error("Only an editable Draft report can remove attachments.");
       state.attachmentBusy = true; renderAttachments();
@@ -466,7 +479,10 @@
       });
       if (error) throw error;
       if (action === "delete") await refreshAttachments();
-      else if (data?.url) window.open(data.url, "_blank", "noopener,noreferrer");
+      else if (data?.url && previewHost) {
+        const image = document.createElement("img"); image.src = data.url; image.alt = "Private M02 photographic record"; image.loading = "lazy";
+        previewHost.replaceChildren(image);
+      } else if (data?.url) window.open(data.url, "_blank", "noopener,noreferrer");
       else throw new Error("The attachment service returned no download link.");
     } catch (error) { showEditorError(error.message || "Attachment action failed."); }
     finally { state.attachmentBusy = false; renderAttachments(); }
@@ -651,6 +667,7 @@
     $all("[data-chapter-score]").forEach((select) => { select.value = chapterScores[select.dataset.chapterScore] ?? ""; });
   }
   function reportObject() {
+    appendices.deriveTotals();
     const vessel = snapshotVessel(el("vesselId").value);
     const current = state.report || {};
     const details = {
@@ -714,7 +731,7 @@
     if (report.details.open_items.length > 100 || report.details.inspection_places.length > 100) throw new Error("The repeatable item limit is 100 rows.");
   }
   async function fetchSavedReport(reportId) {
-    const result = await rpc("csvb_m02_get_v2", { p_report_id: reportId });
+    const result = await rpc("csvb_m02_get_v3", { p_report_id: reportId });
     return result || {};
   }
   function setEditorReadonly() {
@@ -748,6 +765,7 @@
       el("editorStatus").textContent = "New report"; el("editorTitle").textContent = "Ship Inspection Report";
       message(el("editorMessage"), "");
       await loadQuestions(null, state.report.library_version);
+      await appendices.newReport();
       state.companyAnswers = new Map(state.companyItems.map((item) => [Number(item.item_no), { response: null, comments: "" }]));
       renderCompanyItems(); renderAttachments();
       restoreWorkspace({});
@@ -787,6 +805,7 @@
       el("editorTitle").textContent = report.vessel_snapshot?.name || "Ship Inspection Report";
       message(el("editorMessage"), "");
       await loadQuestions(id, report.library_version || null);
+      appendices.load(result);
       renderCompanyItems(); renderAttachments();
       renderVesselSnapshot();
       setEditorReadonly();
@@ -818,7 +837,7 @@
     const open = new Set(asArray(state.workspace.open_chapters).map(String));
     $all(".m02-chapter").forEach((chapter) => { chapter.open = open.has(chapter.dataset.chapter); });
     el("appendixDetails").open = state.workspace.appendix_open === true;
-    const section = ["general", "part1", "part2", "company", "questions", "appendix"].includes(state.workspace.section) ? state.workspace.section : "general";
+    const section = ["general", "part1", "part2", "company", "questions", "appendix", "maintenance", "critical", "findings", "photos"].includes(state.workspace.section) ? state.workspace.section : "general";
     $all(".m02-section-nav button").forEach((button) => button.classList.toggle("is-current", button.dataset.section === section));
     if (section !== "general") window.setTimeout(() => el(`section-${section}`)?.scrollIntoView({ block: "start" }), 0);
   }
@@ -829,6 +848,8 @@
     });
   }
   async function saveReport(targetStatus = "draft") {
+    if (state.saving || state.attachmentBusy) return;
+    await appendices.readyForSave();
     if (state.saving || state.attachmentBusy) return;
     let savedAlready = false;
     try {
@@ -841,8 +862,9 @@
       el("saveDraft").disabled = true; el("markCompleted").disabled = true;
       const answers = collectAnswers();
       const savedWorkspace = workspaceState();
-      const saved = await rpc("csvb_m02_save_v2", {
-        p_report: report, p_answers: answers, p_company_items: collectCompanyItems(), p_workspace: savedWorkspace
+      const saved = await rpc("csvb_m02_save_v3", {
+        p_report: report, p_answers: answers, p_company_items: collectCompanyItems(), p_workspace: savedWorkspace,
+        p_appendices: appendices.collect()
       });
       if (!saved?.id) throw new Error("The M02 service did not return a saved report ID.");
       savedAlready = true;
@@ -886,10 +908,11 @@
       el("editorTitle").textContent = persisted.report.vessel_snapshot?.name || "Ship Inspection Report";
       fillDetails(persisted.report.details || {});
       await loadQuestions(persisted.report.id, persisted.report.library_version || state.questionVersion);
+      appendices.load(persisted);
       renderCompanyItems(); renderAttachments();
       restoreWorkspace(persisted.workspace_state || savedWorkspace);
       renderVesselSnapshot();
-      state.reports = asArray(await rpc("csvb_m02_reports_v2", { p_company_id: state.companyId }));
+      state.reports = asArray(await rpc("csvb_m02_reports_v3", { p_company_id: state.companyId }));
       setEditorReadonly();
       showGlobal(`Report ${persisted.report.status === "completed" ? "marked completed" : "saved as Draft"}.`, "success");
       message(el("editorMessage"), persisted.report.status === "completed" ? "Report marked Completed. Completion did not add approval or signature states." : "Draft saved. The persisted vessel snapshot and answers are now loaded.", "success");
@@ -931,6 +954,7 @@
     $all(".m02-section-nav button").forEach((button) => button.classList.toggle("is-current", button.dataset.section === name));
   }
   function bindEvents() {
+    appendices.init({ state, rpc, markDirty, progress, showEditorError, renderAttachments, attachmentMarkup });
     $all("[data-view]").forEach((button) => button.addEventListener("click", () => {
       const view = button.dataset.view;
       if (view === "new") { openNewReport(); return; }

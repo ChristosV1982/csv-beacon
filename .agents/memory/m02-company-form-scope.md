@@ -39,8 +39,14 @@ M02 is View-allowed by default for all Office roles, including legacy Office use
 
 **How to apply:** Use ordinary Rights Matrix/Access Profile grants, preserving explicit denials, personal overrides, company enablement and normal vessel scope. Keep Super Admin access and Vessel/Inspector access unchanged.
 
-Completion requires explicit answers in every implemented response-based section. Part 3 requires Yes/No/N/S; Part 4 requires Yes/No/N/A/N/S. N/S and N/A are answered, while blank/null is Remaining. Draft saves must remain available with missing answers.
+Completion requires explicit answers in every implemented response-based section. Part 3 requires Yes/No/N/S; Part 4 requires Yes/No/N/A/N/S; Appendix 2 has the Company's 29 critical-equipment checks with Yes/No/N/A. N/S and N/A are answered where supported, while blank/null is Remaining. Draft saves must remain available with missing answers.
 
 **Why:** The user requires completion tracking and a hard completion gate, not a new approval workflow.
 
-**How to apply:** Keep section/chapter counters live and Appendix 3 derived. Add future response-based sections to frontend and server completion registries only when implemented; do not require unimplemented Appendix 2 placeholders. Validate the final transaction state because versioned saves persist different sections in multiple steps. Do not rewrite existing Completed records.
+**How to apply:** Keep section/chapter counters live and Appendix 3 derived. Add future response-based sections to frontend and server completion registries only when implemented. Validate the final transaction state because versioned saves persist different sections in multiple steps. Do not rewrite existing Completed records.
+
+Appendix 1 maintenance checks, Appendix 4 findings and Appendix 5 photos are optional repeatable content; do not invent minimum row counts. Appendix 4 is the sole source of Part 2 High/Medium/Low observation totals. Root cause remains free text without an invented taxonomy. No DANAOS integration/upload is authorized.
+
+**Why:** The user explicitly defined these Company-form sections and their optional-content/completion boundaries.
+
+**How to apply:** Keep maintenance A/B/C distinct. Use only existing due-date particulars (do not invent responsible-party/start/end fields). Keep photographic records separate from question/item evidence. Retain the system-derived Last Vetting source independently of editable M02 values, and never silently replace a saved manual override when reopening.

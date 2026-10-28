@@ -63,7 +63,10 @@ Deno.serve(async (req) => {
       if (!file.size || file.size > LIMIT) return respond({ error: "Maximum 10 MB combined per question/item" }, 413);
       const bytes = new Uint8Array(await file.arrayBuffer());
       if (!validSignature(ext, bytes)) return respond({ error: "File content does not match the allowed document/image type" }, 400);
-      reservation = await rpc("csvb_m02_attachment_reserve", {
+      reservation = input.appendix_record_id ? await rpc("csvb_m02_attachment_reserve_appendix", {
+        p_report_id: input.report_id, p_appendix_record_id: input.appendix_record_id,
+        p_filename: file.name, p_mime: mime, p_size: bytes.length,
+      }) : await rpc("csvb_m02_attachment_reserve", {
         p_report_id: input.report_id, p_question_id: input.question_id || null,
         p_company_item_no: input.company_item_no ? Number(input.company_item_no) : null,
         p_filename: file.name, p_mime: mime, p_size: bytes.length,
