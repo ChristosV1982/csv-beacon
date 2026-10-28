@@ -157,6 +157,7 @@
   }
 
   async function loadInbox() {
+    if (!await officeAllowsThreads()) return;
     ensureInboxCard();
 
     if (busy) return;
@@ -204,13 +205,24 @@
     }, 900);
   }
 
-  function init() {
+  async function officeAllowsThreads() {
+    window.CSVB_OFFICE_AUTHORIZATION_PROMISE ||= sb.rpc("csvb_my_office_authorization")
+      .then(({ data, error }) => { if (error) throw error; return data; });
+    try {
+      const policy = await window.CSVB_OFFICE_AUTHORIZATION_PROMISE;
+      return !policy?.enforced || policy.permissions?.some(p =>
+        p.module_code === "THREADS" && p.action === "view" && p.decision?.allowed === true);
+    } catch { return false; }
+  }
+
+  async function init() {
     window.CSVB_THREADS_INBOX_UI_BUILD = BUILD;
 
     if (!window.AUTH?.ensureSupabase) return;
 
     sb = window.AUTH.ensureSupabase();
 
+    if (!await officeAllowsThreads()) return;
     ensureInboxCard();
     watchCompany();
     setTimeout(loadInbox, 1200);

@@ -39,7 +39,9 @@
       : (profile?.code === role.default_access_profile_code ? "Role default. " : "Custom per-user Access Profile. ") +
         (profile?.requires_enforcement
           ? "Account will be created inactive with login locked until View-only permission enforcement is available."
-          : "Prepared profile: the compatible legacy access baseline will be used until profile enforcement is available.");
+          : options?.permission_enforcement_active
+            ? "Enforced Access Profile. Personal overrides and protected company/vessel scope apply."
+            : "Prepared profile: the compatible legacy access baseline will be used until profile enforcement is available.");
   }
   async function sync() {
     const card = el("userCreateCard");

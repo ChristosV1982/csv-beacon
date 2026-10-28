@@ -12,4 +12,4 @@
 - [Mooring task context](mai-task-context.md) — task entry preserves existing workflows; vessel context is a validated hint, and empty selections must survive refresh.
 - [Vessel/account governance](vessel-account-governance.md) — Active/Inactive, restricted reasons, staged account changes and the approved vessel-rank module allowlist.
 - [Rights Matrix inheritance](rights-matrix-inheritance.md) — resetting a rank or position restores live role-default inheritance, never a frozen copy or implicit grant.
-- [Office role governance](office-role-governance.md) — manual identity/profile assignment is separate from pending permission enforcement; preserve protected roles and Auth identities.
+- [Office role governance](office-role-governance.md) — assigned profiles are authoritative; personal Deny/Allow, tenancy and protected identities must survive legacy migration.

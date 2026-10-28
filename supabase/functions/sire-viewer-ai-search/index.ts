@@ -1,3 +1,4 @@
+import { officeAuthorizationGate } from "../_shared/office-authorization.ts";
 // supabase/functions/sire-viewer-ai-search/index.ts
 // C.S.V. BEACON — Viewer AI Search
 // Server-side OpenAI Responses API integration for SIRE and RISQ source packs.
@@ -417,6 +418,12 @@ async function callOpenAI(params: {
 }
 
 Deno.serve(async (req: Request): Promise<Response> => {
+  const officeBody = await req.clone().json().catch(() => ({}));
+  const officeViewer = normalizeViewerType(officeBody.viewer_type || officeBody.viewerType ||
+    officeBody.source_kind || officeBody.sourceKind) === "RISQ"
+    ? "RISQ_QUESTIONS_VIEWER" : "SIRE_QUESTIONS_VIEWER";
+  const officeDenied = await officeAuthorizationGate(req, officeViewer, "view");
+  if (officeDenied) return officeDenied;
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }

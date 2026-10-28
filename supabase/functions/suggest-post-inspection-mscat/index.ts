@@ -1,3 +1,4 @@
+import { officeAuthorizationGate } from "../_shared/office-authorization.ts";
 export const config = {
   verify_jwt: false,
 };
@@ -464,6 +465,8 @@ async function loadLearningExamplesForItem(supabaseAdmin: any, profile: any, ite
 }
 
 Deno.serve(async (req: Request) => {
+  const officeDenied = await officeAuthorizationGate(req, "POST_INSPECTION", "edit");
+  if (officeDenied) return officeDenied;
   if (req.method === "OPTIONS") return noContent(req, 204);
 
   try {

@@ -1,13 +1,13 @@
 ---
 name: Office role catalogue governance
-description: Manual Office identity assignment is separate from pending access-profile enforcement; protected security identities remain unchanged.
+description: Office identity is separate from authoritative Access Profile permissions; preserve protected roles, tenancy, legacy fallback and Auth identities.
 ---
 
-Office role identity and prepared Access Profile references may now be assigned manually to existing Office accounts by Super Admin. This does not itself activate Access Profile permission enforcement.
+Office Role identifies an organizational position; an assigned Access Profile controls ordinary Office authorization. Personal Deny precedes personal Allow, then the assigned profile. Legacy fallback is allowed only when no Access Profile is assigned.
 
-**Why:** The user explicitly requested assignment to existing users without recreating Auth accounts. The broader authorization resolver/backend migration is still incomplete.
+**Why:** The user required genuinely enforced view-only profiles without recreating accounts or allowing legacy Company Admin/Superintendent shortcuts to broaden assigned-profile access.
 
-**How to apply:** Preserve legacy security roles, Auth identity, company/vessel context and audited manual assignment. Keep an explicit access-enforcement-pending warning and confirmation in the editor; never imply that storing a view-only profile has already restricted effective access. New arbitrary catalogue entries remain unassignable until explicitly enabled.
+**How to apply:** Preserve legacy security classes, Auth identity, company/vessel scope and audited manual assignment. Fail closed for an inactive assigned profile; never fall back to its broader security class. Show actual backend enforcement state, not a hard-coded pending/enforced label. New catalogue entries remain unassignable until explicitly enabled.
 
 The current Super Admin, Company Admin, Vessel and Inspector categories are protected system roles. Company Superintendent is a protected legacy operational role under review, not an unused role available for deletion.
 
@@ -31,13 +31,19 @@ Prepared access-profile baselines must remain inactive until the backend's ordin
 
 **Why:** Legacy Office role shortcuts can grant writes outside the Rights Matrix; mapping a new identity onto an old security role before those checks are aligned would let a view-only profile act with broader privileges.
 
-**How to apply:** Verify both direct-route visibility and backend RPC/write denial before activating Office/Demo profile enforcement. Preserve the current legacy resolver for all users until that activation; storing role/profile references alone must not be mistaken for effective-access enforcement.
+**How to apply:** Require direct-route, authenticated API/Storage/Edge write-denial and compatibility verification before enabling a resolver in another environment. Preserve legacy behavior only for unmigrated Office users, and preserve Super Admin, Vessel rank and Inspector semantics.
 
 Authorization coverage must use reviewed module/action contracts, not RPC-name heuristics. A reader-looking endpoint can create draft or derived records, and a SECURITY DEFINER or service-role path can bypass browser table policies.
 
 **Why:** A generic endpoint-name classifier can accidentally authorize a write as a View operation, defeating the agreed view-only profiles.
 
 **How to apply:** Verify actual backend effects and scope before admitting an endpoint. Unknown operations must fail closed; candidate decision-engine tests alone are not evidence of end-to-end enforcement.
+
+When one endpoint serves multiple modules, its permission gate must reuse the business handler's exact discriminator normalization and field precedence.
+
+**Why:** A RightShip alias can select RISQ even without containing the string “RISQ”; independent substring matching at the permission boundary can authorize the wrong module.
+
+**How to apply:** Reuse the canonical normalizer and test aliases and conflicting selector fields, not only the usual module labels.
 
 The approved initial configuration for Marine Superintendent, Marine Superintendent - Port Captain, Technical Superintendent, Technical Superintendent - Port Engineer, HSQE Superintendent, DPA, Technical Manager and General Manager is a shared nine-module view-only profile, not the broader legacy Superintendent baseline.
 
@@ -49,12 +55,18 @@ Demo User also shares this same approved nine-module view-only profile, while re
 
 **Why:** The user explicitly extended the prepared profile to Demo User, denying Edit, Export, Admin, destructive/configuration rights and unlisted modules by default.
 
-**How to apply:** Do not restore the narrower original Demo mapping when operationalizing assignment. Keep the shared profile inactive until the same backend enforcement checks required for Office users pass.
+**How to apply:** Do not restore the narrower original Demo mapping. Demo shares the same enforced profile and ordinary override rules as the approved view-only Office roles; it never receives an authorization bypass.
 
-## New-account safety while enforcement is pending
+## Account activation is separate from permission activation
 
-New Office accounts assigned a View-only profile must not become active through a broader legacy security class while that profile is unenforced. Keep login locked until enforcement is ready. Existing accounts retain their separately agreed legacy fallback.
+Never activate a new view-only account through a broader legacy security class while profile enforcement is unavailable. Once enforcement is active, new accounts may use their ordinary configured active/reset flow. Activating a resolver must not automatically unlock, unban or reassign existing accounts.
 
 **Why:** A prepared role/profile label is not authorization. Activating a new Demo or View-only Office account through Superintendent permissions would contradict the agreed restrictions.
 
-**How to apply:** Show the inactive/prepared outcome before creation and require confirmation. Future activation must address both profile status and the Auth login lock only after permission enforcement is complete.
+**How to apply:** Use authoritative enforcement readiness during creation. If unavailable, show the locked/prepared outcome and require confirmation. Existing account-status changes remain an explicit, separate administration decision.
+
+Legacy role defaults may contain multiple rows for the same permission when Position is NULL. Audit duplicates before copying a baseline; identical defaults may be deduplicated for the copy, but conflicting grants must not be combined into a broader grant.
+
+**Why:** Nullable-position uniqueness allowed duplicate legacy defaults; a direct baseline UPSERT failed because the same permission was inserted twice.
+
+**How to apply:** Check for conflicting default rows before rebuilding reusable profiles. Preserve audited permission meaning rather than treating every legacy row as a distinct grant.

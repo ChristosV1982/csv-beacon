@@ -1,48 +1,87 @@
 # Office authorization activation audit
 
-## Current state
+## Live development/testing state
 
-The candidate decision engine and audited configuration/override RPCs are staged.
-**Live enforcement is not activated.** No users are reassigned or unlocked.
-The existing effective-permissions RPC, module guard and legacy authorization
-remain authoritative until the backend coverage below is complete.
+Enforcement is **enabled** in the verified development/testing Supabase project.
+Eight existing Office assignments report `Enforced`. No existing user was
+reassigned, activated, unlocked or unbanned. The Replit app was not published.
 
-Do not flip `csvb_office_authorization_state.enforcement_enabled` merely because
-the candidate resolver tests pass. Those tests validate permission resolution,
-not end-to-end enforcement.
+Assigned Office profiles use: hard system/company/vessel constraints → personal
+Deny → personal Allow → Access Profile. Unassigned Office accounts retain the
+legacy resolver. Super Admin, Vessel and Inspector retain their existing paths.
 
-## Confirmed activation blockers
+## Enforcement boundaries
 
-- `is_admin_user()` and `is_admin_role()` still recognize the legacy Company
-  Admin/Superintendent security classes without consulting the assigned profile.
-- `mai_has_permission()` has an Office branch based on `app_role_permissions`.
-- `pla_current_user_can()` allows the legacy Office roles before normal
-  per-action permission resolution.
-- Hundreds of public SECURITY DEFINER RPCs have vessel-only guards and private
-  implementations. An Office profile check must cover their ordinary read/write
-  entry points without changing protected administration or vessel behavior.
-- Public views and table/storage policies must be audited together. A route
-  guard or restrictive browser-table policy alone cannot constrain owner-executed
-  views, SECURITY DEFINER RPCs or service-role Edge Functions.
-- Hosted `import-post-inspection-pdf`, `suggest-post-inspection-mscat`,
-  `backfill-post-inspection-mscat-ai` and `backfill-audit-observations-mscat-ai`
-  use privileged backend access following legacy role checks. Gate the caller's
-  module/action before privileged work and preserve each deployed implementation.
-- Viewer AI/search endpoints and protected administration endpoints also need
-  explicit classification; do not infer authorization from endpoint names.
-- Rights Matrix profile editing, named-user override/diagnostic UI, directory
-  enforcement labels and creation/activation logic still require integration.
+- The effective-permission RPC feeds existing dashboard filtering and route guards.
+- The PostgREST pre-request hook checks reviewed endpoint/module/action contracts.
+  Unknown endpoints fail closed for migrated Office users. Contracts can also
+  reuse literal module/action pairs from already-audited public wrappers; names
+  and volatility are not used to guess whether an RPC writes.
+- Existing restrictive table/view predicates and new restrictive private-storage
+  policies use the same Office decision. Existing tenancy restrictions remain.
+- Mooring and Portable Lifting permission probes now return authoritative results.
+- Seven hosted Edge Functions have a caller-JWT permission gate before privileged
+  work. Deployment preserved each hosted implementation and `verify_jwt` setting.
+  The deployment helper patches the hosted source rather than shipping unrelated
+  local parser changes.
+- Legacy role-family identity helpers remain for compatibility and hard security
+  checks, but cannot authorize an assigned Office user past these API boundaries.
 
-## Safe next implementation sequence
+## Administration/UI
 
-1. Use an explicit, reviewed endpoint/module/action inventory, including shared
-   data readers. Do not classify unknown RPCs as reads or rely on naming regexes.
-2. Add Office decisions at backend entry points, retaining the existing company,
-   permitted-vessel, ownership and hard-system checks.
-3. Gate privileged Edge operations and Storage access. Verify denied writes with
-   actual authenticated REST calls, not only candidate-decision queries.
-4. Wire the existing effective-permission RPC and frontend actions to the same
-   result; integrate profile/override management and diagnostic source labels.
-5. Run all requested role, scope, direct-route, export and backend-write tests.
-6. Activate prepared profiles and enforcement atomically only after coverage
-   passes. Do not automatically reassign users or unban locked accounts.
+Rights Matrix now offers `Configure` contexts:
+
+1. Role / Rank defaults (existing workspace unchanged).
+2. Access Profile: audited profile permission editing.
+3. User overrides / Diagnostics: Allow, Deny, Inherited and resolved source.
+
+Users directory reports real enforcement state and flags custom overrides.
+Office creation readiness uses the live resolver state, not the existence of a
+legacy baseline. Previously locked accounts are deliberately not unlocked.
+The nine-module view-only profile contains exactly nine View grants and no
+Edit, Export, Admin or Review grants. Company Administrator Access mirrors
+current Company Admin role defaults, with global Office scope clipped to company.
+
+## Verification
+
+Before activation, isolated owner-controlled verification subjects exercised
+the real JWT/REST boundary without changing existing users' permissions.
+
+- 46 checks passed, including authenticated reader calls; denied writes through
+  RPCs, direct table inserts and privileged Edge Functions; storage rejection;
+  personal Allow/Deny isolation; company/vessel escape rejection; and cleanup.
+- Rollback-only compatibility tests preserved effective permission results for
+  legacy Company Admin/Superintendent, Super Admin, Vessel and Inspector.
+- Company Administrator profile grants/scopes matched current role defaults.
+- Profile save, diagnostic output and audit insertion were tested in rollback.
+- 12 authenticated Preview checks passed with no Supabase API errors: six
+  Inspection-area modules, three Marine-area modules, all nine view pages,
+  hidden editing/CSV/PDF controls, and denied direct editor navigation.
+- After activation, directory metadata reported eight enforced assignments.
+  Creation options reported live enforcement and no prepared-profile login lock.
+- A post-activation Auth fixture with no test-subject membership was enforced;
+  a direct report insert and a valid-PDF private-storage upload were denied.
+- Viewer AI authorization reuses its business discriminator. RISQ/RightShip
+  aliases and conflicting selector fields cannot select an ungranted module.
+- All disposable verification accounts and test-subject rows were removed.
+- Existing profile rows, vessel rows and legacy role-permission rows were
+  byte-for-byte unchanged. Account/profile counts remained 15; vessels remained 20.
+
+## Limits and maintenance
+
+This is not a claim that every historical RPC was manually exercised. Unreviewed
+APIs remain denied rather than falling back to a legacy role shortcut. Add a
+reviewed contract when admitting a new endpoint.
+
+Application CSV/PDF controls are permission-gated. View access cannot prevent a
+user from manually copying or browser-printing information they are allowed to see.
+Shared analytics readers remain readers even where historical RPC names include
+`export`; their datasets are also required to render the authorized analytics.
+
+Frontend additions are available in Preview but are not published. Backend
+activation is in development/testing only. The normal unauthenticated screenshot
+shows the sign-in page; signed-in checks used disposable real Auth accounts.
+
+The live regression script is restricted to this development project; use
+`--active` to verify an already-activated environment. Existing users are never
+reassigned by the test harness.

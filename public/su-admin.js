@@ -784,7 +784,8 @@ function renderUsers() {
         '<div class="muted small">' + (u.office_profile_is_role_default === true ? "Role default" :
           u.office_profile_is_role_default === false ? "Custom per-user profile" : "Default comparison unavailable") + '</div>' +
         '<span class="pill">' + (u.office_permission_enforcement_active === true
-          ? "Enforced" : "Prepared / enforcement pending") + '</span>'
+          ? "Enforced" : "Prepared / enforcement pending") + '</span>' +
+        (u.office_custom_permissions_applied ? '<span class="pill">Custom permissions applied</span>' : '')
       : '<span class="muted small">' + (["company_admin","company_superintendent"].includes(roleName)
         ? "Legacy permissions — no Office assignment" : "—") + '</span>';
 

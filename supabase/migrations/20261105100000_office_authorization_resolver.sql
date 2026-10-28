@@ -26,7 +26,13 @@ returns text language sql immutable set search_path=pg_catalog as $$
     when 'PORT_CALL_INTELLIGENCE' then 'port_call_intelligence'
     when 'PORTABLE_LIFTING_APPLIANCES_WIRES' then 'portable_lifting_appliances_wires'
     when 'INSPECTOR_INTELLIGENCE' then 'inspector_intelligence'
-    when 'QUESTIONS_EDITOR' then 'sire_questions_editor'
+    when 'QUESTIONS_EDITOR' then 'questions_editor'
+    when 'QUESTION_LIBRARY' then 'read_only_library'
+    when 'REPORTS' then 'fleet_reports'
+    when 'INSPECTOR_THIRD_PARTY' then 'sire_2_vetting'
+    when 'VESSEL_QUESTIONNAIRES' then 'self_assessment'
+    when 'SELF_ASSESSMENT_TASKS' then 'self_assessment'
+    when 'SELF_ASSESSMENT_ASSIGNMENTS' then 'self_assessment'
     when 'RISQ_QUESTIONS_EDITOR' then 'risq_questions_editor'
     when 'RISQ_QUESTIONS_VIEWER' then 'risq_questions_viewer'
     else lower(p_module) end
@@ -121,7 +127,8 @@ begin
   end if;
   -- "global" in a legacy baseline never changes company/vessel tenancy.
   return jsonb_build_object('allowed',coalesce(granted,false),'source',origin,
-    'scope',resolved_scope,'company_id',p.company_id,
+    'scope',case when resolved_scope='global' then 'company' else resolved_scope end,
+    'company_id',p.company_id,
     'access_profile_code',p.office_access_profile_code,'reason',reason);
 end $$;
 

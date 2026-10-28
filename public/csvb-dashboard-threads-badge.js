@@ -111,6 +111,14 @@
       }
 
       const sb = window.AUTH.ensureSupabase();
+      window.CSVB_OFFICE_AUTHORIZATION_PROMISE ||= sb.rpc("csvb_my_office_authorization")
+        .then(({ data, error }) => { if (error) throw error; return data; });
+      const office = await window.CSVB_OFFICE_AUTHORIZATION_PROMISE;
+      if (office?.enforced && !office.permissions?.some(p =>
+        p.module_code === "THREADS" && p.action === "view" && p.decision?.allowed === true)) {
+        setBadgeHtml("");
+        return;
+      }
 
       let bundle = null;
       if (window.AUTH.getSessionUserProfile) {
