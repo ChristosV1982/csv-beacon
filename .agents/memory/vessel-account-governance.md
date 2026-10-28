@@ -15,6 +15,12 @@ Vessel lifecycle has only Active / Inactive. Commercial reasons and internal rem
 
 **How to apply:** Extend the existing Superuser Administration foundation, not a second registry. Treat company transfer and hard deletion as separate operations, and preserve history when status changes.
 
+Vessel particulars editing must preserve the vessel UUID, company assignment and current lifecycle status. Keep company transfer and activation/deactivation outside the particulars editor.
+
+**Why:** The general Add/Update path also writes status and invokes transfer logic. Passing a status copied when the editor opened can undo a later lifecycle transition even if no status input is shown.
+
+**How to apply:** Use an update-only particulars operation with no company/status parameters. Read-only form controls alone are not sufficient protection against those server-side effects.
+
 Step 1 changes vessel lifecycle status only. It must not automatically disable accounts, change onboard/embarkation state, revoke sessions, reset passwords or alter historical module data.
 
 **Why:** The user requires vessel/account governance to be built step-by-step, with account consequences agreed in a later step.

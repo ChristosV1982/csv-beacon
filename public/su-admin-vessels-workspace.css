@@ -1,0 +1,446 @@
+/* Focused vessel register and editor; all selectors stay within the Vessels
+   workspace or its reusable native dialog. */
+.wrap:has(#tab-vessels:not([style*="none"])) {
+  width: 100%;
+  max-width: none;
+  box-sizing: border-box;
+}
+
+#tab-vessels {
+  min-width: 0;
+  padding: clamp(16px, 2.2vw, 28px);
+  border-color: #cbdced;
+  border-radius: 15px;
+  background: #fbfdff;
+  box-shadow: 0 12px 30px rgba(16, 48, 79, .06) !important;
+}
+
+#tab-vessels .vessels-workspace {
+  width: 100%;
+  min-width: 0;
+}
+
+#tab-vessels .vessels-workspace-heading,
+#tab-vessels .vessels-directory-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+#tab-vessels .vessels-workspace-heading {
+  padding: 2px 0 20px;
+}
+
+#tab-vessels .vessels-workspace-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  flex: 0 1 auto;
+}
+
+#tab-vessels .vessel-workspace-feedback {
+  color: #246448;
+  font-size: .84rem;
+  font-weight: 750;
+  line-height: 1.35;
+  text-align: right;
+}
+
+#tab-vessels .vessel-workspace-feedback:empty {
+  display: none;
+}
+
+#tab-vessels .vessels-eyebrow {
+  color: #47789f;
+  font-size: .68rem;
+  font-weight: 950;
+  letter-spacing: .16em;
+}
+
+#tab-vessels .vessels-workspace-heading h1 {
+  margin: 4px 0 3px;
+  color: #173d60;
+  font-size: clamp(1.55rem, 2vw, 2rem);
+  letter-spacing: -.04em;
+}
+
+#tab-vessels .vessels-workspace-heading p,
+#tab-vessels .vessels-directory-heading p {
+  margin: 4px 0 0;
+  color: #617b91;
+  font-weight: 600;
+}
+
+#tab-vessels .vessels-add-trigger {
+  flex: 0 0 auto;
+  min-height: 44px;
+  padding: 10px 17px;
+  border-radius: 8px;
+  background: #1f5685;
+  box-shadow: 0 4px 11px rgba(31, 86, 133, .16);
+}
+
+#tab-vessels .vessels-directory {
+  min-width: 0;
+  padding: clamp(14px, 1.8vw, 22px);
+  border: 1px solid #d6e3ef;
+  border-radius: 12px;
+  background: #fff;
+}
+
+#tab-vessels .vessels-directory-heading {
+  align-items: end;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #e4edf4;
+}
+
+#tab-vessels .vessels-directory-heading h2 {
+  margin: 0;
+  color: #1b4264;
+  font-size: 1.08rem;
+  letter-spacing: -.02em;
+}
+
+#tab-vessels .vessels-directory-heading p {
+  max-width: 540px;
+  font-size: .86rem;
+}
+
+#tab-vessels .vessels-list-controls {
+  display: grid;
+  grid-template-columns: minmax(150px, .65fr) minmax(280px, 1.35fr);
+  gap: 10px;
+  align-items: end;
+  min-width: min(100%, 500px);
+  margin-left: auto;
+}
+
+#tab-vessels .vessels-list-controls .field {
+  min-width: 0;
+  gap: 5px;
+}
+
+#tab-vessels .vessels-list-controls label {
+  color: #45657e;
+  font-size: .76rem;
+  letter-spacing: .035em;
+}
+
+#tab-vessels .vessels-list-controls select,
+#tab-vessels .vessels-list-controls input {
+  min-height: 42px;
+  padding: 9px 11px;
+  border-color: #c9d9e6;
+  border-radius: 8px;
+  background: #fbfdff;
+  font-size: 14px;
+}
+
+/* Legacy lifecycle controls use flex-basis:180px for a horizontal search.
+   Inside this labelled column that would become a 180px input height. */
+#tab-vessels #v_search {
+  flex: 0 0 auto;
+  width: 100%;
+  height: 42px;
+  box-sizing: border-box;
+}
+
+#vesselEditorDialog .vessel-editor-feedback.is-error {
+  color: #a02936;
+}
+
+#tab-vessels .vessels-table-scroll {
+  max-height: min(68vh, 780px);
+  margin-top: 15px;
+  overflow: auto;
+  border: 1px solid #dce7ef;
+  border-radius: 9px;
+  scrollbar-color: #a9bfd0 #f0f5f9;
+  scrollbar-width: thin;
+}
+
+#tab-vessels .vessels-table {
+  width: 100%;
+  min-width: 980px;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+#tab-vessels .vessels-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 11px 10px !important;
+  border-bottom: 1px solid #d5e1eb;
+  background: #edf4f9;
+  color: #355974;
+  font-size: .72rem !important;
+  font-weight: 900;
+  letter-spacing: .055em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+#tab-vessels .vessels-table td {
+  padding: 10px !important;
+  color: #29465d;
+  font-size: .86rem !important;
+  line-height: 1.35;
+  vertical-align: middle;
+}
+
+#tab-vessels .vessels-table tbody tr:nth-child(even) {
+  background: #f8fbfd;
+}
+
+#tab-vessels .vessels-table tbody tr:hover {
+  background: #eef6fb;
+}
+
+#tab-vessels .vessels-table td:nth-child(2) {
+  color: #173d60;
+  font-weight: 800;
+}
+
+#tab-vessels .vessels-table .vessel-row-actions {
+  flex-wrap: nowrap;
+  gap: 5px;
+}
+
+#tab-vessels .vessels-table .vessel-row-actions .btnSmall {
+  min-height: 30px;
+  padding: 5px 8px;
+  border-radius: 6px;
+  font-size: .76rem;
+  line-height: 1.15;
+  white-space: nowrap;
+}
+
+#tab-vessels .vessels-lifecycle-note {
+  margin: 12px 0 0;
+  color: #5b7387;
+  font-size: .82rem;
+  font-weight: 650;
+  line-height: 1.5;
+}
+
+#vesselEditorDialog {
+  width: min(100% - 32px, 680px);
+  max-width: 680px;
+  max-height: min(92dvh, 850px);
+  padding: 0;
+  overflow: auto;
+  border: 1px solid #cbdce9;
+  border-radius: 15px;
+  background: #f9fcfe;
+  color: #203f59;
+  box-shadow: 0 25px 76px rgba(11, 35, 57, .3);
+}
+
+#vesselEditorDialog::backdrop {
+  background: rgba(12, 34, 55, .61);
+  backdrop-filter: blur(3px);
+}
+
+#vesselEditorDialog .vessel-editor-form {
+  margin: 0;
+}
+
+#vesselEditorDialog .vessel-editor-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 22px 25px 17px;
+  border-bottom: 1px solid #dce7ef;
+  background: #f9fcfe;
+}
+
+#vesselEditorDialog .vessel-editor-header h2 {
+  margin: 5px 0 4px;
+  color: #173d60;
+  font-size: 1.42rem;
+  letter-spacing: -.035em;
+}
+
+#vesselEditorDialog .vessel-editor-header p {
+  max-width: 500px;
+  margin: 0;
+  color: #617b91;
+  font-size: .88rem;
+  line-height: 1.45;
+}
+
+#vesselEditorDialog .vessel-editor-close {
+  flex: 0 0 auto;
+  min-height: 38px;
+  padding: 7px 12px;
+  border: 1px solid #bfd2df;
+  border-radius: 7px;
+  background: #fff;
+  color: #294d68;
+  font: inherit;
+  font-size: .84rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+#vesselEditorDialog .vessel-editor-feedback {
+  display: none;
+  margin: 15px 25px 0;
+  padding: 11px 13px;
+  border: 1px solid #b9d5e8;
+  border-radius: 8px;
+  background: #edf6fc;
+  color: #244e6b;
+  font-size: .88rem;
+  font-weight: 750;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+#vesselEditorDialog .vessel-editor-feedback:not(:empty) {
+  display: block;
+}
+
+#vesselEditorDialog .vessel-editor-fields {
+  display: grid;
+  gap: 13px;
+  padding: 18px 25px 20px;
+}
+
+#vesselEditorDialog .vessel-editor-fields .field {
+  gap: 5px;
+}
+
+#vesselEditorDialog .vessel-editor-fields label {
+  color: #345a75;
+  font-size: .86rem;
+}
+
+#vesselEditorDialog .vessel-editor-fields input,
+#vesselEditorDialog .vessel-editor-fields select {
+  min-height: 43px;
+  padding: 9px 11px;
+  border-color: #c5d7e4;
+  border-radius: 7px;
+  background: #fff;
+  font-size: 14px;
+}
+
+#vesselEditorDialog .vessel-editor-fields .muted {
+  color: #667f91;
+  font-size: .78rem;
+  font-weight: 600;
+}
+
+#vesselEditorDialog .vessel-editor-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+#vesselEditorDialog .vessel-editor-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 14px 25px 20px;
+  border-top: 1px solid #dce7ef;
+  background: #f5f9fc;
+}
+
+#vesselEditorDialog .vessel-editor-actions button {
+  min-height: 40px;
+  padding: 8px 13px;
+  border-radius: 7px;
+}
+
+#tab-vessels :is(button, input, select, [tabindex="0"]):focus-visible,
+#vesselEditorDialog :is(button, input, select):focus-visible {
+  outline: 3px solid #62a5c8;
+  outline-offset: 2px;
+}
+
+@media (max-width: 850px) {
+  #tab-vessels .vessels-directory-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  #tab-vessels .vessels-list-controls {
+    min-width: 0;
+    grid-template-columns: minmax(145px, .7fr) minmax(0, 1.3fr);
+    margin-left: 0;
+  }
+}
+
+@media (max-width: 600px) {
+  #tab-vessels {
+    padding: 14px;
+  }
+
+  #tab-vessels .vessels-workspace-heading {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  #tab-vessels .vessels-workspace-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  #tab-vessels .vessel-workspace-feedback {
+    text-align: left;
+  }
+
+  #tab-vessels .vessels-add-trigger {
+    width: 100%;
+  }
+
+  #tab-vessels .vessels-directory {
+    padding: 13px;
+  }
+
+  #tab-vessels .vessels-list-controls {
+    grid-template-columns: 1fr;
+  }
+
+  #tab-vessels .vessels-table-scroll {
+    max-height: 62vh;
+  }
+
+  #vesselEditorDialog {
+    width: 100%;
+    max-width: none;
+    max-height: 94dvh;
+    margin: auto 0 0;
+    border-radius: 15px 15px 0 0;
+  }
+
+  #vesselEditorDialog .vessel-editor-header {
+    padding: 18px 18px 14px;
+  }
+
+  #vesselEditorDialog .vessel-editor-fields {
+    padding: 16px 18px;
+  }
+
+  #vesselEditorDialog .vessel-editor-feedback {
+    margin-right: 18px;
+    margin-left: 18px;
+  }
+
+  #vesselEditorDialog .vessel-editor-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    padding: 13px 18px 18px;
+  }
+
+  #vesselEditorDialog .vessel-editor-actions #v_addBtn {
+    grid-column: 1 / -1;
+  }
+}

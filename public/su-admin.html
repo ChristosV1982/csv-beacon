@@ -174,6 +174,7 @@
   <link rel="stylesheet" href="./csvb-module-header.css?v=20261027_rollout_2" />
   <link id="csvb-vessel-lifecycle-admin-style" rel="stylesheet" href="./csvb-vessel-lifecycle-admin.css?v=20261028_lifecycle_1" />
   <link rel="stylesheet" href="./su-admin-users-workspace.css?v=20261103_office_directory_v2_1" />
+  <link rel="stylesheet" href="./su-admin-vessels-workspace.css?v=20261106_vessels_workspace_2" />
   <link rel="stylesheet" href="./csvb-rights-workspace.css?v=20261030_1" />
   <link rel="stylesheet" href="./csvb-role-management.css?v=20261030_role_catalogue_1">
   <script defer src="./csvb-office-rights.js?v=20261105_office_enforced_2"></script>
@@ -680,109 +681,119 @@
 
     <!-- VESSELS TAB -->
     <div class="card" id="tab-vessels" style="display:none;">
-      <div style="font-weight:950;font-size:1.05rem;">Vessels</div>
-      <div class="muted" style="margin-top:6px;">Add / deactivate vessels.</div>
-
-      <div style="height:12px;"></div>
-
-      <div class="grid2">
-        <div class="card" style="box-shadow:none;">
-          <div style="font-weight:950;">Add vessel</div>
-          <div style="height:10px;"></div>
-
-          <div class="field">
-            <label>Company</label>
-            <select id="v_company">
-              <option value="">Loading companies…</option>
-            </select>
-            <div class="muted small">New vessel will be created under the selected company.</div>
+      <section class="vessels-workspace" aria-labelledby="vesselsWorkspaceTitle">
+        <header class="vessels-workspace-heading">
+          <div>
+            <div class="vessels-eyebrow">FLEET REGISTER</div>
+            <h1 id="vesselsWorkspaceTitle">Vessels</h1>
+            <p class="muted">Review fleet particulars, lifecycle status and vessel history.</p>
           </div>
-
-          <div style="height:10px;"></div>
-
-          <div class="field">
-            <label>Vessel name</label>
-            <input id="v_name" placeholder="e.g. OLYMPIC FIGHTER" />
+          <div class="vessels-workspace-actions">
+            <div id="vesselWorkspaceFeedback" class="vessel-workspace-feedback" role="status" aria-live="polite"></div>
+            <button class="btn vessels-add-trigger" type="button" id="v_openAddBtn"
+              aria-haspopup="dialog" aria-controls="vesselEditorDialog">+ Add vessel</button>
           </div>
+        </header>
 
-          <div style="height:10px;"></div>
-
-          <div class="grid2">
-            <div class="field">
-              <label>Hull number (optional)</label>
-              <input id="v_hull" placeholder="e.g. 103/76" />
+        <section class="vessels-directory" aria-labelledby="vesselsDirectoryTitle">
+          <div class="vessels-directory-heading">
+            <div>
+              <h2 id="vesselsDirectoryTitle">Existing vessels</h2>
+              <p class="muted small">Search vessel particulars or narrow the register by lifecycle status.</p>
             </div>
-            <div class="field">
-              <label>IMO number (optional)</label>
-              <input id="v_imo" placeholder="e.g. 9399999" />
+            <div class="vessels-list-controls csvb-vl-list-controls">
+              <div class="field">
+                <label for="v_status_filter">Status</label>
+                <select id="v_status_filter" aria-label="Vessel status filter">
+                  <option value="all">All statuses</option>
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                </select>
+              </div>
+              <div class="field vessels-search-field">
+                <label for="v_search">Search register</label>
+                <input id="v_search" type="search" placeholder="Company, vessel, IMO, hull or call sign…" />
+              </div>
             </div>
           </div>
 
-          <div style="height:10px;"></div>
-
-          <div class="field">
-            <label>Call sign (optional)</label>
-            <input id="v_call" placeholder="e.g. SVAB" />
-          </div>
-
-          <div style="height:10px;"></div>
-
-          <div class="field">
-            <label>Date Delivered (optional)</label>
-            <input id="v_date_delivered" type="date" />
-            <div class="muted small">Used for Risk Evaluation vessel age: inspection date minus date delivered.</div>
-          </div>
-
-          <div style="height:12px;"></div>
-
-          <div class="actions">
-            <button class="btn" type="button" id="v_addBtn">Add vessel</button>
-            <button class="btn2" type="button" id="v_clearBtn">Clear</button>
-          </div>
-        </div>
-
-        <div class="card" style="box-shadow:none;">
-          <div class="row">
-            <div style="font-weight:950;">Vessel list</div>
-            <div class="right csvb-vl-list-controls">
-              <label for="v_status_filter" class="small">Vessel status</label>
-              <select id="v_status_filter" aria-label="Vessel status filter">
-                <option value="all">All</option>
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-              </select>
-              <input id="v_search" placeholder="Search name / IMO / hull…" style="min-width:320px;" />
-            </div>
-          </div>
-
-          <div style="height:10px;"></div>
-
-          <div style="overflow:auto; max-height:520px;">
-            <table>
+          <div class="vessels-table-scroll" role="region" aria-label="Existing vessels" tabindex="0">
+            <table class="vessels-table">
               <thead>
                 <tr>
-                  <th>Company</th>
-                  <th>Name</th>
-                  <th>Hull</th>
-                  <th>IMO</th>
-                  <th>Call sign</th>
-                  <th>Date Delivered</th>
-                  <th>Status</th>
-                  <th>Actions</th>
+                  <th scope="col">Company</th>
+                  <th scope="col">Vessel Name</th>
+                  <th scope="col">Hull</th>
+                  <th scope="col">IMO</th>
+                  <th scope="col">Call Sign</th>
+                  <th scope="col">Date Delivered</th>
+                  <th scope="col">Status</th>
+                  <th scope="col">Actions</th>
                 </tr>
               </thead>
               <tbody id="vesselsBody">
-                <tr><td colspan="8" class="muted small">Loading…</td></tr>
+                <tr><td colspan="8" class="muted small">Loading vessels…</td></tr>
               </tbody>
             </table>
           </div>
 
-          <div class="muted small" style="margin-top:10px;">
+          <p class="vessels-lifecycle-note">
             Lifecycle status is Active or Inactive. Status changes preserve historical records and do not change linked user/account access in Step 1. Restricted reasons are available through Status history.
+          </p>
+        </section>
+      </section>
+    </div>
+
+    <dialog id="vesselEditorDialog" aria-labelledby="vesselEditorTitle" aria-describedby="vesselEditorDescription">
+      <form id="vesselEditorForm" class="vessel-editor-form">
+        <header class="vessel-editor-header">
+          <div>
+            <div class="vessels-eyebrow">VESSEL PARTICULARS</div>
+            <h2 id="vesselEditorTitle">Add vessel</h2>
+            <p id="vesselEditorDescription">Add a vessel to the selected company fleet.</p>
+          </div>
+          <button class="vessel-editor-close" type="button" id="v_closeBtn" aria-label="Close vessel editor">Close</button>
+        </header>
+        <div id="vesselEditorFeedback" class="vessel-editor-feedback" role="status" aria-live="polite"></div>
+        <div class="vessel-editor-fields">
+          <div class="field">
+            <label for="v_company">Company</label>
+            <select id="v_company">
+              <option value="">Loading companies…</option>
+            </select>
+            <div id="v_company_help" class="muted small">New vessel will be created under the selected company.</div>
+          </div>
+          <div class="field">
+            <label for="v_name">Vessel name</label>
+            <input id="v_name" placeholder="e.g. OLYMPIC FIGHTER" />
+          </div>
+          <div class="vessel-editor-pair">
+            <div class="field">
+              <label for="v_hull">Hull number (optional)</label>
+              <input id="v_hull" placeholder="e.g. 103/76" />
+            </div>
+            <div class="field">
+              <label for="v_imo">IMO number (optional)</label>
+              <input id="v_imo" placeholder="e.g. 9399999" />
+            </div>
+          </div>
+          <div class="field">
+            <label for="v_call">Call sign (optional)</label>
+            <input id="v_call" placeholder="e.g. SVAB" />
+          </div>
+          <div class="field">
+            <label for="v_date_delivered">Date Delivered (optional)</label>
+            <input id="v_date_delivered" type="date" />
+            <div class="muted small">Used for Risk Evaluation vessel age: inspection date minus date delivered.</div>
           </div>
         </div>
-      </div>
-    </div>
+        <footer class="vessel-editor-actions">
+          <button class="btn2" type="button" id="v_cancelBtn">Cancel</button>
+          <button class="btn2" type="button" id="v_clearBtn">Clear</button>
+          <button class="btn" type="submit" id="v_addBtn">Add vessel</button>
+        </footer>
+      </form>
+    </dialog>
 
     <!-- RIGHTS TAB -->
     <div class="card" id="tab-rights" style="display:none;">
@@ -862,7 +873,7 @@
   <script src="./su-admin-user-cleanup.js?v=20261029_vessel_cleanup_3"></script>
   <script src="./csvb-rights-workspace.js?v=20261030_rights_workspace_1"></script>
   <script src="./csvb-role-management.js?v=20261102_manual_office_assignment_1"></script>
-  <script src="./su-admin.js?v=20261105_office_enforced_2"></script>
+  <script src="./su-admin.js?v=20261106_vessel_editor_2"></script>
   <script src="./csvb-question-admin.js?v=20260430_1"></script>
   <script src="./csvb-question-overrides-admin.js?v=20260430_1"></script>
   <script src="./csvb-thread-admin-controls.js?v=20260505_1"></script>

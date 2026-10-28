@@ -383,6 +383,7 @@ const state = {
   },
 };
 let currentAdminUser = null;
+const vesselEditor = { record: null, busy: false };
 
 
 /* ======================== MC-3B5B Repair: Vessel Company Dropdown ======================== */
@@ -409,6 +410,16 @@ function renderVesselCompanyDropdown() {
         return '<option value="' + esc(c.id) + '">' + esc(label) + '</option>';
       })
   ].join("");
+
+  // An existing vessel may belong to an inactive company. Display that company
+  // read-only in Edit without making it an Add/transfer destination.
+  const existingCompany = vesselEditor.record?.company_id;
+  if (existingCompany && !Array.from(sel.options).some(o => o.value === existingCompany)) {
+    const option = document.createElement("option");
+    option.value = existingCompany;
+    option.textContent = vesselEditor.record.company_name || "Existing company";
+    sel.appendChild(option);
+  }
 
   if (current && companies.some((c) => String(c.id) === String(current))) {
     sel.value = current;
@@ -913,10 +924,10 @@ function renderVessels() {
 
     const activeBtn = active
       ? '<button class="btnSmall btnDanger" data-act="deactivate" data-id="' + esc(v.id) + '" type="button">Deactivate</button>'
-      : '<button class="btnSmall btn" data-act="activate" data-id="' + esc(v.id) + '" type="button">Activate</button>';
+      : '<button class="btnSmall btn" data-act="activate" data-id="' + esc(v.id) + '" type="button">Reactivate</button>';
 
-    const saveDateBtn =
-      '<button class="btnSmall btn2" data-act="save_date" data-id="' + esc(v.id) + '" type="button">Save date</button>';
+    const editBtn =
+      '<button class="btnSmall btn2" data-act="edit" data-id="' + esc(v.id) + '" type="button">Edit</button>';
 
     const deleteBtn =
       '<button class="btnSmall btnDanger" data-act="delete" data-id="' + esc(v.id) + '" type="button">Delete</button>';
@@ -930,9 +941,9 @@ function renderVessels() {
         <td>${esc(v.hull_number || "")}</td>
         <td>${esc(v.imo_number || "")}</td>
         <td>${esc(v.call_sign || "")}</td>
-        <td><input class="v-date-input" data-id="${esc(v.id)}" type="date" value="${esc(v.date_delivered || "")}" style="min-width:145px;" /></td>
+        <td>${esc(v.date_delivered ? String(v.date_delivered).split("-").reverse().join("/") : "—")}</td>
         <td>${statusPill}</td>
-        <td><div class="actions">${saveDateBtn}${activeBtn}${historyBtn}${deleteBtn}</div></td>
+        <td><div class="vessel-row-actions">${editBtn}${historyBtn}${activeBtn}${deleteBtn}</div></td>
       </tr>
     `);
   }
@@ -969,28 +980,8 @@ function renderVessels() {
           return;
         }
 
-        if (act === "save_date") {
-          const dateInput = document.querySelector('.v-date-input[data-id="' + id + '"]');
-          const date_delivered = (dateInput?.value || "").trim();
-
-          setStatus("Saving vessel Date Delivered…");
-
-          await csvbRpc("csvb_admin_upsert_vessel", {
-            p_vessel_id: v.id,
-            p_company_id: v.company_id || publicDefaultCompanyId(),
-            p_name: v.name || "",
-            p_hull_number: v.hull_number || null,
-            p_imo_number: v.imo_number ? String(v.imo_number) : null,
-            p_call_sign: v.call_sign || null,
-            p_is_active: (v.is_active === false ? false : true),
-            p_move_related: false,
-            p_date_delivered: date_delivered || null
-          });
-
-          showOk("Vessel Date Delivered saved.");
-          await refreshVessels();
-          renderVesselDropdown();
-          setStatus("Ready");
+        if (act === "edit") {
+          await openVesselEditor(v);
           return;
         }
 
@@ -1260,40 +1251,76 @@ function initCreateUser() {
   });
 }
 
-/* ======================== Vessel create ======================== */
+/* ======================== Vessel particulars editor ======================== */
+function vesselEditorFeedback(message, isError = false) {
+  const el = document.getElementById("vesselEditorFeedback");
+  if (!el) return;
+  el.textContent = message;
+  el.classList.toggle("is-error", isError);
+}
+
+function fillVesselEditor() {
+  const vessel = vesselEditor.record;
+  renderVesselCompanyDropdown();
+  const company = document.getElementById("v_company");
+  if (vessel) company.value = vessel.company_id || "";
+  company.disabled = !!vessel;
+  document.getElementById("v_company_help").textContent = vessel
+    ? "Read-only. Use the separate company-transfer workflow for reassignment."
+    : "New vessel will be created under the selected company.";
+  for (const [input, field] of Object.entries({
+    v_name: "name", v_hull: "hull_number", v_imo: "imo_number",
+    v_call: "call_sign", v_date_delivered: "date_delivered"
+  })) document.getElementById(input).value = vessel?.[field] ?? "";
+  document.getElementById("vesselEditorTitle").textContent = vessel ? "Edit Vessel" : "Add Vessel";
+  document.getElementById("vesselEditorDescription").textContent = vessel
+    ? "Edit vessel particulars only. Company assignment and lifecycle status are managed separately."
+    : "Register a vessel under the selected company. Existing validation rules apply.";
+  document.getElementById("v_addBtn").textContent = vessel ? "Save Changes" : "Add Vessel";
+  document.getElementById("v_clearBtn").textContent = vessel ? "Reset Changes" : "Clear";
+  vesselEditorFeedback("");
+}
+
+async function openVesselEditor(vessel = null) {
+  if (vesselEditor.busy) return;
+  if (typeof ensureCompaniesLoaded === "function") await ensureCompaniesLoaded();
+  vesselEditor.record = vessel ? { ...vessel } : null;
+  document.getElementById("vesselEditorForm").querySelectorAll("input, select, button")
+    .forEach(el => el.disabled = false);
+  document.getElementById("v_closeBtn").disabled = false;
+  fillVesselEditor();
+  const dialog = document.getElementById("vesselEditorDialog");
+  if (!dialog.open) dialog.showModal();
+  document.getElementById("v_name").focus();
+}
+
 function initAddVessel() {
   const btn = document.getElementById("v_addBtn");
   const clearBtn = document.getElementById("v_clearBtn");
+  const dialog = document.getElementById("vesselEditorDialog");
+  const form = document.getElementById("vesselEditorForm");
+  if (!btn || !dialog || !form) return;
+  document.getElementById("v_openAddBtn")?.addEventListener("click", () =>
+    openVesselEditor().catch(e => showWarn(String(e?.message || e))));
+  const close = () => { if (!vesselEditor.busy) dialog.close(); };
+  document.getElementById("v_closeBtn")?.addEventListener("click", close);
+  document.getElementById("v_cancelBtn")?.addEventListener("click", close);
+  dialog.addEventListener("cancel", e => { if (vesselEditor.busy) e.preventDefault(); });
+  dialog.addEventListener("close", () => {
+    vesselEditor.record = null;
+    document.getElementById("v_company").disabled = false;
+  });
+  clearBtn?.addEventListener("click", () => { if (!vesselEditor.busy) fillVesselEditor(); });
 
-  if (clearBtn) {
-    clearBtn.addEventListener("click", () => {
-      clearWarn();
-      clearOk();
-
-      document.getElementById("v_name").value = "";
-      document.getElementById("v_hull").value = "";
-      document.getElementById("v_imo").value = "";
-      document.getElementById("v_call").value = "";
-      document.getElementById("v_date_delivered").value = "";
-
-      renderVesselCompanyDropdown();
-    });
-  }
-
-  if (!btn) return;
-
-  btn.addEventListener("click", async () => {
+  form.addEventListener("submit", async event => {
+    event.preventDefault();
+    if (vesselEditor.busy) return;
     clearWarn();
     clearOk();
-
+    const existing = vesselEditor.record;
+    let saved = false;
     try {
-      if (typeof ensureCompaniesLoaded === "function") {
-        await ensureCompaniesLoaded();
-      }
-
-      renderVesselCompanyDropdown();
-
-      const company_id = (document.getElementById("v_company")?.value || "").trim();
+      const company_id = existing?.company_id || (document.getElementById("v_company")?.value || "").trim();
       const name = (document.getElementById("v_name").value || "").trim();
       const hull_number = (document.getElementById("v_hull").value || "").trim();
       const imo_number_raw = (document.getElementById("v_imo").value || "").trim();
@@ -1307,45 +1334,52 @@ function initAddVessel() {
         throw new Error("IMO number must contain digits only, or remain blank.");
       }
 
-      setStatus("Adding vessel…");
-
-      const resp = await csvbRpc("csvb_admin_upsert_vessel", {
-        p_vessel_id: null,
-        p_company_id: company_id,
+      vesselEditor.busy = true;
+      form.querySelectorAll("input, select, button").forEach(el => el.disabled = true);
+      document.getElementById("v_closeBtn").disabled = true;
+      setStatus(existing ? "Saving vessel particulars…" : "Adding vessel…");
+      vesselEditorFeedback(existing ? "Saving changes…" : "Adding vessel…");
+      const particulars = {
         p_name: name,
         p_hull_number: hull_number || null,
         p_imo_number: imo_number_raw || null,
         p_call_sign: call_sign || null,
-        p_is_active: true,
-        p_move_related: true,
         p_date_delivered: date_delivered || null
-      });
-
-      showOk("Vessel saved.\n\n" + JSON.stringify(resp, null, 2));
-
-      document.getElementById("v_name").value = "";
-      document.getElementById("v_hull").value = "";
-      document.getElementById("v_imo").value = "";
-      document.getElementById("v_call").value = "";
-      document.getElementById("v_date_delivered").value = "";
-
-      state.selectedCompanyId = company_id;
-
-      await refreshVessels();
-
-      if (typeof refreshCompanies === "function") {
-        await refreshCompanies();
-        const c = companyById(company_id);
-        if (c) fillCompanyForm(c);
+      };
+      // Edit has no lifecycle/company arguments and can never create a row.
+      await csvbRpc(existing ? "csvb_admin_update_vessel_particulars" : "csvb_admin_upsert_vessel",
+        existing ? { ...particulars, p_vessel_id: existing.id } : {
+          ...particulars, p_vessel_id: null, p_company_id: company_id,
+          p_is_active: true, p_move_related: true
+        });
+      saved = true;
+      try {
+        await refreshVessels();
+        if (!existing && typeof refreshCompanies === "function") await refreshCompanies();
         if (typeof refreshSelectedCompanyDetails === "function") {
           await refreshSelectedCompanyDetails();
         }
+      } catch (refreshError) {
+        vesselEditorFeedback("Vessel saved, but the list could not be refreshed. Close and Reload; do not resubmit. " +
+          String(refreshError?.message || refreshError), true);
+        return;
       }
-
-      setStatus("Ready");
+      document.getElementById("vesselWorkspaceFeedback").textContent =
+        existing ? "Vessel particulars saved." : "Vessel added.";
+      dialog.close();
     } catch (e) {
+      vesselEditorFeedback(String(e?.message || e), true);
+    } finally {
+      vesselEditor.busy = false;
+      form.querySelectorAll("input, select, button").forEach(el => el.disabled = false);
+      document.getElementById("v_closeBtn").disabled = false;
+      document.getElementById("v_company").disabled = !!vesselEditor.record;
+      // In particular, do not repeat a successful Add if only refresh failed.
+      if (saved && dialog.open) {
+        btn.disabled = true;
+        clearBtn.disabled = true;
+      }
       setStatus("Ready");
-      showWarn(String(e?.message || e));
     }
   });
 }
