@@ -5,6 +5,12 @@ description: Office identity is separate from authoritative Access Profile permi
 
 Office Role identifies an organizational position; an assigned Access Profile controls ordinary Office authorization. Personal Deny precedes personal Allow, then the assigned profile. Legacy fallback is allowed only when no Access Profile is assigned.
 
+The user-first Rights Matrix must default to audited personal overrides, never silently changing a shared Access Profile or an account's role/profile assignment. Shared-profile editing is a separate advanced operation with affected-user warning.
+
+**Why:** The user requested simple named-user controls after legacy-role and Access Profile displays produced conflicting expectations. Simplifying the UI must not silently change other users' rights.
+
+**How to apply:** Display saved backend decisions separately from unsaved proposals, re-read diagnostics after writes, and never call a denied or unverified result a successful grant. Preserve protected system constraints and unmigrated/Vessel/Inspector behavior. Baseline differences are a separate policy decision, not an automatic synchronization.
+
 **Why:** The user required genuinely enforced view-only profiles without recreating accounts or allowing legacy Company Admin/Superintendent shortcuts to broaden assigned-profile access.
 
 **How to apply:** Preserve legacy security classes, Auth identity, company/vessel scope and audited manual assignment. Fail closed for an inactive assigned profile; never fall back to its broader security class. Show actual backend enforcement state, not a hard-coded pending/enforced label. New catalogue entries remain unassignable until explicitly enabled.
