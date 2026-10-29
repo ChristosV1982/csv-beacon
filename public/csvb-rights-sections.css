@@ -1,0 +1,408 @@
+/* Incremental section navigation for the C.S.V. Beacon rights workspace. */
+#csvbRightsSections {
+  --rs-ink: var(--rm-ink, #062a5e);
+  --rs-muted: var(--rm-muted, #5e6f86);
+  --rs-line: var(--rm-line, #d6e4f5);
+  --rs-paper: var(--rm-paper, #f4f8fc);
+  --rs-blue: var(--rm-blue, #1b65a7);
+  --rs-blue-soft: #eaf2fa;
+  --rs-white: #fff;
+  --rs-shadow: 0 5px 18px rgba(28, 63, 92, .055);
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  color: var(--rs-ink);
+  font-family: "Segoe UI", sans-serif;
+}
+
+#csvbRightsSections *,
+#csvbRightsSections *::before,
+#csvbRightsSections *::after {
+  box-sizing: border-box;
+}
+
+#csvbRightsSections [hidden] {
+  display: none !important;
+}
+
+#csvbRightsSections .rights-section-tabs {
+  display: flex;
+  align-items: stretch;
+  gap: 5px;
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 0 15px;
+  padding: 4px;
+  overflow-x: auto;
+  border: 1px solid var(--rs-line);
+  border-radius: 10px;
+  background: #eaf2fa;
+  scrollbar-width: thin;
+}
+
+#csvbRightsSections .rights-section-tabs button {
+  position: relative;
+  flex: 0 0 auto;
+  min-height: 40px;
+  padding: 9px 15px;
+  color: #526a84;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  font: inherit;
+  font-size: .76rem;
+  font-weight: 850;
+  letter-spacing: .055em;
+  line-height: 1.2;
+  text-align: center;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: color .16s ease, background-color .16s ease, border-color .16s ease, transform .16s ease;
+}
+
+#csvbRightsSections .rights-section-tabs button[aria-selected="true"] {
+  color: var(--rs-ink);
+  border-color: #d4e2f0;
+  background: var(--rs-white);
+  box-shadow: 0 1px 3px rgba(19, 56, 97, .07);
+}
+
+#csvbRightsSections .rights-simple-table small {
+  display: block;
+  margin-top: 3px;
+  font-weight: 400;
+}
+
+#csvbRightsSections .rights-simple-table label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#csvbRightsSections .rights-simple-table input[type="checkbox"] {
+  width: 18px !important;
+  height: 18px !important;
+  min-height: 18px !important;
+  margin: 0;
+}
+
+#csvbRightsSections .rights-section-tabs button:hover:not([aria-selected="true"]) {
+  color: var(--rs-ink);
+  background: rgba(255, 255, 255, .58);
+}
+
+#csvbRightsSections .rights-section-tabs button:focus-visible,
+#csvbRightsSections .rights-section-panel button:focus-visible,
+#csvbRightsSections .rights-section-panel a:focus-visible,
+#csvbRightsSections .rights-section-panel input:focus-visible,
+#csvbRightsSections .rights-section-panel select:focus-visible,
+#csvbRightsSections .rights-section-panel textarea:focus-visible {
+  outline: 3px solid rgba(27, 101, 167, .25);
+  outline-offset: 2px;
+}
+
+#csvbRightsSections .rights-section-panel {
+  min-width: 0;
+  padding: clamp(14px, 2.1vw, 22px);
+  border: 1px solid var(--rs-line);
+  border-radius: 12px;
+  background: var(--rs-white);
+  box-shadow: var(--rs-shadow);
+}
+
+#csvbRightsSections .rights-section-panel > :first-child {
+  margin-top: 0;
+}
+
+#csvbRightsSections .rights-section-panel > :last-child {
+  margin-bottom: 0;
+}
+
+#csvbRightsSections .rights-section-panel h1,
+#csvbRightsSections .rights-section-panel h2,
+#csvbRightsSections .rights-section-panel h3 {
+  color: var(--rs-ink);
+}
+
+#csvbRightsSections .rights-section-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 9px 12px;
+  min-width: 0;
+  margin: 0 0 14px;
+}
+
+#csvbRightsSections .rights-section-controls > label {
+  display: flex;
+  min-width: min(100%, 190px);
+  flex: 1 1 190px;
+  flex-direction: column;
+  gap: 6px;
+  color: #35507b;
+  font-size: .78rem;
+  font-weight: 800;
+}
+
+#csvbRightsSections .rights-section-controls input,
+#csvbRightsSections .rights-section-controls select,
+#csvbRightsSections .rights-section-controls textarea {
+  width: 100%;
+  min-height: 42px;
+  padding: 9px 11px;
+  color: var(--rs-ink);
+  border: 1px solid var(--rs-line);
+  border-radius: 7px;
+  background: #f7fafe;
+  font: inherit;
+  font-size: .84rem;
+}
+
+#csvbRightsSections .rights-section-controls button {
+  min-height: 42px;
+  padding: 9px 14px;
+  color: #355b7e;
+  border: 1px solid #c6d8eb;
+  border-radius: 7px;
+  background: #edf4fb;
+  font: inherit;
+  font-size: .8rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background-color .16s ease, border-color .16s ease, transform .16s ease;
+}
+
+#csvbRightsSections .rights-context-note,
+#csvbRightsSections .rights-readonly-note {
+  margin: 0 0 14px;
+  padding: 11px 13px;
+  color: #48637f;
+  border: 1px solid #d5e3f1;
+  border-left: 3px solid var(--rs-blue);
+  border-radius: 7px;
+  background: var(--rs-blue-soft);
+  font-size: .82rem;
+  line-height: 1.5;
+}
+
+#csvbRightsSections .rights-readonly-note {
+  color: #52677d;
+  border-color: #dce6f0;
+  border-left-color: #829bb4;
+  background: #f5f8fb;
+}
+
+#csvbRightsSections .rights-table-scroll {
+  width: 100%;
+  min-width: 0;
+  margin: 12px 0;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  border: 1px solid var(--rs-line);
+  border-radius: 9px;
+  background: var(--rs-white);
+  scrollbar-color: #b5cbe1 #edf3f8;
+  scrollbar-width: thin;
+}
+
+#csvbRightsSections .rights-simple-table {
+  width: 100%;
+  min-width: 570px;
+  border-collapse: separate;
+  border-spacing: 0;
+  color: #334f6d;
+  font-size: .81rem;
+  line-height: 1.4;
+  text-align: left;
+}
+
+#csvbRightsSections .rights-simple-table th,
+#csvbRightsSections .rights-simple-table td {
+  padding: 11px 13px;
+  border-bottom: 1px solid #e5edf5;
+  vertical-align: top;
+}
+
+#csvbRightsSections .rights-simple-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  color: #35507b;
+  background: #edf4fb;
+  font-size: .72rem;
+  font-weight: 900;
+  letter-spacing: .055em;
+  text-transform: uppercase;
+}
+
+#csvbRightsSections .rights-simple-table tbody tr:last-child > * {
+  border-bottom: 0;
+}
+
+#csvbRightsSections .rights-simple-table tbody tr:nth-child(even) {
+  background: #f9fbfd;
+}
+
+#csvbRightsSections .rights-simple-table tbody th {
+  color: var(--rs-ink);
+  font-weight: 800;
+}
+
+#csvbRightsSections .rights-simple-table caption {
+  padding: 10px 13px;
+  color: var(--rs-muted);
+  font-size: .77rem;
+  text-align: left;
+}
+
+#csvbRightsSections .rights-section-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 9px;
+  margin-top: 14px;
+}
+
+#csvbRightsSections .rights-section-actions button {
+  min-width: 104px;
+  min-height: 42px;
+  padding: 9px 15px;
+  color: #35507b;
+  border: 1px solid #c6d8eb;
+  border-radius: 7px;
+  background: #f4f8fc;
+  font: inherit;
+  font-size: .8rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background-color .16s ease, border-color .16s ease, transform .16s ease;
+}
+
+#csvbRightsSections .rights-section-actions button[type="submit"],
+#csvbRightsSections .rights-section-actions .is-primary {
+  color: #fff;
+  border-color: var(--rs-blue);
+  background: var(--rs-blue);
+}
+
+#csvbRightsSections .rights-blocker-card,
+#csvbRightsSections .rights-transition-plan {
+  min-width: 0;
+  margin: 14px 0;
+  padding: 14px 16px;
+  border: 1px solid #d8e4ef;
+  border-radius: 9px;
+  background: #f6f9fc;
+}
+
+#csvbRightsSections .rights-blocker-card {
+  border-left: 3px solid #b27755;
+  background: #fffaf5;
+}
+
+#csvbRightsSections .rights-blocker-card > :first-child,
+#csvbRightsSections .rights-transition-plan > :first-child {
+  margin-top: 0;
+}
+
+#csvbRightsSections .rights-blocker-card > :last-child,
+#csvbRightsSections .rights-transition-plan > :last-child {
+  margin-bottom: 0;
+}
+
+#csvbRightsSections .rights-blocker-card h3,
+#csvbRightsSections .rights-transition-plan h3 {
+  margin: 0 0 7px;
+  font-size: .9rem;
+  font-weight: 850;
+}
+
+#csvbRightsSections .rights-blocker-card p,
+#csvbRightsSections .rights-blocker-card li,
+#csvbRightsSections .rights-transition-plan p,
+#csvbRightsSections .rights-transition-plan li {
+  color: #536b82;
+  font-size: .82rem;
+  line-height: 1.5;
+}
+
+#csvbRightsSections .rights-blocker-card ul,
+#csvbRightsSections .rights-transition-plan ol,
+#csvbRightsSections .rights-transition-plan ul {
+  margin: 8px 0 0;
+  padding-left: 1.25rem;
+}
+
+#csvbRightsSections button:disabled,
+#csvbRightsSections input:disabled,
+#csvbRightsSections select:disabled {
+  cursor: not-allowed;
+  opacity: .58;
+}
+
+#csvbRightsSections button:hover:not(:disabled) {
+  border-color: #9bb8d6;
+}
+
+@media (max-width: 680px) {
+  #csvbRightsSections .rights-section-tabs {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    width: 100%;
+    gap: 3px;
+  }
+
+  #csvbRightsSections .rights-section-tabs button {
+    min-height: 44px;
+    padding: 8px 7px;
+    font-size: .68rem;
+    letter-spacing: .025em;
+    white-space: normal;
+  }
+
+  #csvbRightsSections .rights-section-panel {
+    padding: 13px;
+  }
+
+  #csvbRightsSections .rights-section-controls {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  #csvbRightsSections .rights-section-controls > label {
+    flex: 1 1 auto;
+  }
+
+  #csvbRightsSections .rights-section-controls button,
+  #csvbRightsSections .rights-section-actions button {
+    min-height: 44px;
+  }
+
+  #csvbRightsSections .rights-section-actions {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(125px, 1fr));
+  }
+
+  #csvbRightsSections .rights-section-actions button {
+    width: 100%;
+  }
+
+  #csvbRightsSections .rights-table-scroll {
+    margin-inline: 0;
+    border-radius: 7px;
+  }
+
+  #csvbRightsSections .rights-simple-table th,
+  #csvbRightsSections .rights-simple-table td {
+    padding: 10px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #csvbRightsSections .rights-section-tabs button,
+  #csvbRightsSections .rights-section-controls button,
+  #csvbRightsSections .rights-section-actions button {
+    transition: none;
+  }
+}

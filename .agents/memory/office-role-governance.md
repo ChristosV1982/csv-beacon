@@ -11,6 +11,12 @@ The user-first Rights Matrix must default to audited personal overrides, never s
 
 **How to apply:** Display saved backend decisions separately from unsaved proposals, re-read diagnostics after writes, and never call a denied or unverified result a successful grant. Preserve protected system constraints and unmigrated/Vessel/Inspector behavior. Baseline differences are a separate policy decision, not an automatic synchronization.
 
+Office Role defaults must not be implemented by merely relabeling a shared Access Profile editor. Keep role-specific saving read-only until a verified role-scoped backend transition can preserve current effective access and explain every affected user.
+
+**Why:** The user explicitly approved incremental three-section Rights Matrix navigation but required a truthful controlled-transition fallback where organizational roles are not yet authoritative.
+
+**How to apply:** Separate role overview, individual exceptions and company availability. Keep technical compatibility editors advanced; show shared impact and require confirmation. “Same as role” must explain that removing an exception uses the account’s existing assigned access settings, including any custom assignment.
+
 **Why:** The user required genuinely enforced view-only profiles without recreating accounts or allowing legacy Company Admin/Superintendent shortcuts to broaden assigned-profile access.
 
 **How to apply:** Preserve legacy security classes, Auth identity, company/vessel scope and audited manual assignment. Fail closed for an inactive assigned profile; never fall back to its broader security class. Show actual backend enforcement state, not a hard-coded pending/enforced label. New catalogue entries remain unassignable until explicitly enabled.

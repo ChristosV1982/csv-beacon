@@ -8,6 +8,11 @@
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
   const office = user => ["company_admin", "company_superintendent"].includes(user?.role || user?.role_name);
   const profileCode = user => user?.office_access_profile_code;
+  const roleLabel = user => user?.office_role_label || ({
+    super_admin: "Super Admin", company_admin: "Company Admin",
+    company_superintendent: "Company Superintendent", vessel: "Vessel / Onboard Personnel",
+    inspector: "Inspector / Third Party"
+  })[user?.role || user?.role_name] || "Account";
   let config, users = [], diagnostic, panel, advanced, userSelect, profileSelect;
   let selectedId = "", selectedProfile = "", busy = false, loaded = false;
   let diagnosticValid = false, legacySection, sharedSection;
@@ -31,23 +36,24 @@
     return !(draft.size || sharedDraft.size) || confirm("Discard unsaved permission changes?");
   }
   function originLabel(decision) {
-    return ({ hard_constraint: "System/company restriction", personal_allow: "Personal Allow",
-      personal_deny: "Personal Deny", access_profile: "Access Profile",
-      legacy_fallback: "Legacy role/position" })[decision?.source] || "Not available";
+    return ({ hard_constraint: "System/company restriction", personal_allow: "Individual Allow",
+      personal_deny: "Individual Deny", access_profile: "Assigned access settings",
+      legacy_fallback: "Earlier role settings" })[decision?.source] || "Not available";
   }
   function render() {
     if (!panel) return;
     const subject = user(), ds = decisions(), os = overrides();
     panel.querySelector("[data-context]").textContent = !subject ? "Select a user to see backend-resolved permissions."
-      : `${subject.username} · ${subject.office_role_label || subject.role || subject.role_name} · ` +
-        `${subject.office_access_profile_label || "Legacy permissions (no Access Profile)"}` +
-        `${diagnostic?.custom_permissions_applied ? " · Custom permissions applied" : ""}`;
+      : `${subject.username} · ${roleLabel(subject)} · ${subject.company_name || "Company scope applies"}` +
+        `${diagnostic?.custom_permissions_applied ? " · Individual exceptions applied" : ""}`;
     panel.querySelector("[data-policy]").textContent = !subject ? ""
-      : !office(subject) ? "Protected/non-Office account. Office overrides cannot change Super Admin, vessel-rank or Inspector permissions. Use the unchanged advanced role/rank tools where appropriate."
-      : !profileCode(subject) ? "Legacy fallback preserved. Individual overrides require an assigned Office Access Profile; no account or profile assignment will be changed here."
+      : !office(subject) ? "Protected/non-Office account. Individual Office exceptions cannot change Super Admin, vessel-rank or Inspector permissions. Use Advanced compatibility tools where appropriate."
+      : !profileCode(subject) ? "This account uses earlier role settings. Individual exceptions require a controlled access-configuration transition first. No account or access assignment will be changed here."
       : !diagnosticValid ? "Effective permissions could not be verified. Editing is disabled until Reload succeeds."
       : !diagnostic?.enforcement_enabled ? "Office enforcement is not active for this user. Editing is disabled; no legacy permissions will be bypassed."
-      : "Changes affect only this user. Use profile default removes a personal override; it does not mean Allowed. Company, vessel and protected-system restrictions always apply.";
+      : "Changes affect only this user. “Same as role” removes the individual exception and uses this account’s assigned access settings—not directly editable Office Role defaults. " +
+        (subject.office_profile_is_role_default === false ? "This account has a custom access assignment, different from its role’s mapped settings. " : "") +
+        "Company, vessel and protected-system restrictions always apply.";
     const term = panel.querySelector("[data-search]").value.trim().toLowerCase();
     const only = panel.querySelector("[data-enabled]").checked;
     const canEdit = editable() && !busy;
@@ -64,14 +70,14 @@
             return `<div class="office-rights-action" data-permission-row="${esc(p.id)}">
               <strong>${esc(p.action[0].toUpperCase() + p.action.slice(1))}</strong>
               <div class="office-rights-choice">
+                <button type="button" class="btn2" data-permission="${esc(p.id)}" data-use-default
+                  aria-pressed="${setting === "inherit"}" ${!canEdit || !old && !draft.has(p.id) ? "disabled" : ""}>Same as role</button>
                 ${["allow", "deny"].map(choice => `<button type="button" class="btn2"
                   data-permission="${esc(p.id)}" data-choice="${choice}" aria-pressed="${setting === choice}"
                   ${!canEdit || hard ? "disabled" : ""}>${choice === "allow" ? "Allow" : "Deny"}</button>`).join("")}
-                <button type="button" class="btn2" data-permission="${esc(p.id)}" data-use-default
-                  aria-pressed="${setting === "inherit"}" ${!canEdit || !old && !draft.has(p.id) ? "disabled" : ""}>Use profile default</button>
               </div>
               <span class="office-rights-effective" data-allowed="${d?.allowed === true}">Backend: ${d?.allowed ? "Allowed" : "Denied"}</span>
-              <small class="office-rights-origin">${esc(originLabel(d))}${setting === "inherit" ? " · No personal override" : ""}${draft.has(p.id) ? ` · Proposed: ${setting === "inherit" ? "use profile default" : setting} (not saved)` : ""}</small>
+              <small class="office-rights-origin">${esc(originLabel(d))}${setting === "inherit" ? " · No individual exception" : ""}${draft.has(p.id) ? ` · Proposed: ${setting === "inherit" ? "same as role" : setting} (not saved)` : ""}</small>
               ${d?.reason || hard ? `<small class="office-rights-reason">${esc(d?.reason || "Inactive module")}</small>` : ""}
             </div>`;
           }).join("")}</article>`;
@@ -81,6 +87,7 @@
     userSelect.disabled = busy;
     panel.querySelector("[data-reload]").disabled = busy;
     if (config) renderShared();
+    window.dispatchEvent(new CustomEvent("csvb:rights-user", { detail: { user: subject } }));
   }
   function renderShared() {
     const code = profileSelect.value;
@@ -123,7 +130,7 @@
       config = nextConfig; users = nextUsers || [];
       userSelect.innerHTML = '<option value="">Select a user</option>' + users
         .slice().sort((a, b) => a.username.localeCompare(b.username))
-        .map(u => `<option value="${esc(u.id)}">${esc(u.username)} — ${esc(u.office_role_label || u.role || u.role_name)}</option>`).join("");
+        .map(u => `<option value="${esc(u.id)}">${esc(u.username)} — ${esc(roleLabel(u))}</option>`).join("");
       if (!users.some(u => u.id === selectedId)) selectedId = "";
       userSelect.value = selectedId;
       profileSelect.innerHTML = config.profiles.map(p =>
@@ -133,7 +140,8 @@
       await reloadDiagnostic();
       loaded = true;
       success = true;
-      message("User-specific changes never update a shared profile. Backend results are loaded from the authorization diagnostic.");
+      window.dispatchEvent(new CustomEvent("csvb:rights-loaded", { detail: { config, users } }));
+      message("Individual changes never update shared role settings. Saved results come from the backend permission check.");
     } catch (e) { message(`Permissions unavailable: ${e.message}`, true); }
     finally { busy = false; render(); }
     return success;
@@ -170,7 +178,7 @@
       }).join("; ");
       message(saveError ? `Save stopped: ${saveError.message}. ${applied.length} change(s) saved; ${draft.size} remain unsaved. Backend reloaded.`
         : failures.length ? `Override(s) saved, but requested access was not confirmed: ${detail}. No effective grant is claimed.`
-        : `Saved and backend-verified ${applied.length} user-specific change(s). Shared profiles unchanged.`,
+        : `Saved and backend-verified ${applied.length} user-specific change(s). Shared access settings unchanged.`,
       !!saveError || !!failures.length);
     } catch (e) {
       diagnosticValid = false;
@@ -206,7 +214,7 @@
     const selector = workspace?.querySelector(".rm-selector-panel");
     if (!selector || document.getElementById("officeRightsPanel")) return;
     const intro = workspace.querySelector(".rm-intro p");
-    if (intro) intro.textContent = "Select a user, change only their permissions, and verify the result from the backend.";
+    if (intro) intro.textContent = "Review role defaults, individual exceptions and company availability separately. Saved backend decisions remain authoritative.";
     panel = document.createElement("section");
     panel.id = "officeRightsPanel"; panel.className = "card";
     panel.innerHTML = `<div class="office-rights-heading"><h2>User permissions</h2>
@@ -221,7 +229,7 @@
       <button type="button" class="btn" data-save-users disabled>Save User Rights</button></div>`;
     selector.before(panel);
     advanced = document.createElement("details"); advanced.id = "officeRightsAdvanced";
-    advanced.innerHTML = `<summary>Advanced — shared Access Profiles and legacy role/rank defaults</summary>
+    advanced.innerHTML = `<summary>Advanced compatibility — shared Access Profiles and legacy role/rank defaults</summary>
       <p class="office-rights-warning">Shared-profile changes affect every assigned user. Legacy role/rank defaults are separate and do not control migrated Office users. Nothing here is changed by Save User Rights.</p>
       <label>Advanced configuration <select data-advanced-mode><option value="profile">Shared Access Profile</option><option value="legacy">Legacy role / rank defaults</option></select></label>`;
     panel.after(advanced);

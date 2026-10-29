@@ -24,7 +24,7 @@ try {
     if(d.id){const p=pending.get(d.id);pending.delete(d.id);d.error?p?.reject(Error(d.error.message)):p?.resolve(d.result);}
     if(d.method==="Runtime.exceptionThrown")exceptions.push(d.params.exceptionDetails.exception?.description||d.params.exceptionDetails.text);
     if(d.method==="Fetch.requestPaused"){
-      const p=d.params, keep=/\/csvb-office-rights\.js(?:\?|$)/.test(p.request.url);
+      const p=d.params, keep=/\/csvb-(?:office-rights|rights-sections)\.js(?:\?|$)/.test(p.request.url);
       if(p.resourceType==="Script"&&!keep)await call("Fetch.fulfillRequest",{
         requestId:p.requestId,responseCode:200,responseHeaders:[{name:"Content-Type",value:"application/javascript"}],body:Buffer.from("/* isolated presentation check; other admin scripts are not executed */").toString("base64")
       },d.sessionId);
@@ -43,6 +43,17 @@ try {
       const t=window.__rightsTest;t.calls.push({name,args});
       if(name==="csvb_admin_office_access_configuration")return {data:structuredClone(t.config)};
       if(name==="csvb_admin_list_users_by_company_v2")return {data:structuredClone(t.users)};
+      if(name==="csvb_admin_office_creation_options")return {data:structuredClone(t.options)};
+      if(name==="csvb_admin_list_companies")return {data:structuredClone(t.companies)};
+      if(name==="csvb_admin_list_company_modules"){
+        if(t.failCompanyRead)return {error:{message:"Simulated company read unavailable"}};
+        return {data:structuredClone(t.companyModules[args.p_company_id])};
+      }
+      if(name==="csvb_admin_set_company_module"){
+        const m=t.companyModules[args.p_company_id].find(m=>m.module_key===args.p_module_key);
+        if(!m)return {error:{message:"Unknown module key"}};
+        m.is_enabled=args.p_is_enabled;return {data:structuredClone(m)};
+      }
       if(name==="csvb_admin_office_permission_diagnostic"){
         if(t.failDiagnostic)return {error:{message:"Simulated diagnostic unavailable"}};
         return {data:structuredClone(t.diagnostics[args.p_profile_id])};
@@ -79,7 +90,10 @@ try {
   const ids=Object.fromEntries(input.diagnostics[input.aga].permissions.filter(p=>p.module_code==="POST_INSPECTION").map(p=>[p.action,p.permission_id]));
   const editRow=`[data-permission-row="${ids.edit}"]`, viewRow=`[data-permission-row="${ids.view}"]`;
   await wait(`document.querySelector('${editRow} .office-rights-effective')?.dataset.allowed==="true"`);
-  await check("AGA live-snapshot View/Edit allowed, Export/Admin denied",`document.querySelector('${viewRow} .office-rights-effective').dataset.allowed==="true" && document.querySelector('[data-permission-row="${ids.admin}"] .office-rights-effective').dataset.allowed==="false" && document.querySelector('[data-permission-row="${ids.export}"] .office-rights-effective').dataset.allowed==="false"`);
+  await check("All displayed AGA decisions match the current live snapshot without changing grants",
+    JSON.stringify(input.diagnostics[input.aga].permissions.filter(p=>p.module_code==="POST_INSPECTION")
+      .map(p=>({id:p.permission_id,allowed:p.decision.allowed})))+
+    `.every(p=>document.querySelector('[data-permission-row="'+p.id+'"] .office-rights-effective').dataset.allowed===String(p.allowed))`);
   await check("Registered Review action is displayed",`[...document.querySelectorAll(".office-rights-action > strong")].some(n=>n.textContent==="Review")`);
   await ev(`document.querySelector('${editRow} [data-choice="deny"]').click()`);
   await check("Unsaved setting does not misrepresent backend result",`document.querySelector('${editRow} .office-rights-effective').dataset.allowed==="true" && document.querySelector("[data-dirty]").textContent.includes("1 unsaved")`);
@@ -88,7 +102,7 @@ try {
   await wait(`document.querySelector("[data-status]").textContent.includes("backend-verified")`);
   await check("Save only calls personal override RPC and reloads diagnostic",`document.querySelector('${editRow} .office-rights-effective').dataset.allowed==="false" && __rightsTest.calls.filter(c=>/save/.test(c.name)).every(c=>c.name==="csvb_admin_office_personal_override_save")`);
   await ev(`document.querySelector('${editRow} [data-use-default]').click();document.querySelector("[data-save-users]").click()`);
-  await wait(`document.querySelector('${editRow} .office-rights-origin').textContent.includes("Access Profile")`);
+  await wait(`document.querySelector('${editRow} .office-rights-origin').textContent.includes("Assigned access settings")`);
   await check("Use profile default removes override, does not imply Allow",`document.querySelector('${editRow} .office-rights-effective').dataset.allowed==="false" && !__rightsTest.diagnostics[__rightsTest.aga].overrides.some(o=>o.permission_id==="${ids.edit}")`);
   await ev(`{__rightsTest.forceHard=true;document.querySelector('${editRow} [data-choice="allow"]').click();document.querySelector("[data-save-users]").click();}`);
   await wait(`document.querySelector("[data-status]").textContent.includes("No effective grant is claimed")`);
@@ -99,7 +113,7 @@ try {
   await ev(`{__rightsTest.failDiagnostic=false;document.querySelector("[data-reload]").click();}`);
   await wait(`!!document.querySelector('${editRow}')`);
   await set("#officeRightsPanel [data-user]",input.legacy);
-  await wait(`document.querySelector("[data-policy]").textContent.includes("Legacy fallback preserved")`);
+  await wait(`document.querySelector("[data-policy]").textContent.includes("earlier role settings")`);
   await check("Legacy account is not silently migrated or written",`document.querySelector("[data-save-users]").disabled && [...document.querySelectorAll("#officeRightsPanel [data-permission]")].every(n=>n.disabled)`);
   await set("#officeRightsPanel [data-user]",input.root);
   await check("Protected/non-Office roles cannot be changed by Office editor",`document.querySelector("[data-policy]").textContent.includes("Protected/non-Office") && !document.querySelectorAll(".office-rights-module").length`);
@@ -108,6 +122,48 @@ try {
   await ev(`document.getElementById("officeRightsAdvanced").open=true`);
   await check("Advanced shared editor identifies affected users",`document.querySelector("[data-affected]").textContent.includes("AGA") && document.querySelector("[data-affected]").textContent.includes("DSK")`);
   await ev(`document.getElementById("officeRightsAdvanced").open=false`);
+  await check("Three sections exist; user-first workspace is preserved",`document.querySelectorAll("[data-rights-section]").length===3 && document.getElementById("rightsUserTab").getAttribute("aria-selected")==="true"`);
+  await ev(`document.querySelector('[data-rights-section="role"]').click()`);
+  await wait(`document.querySelectorAll("[data-office-role] option").length>2`);
+  await set("[data-office-role]",input.users.find(u=>u.id===input.aga).office_role_code);
+  await check("Role overview is truthful, read-only and shows shared impact",`document.querySelector(".rights-readonly-note").textContent.includes("Read-only role overview") && document.querySelector("[data-role-context]").textContent.includes("across all roles") && !document.querySelectorAll("#rightsRolePanel input[type=checkbox],#rightsRolePanel [data-save-role]").length && document.querySelectorAll("[data-role-rows] tr").length>5`);
+  await check("Selected section matches visible panel",`document.getElementById("rightsRoleTab").getAttribute("aria-selected")==="true" && document.getElementById("rightsUserTab").getAttribute("aria-selected")==="false" && !document.getElementById("rightsRolePanel").hidden`);
+  await check("No role or company writes occur on selection",`!__rightsTest.calls.some(c=>c.name==="csvb_admin_set_company_module" || c.name==="csvb_admin_office_access_save")`);
+  await ev(`document.querySelector('[data-rights-section="company"]').click()`);
+  await wait(`document.querySelectorAll("[data-company-select] option").length>1`);
+  const companyId=input.users.find(u=>u.id===input.aga).company_id||input.companies[0].id;
+  await set("[data-company-select]",companyId);
+  await wait(`document.querySelectorAll("[data-company-key]").length>0 && !document.querySelector("[data-company-reload]").disabled`);
+  await check("Company Builder links to its actual route and honestly reports API limitation",`document.querySelector("[data-open-builder]").getAttribute("href")==="./q-company.html" && document.querySelector("[data-company-builder-note]").textContent.includes("cannot safely offer") && !__rightsTest.calls.some(c=>c.name==="csvb_admin_set_company_module")`);
+  await ev(`document.querySelector("[data-company-key]").click()`);
+  await check("Company toggles stage changes without writing",`!document.querySelector("[data-company-save]").disabled && !__rightsTest.calls.some(c=>c.name==="csvb_admin_set_company_module")`);
+  await ev(`window.confirm=()=>false;document.querySelector("[data-company-save]").click()`);
+  await check("Company confirmation cancellation does not write",`!__rightsTest.calls.some(c=>c.name==="csvb_admin_set_company_module")`);
+  await ev(`window.confirm=()=>true;document.querySelector("[data-company-save]").click()`);
+  await wait(`document.querySelector("[data-company-status]").textContent.includes("saved and backend-verified")`);
+  await check("Explicit company save uses only existing setter, verifies backend and leaves grants alone",`__rightsTest.calls.filter(c=>c.name==="csvb_admin_set_company_module").length===1 && !__rightsTest.calls.some(c=>c.name==="csvb_admin_office_access_save") && document.querySelector("[data-company-save]").disabled`);
+  await ev(`document.querySelector("[data-company-key]").click();__rightsTest.failCompanyRead=true;document.querySelector("[data-company-save]").click()`);
+  await wait(`document.querySelector("[data-company-status]").textContent.includes("could not be verified")`);
+  await check("Company reload failure locks edits and never reports success",`document.querySelector("[data-company-save]").disabled && [...document.querySelectorAll("[data-company-key]")].every(c=>c.disabled)`);
+  await ev(`{__rightsTest.failCompanyRead=false;document.querySelector("[data-company-reload]").click();}`);
+  await wait(`!document.querySelector("[data-company-reload]").disabled`);
+  await ev(`document.querySelector('[data-rights-section="user"]').click()`);
+  await set("#officeRightsPanel [data-user]",input.legacy);
+  await wait(`document.querySelector(".rights-blocker-card p").textContent.includes("Deletion eligibility")`);
+  await check("Deletion explanation is non-destructive and never claims eligibility",`document.querySelector(".rights-blocker-card").textContent.includes("not verified by this screen") && !__rightsTest.calls.some(c=>/cleanup|delet/.test(c.name)) && !document.querySelectorAll(".rights-blocker-card button").length`);
+  await set("#officeRightsPanel [data-user]",input.aga);
+  await wait(`!!document.querySelector('${editRow}')`);
+  await check("Normal user UI uses simple labels without technical defaults",`document.querySelector('${editRow} [data-use-default]').textContent==="Same as role" && !/legacy|inherited|profile default/i.test(document.getElementById("officeRightsPanel").textContent)`);
+  await mkdir("generated-artifacts/rights",{recursive:true});
+  await ev(`document.querySelector('[data-rights-section="role"]').click();document.getElementById("csvbRightsSections").scrollIntoView()`);
+  await new Promise(r=>setTimeout(r,210));
+  await writeFile("generated-artifacts/rights/role-overview-desktop.jpg",Buffer.from((await call("Page.captureScreenshot",{format:"jpeg",quality:80},sid)).data,"base64"));
+  await set("[data-office-role]","");
+  await check("Clearing role selection removes stale mapped permissions",`!document.querySelector("[data-role-rows]").children.length && !document.querySelector("[data-role-base]").textContent`);
+  await ev(`document.querySelector('[data-rights-section="company"]').click();document.getElementById("csvbRightsSections").scrollIntoView()`);
+  await new Promise(r=>setTimeout(r,210));
+  await writeFile("generated-artifacts/rights/company-modules-desktop.jpg",Buffer.from((await call("Page.captureScreenshot",{format:"jpeg",quality:80},sid)).data,"base64"));
+  await ev(`document.querySelector('[data-rights-section="user"]').click()`);
   await ev(`{__rightsTest.diagnostics[__rightsTest.aga]=${JSON.stringify(input.diagnostics[input.aga])};
     __rightsTest.forceHard=false;document.querySelector("[data-reload]").click();}`);
   await wait(`document.querySelector('${editRow} .office-rights-effective')?.dataset.allowed==="true"`);
