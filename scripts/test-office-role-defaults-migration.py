@@ -15,7 +15,7 @@ assert api.PROJECT == "bdidrcyufazskpuwmfca"
 actor = api.sql("select id from public.profiles where role::text='super_admin' "
                "and is_active and not is_disabled order by id limit 1", True)[0]["id"]
 claims = json.dumps({"sub": actor, "role": "authenticated"})
-migration = pathlib.Path("supabase/migrations/20261106100000_office_role_isolated_defaults.sql").read_text()
+migration = pathlib.Path("supabase/migrations/20261029031525_office_role_isolated_defaults.sql").read_text()
 apply = "--apply" in sys.argv
 
 # Compare protected records inside the same transaction, not across unrelated

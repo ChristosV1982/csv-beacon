@@ -1,5 +1,5 @@
-/* Incremental navigation over existing Office authorization APIs.
- * No role writes: organizational roles do not own runtime grants yet.
+/* Role defaults, personal exceptions and company availability use their
+ * respective audited backend APIs; a fetched snapshot is not a human review.
  */
 (() => {
   "use strict";
@@ -38,7 +38,7 @@
     find("[data-role-reload]").disabled = roleBusy;
     find("[data-role-save]").disabled = !enabled || !roleChanges.size;
     text("[data-role-context]", roleError || (ready
-      ? `${role.display_name} · ${followers.length} user(s) follow this role · ${custom.length} custom assignment(s) · Revision ${roleSnapshot.revision}. Other roles are not changed.`
+      ? `${role.display_name} · ${followers.length} user(s) use these defaults · ${custom.length} custom assignment(s) · Revision ${roleSnapshot.revision}. Other role defaults are not changed.${roleSnapshot.is_assignable === false ? " Draft: configure rights here, then enable user assignment in Role Management." : ""}`
       : roleBusy ? "Loading authoritative role defaults…" : "Select or reload a role to verify its backend defaults."));
     text("[data-role-base]", ready
       ? "Role defaults apply to accounts following this Office Role and future default assignments. Personal Allow/Deny exceptions and company/system restrictions still win. Explicit custom access assignments remain separate and are not silently converted."
@@ -82,8 +82,8 @@
     const followers = roleSnapshot.users.filter(u => u.follows_role);
     const custom = roleSnapshot.users.filter(u => !u.follows_role);
     if (!confirm(`Save ${roleChanges.size} default permission change(s) for ${roleSnapshot.role_label}?\n` +
-      `${followers.length} current user(s) follow this role, including inactive accounts, plus future default assignments.\n` +
-      `${custom.length} custom assignment(s) remain unchanged. Personal exceptions and hard security restrictions still apply.\nOther roles are not changed.`)) return;
+      `${followers.length} current user(s) use these defaults, including inactive accounts and explicit custom borrowers, plus future default assignments.\n` +
+      `${custom.length} custom assignment(s) using other defaults remain unchanged. Personal exceptions and hard security restrictions still apply.\nOther role defaults are not changed.`)) return;
     const changes = [...roleChanges].map(([id, allowed]) => {
       const old = roleSnapshot.grants.find(g => g.permission_id === id);
       return { permission_id: id, is_granted: allowed, scope: old?.scope && old.scope !== "global" ? old.scope : "company" };
@@ -111,8 +111,11 @@
     if (roleLoading) return roleLoading;
     roleLoading = (async () => {
       try {
-        const options = await rpc("csvb_admin_office_creation_options");
-        roles = options.roles || [];
+        // Creation options intentionally exclude drafts. Catalogue visibility is
+        // not authorization: the role-default RPC must still verify each choice.
+        const options = await rpc("csvb_role_catalogue_list");
+        roles = (options.roles || []).filter(r => !r.is_protected &&
+          r.is_active !== false && r.has_isolated_defaults !== false);
         const old = find("[data-office-role]").value;
         find("[data-office-role]").innerHTML = '<option value="">Select Office Role</option>' +
           roles.map(r => `<option value="${esc(r.code)}">${esc(r.display_name)}</option>`).join("");
@@ -311,6 +314,9 @@
     if (!companyPanel.hidden) void loadCompanies();
   }
   window.addEventListener("csvb:rights-loaded", event => acceptData(event.detail));
+  window.addEventListener("csvb:role-catalogue-changed", () => {
+    if (!roleBusy && !roleChanges.size) void loadRoleOptions();
+  });
   window.addEventListener("csvb:rights-user", event => deletionExplanation(event.detail.user));
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", install, { once: true });
   else install();
