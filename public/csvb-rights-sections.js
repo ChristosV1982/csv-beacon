@@ -14,6 +14,8 @@
   let root, rolePanel, companyPanel, safety, config, users = [], roles = [], companies = [];
   let roleLoading, companyListLoading, companyLoading = false, companyVerified = false, selectedCompany = "";
   let companyRows = [], companyChanges = new Map(), lastData;
+  let roleSnapshot = null, roleBusy = false, roleError = "";
+  const roleChanges = new Map();
   const find = selector => root.querySelector(selector);
   const text = (selector, value) => { find(selector).textContent = value; };
   function status(message, error = false) {
@@ -25,25 +27,85 @@
     if (!role || !config) {
       text("[data-role-context]", "Select an Office Role to review its mapped defaults.");
       text("[data-role-base]", ""); find("[data-role-rows]").innerHTML = "";
+      find("[data-role-save]").disabled = true;
       return;
     }
-    const own = users.filter(u => u.office_role_code === role.code);
-    const affected = users.filter(u => u.office_access_profile_code === role.default_access_profile_code);
-    const other = affected.filter(u => u.office_role_code !== role.code);
-    const custom = own.filter(u => u.office_access_profile_code !== role.default_access_profile_code);
-    const base = config.profiles.find(p => p.code === role.default_access_profile_code);
-    text("[data-role-context]", `${role.display_name} · ${own.length} assigned user(s) · ${affected.length} user(s) across all roles use the mapped access settings · ${other.length} of those belong to other/no Office Roles · ${custom.length} role member(s) use different access settings.`);
-    text("[data-role-base]", `Mapped access settings: ${base?.display_name || "Unavailable"}${base?.is_active === false ? " (inactive)" : ""}. These are configuration defaults, not a user's effective access. Company availability, account status and individual exceptions still apply.`);
-    const grants = new Map(config.grants.filter(g => g.access_profile_code === role.default_access_profile_code).map(g => [g.permission_id, g]));
+    const ready = roleSnapshot?.role_code === role.code;
+    const followers = (roleSnapshot?.users || []).filter(u => u.follows_role);
+    const custom = (roleSnapshot?.users || []).filter(u => !u.follows_role);
+    const enabled = ready && roleSnapshot.is_active && !roleBusy;
+    find("[data-office-role]").disabled = roleBusy;
+    find("[data-role-reload]").disabled = roleBusy;
+    find("[data-role-save]").disabled = !enabled || !roleChanges.size;
+    text("[data-role-context]", roleError || (ready
+      ? `${role.display_name} · ${followers.length} user(s) follow this role · ${custom.length} custom assignment(s) · Revision ${roleSnapshot.revision}. Other roles are not changed.`
+      : roleBusy ? "Loading authoritative role defaults…" : "Select or reload a role to verify its backend defaults."));
+    text("[data-role-base]", ready
+      ? "Role defaults apply to accounts following this Office Role and future default assignments. Personal Allow/Deny exceptions and company/system restrictions still win. Explicit custom access assignments remain separate and are not silently converted."
+      : "Editing is disabled until the isolated role-default backend is verified. No UI-only grant is possible.");
+    text("[data-role-dirty]", roleChanges.size ? `${roleChanges.size} unsaved role permission change(s).` : "No role changes pending.");
+    const grants = new Map((ready ? roleSnapshot.grants : []).map(g => [g.permission_id, g]));
     const term = find("[data-role-search]").value.trim().toLowerCase();
     find("[data-role-rows]").innerHTML = config.modules.filter(m => `${m.name} ${m.code}`.toLowerCase().includes(term)).map(m => {
       const supported = config.permissions.filter(p => p.module_id === m.id);
       if (!supported.length) return "";
       return `<tr><th scope="row">${esc(m.name)}${m.is_active === false ? " (inactive)" : ""}</th>${actions.map(action => {
         const permission = supported.find(p => p.action === action), grant = permission && grants.get(permission.id);
-        return `<td>${permission ? grant?.is_granted ? "Allowed in mapped defaults" : "Denied in mapped defaults" : "—"}</td>`;
+        if (!permission) return "<td>—</td>";
+        const value = roleChanges.has(permission.id) ? roleChanges.get(permission.id) : !!grant?.is_granted;
+        const protectedAction = m.code === "SU_ADMIN" || m.is_active === false ||
+          (["Q_DASHBOARD", "MODE_SELECTION"].includes(m.code) && action === "view");
+        return `<td><span class="muted small">${ready ? grant?.is_granted ? "Saved: Allowed" : "Saved: Denied" : "Not verified"}</span>
+          <select data-role-permission="${esc(permission.id)}" aria-label="${esc(m.name)} ${esc(action)}"
+            ${!enabled || protectedAction ? "disabled" : ""}>
+            <option value="allow" ${value ? "selected" : ""}>Allow</option><option value="deny" ${!value ? "selected" : ""}>Deny</option></select>
+          ${protectedAction ? '<small>System-controlled or inactive</small>' : roleChanges.has(permission.id) ? '<small>Unsaved</small>' : ""}</td>`;
       }).join("")}</tr>`;
     }).join("") || '<tr><td colspan="6">No matching modules.</td></tr>';
+  }
+  async function loadSelectedRole() {
+    if (roleBusy) return;
+    const code = find("[data-office-role]").value;
+    roleSnapshot = null; roleError = ""; roleChanges.clear();
+    if (!code) { roleOverview(); return; }
+    roleBusy = true; roleOverview();
+    try {
+      roleSnapshot = await rpc("csvb_admin_office_role_defaults", { p_role_code: code });
+      if (roleSnapshot?.role_code !== code) throw Error("Backend returned a different role.");
+    } catch (error) { roleSnapshot = null; roleError = `Role defaults unavailable: ${error.message}. No permission changed.`; }
+    finally { roleBusy = false; roleOverview(); }
+  }
+  async function saveRole() {
+    if (roleBusy || !roleSnapshot?.is_active || !roleChanges.size) return;
+    const reason = find("[data-role-reason]").value.trim();
+    if (!reason) { text("[data-role-context]", "Enter an audit reason before saving role defaults."); return; }
+    const followers = roleSnapshot.users.filter(u => u.follows_role);
+    const custom = roleSnapshot.users.filter(u => !u.follows_role);
+    if (!confirm(`Save ${roleChanges.size} default permission change(s) for ${roleSnapshot.role_label}?\n` +
+      `${followers.length} current user(s) follow this role, including inactive accounts, plus future default assignments.\n` +
+      `${custom.length} custom assignment(s) remain unchanged. Personal exceptions and hard security restrictions still apply.\nOther roles are not changed.`)) return;
+    const changes = [...roleChanges].map(([id, allowed]) => {
+      const old = roleSnapshot.grants.find(g => g.permission_id === id);
+      return { permission_id: id, is_granted: allowed, scope: old?.scope && old.scope !== "global" ? old.scope : "company" };
+    });
+    roleBusy = true; roleOverview();
+    let saved = false;
+    try {
+      await rpc("csvb_admin_office_role_defaults_save", {
+        p_role_code: roleSnapshot.role_code, p_changes: changes, p_expected_revision: roleSnapshot.revision,
+        p_expected_fingerprint: roleSnapshot.fingerprint, p_reason: reason
+      });
+      saved = true;
+      const actual = await rpc("csvb_admin_office_role_defaults", { p_role_code: roleSnapshot.role_code });
+      if (changes.some(c => !!actual.grants.find(g => g.permission_id === c.permission_id)?.is_granted !== c.is_granted))
+        throw Error("Requested defaults do not match the backend result.");
+      roleSnapshot = actual; roleChanges.clear();
+      roleError = `Saved and backend-verified ${changes.length} role default change(s). Revision ${actual.revision}. Personal exceptions and security gates remain effective.`;
+      window.dispatchEvent(new CustomEvent("csvb:role-defaults-saved"));
+    } catch (error) {
+      roleError = `${saved ? "Role save returned, but verification failed" : "Role save failed"}: ${error.message}. Reload before further editing.`;
+      roleSnapshot = null;
+    } finally { roleBusy = false; roleOverview(); }
   }
   async function loadRoleOptions() {
     if (roleLoading) return roleLoading;
@@ -147,19 +209,17 @@
       <button type="button" role="tab" id="rightsUserTab" data-rights-section="user" aria-controls="rightsUserPanel" aria-selected="true" tabindex="0">USER PERMISSIONS</button>
       <button type="button" role="tab" id="rightsCompanyTab" data-rights-section="company" aria-controls="rightsCompanyPanel" aria-selected="false" tabindex="-1">COMPANY MODULES</button></div>
       <section class="rights-section-panel" role="tabpanel" id="rightsRolePanel" aria-labelledby="rightsRoleTab" hidden>
-        <h2>Role permissions</h2><div class="rights-readonly-note"><strong>Read-only role overview — controlled transition required.</strong>
-        Office Roles currently map to shared access settings; they do not own isolated runtime permission defaults.
-        Changing shared settings could affect other roles. No role changes can be saved from this section.</div>
+        <h2>Role permissions</h2><div class="rights-readonly-note"><strong>Office Role defaults — isolated and audited.</strong>
+        Each migrated Office Role has its own backend defaults. Save changes only after reviewing affected users.
+        Personal exceptions, company availability and hard security limits remain authoritative.</div>
         <div class="rights-section-controls"><label>Office Role <select data-office-role><option value="">Select Office Role</option></select></label>
-        <label>Find module <input type="search" data-role-search></label><button type="button" data-role-reload>Reload role overview</button></div>
+        <label>Find module <input type="search" data-role-search></label><button type="button" data-role-reload>Reload role defaults</button></div>
         <p data-role-context role="status">Open Rights Matrix to load the authorized role catalogue.</p><p class="rights-context-note" data-role-base></p>
-        <div class="rights-table-scroll"><table class="rights-simple-table"><caption>Mapped role defaults — not individual effective access</caption>
+        <div class="rights-table-scroll"><table class="rights-simple-table"><caption>Office Role defaults — individual exceptions and security restrictions can change effective access</caption>
         <thead><tr><th>Module</th>${actions.map(a => `<th>${a[0].toUpperCase() + a.slice(1)}</th>`).join("")}</tr></thead><tbody data-role-rows></tbody></table></div>
-        <details class="rights-transition-plan"><summary>Controlled transition plan for genuine role-default editing</summary>
-        <ol><li>Compare each role's mapped settings, current effective user access and individual exceptions.</li>
-        <li>Prepare an audited role-scoped backend contract and isolate settings shared with other roles. No remapping happens here.</li>
-        <li>Preview all affected current users and future defaults; obtain explicit approval for any access changes.</li>
-        <li>Verify backend, route and company-scope results before enabling role-specific Save. Keep current grants unchanged until then.</li></ol></details></section>
+        <div class="rights-section-actions"><span data-role-dirty>No role changes pending.</span>
+        <label>Audit reason <input type="text" data-role-reason maxlength="1000"></label>
+        <button type="button" data-role-save disabled>Save Role Rights</button></div></section>
       <section class="rights-section-panel" role="tabpanel" id="rightsUserPanel" aria-labelledby="rightsUserTab"></section>
       <section class="rights-section-panel" role="tabpanel" id="rightsCompanyPanel" aria-labelledby="rightsCompanyTab" hidden>
         <h2>Company modules</h2><p class="rights-context-note">Company availability is separate from permission to View, Edit, Export, Admin or Review.
@@ -199,12 +259,25 @@
         tabs[next].click(); tabs[next].focus();
       });
     });
-    find("[data-office-role]").addEventListener("change", roleOverview);
+    let lastRole = "";
+    find("[data-office-role]").addEventListener("change", event => {
+      if (roleChanges.size && !confirm("Discard unsaved role permission changes?")) { event.target.value = lastRole; return; }
+      lastRole = event.target.value; void loadSelectedRole();
+    });
     find("[data-role-search]").addEventListener("input", roleOverview);
     find("[data-role-reload]").addEventListener("click", () => {
-      // Refresh the shared read-only configuration as well as role mappings.
-      panel.querySelector("[data-reload]").click();
+      if (roleChanges.size && !confirm("Discard unsaved role changes and reload?")) return;
+      void loadSelectedRole();
     });
+    find("[data-role-rows]").addEventListener("change", event => {
+      const id = event.target.dataset.rolePermission;
+      if (!id || roleBusy || !roleSnapshot) return;
+      const allowed = event.target.value === "allow";
+      const old = roleSnapshot.grants.find(g => g.permission_id === id);
+      if (!!old?.is_granted === allowed) roleChanges.delete(id); else roleChanges.set(id, allowed);
+      roleOverview();
+    });
+    find("[data-role-save]").addEventListener("click", saveRole);
     find("[data-company-select]").addEventListener("change", async event => {
       if (companyChanges.size && !confirm("Discard unsaved company availability changes?")) { event.target.value = selectedCompany; return; }
       selectedCompany = event.target.value; companyRows = []; companyChanges.clear(); companyVerified = false;
@@ -227,7 +300,7 @@
     });
     find("[data-company-save]").addEventListener("click", companySave);
     window.addEventListener("beforeunload", event => {
-      if (companyChanges.size) { event.preventDefault(); event.returnValue = ""; }
+      if (companyChanges.size || roleChanges.size) { event.preventDefault(); event.returnValue = ""; }
     });
     companyRender(); if (lastData) acceptData(lastData);
   }

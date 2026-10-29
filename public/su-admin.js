@@ -384,6 +384,13 @@ const state = {
 };
 let currentAdminUser = null;
 const vesselEditor = { record: null, busy: false };
+// Fresh module entry always starts with active users. Retain the chosen
+// partition during this page session and directory refreshes, not globally.
+let usersPartition = "active";
+
+function isUserDeactivated(user) {
+  return user?.is_active === false || !!user?.is_disabled;
+}
 
 
 /* ======================== MC-3B5B Repair: Vessel Company Dropdown ======================== */
@@ -585,18 +592,13 @@ function ensureUserFiltersBar() {
       '<div class="field"><label>Company</label><select id="u_filter_company"><option value="">All companies</option></select></div>' +
       '<div class="field"><label>Office Role / User Type</label><select id="u_filter_role" data-office-directory="v2"><option value="">All roles</option></select></div>' +
       '<div class="field"><label>Access Profile</label><select id="u_filter_profile"><option value="">All profiles</option></select></div>' +
-      '<div class="field"><label>Status</label><select id="u_filter_status">' +
-        '<option value="">All statuses</option>' +
-        '<option value="active">Active</option>' +
-        '<option value="disabled">Disabled / inactive</option>' +
-      '</select></div>' +
       '<div class="field"><label>Vessel</label><select id="u_filter_vessel"><option value="">All vessels</option></select></div>' +
       '<div class="field"><label>&nbsp;</label><button class="btn2 btnSmall" type="button" id="u_filter_clear">Clear filters</button></div>' +
     '</div>';
 
   hostRow.insertAdjacentElement("afterend", bar);
 
-  ["u_filter_company", "u_filter_role", "u_filter_profile", "u_filter_status", "u_filter_vessel"].forEach((id) => {
+  ["u_filter_company", "u_filter_role", "u_filter_profile", "u_filter_vessel"].forEach((id) => {
     const el = document.getElementById(id);
     if (el) el.addEventListener("change", renderUsers);
   });
@@ -607,7 +609,7 @@ function ensureUserFiltersBar() {
       const q = document.getElementById("u_search");
       if (q) q.value = "";
 
-      ["u_filter_company", "u_filter_role", "u_filter_profile", "u_filter_status", "u_filter_vessel"].forEach((id) => {
+      ["u_filter_company", "u_filter_role", "u_filter_profile", "u_filter_vessel"].forEach((id) => {
         const el = document.getElementById(id);
         if (el) el.value = "";
       });
@@ -718,10 +720,28 @@ function renderUsers() {
   const fCompany = document.getElementById("u_filter_company")?.value || "";
   const fRole = document.getElementById("u_filter_role")?.value || "";
   const fProfile = document.getElementById("u_filter_profile")?.value || "";
-  const fStatus = document.getElementById("u_filter_status")?.value || "";
   const fVessel = document.getElementById("u_filter_vessel")?.value || "";
 
   const users = Array.isArray(state.users) ? state.users : [];
+  const activeCount = users.filter((u) => !isUserDeactivated(u)).length;
+  const deactivatedCount = users.length - activeCount;
+  const activeCountEl = document.getElementById("usersActiveCount");
+  const deactivatedCountEl = document.getElementById("usersDeactivatedCount");
+  if (activeCountEl) activeCountEl.textContent = String(activeCount);
+  if (deactivatedCountEl) deactivatedCountEl.textContent = String(deactivatedCount);
+
+  document.querySelectorAll("[data-users-partition]").forEach((button) => {
+    const selected = button.getAttribute("data-users-partition") === usersPartition;
+    button.setAttribute("aria-selected", selected ? "true" : "false");
+    button.classList.toggle("is-selected", selected);
+    button.tabIndex = selected ? 0 : -1;
+  });
+  const partitionContext = document.getElementById("usersPartitionContext");
+  if (partitionContext) {
+    partitionContext.textContent = usersPartition === "active"
+      ? "Showing active accounts"
+      : "Showing deactivated accounts — historical accounts remain available here.";
+  }
 
   const filtered = users.filter((u) => {
     const roleName = userRoleValue(u);
@@ -729,13 +749,13 @@ function renderUsers() {
     const companyValue = userCompanyValue(u);
     const vesselValue = userVesselValue(u);
 
-    const disabled = !!u.is_disabled || u.is_active === false;
-    const statusValue = disabled ? "disabled" : "active";
+    const disabled = isUserDeactivated(u);
+
+    if ((usersPartition === "deactivated") !== disabled) return false;
 
     if (fCompany && companyValue !== fCompany) return false;
     if (fRole && roleName !== fRole) return false;
     if (fProfile && (u.office_access_profile_code || "__legacy") !== fProfile) return false;
-    if (fStatus && statusValue !== fStatus) return false;
     if (fVessel && vesselValue !== fVessel) return false;
 
     if (q) {
@@ -771,12 +791,12 @@ function renderUsers() {
   const rows = [];
 
   for (const u of filtered) {
-    const disabled = !!u.is_disabled;
-    const active = u.is_active === false ? false : true;
+    const disabled = isUserDeactivated(u);
+    const active = !disabled;
 
     const statusPill =
       disabled || !active
-        ? '<span class="pill bad">Disabled</span>'
+        ? '<span class="pill bad">Deactivated</span>'
         : '<span class="pill ok">Active</span>';
 
     const forceReset = u.force_password_reset
@@ -804,7 +824,7 @@ function renderUsers() {
 
     if (disabled || !active) {
       actionBtns.push(
-        '<button class="btnSmall btn" data-act="enable_user" data-id="' + esc(uid) + '" type="button">Enable</button>'
+        '<button class="btnSmall btn" data-act="enable_user" data-id="' + esc(uid) + '" type="button">Reactivate</button>'
       );
     } else {
       actionBtns.push(
@@ -865,7 +885,7 @@ function renderUsers() {
           await refreshUsers();
         } else if (act === "enable_user") {
           await callSuAdmin({ action: "enable_user", user_id: id });
-          showOk("User enabled.");
+          showOk("User reactivated.");
           await refreshUsers();
         } else if (act === "reset_password") {
           const newPass = prompt("Enter new password for this user:");
@@ -1388,6 +1408,24 @@ function initAddVessel() {
 function initSearch() {
   const u = document.getElementById("u_search");
   if (u) u.addEventListener("input", () => renderUsers());
+
+  document.querySelectorAll("[data-users-partition]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const partition = button.getAttribute("data-users-partition");
+      if (!["active", "deactivated"].includes(partition)) return;
+      usersPartition = partition;
+      renderUsers();
+    });
+    button.addEventListener("keydown", (event) => {
+      if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+      event.preventDefault();
+      const tabs = [...document.querySelectorAll("[data-users-partition]")];
+      const index = tabs.indexOf(button);
+      const next = event.key === "Home" ? 0 : event.key === "End" ? tabs.length - 1 :
+        (index + (event.key === "ArrowRight" ? 1 : -1) + tabs.length) % tabs.length;
+      tabs[next].click(); tabs[next].focus();
+    });
+  });
 
   const v = document.getElementById("v_search");
   if (v) v.addEventListener("input", () => renderVessels());

@@ -37,7 +37,7 @@
   }
   function originLabel(decision) {
     return ({ hard_constraint: "System/company restriction", personal_allow: "Individual Allow",
-      personal_deny: "Individual Deny", access_profile: "Assigned access settings",
+      personal_deny: "Individual Deny", access_profile: "Custom access settings", role_default: "Office Role defaults",
       legacy_fallback: "Earlier role settings" })[decision?.source] || "Not available";
   }
   function render() {
@@ -51,7 +51,7 @@
       : !profileCode(subject) ? "This account uses earlier role settings. Individual exceptions require a controlled access-configuration transition first. No account or access assignment will be changed here."
       : !diagnosticValid ? "Effective permissions could not be verified. Editing is disabled until Reload succeeds."
       : !diagnostic?.enforcement_enabled ? "Office enforcement is not active for this user. Editing is disabled; no legacy permissions will be bypassed."
-      : "Changes affect only this user. “Same as role” removes the individual exception and uses this account’s assigned access settings—not directly editable Office Role defaults. " +
+      : "Changes affect only this user. “Same as role” removes the individual exception and follows the Office Role defaults for accounts using their role assignment. " +
         (subject.office_profile_is_role_default === false ? "This account has a custom access assignment, different from its role’s mapped settings. " : "") +
         "Company, vessel and protected-system restrictions always apply.";
     const term = panel.querySelector("[data-search]").value.trim().toLowerCase();
@@ -213,6 +213,15 @@
     const workspace = document.getElementById("rmWorkspace");
     const selector = workspace?.querySelector(".rm-selector-panel");
     if (!selector || document.getElementById("officeRightsPanel")) return;
+    window.addEventListener("csvb:role-defaults-saved", async () => {
+      if (busy || draft.size) {
+        diagnosticValid = false; render();
+        message("Role defaults changed. Reload backend permissions before saving individual exceptions.", true);
+        return;
+      }
+      await load();
+      window.CSVB_REFRESH_USER_DIRECTORY?.();
+    });
     const intro = workspace.querySelector(".rm-intro p");
     if (intro) intro.textContent = "Review role defaults, individual exceptions and company availability separately. Saved backend decisions remain authoritative.";
     panel = document.createElement("section");

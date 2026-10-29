@@ -78,6 +78,61 @@
   background: #fafdff;
 }
 
+#tab-users .users-partition-tabs {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+  padding: 5px;
+  width: fit-content;
+  max-width: 100%;
+  border: 1px solid #d3e1e8;
+  border-radius: 11px;
+  background: #f1f6f8;
+}
+
+#tab-users .users-partition-tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 42px;
+  padding: 8px 13px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: #45637a;
+  font: inherit;
+  font-size: .88rem;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+#tab-users .users-partition-tab.is-selected {
+  border-color: #c5d8e4;
+  background: #fff;
+  color: #174b70;
+  box-shadow: 0 2px 6px rgba(25, 59, 81, .08);
+}
+
+#tab-users .users-partition-count {
+  min-width: 24px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: #e6eff3;
+  color: #45637a;
+  font-size: .75rem;
+  font-variant-numeric: tabular-nums;
+}
+
+#tab-users .users-partition-tab.is-selected .users-partition-count {
+  background: #e1f0f1;
+  color: #17616a;
+}
+
+#tab-users .users-partition-context {
+  margin-top: 8px;
+}
+
 #tab-users #u_filters_bar {
   margin: 13px 0 0 !important;
   padding: 15px !important;
@@ -380,6 +435,18 @@ body.users-dialog-open {
 
   #tab-users .users-create-trigger {
     width: 100%;
+  }
+
+  #tab-users .users-partition-tabs {
+    display: grid;
+    width: 100%;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  #tab-users .users-partition-tab {
+    gap: 6px;
+    padding: 8px 6px;
+    font-size: .8rem;
   }
 
   #tab-users #u_filters_bar > div:nth-child(2) {

@@ -173,14 +173,14 @@
   <link rel="stylesheet" href="./csvb-mobile-fixes-20260528-2.css?v=20260528_2" />
   <link rel="stylesheet" href="./csvb-module-header.css?v=20261027_rollout_2" />
   <link id="csvb-vessel-lifecycle-admin-style" rel="stylesheet" href="./csvb-vessel-lifecycle-admin.css?v=20261028_lifecycle_1" />
-  <link rel="stylesheet" href="./su-admin-users-workspace.css?v=20261103_office_directory_v2_1" />
+  <link rel="stylesheet" href="./su-admin-users-workspace.css?v=20261107_user_partitions_1" />
   <link rel="stylesheet" href="./su-admin-vessels-workspace.css?v=20261106_vessels_workspace_2" />
   <link rel="stylesheet" href="./csvb-rights-workspace.css?v=20261030_1" />
   <link rel="stylesheet" href="./csvb-role-management.css?v=20261030_role_catalogue_1">
-  <link rel="stylesheet" href="./csvb-office-rights.css?v=20261029_sections_2" />
-  <link rel="stylesheet" href="./csvb-rights-sections.css?v=20261029_sections_2" />
-  <script defer src="./csvb-office-rights.js?v=20261029_sections_2"></script>
-  <script defer src="./csvb-rights-sections.js?v=20261029_sections_2"></script>
+  <link rel="stylesheet" href="./csvb-office-rights.css?v=20261107_office_role_defaults_1" />
+  <link rel="stylesheet" href="./csvb-rights-sections.css?v=20261107_office_role_defaults_1" />
+  <script defer src="./csvb-office-rights.js?v=20261107_office_role_defaults_1"></script>
+  <script defer src="./csvb-rights-sections.js?v=20261107_office_role_defaults_1"></script>
 </head>
 
 <body class="csvb-su-admin-density-page">
@@ -596,6 +596,15 @@
             <label for="u_search">Search accounts</label>
             <input id="u_search" type="search" placeholder="Username, Office Role, Access Profile, position, company or vessel…" />
           </div>
+          <div class="users-partition-tabs" role="tablist" aria-label="User account status">
+            <button class="users-partition-tab" type="button" role="tab" data-users-partition="active" aria-selected="true">
+              <span>Active Users</span><span class="users-partition-count" id="usersActiveCount">0</span>
+            </button>
+            <button class="users-partition-tab" type="button" role="tab" data-users-partition="deactivated" aria-selected="false">
+              <span>Deactivated Users</span><span class="users-partition-count" id="usersDeactivatedCount">0</span>
+            </button>
+          </div>
+          <div class="users-partition-context muted small" id="usersPartitionContext" aria-live="polite">Showing active accounts</div>
           <div class="users-results-meta">
             <span class="users-results-kicker">ACCOUNT DIRECTORY</span>
             <span id="usersResultCount" class="muted small" aria-live="polite">Loading accounts…</span>
@@ -876,7 +885,7 @@
   <script src="./su-admin-user-cleanup.js?v=20261029_vessel_cleanup_3"></script>
   <script src="./csvb-rights-workspace.js?v=20261030_rights_workspace_1"></script>
   <script src="./csvb-role-management.js?v=20261102_manual_office_assignment_1"></script>
-  <script src="./su-admin.js?v=20261106_vessel_editor_2"></script>
+  <script src="./su-admin.js?v=20261107_user_partitions_1"></script>
   <script src="./csvb-question-admin.js?v=20260430_1"></script>
   <script src="./csvb-question-overrides-admin.js?v=20260430_1"></script>
   <script src="./csvb-thread-admin-controls.js?v=20260505_1"></script>
